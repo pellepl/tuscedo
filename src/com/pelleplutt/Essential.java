@@ -1,6 +1,6 @@
-package com.pelleplutt.tuscedo;
+package com.pelleplutt;
 
-public class Essential {
+public interface Essential {
   /** App name */
   String name = "TUSCEDO";
   /** Version major */
