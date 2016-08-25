@@ -30,12 +30,13 @@ import javax.swing.JPanel;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 
+import com.pelleplutt.tuscedo.ui.ACTextField;
+import com.pelleplutt.tuscedo.ui.KeyMap;
 import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.FastTextPane;
 import com.pelleplutt.util.Log;
@@ -50,7 +51,7 @@ public class Tuscedo {
   static final int STYLE_ID_FIND = 10;
   static final int STYLE_ID_FIND_ALL = 11;
 
-  JTextField input;
+  ACTextField input;
   JFrame f;
   FastTextPane ftp, ftp2;
   Font font = new Font(Font.MONOSPACED, Font.PLAIN, 11);
@@ -87,7 +88,10 @@ public class Tuscedo {
     ftp.setFont(font);
   }
   
-  void decorateScrollPane(JScrollPane sp) {
+  public static void decorateScrollPane(JScrollPane sp) {
+    UIManager.put("ScrollBar.width", 6);
+    UIManager.put("ScrollBar.height", 6);
+
     sp.getVerticalScrollBar().setUI(new SpecScrollBarUI());
     sp.getHorizontalScrollBar().setUI(new SpecScrollBarUI());
     sp.getVerticalScrollBar().setBackground(Color.black);
@@ -101,15 +105,23 @@ public class Tuscedo {
     sp.setFocusable(false);
   }
   
-  void decorateSplitPane(JSplitPane sp) {
+  public static void decorateSplitPane(JSplitPane sp) {
     sp.setBorder(null);
     sp.setDividerSize(4);
   }
+  
+  void defineAction(String name, String keys, AbstractAction action) {
+  	KeyMap key = KeyMap.getKeyDef(name);
+  	if (key == null) {
+  		key = KeyMap.fromString(keys);
+  	}
+  	input.getInputMap().put(
+        KeyStroke.getKeyStroke(key.keyCode, key.modifiers),
+        name);
+    input.getActionMap().put(name, action);
+  }
 
   private void build() {
-    UIManager.put("ScrollBar.width", 6);
-    UIManager.put("ScrollBar.height", 6);
-
     f = new JFrame();
     f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
     f.getContentPane().setLayout(new BorderLayout());
@@ -132,53 +144,25 @@ public class Tuscedo {
         JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
     decorateScrollPane(secScrollPane);
 
-    input = new JTextField();
+    input = new ACTextField();
     input.setFont(font);
     input.setBackground(colInputBg);
     input.setCaretColor(new Color(192, 192, 192));
     input.setForeground(colInputFg);
     input.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
 
-    input.getInputMap().put(
-        KeyStroke.getKeyStroke(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK),
-        "find");
-    input.getInputMap().put(
-        KeyStroke.getKeyStroke(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK),
-        "findshift");
-    input.getInputMap().put(
-        KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK),
-        "findregx");
-    input.getInputMap().put(
-        KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK),
-        "findregxshift");
-    input.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
-        "inputback");
-    input.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0),
-        "inputenter");
-    input.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, InputEvent.SHIFT_DOWN_MASK),
-        "inputentershift");
-    input.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK),
-        "openserial");
-    input.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_W, InputEvent.CTRL_DOWN_MASK),
-        "splitnone");
-    input.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_W, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK),
-        "splitver");
-    input.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_W, InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK),
-        "splithor");
-    input.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, InputEvent.CTRL_DOWN_MASK),
-        "clear");
-    input.getActionMap().put("find", actionOpenFind);
-    input.getActionMap().put("findshift", actionOpenFindShift);
-    input.getActionMap().put("findregx", actionOpenFindRegex);
-    input.getActionMap().put("findregxshift", actionOpenFindRegexShift);
-    input.getActionMap().put("inputback", actionInputBack);
-    input.getActionMap().put("inputenter", actionInputEnter);
-    input.getActionMap().put("inputentershift", actionInputEnterShift);
-    input.getActionMap().put("openserial", actionOpenSerial);
-    input.getActionMap().put("splitnone", actionSplitNone);
-    input.getActionMap().put("splitver", actionSplitVer);
-    input.getActionMap().put("splithor", actionSplitHor);
-    input.getActionMap().put("clear", actionClear);
+    defineAction("find", "ctrl+f", actionOpenFind);
+    defineAction("findback", "ctrl+shift+f", actionOpenFindBack);
+    defineAction("findregx", "alt+f", actionOpenFindRegex);
+    defineAction("findregxback", "alt+shift+f", actionOpenFindRegexBack);
+    defineAction("inputclose", "escape", actionInputClose);
+    defineAction("inputenter", "enter", actionInputEnter);
+    defineAction("inputenterback", "shift+enter", actionInputEnterBack);
+    defineAction("openserial", "ctrl+o", actionOpenSerial);
+    defineAction("splitnone", "ctrl+w", actionSplitNone);
+    defineAction("splithoril", "shift+ctrl+w", actionSplitHor);
+    defineAction("splitveri", "alt+ctrl+w", actionSplitVer);
+    defineAction("clearlog", "ctrl+delete", actionClear);
 
     inputLabel = new JLabel();
     inputLabel.setFont(font);
@@ -211,7 +195,7 @@ public class Tuscedo {
     f.getContentPane().add(ip, BorderLayout.SOUTH);
 
     String text = AppSystem
-        .readFile(new File("/home/petera/proj/generic/spiffs/src/spiffs_nucleus.c"));
+        .readFile(new File("/home/petera/proj/tuscedo/src/com/pelleplutt/tuscedo/Tuscedo.java	"));
     ftp.setText(text);
     
     f.setVisible(true);
@@ -346,7 +330,7 @@ public class Tuscedo {
     }
   };
 
-  AbstractAction actionOpenFindShift = new AbstractAction() {
+  AbstractAction actionOpenFindBack = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
       actionFind(true, false);
@@ -360,14 +344,14 @@ public class Tuscedo {
     }
   };
 
-  AbstractAction actionOpenFindRegexShift = new AbstractAction() {
+  AbstractAction actionOpenFindRegexBack = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
       actionFind(true, true);
     }
   };
 
-  AbstractAction actionInputBack = new AbstractAction() {
+  AbstractAction actionInputClose = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
       if (input.getText().length() > 0) {
@@ -404,7 +388,7 @@ public class Tuscedo {
     }
   };
 
-  AbstractAction actionInputEnterShift = new AbstractAction() {
+  AbstractAction actionInputEnterBack = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
       actionInputEnter(true);
