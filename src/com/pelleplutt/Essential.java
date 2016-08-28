@@ -3,6 +3,7 @@ package com.pelleplutt;
 public interface Essential {
   /** App name */
   String name = "TUSCEDO";
+  String longname = "The Ultimate Serial Console for Engineers, Developers, and Others";
   /** Version major */
   int vMaj = 0;
   /** Version minor */

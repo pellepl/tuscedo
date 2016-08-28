@@ -16,20 +16,32 @@ import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultStyledDocument;
-import javax.swing.text.Document;
 import javax.swing.text.DocumentFilter;
 import javax.swing.text.DocumentFilter.FilterBypass;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyleContext;
 
 public class ACTextField extends JTextPane implements CaretListener {
+  /** Suggestion model */
   List<String> model = new ArrayList<String>();
+  /** Currently user input, without suggestion */
   String userString = "";
-  AttributeSet attr;
+  /** If user input is suggested from empty string */
+  boolean userStringFullySuggested;
+  /** Current suggestion model index */
   volatile int lastSuggestionIndex = -1;
+  /** User has selected a suggestion */
   boolean lastKnownSuggestion = false;
-  static final String PROGRAMMATICALLY_TRIGGER_STRING = "@@||££HOPE_NO_OnE_EnTeR-s@this_T3xT-ultraFULT";
+  /** Suggestion listener */
+  SuggestionListener suggestionListener;
+  /** If user must enter strings comprised in model only */
+  boolean forced;
+  /** Attribute set for suggetions */
+  AttributeSet suggestAttr;
+  /** ID offset for triggering a document change without changing document */
   static final int PROGRAMMATICALLY_TRIGGER_OFFSET = -314159265;
+  /** ID string for triggering a document change without changing document */
+  static final String PROGRAMMATICALLY_TRIGGER_STRING = "@@||££HOPE_NO_OnE_EnTeR-s@this_T3xT-ultraFULT";
   
   public ACTextField() {
     setDocument(new DefaultStyledDocument());
@@ -47,48 +59,74 @@ public class ACTextField extends JTextPane implements CaretListener {
     actionMap.put("prevsug", actionPrevSuggestion);
     actionMap.put("nextsug", actionNextSuggestion);
     actionMap.put("acceptsug", actionAcceptSuggestion);
-
-    model.add("apple");
-    model.add("klipp");
-    model.add("klirr");
-    model.add("kloster");
-    model.add("knippe");
-    model.add("argantay");
-    model.add("kullagulla");
-    model.add("kullafjulla");
-    model.add("kullaulla");
-    model.add("kullalulla");
-    model.add("ullaulla");
-    model.add("ullalulla");
-    model.add("alkis");
   }
   
+  /**
+   * If enabled, this will only let user enter text that is comprised by the
+   * suggestion model.
+   * @param forced
+   */
+  public void setForcedModel(boolean forced) {
+    this.forced = forced;
+  }
+  
+  /**
+   * Returns if input is forced to model.
+   * @return Wether forced or not
+   */
+  public boolean isForcedModel() {
+    return this.forced;
+  }
+  
+  /**
+   * Sets the suggestion model.
+   * @param s
+   */
   public void setSuggestions(List<String> s) {
     lastSuggestionIndex = -1;
     model = s;
   }
   
+  public void addSuggestion(String text) {
+    if (model != null) {
+      if (model.size() > 0 && model.get(model.size()-1).equals(text)) {
+        return;
+      }
+      model.add(text);
+    }
+    lastSuggestionIndex = -1;
+  }
+
+  /**
+   * Sets colour of suggested text.
+   * @param c
+   */
   public void setSuggestionColor(Color c) {
     final StyleContext cont = StyleContext.getDefaultStyleContext();
-    attr = cont.addAttribute(cont.getEmptySet(), StyleConstants.Foreground, c);
+    suggestAttr = cont.addAttribute(cont.getEmptySet(), StyleConstants.Foreground, c);
+  }
+  
+  /**
+   * Makes ACTextField forget where last suggestion was in model.
+   */
+  public void resetLastSuggestionIndex() {
+    lastSuggestionIndex = -1;
   }
   
   void prevSuggestion() {
     final int suggestions = model.size();
     if (suggestions == 0) return;
-    if (userString == null || userString.length() == 0) {
+    if (userString == null || userString.length() == 0 || userStringFullySuggested) {
+      userString = "";
       if (lastSuggestionIndex < 0) {
         lastSuggestionIndex = suggestions-1; 
       } else {
         lastSuggestionIndex = (suggestions + lastSuggestionIndex - 1) % suggestions;
       }
-      //TODO trigger update
+
       try {
         getDocument().insertString(0, PROGRAMMATICALLY_TRIGGER_STRING, null);
-      } catch (BadLocationException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
-      }
+      } catch (BadLocationException e) {}
 
     } else {
       if (lastSuggestionIndex < 0) return;
@@ -102,23 +140,23 @@ public class ACTextField extends JTextPane implements CaretListener {
       }
       setText(userString);
     }
+    lastKnownSuggestion = true;
   }
   
   void nextSuggestion() {
     final int suggestions = model.size();
-    if (userString == null || userString.length() == 0) {
+    if (suggestions == 0) return;
+    if (userString == null || userString.length() == 0 || userStringFullySuggested) {
+      userString = "";
       if (lastSuggestionIndex < 0) {
         lastSuggestionIndex = 0; 
       } else {
         lastSuggestionIndex = (lastSuggestionIndex + 1) % suggestions;
       }
-      // TODO trigger update
+
       try {
         getDocument().insertString(0, PROGRAMMATICALLY_TRIGGER_STRING, null);
-      } catch (BadLocationException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
-      }
+      } catch (BadLocationException e) {}
     } else {
       if (lastSuggestionIndex < 0) return;
       for (int i = 0; i < suggestions; i++) {
@@ -131,6 +169,7 @@ public class ACTextField extends JTextPane implements CaretListener {
       }
       setText(userString);
     }
+    lastKnownSuggestion = true;
   }
   
   static int strcmp(final String a, final String b) {
@@ -143,22 +182,31 @@ public class ACTextField extends JTextPane implements CaretListener {
     return i;
   }
   
+  /**
+   * Accepts current suggestion wholly.
+   */
   public void acceptSuggestionWholly() {
     if (lastSuggestionIndex < 0) return;
     String s = super.getText();
     setText(s);
   }
   
-  public void acceptSuggestion() {
-    if (lastSuggestionIndex < 0) return;
+  /**
+   * Takes current input and accepts the least common prefix of suggestions.
+   * @return list of possible suggestions
+   */
+  public List<String> acceptSuggestion() {
+    if (lastSuggestionIndex < 0) return null;
     // find smallest common offset of string amongst model suggestions
     final int suggestions = model.size();
     final String ref = userString;
     String curSug = null;
     int minOffs = super.getText().length();
+    List<String> found = new ArrayList<String>();
     for (int i = 0; i < suggestions; i++) {
       String sug = model.get(i);
       if (!sug.startsWith(ref)) continue;
+      found.add(curSug);
       if (curSug == null) {
         curSug = sug; 
       } else {
@@ -166,37 +214,48 @@ public class ACTextField extends JTextPane implements CaretListener {
         minOffs = Math.min(strcmp(sug, curSug), minOffs);
         curSug = sug;
       }
-      
     }
-    //String s = super.getText();
+
     String s = curSug.substring(0, minOffs);
     setText(s);
     lastKnownSuggestion = true;
+    return found;
   }
   
+  /**
+   * Accepts current suggestion. Accepts wholly if previous suggestion was accepted.
+   */
   public void accept() {
     if (lastKnownSuggestion) {
       acceptSuggestionWholly();
+      if (suggestionListener != null) suggestionListener.gotSuggestions(null);
       lastKnownSuggestion = false;
     } else {
-      acceptSuggestion();
+      List<String> foundSuggestions = acceptSuggestion();
+      if (suggestionListener != null) suggestionListener.gotSuggestions(foundSuggestions);
     }
   }
   
-  void handleUpdate(FilterBypass fb, int offset) throws BadLocationException {
+  void handleUpdate(FilterBypass fb, int offset, String newUserString) throws BadLocationException {
     lastKnownSuggestion = false;
-    fb.remove(0, fb.getDocument().getLength());
-    fb.insertString(0, userString, null);
+    if (suggestionListener != null) suggestionListener.gotSuggestions(null);
+    if (!forced || newUserString.length() == 0) {
+      userString = newUserString;
+      fb.remove(0, fb.getDocument().getLength());
+      fb.insertString(0, userString, null);
+    }
     boolean progTrig = offset == PROGRAMMATICALLY_TRIGGER_OFFSET;
     if (progTrig) {
       offset = 0;
+    } else {
+      userStringFullySuggested = false;
     }
-    if (progTrig || (userString != null && userString.length() > 0)) {
+    if (progTrig || (newUserString != null && newUserString.length() > 0)) {
       String suggestion = null;
       
       if (lastSuggestionIndex >= 0 && lastSuggestionIndex < model.size()) {
         String lastSuggestion = model.get(lastSuggestionIndex);
-        if (lastSuggestion.startsWith(userString)) {
+        if (lastSuggestion.startsWith(newUserString)) {
           suggestion = lastSuggestion;
         }
       }
@@ -204,7 +263,7 @@ public class ACTextField extends JTextPane implements CaretListener {
       if (suggestion == null) {
         for (int i = 0; i < model.size(); i++) {
           String s = model.get(i);
-          if (s.startsWith(userString)) {
+          if (s.startsWith(newUserString)) {
             lastSuggestionIndex = i;
             suggestion = s;
             break;
@@ -213,18 +272,35 @@ public class ACTextField extends JTextPane implements CaretListener {
       }
       
       if (suggestion != null) {
-        fb.insertString(userString.length(), suggestion.substring(userString.length()), attr);
+        if (forced) {
+          userString = newUserString;
+          fb.remove(0, fb.getDocument().getLength());
+          fb.insertString(0, userString, null);
+        }
+        if (progTrig) {
+          fb.remove(0, fb.getDocument().getLength());
+          fb.insertString(0, suggestion, null);
+          offset = suggestion.length();
+          userString = suggestion;
+          userStringFullySuggested = true;
+        } else {
+          fb.insertString(userString.length(), suggestion.substring(userString.length()), suggestAttr);
+        }
       } else {
         lastSuggestionIndex = -1;
       }
     }
-    setCaretPosition(offset);
+    setCaretPosition(Math.min(super.getText().length(), offset));
   }
   
   @Override
   public String getText() {
-    if (userString == null) userString = "";
-    return userString;
+    if (forced) {
+      return super.getText();
+    } else {
+      if (userString == null) userString = "";
+      return userString;
+    }
   }
   
   @Override
@@ -242,8 +318,8 @@ public class ACTextField extends JTextPane implements CaretListener {
       if (offset >= usLen) return;
       length = Math.min(usLen-offset, length);
       if (length > 0) {
-        userString = userString.substring(0, offset) + userString.substring(offset + length);
-        handleUpdate(fb, offset);
+        String newUserString = userString.substring(0, offset) + userString.substring(offset + length);
+        handleUpdate(fb, offset, newUserString);
       }
     }
 
@@ -253,10 +329,10 @@ public class ACTextField extends JTextPane implements CaretListener {
       if (userString == null) userString = "";
       string = string.replaceAll("\\r?\\n", "");
       if (string.equals(PROGRAMMATICALLY_TRIGGER_STRING)) {
-        handleUpdate(fb, PROGRAMMATICALLY_TRIGGER_OFFSET);
+        handleUpdate(fb, PROGRAMMATICALLY_TRIGGER_OFFSET, userString);
       } else {
-        userString = userString.substring(0, offset) + string + userString.substring(offset);
-        handleUpdate(fb, offset + string.length());
+        String newUserString = userString.substring(0, offset) + string + userString.substring(offset);
+        handleUpdate(fb, offset + string.length(), newUserString);
       }
     }
 
@@ -268,10 +344,10 @@ public class ACTextField extends JTextPane implements CaretListener {
       int usLen = userString.length();
       String refString = userString;
       if (offset >= usLen) refString = ACTextField.super.getText();
-      userString = refString.substring(0, offset) +
+      String newUserString = refString.substring(0, offset) +
           text + 
           ((offset + length >= usLen) ? "" : refString.substring(offset+length));
-      handleUpdate(fb, offset + text.length());
+      handleUpdate(fb, offset + text.length(), newUserString);
     }
   };
   
@@ -302,5 +378,18 @@ public class ACTextField extends JTextPane implements CaretListener {
     if (getCaretPosition() > l) {
       setCaretPosition(l);
     }
+  }
+  
+  /**
+   * Sets a suggestion listener. This listener will be called with list of suggestions, or with
+   * null if there are no suggestions.
+   * @param sl
+   */
+  public void setSuggestionListener(SuggestionListener sl) {
+    this.suggestionListener = sl;
+  }
+  
+  public static interface SuggestionListener {
+    public void gotSuggestions(List<String> suggestions);
   }
 }

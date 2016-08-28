@@ -27,6 +27,9 @@ import javax.swing.WindowConstants;
 import com.pelleplutt.tuscedo.Tuscedo;
 
 public class GraphPanel extends JPanel {
+  public static final int GRAPH_LINE = 0;
+  public static final int GRAPH_BAR = 1;
+  public static final int GRAPH_PLOT = 2;
   List<Double> samples;
   double minSample = 0;
   double maxSample = 0;
@@ -45,8 +48,12 @@ public class GraphPanel extends JPanel {
   boolean dragging;
   int selAnchorX, selAnchorY;
   int selEndX, selEndY;
+  Color colGraph = new Color(255,255,64,192);
+  Color colGraphFade = new Color(255,255,0,96);
   Color colSelEdge = new Color(0,255,255,128);
   Color colSelArea = new Color(0,255,255,64);
+
+  int graphType = GRAPH_BAR;
   
   public GraphPanel() {
     samples = new ArrayList<Double>();
@@ -129,7 +136,7 @@ public class GraphPanel extends JPanel {
       g.setColor(Color.black);
       g.fillRect(0,0,ww,hh);
       
-      int origoY = (int)Math.round(magVer * - minGSample);
+      int origoY = (int)(magVer * - minGSample);
       
       double visValuesInView = vph / magVer;
       int log10 = (int) Math.log10(visValuesInView);
@@ -147,13 +154,10 @@ public class GraphPanel extends JPanel {
         dimin = Math.pow(10, -expDimin);
       }
       
-      int iter;
-      
       g.setColor(Color.darkGray);
-      iter = 0;
       double y = (int)(minViewSample / unitStep) * unitStep;
       while (y <= maxViewSample) {
-        int gy = hh - (int)Math.round(magVer * (y - minGSample)); 
+        int gy = hh - (int)(magVer * (y - minGSample)); 
         g.setColor(Color.darkGray);
         g.drawLine( 0, gy, ww, gy);
         g.setColor(Color.gray);
@@ -167,29 +171,25 @@ public class GraphPanel extends JPanel {
           g.drawString(decFormat.format(y), vpx, gy);
         }
         y += unitStep;
-        iter++;
       }
-      if (iter > 1000) System.out.println("A"+iter);
       g.setColor(Color.gray);
       g.drawLine( 0, hh - origoY, ww, hh - origoY);
 
-      int startSample = (int)(vpx / magHor);
+      int startSample = (int)Math.max(0, vpx / magHor - 1);
       int endSample = (int)Math.min(samples.size()-1, ((vpx + vpw) / magHor) + 1);
-      g.setColor(Color.yellow);
-      int prevGY = hh - (int)Math.round(magVer * (samples.get(Math.max(0, startSample-1)) - minGSample));
-      int prevGX = (int)Math.max(0, startSample * magHor);
-      iter = 0;
-      for (int i = startSample; i <= endSample; i++) {
-        int gx = (int)Math.round(i * magHor);
-        int gy = hh - (int)Math.round(magVer * (samples.get(i) - minGSample));
-//        g.drawLine(gx, origoY, gx, gy);
-        g.drawLine(prevGX, prevGY, gx, gy);
-        prevGX = gx;
-        prevGY = gy;
-        iter++;
+      g.setColor(colGraph);
+      switch (graphType) {
+      case GRAPH_BAR:
+        paintGraphBar(g, minGSample, origoY, startSample, endSample, vpx, vpw, hh);
+        break;
+      case GRAPH_LINE:
+        paintGraphLine(g, minGSample, origoY, startSample, endSample, vpx, vpw, hh);
+        break;
+      case GRAPH_PLOT:
+        paintGraphPlot(g, minGSample, origoY, startSample, endSample, vpx, vpw, hh);
+        break;
       }
-      if (iter > 1000) System.out.println("A"+iter);
-
+      
       if (dragging) {
         g.setColor(colSelArea);
         int sx = Math.min(selAnchorX, selEndX);
@@ -200,6 +200,84 @@ public class GraphPanel extends JPanel {
         g.setColor(colSelEdge);
         g.drawRect(sx, sy, ex-sx, ey-sy);
       }
+    }
+  }
+  
+  void paintGraphBar(Graphics2D g, double minGSample, int origoY, int startSample, int endSample, 
+      int vpx, int vpw, int hh) {
+    int gw = (int)(magHor);
+    for (int i = startSample; i <= endSample; i++) {
+      int gx = (int)(i * magHor);
+      int gy = hh - (int)(magVer * (samples.get(i) - minGSample));
+      int ymin = hh - origoY;
+      int ymax = gy;
+      if (ymax < ymin) {
+        int t = ymin;
+        ymin = ymax;
+        ymax = t;
+      }
+      if (gw < 3) {
+        g.drawLine(gx, ymin, gx, ymax);
+      } else {
+        g.setColor(colGraph);
+        g.drawRect(gx, ymin, gw, ymax-ymin);
+        g.setColor(colGraphFade);
+        g.fillRect(gx+1, ymin+1, gw-1, ymax-ymin-1);
+      }
+    }
+  }
+  
+  int fillPX[] = new int[4];
+  int fillPY[] = new int[4];
+  void paintGraphLine(Graphics2D g, double minGSample, int origoY, int startSample, int endSample, 
+      int vpx, int vpw, int hh) {
+    int prevGAvgY = hh - (int)(magVer * (samples.get(Math.max(0, startSample-1)) - minGSample));
+    int prevGMinY = prevGAvgY;
+    int prevGMaxY = prevGAvgY;
+    int prevGX = (int)(startSample * magHor);
+    int gx = vpx-1;
+    double vmin = Double.POSITIVE_INFINITY;
+    double vmax = Double.NEGATIVE_INFINITY;
+    double vsum = 0;
+    int vcount = 0;
+    
+    for (int i = startSample; i <= endSample; i++) {
+      gx = (int)(i * magHor);
+      double s = samples.get(i);
+      vmin = s < vmin ? s : vmin;
+      vmax = s > vmax ? s : vmax;
+      vsum += s;
+      vcount++;
+      if (gx != prevGX) {
+        int gAvgY = hh - (int)(magVer * ((vsum/(double)vcount) - minGSample));
+        int gMinY = hh - (int)(magVer * (vmin - minGSample));
+        int gMaxY = hh - (int)(magVer * (vmax - minGSample));
+        fillPX[0] = prevGX; fillPY[0] = prevGMinY;
+        fillPX[1] = gx;     fillPY[1] = gMinY;
+        fillPX[2] = gx;     fillPY[2] = gMaxY;
+        fillPX[3] = prevGX; fillPY[3] = prevGMaxY;
+        g.setColor(colGraphFade);
+        g.fillPolygon(fillPX, fillPY, 4);
+        g.setColor(colGraph);
+        g.drawLine(prevGX, prevGAvgY, gx, gAvgY);
+        prevGX = gx;
+        prevGAvgY = gAvgY;
+        prevGMinY = gMinY;
+        prevGMaxY = gMaxY;
+        vmin = Double.POSITIVE_INFINITY;
+        vmax = Double.NEGATIVE_INFINITY;
+        vsum = 0;
+        vcount = 0;
+      }
+    }
+  }
+  
+  void paintGraphPlot(Graphics2D g, double minGSample, int origoY, int startSample, int endSample, 
+      int vpx, int vpw, int hh) {
+    for (int i = startSample; i <= endSample; i++) {
+      int gx = (int)(i * magHor);
+      int gy = hh - (int)(magVer * (samples.get(i) - minGSample));
+      g.fillRect(gx-1, gy-1, 3,3);
     }
   }
   
@@ -312,7 +390,7 @@ public class GraphPanel extends JPanel {
     
     @Override
     public void mouseClicked(MouseEvent e) {
-      if (e.getButton() == MouseEvent.BUTTON2) {
+      if (e.getButton() == MouseEvent.BUTTON1 && !e.isConsumed() && e.getClickCount()==2) {
       	zoomAll((e.getModifiers() & Event.SHIFT_MASK) == 0,
       			(e.getModifiers() & Event.CTRL_MASK) == 0,
       			e.getPoint());
@@ -340,8 +418,8 @@ public class GraphPanel extends JPanel {
     f.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
     GraphPanel g = new GraphPanel();
     
-    for (int i = 0; i < 3000; i++) {
-      g.addSample(Math.sin((double)i*0.01)*2000);
+    for (int i = 0; i < 30000; i++) {
+      g.addSample(Math.sin((double)i*0.001)*2000 + Math.cos((double)i)*500);
     }
     
     f.getContentPane().add(g);
