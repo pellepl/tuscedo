@@ -14,6 +14,8 @@ public interface Essential {
   String userSettingPath = ".tuscedo";
   /** Name of history file */
   String historyFile = "history";
+  /** Name of history file */
+  String settingsFile = "settings";
   
   /** Logging */
   static final boolean LOG_C = true;

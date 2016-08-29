@@ -14,11 +14,8 @@ import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
-import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
@@ -77,17 +74,19 @@ public class Tuscedo {
   JPanel inputPanel = new JPanel();
   JLabel inputLabel[] = new JLabel[_ISTATE_NUM];
   JLabel infoLabel[] = new JLabel[_ISTATE_NUM];
+  Bash bash[] = new Bash[_ISTATE_NUM];
   ProcessACTextField input[] = new ProcessACTextField[_ISTATE_NUM];
-  static Color colTextFg = new Color(255, 255, 192);
-  static Color colInputFg = new Color(192, 255, 255);
-  static Color colInputBg = new Color(48, 48, 64);
-  static Color colBashFg = new Color(255, 255, 255);
-  static Color colProcessFg = new Color(255, 192, 255);
-  static Color colProcessErrFg = new Color(255, 128, 128);
-  static Color colFindFg = colInputBg;
-  static Color colFindBg = colInputFg;
-  static Color colFindMarkFg = new Color(255,192,255);
-  static Color colFindMarkBg = null;
+  public static final Color colTextFg = new Color(255, 255, 192);
+  public static final Color colInputFg = new Color(192, 255, 255);
+  public static final Color colInputBg = new Color(48, 48, 64);
+  public static final Color colInputBashBg = new Color(64, 64, 64);
+  public static final Color colBashFg = new Color(255, 255, 255);
+  public static final Color colProcessFg = new Color(192, 192, 192);
+  public static final Color colProcessErrFg = new Color(192, 128, 128);
+  public static final Color colFindFg = colInputBg;
+  public static final Color colFindBg = colInputFg;
+  public static final Color colFindMarkFg = new Color(255,192,255);
+  public static final Color colFindMarkBg = null;
   int lastFindIndex = -1;
   String lastFindString = null;
   List<OffsetSpan> findResult;
@@ -95,6 +94,7 @@ public class Tuscedo {
   JScrollPane mainScrollPane;
   JScrollPane secScrollPane;
   JComponent curView;
+  Settings settings;
   
   final Object LOCK_SERIAL = new Object();
   PortConnector serial;
@@ -104,13 +104,12 @@ public class Tuscedo {
   volatile boolean serialRun;
   volatile boolean serialRunning;
   
-  File pwd = new File(".");
-
   public Tuscedo() {
   }
 
   public void create() {
     build();
+    settings = Settings.inst();
   }
   
   public static void decorateFTP(FastTextPane ftp) {
@@ -220,12 +219,12 @@ public class Tuscedo {
       defineAction(input[i], "log.input.splithori", "shift+ctrl+w", actionSplitHori);
       defineAction(input[i], "log.input.splitveri", "alt+ctrl+w", actionSplitVeri);
       defineAction(input[i], "log.input.clear", "ctrl+delete", actionClear);
-      defineAction(input[i], "log.input.pageup", "ctrl+page_up", actionLogPageUp);
-      defineAction(input[i], "log.input.pagedown", "ctrl+page_down", actionLogPageDown);
-      defineAction(input[i], "log.input.scrollup", "ctrl+up", actionLogUp);
-      defineAction(input[i], "log.input.scrolldown", "ctrl+down", actionLogDown);
-      defineAction(input[i], "log.input.scrollleft", "ctrl+left", actionLogLeft);
-      defineAction(input[i], "log.input.scrollright", "ctrl+right", actionLogRight);
+      defineAction(input[i], "log.input.pageup", "alt+page_up", actionLogPageUp);
+      defineAction(input[i], "log.input.pagedown", "alt+page_down", actionLogPageDown);
+      defineAction(input[i], "log.input.scrollup", "alt+up", actionLogUp);
+      defineAction(input[i], "log.input.scrolldown", "alt+down", actionLogDown);
+      defineAction(input[i], "log.input.scrollleft", "alt+left", actionLogLeft);
+      defineAction(input[i], "log.input.scrollright", "alt+right", actionLogRight);
       defineAction(input[i], "log.input.home", "ctrl+home", actionLogHome);
       defineAction(input[i], "log.input.end", "ctrl+end", actionLogEnd);
 
@@ -249,6 +248,27 @@ public class Tuscedo {
       ip[i].add(infoLabel[i], BorderLayout.EAST);
       
       inputPanel.add(ip[i], Integer.toString(i));
+      
+      final ProcessHandler ph = input[i];
+      bash[i] = new Bash(input[i], new Bash.Console() {
+        @Override
+        public void stdout(String s) {
+          ftp.addText(s, 1, colProcessFg, null, false);
+        }
+
+        @Override
+        public void stderr(String s) {
+          ftp.addText(s, 1, colProcessErrFg, null, false);
+        }
+        
+        @Override
+        public void stdin(String s) {
+          try {
+            ph.stdin().write(s.getBytes());
+          } catch (IOException e) {
+          }
+        }
+      });
     }
     
     input[ISTATE_OPEN_SERIAL].setForcedModel(true);
@@ -468,63 +488,7 @@ public class Tuscedo {
   
   void process(String s) {
     ftp.addText(s + "\n", 1, colBashFg, null, false);
-    try {
-      if (s.toLowerCase().startsWith("cd ")) {
-        pwd = new File(pwd, s.substring("cd ".length()).trim());
-        ftp.addText(pwd.getCanonicalPath() + "\n", 1, colProcessFg, null, false);
-      } else {
-        if (input[istate].isLinkedToProcess()) {
-          input[istate].stdin().write((s + "\n").getBytes());
-          input[istate].stdin().flush();
-        } else {
-          final String cmd = s;
-          final ProcessACTextField pInput = input[istate]; 
-          final Process p = Runtime.getRuntime().exec(cmd, null, pwd);
-          pInput.linkToProcess(p);
-          Thread processIn = new Thread(new Runnable() {
-            public void run() {
-              try {
-                BufferedReader out = new BufferedReader(new InputStreamReader(pInput.stdout()));
-                String stdout;
-                while ((stdout = out.readLine()) != null) {
-                  ftp.addText(stdout + "\n", 1, colProcessFg, null, false);
-                }
-              } catch (Throwable t) {}
-            }
-          }, "procin:" + s);
-          processIn.setDaemon(true);
-          processIn.start();
-          Thread processErr = new Thread(new Runnable() {
-            public void run() {
-              try {
-                BufferedReader err = new BufferedReader(new InputStreamReader(pInput.stderr()));
-                String stderr;
-                while ((stderr = err.readLine()) != null) {
-                  ftp.addText(stderr + "\n", 1, colProcessErrFg, null, false);
-                }
-              } catch (Throwable t) {}
-            }
-          }, "procerr:" + s);
-          processErr.setDaemon(true);
-          processErr.start();
-          Thread processWatch = new Thread(new Runnable() {
-            public void run() {
-              int ret = -1;
-              try {
-                ret = p.waitFor();
-              } catch (InterruptedException e) {}
-              pInput.unlinkFromProcess();
-              System.out.println(cmd + " exited, " + ret);
-            }
-          }, "proc:" + cmd);
-          processWatch.setDaemon(true);
-          processWatch.start();
-        }
-      }
-    } catch (Exception e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    }
+    bash[istate].input(s);
   }
   
   void actionInputEnter(boolean shift) {
@@ -536,8 +500,8 @@ public class Tuscedo {
     case ISTATE_INPUT:
       String in = input[istate].getText(); 
       input[istate].setText("");
-      if (in.startsWith("$$")) { // TODO make $$ configurable
-        process(in.substring("$$".length()));
+      if (in.startsWith(settings.string(Settings.BASH_PREFIX_STRING))) {
+        process(in.substring(settings.string(Settings.BASH_PREFIX_STRING).length()));
       } else {
         ftp.addText(in + "\n", 1, colInputFg, null, false);
         transmit(in + "\n");
@@ -887,9 +851,10 @@ public class Tuscedo {
   }
 
   class AutoAdjustmentListener implements AdjustmentListener {
-    private int _val = 0;
-    private int _ext = 0;
-    private int _max = 0;
+    private volatile int _val = 0;
+    private volatile int _ext = 0;
+    private volatile int _max = 0;
+    private volatile boolean adjusting;
     private final BoundedRangeModel _model;
     
     public AutoAdjustmentListener(JScrollPane p) {
@@ -898,18 +863,25 @@ public class Tuscedo {
 
     @Override
     public void adjustmentValueChanged(AdjustmentEvent e) {
-      // Get the new max
-      int newMax = _model.getMaximum();
-      // If the new max has changed and if we were scrolled to bottom
-      if (newMax != _max && (_val + _ext == _max)) {
-        // Scroll to bottom
-        _model.setValue(_model.getMaximum() - _model.getExtent());
-      }
+      if (adjusting) return;
+      adjusting = true;
+      SwingUtilities.invokeLater(new Runnable() {
+        public void run() {
+          // Get the new max
+          int newMax = _model.getMaximum();
+          // If the new max has changed and if we were scrolled to bottom
+          if (newMax != _max && (_val + _ext == _max)) {
+            // Scroll to bottom
+            _model.setValue(newMax - _model.getExtent());
+          }
 
-      // Save the new values
-      _val = _model.getValue();
-      _ext = _model.getExtent();
-      _max = _model.getMaximum();
+          // Save the new values
+          _val = _model.getValue();
+          _ext = _model.getExtent();
+          _max = newMax;
+          adjusting = false;
+        }
+      });
     }
   }
   

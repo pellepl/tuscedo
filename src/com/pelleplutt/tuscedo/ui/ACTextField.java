@@ -318,7 +318,12 @@ public class ACTextField extends JTextPane implements CaretListener {
       if (offset >= usLen) return;
       length = Math.min(usLen-offset, length);
       if (length > 0) {
-        String newUserString = userString.substring(0, offset) + userString.substring(offset + length);
+        String newUserString;
+        if (forced) {
+          newUserString = userString.substring(0, offset); 
+        } else {
+          newUserString = userString.substring(0, offset) + userString.substring(offset + length); 
+        }
         handleUpdate(fb, offset, newUserString);
       }
     }
