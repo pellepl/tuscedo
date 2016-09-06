@@ -23,6 +23,7 @@ public class Settings {
   public final static String BASH_APPEND_STRING = "bashappend.string";
   public final static String BASH_INPUT_STRING = "bashinput.string";
   public final static String BASH_PIPE_STRING = "bashpipe.string";
+  public final static String BASH_SERIAL_STREAM_STRING = "bashserial.string";
 
   public static final int MAX_LIST_ENTRIES = 9;
   
@@ -48,6 +49,7 @@ public class Settings {
     props.setProperty(BASH_APPEND_STRING, ">>");
     props.setProperty(BASH_INPUT_STRING, "<");
     props.setProperty(BASH_PIPE_STRING, "|");
+    props.setProperty(BASH_SERIAL_STREAM_STRING, "$SERIAL");
   }
   
   public void saveSettings() {

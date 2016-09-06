@@ -1,31 +1,31 @@
 package com.pelleplutt.tuscedo;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.Log;
 
-public class Bash {
+public class Bash implements ProcessGroup.Console {
   ProcessHandler handler;
   File pwd;
   Console console;
   static Pattern argBreak = Pattern.compile("([^\"]\\S*|\".+?\")\\s*");
-  List<SubCommand> chain;
+  List<List<SubCommand>> chain;
   volatile int chainIx;
+  Settings settings = Settings.inst();
+  SerialStreamProvider serialProvider;
 
-  public Bash(ProcessHandler ph, Console c) {
+  public Bash(ProcessHandler ph, Console c, SerialStreamProvider ssp) {
     handler = ph;
     console = c;
     pwd = new File(".");
+    serialProvider = ssp;
   }
   
   String[] breakArgs(String input) {
@@ -62,125 +62,17 @@ public class Bash {
     }
   }
   
-  void startProcess(final SubCommand cmd, final SubCommand preCmd) throws IOException {
-    Log.println(cmd.args[0] + " starting, in:" + cmd.stdin + " out:" + cmd.stdout);
-    final ProcessHandler pHandler = handler;
-    final Process process = Runtime.getRuntime().exec(cmd.args, null, pwd);
-    pHandler.linkToProcess(process);
-    
-    if (cmd.stdin == STDIN_PROCESS) {
-      Thread processIn = new Thread(new Runnable() {
-        public void run() {
-          BufferedReader in = null;
-          try {
-            in = new BufferedReader(
-                new InputStreamReader(new ByteArrayInputStream(preCmd.buf.toByteArray())));
-            String stdin;
-            while ((stdin = in.readLine()) != null) {
-              console.stdin(stdin + "\n");
-            }
-          } catch (Throwable t) {
-          }
-          finally {
-            handler.closeStdin();
-            AppSystem.closeSilently(in);
-          }
-        }
-      }, "procin:" + cmd.args[0]);
-      processIn.setDaemon(true);
-      processIn.start();
-    }
-    
-    Thread processOut = new Thread(new Runnable() {
-      public void run() {
-        try {
-          BufferedReader out = new BufferedReader(
-              new InputStreamReader(pHandler.stdout()));
-          String stdout;
-          if (cmd.stdout == STDOUT_PROCESS) {
-            cmd.buf = new ByteArrayOutputStream();
-          }
-          while ((stdout = out.readLine()) != null) {
-            switch (cmd.stdout) {
-            case STDOUT_FILE:
-            case STDOUT_FILE_APPEND:
-              break;
-            case STDOUT_PROCESS:
-              cmd.buf.write((stdout + "\n").getBytes());
-              cmd.buf.flush();
-              break;
-            case STDOUT_SERIAL:
-              break;
-            default:
-              console.stdout(stdout + "\n");
-              break;
-            }
-          }
-        } catch (Throwable t) {
-        }
-      }
-    }, "procout:" + cmd.args[0]);
-    cmd.thrOut = processOut;
-    processOut.setDaemon(true);
-    processOut.start();
-    
-    Thread processErr = new Thread(new Runnable() {
-      public void run() {
-        try {
-          BufferedReader err = new BufferedReader(
-              new InputStreamReader(pHandler.stderr()));
-          String stderr;
-          while ((stderr = err.readLine()) != null) {
-            console.stderr(stderr + "\n");
-          }
-        } catch (Throwable t) {
-        }
-      }
-    }, "procerr:" + cmd.args[0]);
-    processErr.setDaemon(true);
-    processErr.start();
-    
-    
-    Thread processWatch = new Thread(new Runnable() {
-      public void run() {
-        int ret = -1;
-        try {
-          ret = process.waitFor();
-          cmd.thrOut.join();
-        } catch (InterruptedException e) {
-        }
-        Log.println(cmd.args[0] + " exited " + ret);
-        pHandler.unlinkFromProcess();
-        if (ret != 0) {
-          chain = null;
-          chainIx = 0;
-        } else if (!chain.isEmpty() && chainIx <= chain.size()-1) {
-          SubCommand sc = chain.get(chainIx++);
-          try {
-            startProcess(sc, cmd);
-          } catch (IOException e) {
-            pHandler.unlinkFromProcess();
-            console.stderr(e.getMessage() + "\n");
-            e.printStackTrace();
-          }
-        } else {
-          chain = null;
-          chainIx = 0;
-        }
-      }
-    }, "proc:" + cmd.args[0]);
-    processWatch.setDaemon(true);
-    processWatch.start();
-  }
   
   void parseCommand(String args[]) {
-    String strChain = Settings.inst().string(Settings.BASH_CHAIN_STRING);
-    String strOutfile = Settings.inst().string(Settings.BASH_OUTPUT_STRING);
-    String strOutappend = Settings.inst().string(Settings.BASH_APPEND_STRING);
-    String strInfile = Settings.inst().string(Settings.BASH_INPUT_STRING);
-    String strPipe = Settings.inst().string(Settings.BASH_PIPE_STRING);
+    String strChain = settings.string(Settings.BASH_CHAIN_STRING);
+    String strOutfile = settings.string(Settings.BASH_OUTPUT_STRING);
+    String strOutappend = settings.string(Settings.BASH_APPEND_STRING);
+    String strInfile = settings.string(Settings.BASH_INPUT_STRING);
+    String strPipe = settings.string(Settings.BASH_PIPE_STRING);
     
-    List<SubCommand> cmds = new ArrayList<SubCommand>();
+    List<List<SubCommand>> cmds = new ArrayList<List<SubCommand>>();
+    List<SubCommand> subCmds = new ArrayList<SubCommand>();
+
     SubCommand sc = null;
     List<String> curArgs = null;
     
@@ -190,48 +82,90 @@ public class Bash {
       
       if (arg.equals(strChain)) {
         sc.args = curArgs == null ? sc.args : curArgs.toArray(new String[curArgs.size()]);
-        cmds.add(sc);
+        subCmds.add(sc);
+        cmds.add(subCmds);
+        subCmds = new ArrayList<SubCommand>();
         sc = new SubCommand();
         curArgs = null;
       }
       else if (arg.equals(strOutfile)) {
-        sc.stdout = STDOUT_FILE;
+        sc.stdout = FILE;
         sc.stdoutPath = args[++i].trim();
       }
       else if (arg.equals(strOutappend)) {
-        sc.stdout = STDOUT_FILE_APPEND;
+        sc.stdout = FILE_APPEND;
         sc.stdoutPath = args[++i].trim();
       }
       else if (arg.equals(strInfile)) {
-        sc.stdin = STDIN_FILE;
+        sc.stdin = FILE;
         sc.stdinPath = args[++i].trim();
       }
       else if (arg.equals(strPipe)) {
         sc.args = curArgs == null ? sc.args : curArgs.toArray(new String[curArgs.size()]);
-        sc.stdout = STDOUT_PROCESS;
-        cmds.add(sc);
+        sc.stdout = PIPE;
+        subCmds.add(sc);
         sc = new SubCommand();
-        sc.stdin = STDIN_PROCESS;
+        sc.stdin = PIPE;
         curArgs = null;
       } else {
-        if (sc == null) {
-          sc = new SubCommand();
-        }
+        if (sc == null) sc = new SubCommand();
         if (curArgs == null) curArgs = new ArrayList<String>();
         curArgs.add(arg);
       }
     }
     if (sc != null) {
       sc.args = curArgs == null ? sc.args : curArgs.toArray(new String[curArgs.size()]);
-      cmds.add(sc);
+      subCmds.add(sc);
+      cmds.add(subCmds);
     }
     
     chain = cmds;
   }
   
   public void start() throws IOException {
-    SubCommand sc = chain.get(chainIx++);
-    startProcess(sc, null);
+    Log.println("start chain ix " + chainIx + " of " + chain.size());
+    if (chainIx < chain.size()) {
+      List<SubCommand> commands = chain.get(chainIx++);
+      startProcessGroup(commands);
+    }
+  }
+  
+  void startProcessGroup(List<SubCommand> cmds) throws IOException {
+    final String strSerial = settings.string(Settings.BASH_SERIAL_STREAM_STRING);
+    ProcessGroup pg = new ProcessGroup();
+    InputStream serialInputStream = null;
+    OutputStream serialOutputStream = null;
+    for (SubCommand c : cmds) {
+      boolean serialStdin = false;
+      boolean serialStdout = false;
+      
+      if (c.stdinPath != null && c.stdinPath.equals(strSerial)) {
+        c.stdinPath = null;
+        if (serialInputStream == null) {
+          serialInputStream = serialProvider.getSerialInputStream();
+        }
+        serialStdin = serialInputStream != null;
+        Log.println("subcommand " + c.args[0] + " stdin from serial");
+      }
+      if (c.stdoutPath != null && c.stdoutPath.equals(strSerial)) {
+        c.stdoutPath = null;
+        if (serialOutputStream == null) {
+          serialOutputStream = serialProvider.getSerialOutputStream();
+        }
+        serialStdout = serialOutputStream != null;
+        Log.println("subcommand " + c.args[0] + " stdout to serial");
+      }
+      pg.addCmd(c.args, pwd, 
+          c.stdin == PIPE, 
+          c.stdinPath, 
+          c.stdoutPath,
+          null,
+          serialStdin,
+          serialStdout,
+          false);
+    }
+    pg.start(serialInputStream, serialOutputStream, null, this);
+    handler.linkToProcess(pg);
   }
   
   public void input(String input) {
@@ -240,8 +174,7 @@ public class Bash {
       if (handler.isLinkedToProcess()) {
         
         // process linked, send input to process
-        handler.stdin().write((input + "\n").getBytes());
-        handler.stdin().flush();
+        handler.sendToStdIn(input);
         
       } else if (args[0].toLowerCase().equals("cd")) {
         
@@ -269,28 +202,89 @@ public class Bash {
     void stdin(String s);
   }
 
-  static final int STDIN_CONSOLE = 0;
-  static final int STDIN_FILE = 1;
-  static final int STDIN_PROCESS = 3;
-  static final int STDIN_SERIAL = 4;
-  
-  static final int STDOUT_CONSOLE = 0; 
-  static final int STDOUT_FILE = 1; 
-  static final int STDOUT_FILE_APPEND = 2; 
-  static final int STDOUT_PROCESS = 3; 
-  static final int STDOUT_SERIAL = 4; 
+  static final int CONSOLE = 0;
+  static final int FILE = 1;
+  static final int FILE_APPEND = 2;
+  static final int PIPE = 3;
+  static final int SERIAL = 4;
   
   class SubCommand {
     String args[];
-
-    int stdin = STDIN_CONSOLE;
+    int stdin = CONSOLE;
     String stdinPath;
-
-    int stdout = STDOUT_CONSOLE;
+    int stdout = CONSOLE;
     String stdoutPath;
+    int stderr = CONSOLE;
+    String stdoutErr;
+  }
+
+  List<String> bashCompletions = new ArrayList<String>(); 
+  public List<String> suggestFileSystemCompletions(String prefix, String s, String cmd, boolean includeFiles, boolean includeDirs) {
+    if (s.startsWith(cmd + " ")) {
+      final int cmdIx = cmd.length() + 1;
+      bashCompletions.clear();
+      int lastFS = s.lastIndexOf(File.separator);
+      String path = lastFS < 0 ? "" : s.substring(cmdIx, lastFS+1);
+      String filter = lastFS < 0 ? s.substring(cmdIx) : s.substring(lastFS+1);
+      
+      File srcDir;
+      if (path.startsWith(File.separator)) {
+        srcDir = new File(path);
+      } else if (path.startsWith("~" + File.separator)) {
+        srcDir = new File(System.getProperty("user.home"), path.substring(2));
+      } else {
+        srcDir = new File(pwd, path);
+      }
+
+      File[] files = srcDir.listFiles();
+      if (files == null) {
+        return null;
+      }
+      for (File f : files) {
+        try {
+          if (f.getName().startsWith(filter) && 
+              (
+                  (includeDirs && f.isDirectory()) || 
+                  (includeFiles && f.isFile())
+              )) {
+            String c = prefix + s + f.getName().substring(filter.length());
+            bashCompletions.add(c);
+          }
+        } catch (Throwable e) {
+          e.printStackTrace();
+        }
+      }
+      return bashCompletions;
+    }
+    return null;
+  }
+
+  @Override
+  public void outln(String s) {
+    console.stdout(s + "\n");
+  }
+
+  @Override
+  public void errln(String s) {
+    console.stderr(s + "\n");
+  }
+
+  @Override
+  public void exit(int ret) {
+    if (ret == 0) {
+      try {
+        if (chainIx < chain.size()) {
+          start();
+        } else {
+          handler.unlinkFromProcess();
+        }
+      } catch (Throwable t) {
+        handler.unlinkFromProcess();
+        t.printStackTrace();
+      }
+    } else {
+      handler.unlinkFromProcess();
+    }
     
-    Thread thrOut;
-    
-    ByteArrayOutputStream buf;
   }
 }

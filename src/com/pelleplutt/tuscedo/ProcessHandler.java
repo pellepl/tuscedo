@@ -1,14 +1,9 @@
 package com.pelleplutt.tuscedo;
 
-import java.io.InputStream;
-import java.io.OutputStream;
-
 public interface ProcessHandler {
-  void linkToProcess(Process p);
-  boolean isLinkedToProcess();
-  int unlinkFromProcess();
-  void closeStdin();
-  InputStream stdout();
-  InputStream stderr();
-  OutputStream stdin();
+  public void linkToProcess(ProcessGroup p);
+  public boolean isLinkedToProcess();
+  public void closeStdin();
+  public int unlinkFromProcess();
+  public void sendToStdIn(String line);
 }

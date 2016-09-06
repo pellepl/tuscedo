@@ -14,11 +14,8 @@ import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -47,10 +44,8 @@ import com.pelleplutt.Essential;
 import com.pelleplutt.tuscedo.ui.ACTextField;
 import com.pelleplutt.tuscedo.ui.KeyMap;
 import com.pelleplutt.tuscedo.ui.ProcessACTextField;
-import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.FastTextPane;
 import com.pelleplutt.util.io.Port;
-import com.pelleplutt.util.io.PortConnector;
 
 public class Tuscedo {
   static final int ISTATE_INPUT = 0;
@@ -95,14 +90,9 @@ public class Tuscedo {
   JScrollPane secScrollPane;
   JComponent curView;
   Settings settings;
+  Serial serial;
   
-  final Object LOCK_SERIAL = new Object();
-  PortConnector serial;
-  InputStream serialIn;
-  OutputStream serialOut;
-  Thread serialPump;
-  volatile boolean serialRun;
-  volatile boolean serialRunning;
+  String[] prevSerialDevices;
   
   public Tuscedo() {
   }
@@ -174,6 +164,8 @@ public class Tuscedo {
     ftp2.setDocument(ftp.getDocument());
     decorateFTP(ftp2);
     
+    serial = new Serial(ftp);
+    
     mainScrollPane = new JScrollPane(ftp,
         JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
         JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
@@ -205,6 +197,18 @@ public class Tuscedo {
             }
           }
         }
+        
+        @Override
+        public List<String> giveSuggestions(final String userInput) {
+          final String bashPrefix = settings.string(Settings.BASH_PREFIX_STRING);
+          if (userInput.startsWith(settings.string(bashPrefix)) && userInput.length() >= bashPrefix.length()) {
+            if (userInput.startsWith(bashPrefix + "cd ")) {
+              return bash[istate].suggestFileSystemCompletions(bashPrefix, userInput.substring(bashPrefix.length()), 
+                  "cd", false, true);
+            }
+          }
+          return null;
+        }
       });
       defineAction(input[i], "input.find", "ctrl+f", actionOpenFind);
       defineAction(input[i], "input.findback", "ctrl+shift+f", actionOpenFindBack);
@@ -213,7 +217,7 @@ public class Tuscedo {
       defineAction(input[i], "input.inputclose", "escape", actionInputClose);
       defineAction(input[i], "input.inputenter", "enter", actionInputEnter);
       defineAction(input[i], "input.inputenterback", "shift+enter", actionInputEnterBack);
-      defineAction(input[i], "input.openserial", "ctrl+o", actionOpenSerial);
+      defineAction(input[i], "input.openserial", "ctrl+o", actionOpenSerialConfig);
       defineAction(input[i], "input.help", "f1", actionShowHelp);
       defineAction(input[i], "log.input.splitnone", "ctrl+w", actionSplitNone);
       defineAction(input[i], "log.input.splithori", "shift+ctrl+w", actionSplitHori);
@@ -263,12 +267,9 @@ public class Tuscedo {
         
         @Override
         public void stdin(String s) {
-          try {
-            ph.stdin().write(s.getBytes());
-          } catch (IOException e) {
-          }
+          ph.sendToStdIn(s);
         }
-      });
+      }, serial);
     }
     
     input[ISTATE_OPEN_SERIAL].setForcedModel(true);
@@ -288,21 +289,9 @@ public class Tuscedo {
     
     ((CardLayout)inputPanel.getLayout()).show(inputPanel, Integer.toString(ISTATE_INPUT));
     input[ISTATE_INPUT].requestFocus();
-    
-    serial = PortConnector.getPortConnector();
+
   }
 
-  public void transmit(String s) {
-    if (serialRunning) {
-      try {
-        serialOut.write(s.getBytes());
-        serialOut.flush();
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-    }
-  }
-  
   public void setInfo(String s) {
     if (s != null && s.length() > 0) {
       infoLabel[istate].setText(s);
@@ -375,7 +364,7 @@ public class Tuscedo {
   public void handleOpenSerial(String s) {
     input[ISTATE_OPEN_SERIAL].setEnabled(false);
     try {
-      closeSerial();
+      serial.closeSerial();
       Port portSetting = new Port();
       String defs[] = s.split(" ");
       portSetting.portName = defs[0];
@@ -397,7 +386,7 @@ public class Tuscedo {
           Port.parityToString(portSetting.parity).charAt(0) + portSetting.stopbits + "...\n", 
           1, Color.green, null, true);
       
-      openSerial(portSetting);
+      serial.open(portSetting);
       
       ftp.addText("Connected\n", 1, Color.green, null, true);
       enterInputState(ISTATE_INPUT);
@@ -446,46 +435,6 @@ public class Tuscedo {
     }
   }
   
-  byte serialBuf[] = new byte[256*64];
-  volatile int serialBufIx = 0;
-  Runnable pushSerialToLogRunnable = new Runnable() {
-    @Override
-    public void run() {
-      String t;
-      synchronized (serialBuf) {
-        t = new String(serialBuf, 0, serialBufIx);
-        serialBufIx = 0;
-      }
-      ftp.addText(t);
-    }
-  };
-  void openSerial(Port portSetting) throws Exception {
-    synchronized (LOCK_SERIAL) {
-      serial.connect(portSetting);
-      serial.setTimeout(1000);
-      serialIn = serial.getInputStream();
-      serialOut = serial.getOutputStream();
-      serialRun = true;
-      serialPump = new Thread(serialEaterRunnable, "serial:" + portSetting.portName);
-      serialPump.setDaemon(true);
-      serialPump.start();
-    }
-  }
-  
-  void closeSerial() {
-    synchronized (LOCK_SERIAL) {
-      if (serialIn != null) {
-        serial.disconnectSilently();
-        serialIn = null;
-        serialOut = null;
-        serialRun = false;
-        while (serialRunning) {
-          AppSystem.waitSilently(LOCK_SERIAL, 1000);
-        }
-      }
-    }
-  }
-  
   void process(String s) {
     ftp.addText(s + "\n", 1, colBashFg, null, false);
     bash[istate].input(s);
@@ -504,7 +453,7 @@ public class Tuscedo {
         process(in.substring(settings.string(Settings.BASH_PREFIX_STRING).length()));
       } else {
         ftp.addText(in + "\n", 1, colInputFg, null, false);
-        transmit(in + "\n");
+        serial.transmit(in + "\n");
       }
       break;
     case ISTATE_FIND:
@@ -546,6 +495,107 @@ public class Tuscedo {
     }
   }
   
+  void openSerialConfig() {
+    String[] devices = serial.getDevices();
+    List<String> model = new ArrayList<String>();
+    int[] baudRates = {
+        Port.BAUD_921600,
+        Port.BAUD_115200,
+        Port.BAUD_57600,
+        Port.BAUD_38400,
+        Port.BAUD_19200,
+        Port.BAUD_14400,
+        Port.BAUD_9600,
+        Port.BAUD_460800,
+        Port.BAUD_256000,
+        Port.BAUD_230400,
+        Port.BAUD_128000,
+        Port.BAUD_4800,
+        Port.BAUD_2400,
+        Port.BAUD_1200,
+        Port.BAUD_600,
+        Port.BAUD_300,
+        Port.BAUD_110,
+    };
+    int databits[] = {
+        Port.BYTESIZE_8,
+        Port.BYTESIZE_7,
+        Port.BYTESIZE_6,
+        Port.BYTESIZE_5,
+    };
+    String parities[] = {
+        Port.PARITY_NONE_S.toLowerCase(),
+        Port.PARITY_EVEN_S.toLowerCase(),
+        Port.PARITY_ODD_S.toLowerCase(),
+    };
+    int stopbits[] = {
+        Port.STOPBIT_ONE,
+        Port.STOPBIT_TWO,
+    };
+    for (int d = 0; d < devices.length; d++) {
+      String device = devices[devices.length - d - 1];
+      for (int baud = 0; baud < baudRates.length; baud++) {
+        for (int db = 0; db < databits.length; db++) {
+          for (int p = 0; p < parities.length; p++) {
+            for (int s = 0; s < stopbits.length; s++) {
+              model.add(device + 
+                  " " + PORT_ARG_BAUD + baudRates[baudRates.length - baud -1] + 
+                  " " + PORT_ARG_DATABITS + databits[databits.length - db - 1] +
+                  " " + PORT_ARG_PARITY + parities[parities.length - p - 1] + 
+                  " " + PORT_ARG_STOPBITS + stopbits[stopbits.length -s -1] 
+                      );
+            }
+          }
+        }
+      }
+    }
+    for (int d = 0; d < devices.length; d++) {
+      String device = devices[devices.length - d - 1];
+      for (int baud = 0; baud < baudRates.length; baud++) {
+              model.add(device + 
+                  " " + PORT_ARG_BAUD + baudRates[baudRates.length - baud -1]
+                      );
+      }
+    }
+    input[ISTATE_OPEN_SERIAL].setSuggestions(model);
+    enterInputState(ISTATE_OPEN_SERIAL);
+    
+    if (prevSerialDevices == null) {
+      if (devices != null) {
+        setInfo(devices.length + " SERIALS");
+      }
+    } else if (devices != null) {
+      List<String> added = new ArrayList<String>(Arrays.asList(devices));
+      List<String> removed = new ArrayList<String>(Arrays.asList(prevSerialDevices));
+    match: while (true) {
+        for (int i = 0; i < added.size(); i++) {
+          String ai = added.get(i);
+          for (int j = 0; j  < removed.size(); j++) {
+            if (ai.equals(removed.get(j))) {
+              added.remove(ai);
+              removed.remove(ai);
+              continue match;
+            }
+          }
+        }
+        break match;
+      }
+      StringBuilder sb = new StringBuilder();
+      if (added.isEmpty() && removed.isEmpty()) {
+        setInfo(devices.length + " SERIALS");
+      } else {
+        for (String d : added) {
+          sb.append("+" + d + " ");
+        }
+        for (String d : removed) {
+          sb.append("-" + d + " ");
+        }
+        setInfo(sb.toString().trim());
+      }
+    }
+    prevSerialDevices = devices;
+  }
+  
   AbstractAction actionOpenFind = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
@@ -577,7 +627,7 @@ public class Tuscedo {
   AbstractAction actionInputClose = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      if (input[istate].getText().length() > 0) {
+      if (input[istate].getText().length() > 0 && !input[istate].isForcedModel()) {
         input[istate].setText("");
         input[istate].resetLastSuggestionIndex();
       } else {
@@ -600,70 +650,10 @@ public class Tuscedo {
     }
   };
 
-  AbstractAction actionOpenSerial = new AbstractAction() {
+  AbstractAction actionOpenSerialConfig = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      String[] devices = serial.getDevices();
-      List<String> model = new ArrayList<String>();
-      int[] baudRates = {
-          Port.BAUD_921600,
-          Port.BAUD_115200,
-          Port.BAUD_57600,
-          Port.BAUD_38400,
-          Port.BAUD_19200,
-          Port.BAUD_14400,
-          Port.BAUD_9600,
-          Port.BAUD_460800,
-          Port.BAUD_256000,
-          Port.BAUD_230400,
-          Port.BAUD_128000,
-          Port.BAUD_4800,
-          Port.BAUD_2400,
-          Port.BAUD_1200,
-          Port.BAUD_600,
-          Port.BAUD_300,
-          Port.BAUD_110,
-      };
-      int databits[] = {
-          Port.BYTESIZE_8,
-          Port.BYTESIZE_7,
-          Port.BYTESIZE_6,
-          Port.BYTESIZE_5,
-      };
-      String parities[] = {
-          Port.PARITY_NONE_S.toLowerCase(),
-          Port.PARITY_EVEN_S.toLowerCase(),
-          Port.PARITY_ODD_S.toLowerCase(),
-      };
-      int stopbits[] = {
-          Port.STOPBIT_ONE,
-          Port.STOPBIT_TWO,
-      };
-      for (String device : devices) {
-        for (int baud = 0; baud < baudRates.length; baud++) {
-                model.add(device + 
-                    " " + PORT_ARG_BAUD + baudRates[baud]
-                        );
-        }
-      }
-      for (String device : devices) {
-        for (int baud = 0; baud < baudRates.length; baud++) {
-          for (int db = 0; db < databits.length; db++) {
-            for (int p = 0; p < parities.length; p++) {
-              for (int s = 0; s < stopbits.length; s++) {
-                model.add(device + 
-                    " " + PORT_ARG_BAUD + baudRates[baud] + 
-                    " " + PORT_ARG_DATABITS + databits[db] +
-                    " " + PORT_ARG_PARITY + parities[p] + 
-                    " " + PORT_ARG_STOPBITS + stopbits[s] 
-                        );
-              }
-            }
-          }
-        }
-      }
-      input[ISTATE_OPEN_SERIAL].setSuggestions(model);
-      enterInputState(ISTATE_OPEN_SERIAL);
+      openSerialConfig();
     }
   };
 
@@ -885,42 +875,6 @@ public class Tuscedo {
     }
   }
   
-  final Runnable serialEaterRunnable = new Runnable() {
-    @Override
-    public void run() {
-      int b;
-      serialRunning = true;
-      try {
-        while (serialRun) {
-          try {
-            b = serialIn.read();
-            synchronized (serialBuf) {
-              if (serialBufIx < serialBuf.length) {
-                serialBuf[serialBufIx++] = (byte)b;
-              }
-            }
-            if (b == '\n' || serialBufIx >= serialBuf.length/64) {
-              SwingUtilities.invokeLater(pushSerialToLogRunnable);
-            }
-          } catch (SocketTimeoutException ste) {
-            // ignore
-          }
-        } // while
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-      finally {
-        synchronized (LOCK_SERIAL) {
-          serialRunning = false;
-          serialRun = false;
-          ftp.addText("Disconnected\n", 1, Color.green, null, true);
-
-          LOCK_SERIAL.notifyAll();
-        }
-      }
-    } // run
-  };
-
   public static void main(String[] args) {
     try {
       UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
