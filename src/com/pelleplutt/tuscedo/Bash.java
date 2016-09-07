@@ -6,7 +6,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.pelleplutt.util.Log;
@@ -20,6 +19,7 @@ public class Bash implements ProcessGroup.Console {
   volatile int chainIx;
   Settings settings = Settings.inst();
   SerialStreamProvider serialProvider;
+  int lastReturnCode = 0;
 
   public Bash(ProcessHandler ph, Console c, SerialStreamProvider ssp) {
     handler = ph;
@@ -29,11 +29,45 @@ public class Bash implements ProcessGroup.Console {
   }
   
   String[] breakArgs(String input) {
+    input = input.trim();
     List<String> list = new ArrayList<String>();
-    Matcher m = argBreak.matcher(input);
-    while (m.find()) {
-      list.add(m.group(1).replace("\"", ""));
+    char quoteChar = 0;
+    StringBuilder sb = null;
+    for (int i = 0; i < input.length(); i++) {
+      char c = input.charAt(i);
+      if (quoteChar != 0) {
+        sb.append(c);
+        if (c == quoteChar) {
+          list.add(sb.toString());
+          sb = null;
+          quoteChar = 0;
+        }
+        continue;
+      } else if (c == ' ' || c == '\t') {
+        if (sb != null) {
+          list.add(sb.toString());
+          sb = null;
+        }
+        continue;
+      } else if (c == '=') {
+        if (sb != null) {
+          list.add(sb.toString());
+        }
+        list.add(Character.toString(c));
+        sb = null;
+        continue;
+      } else if (c == '\'' || c == '"') {
+        quoteChar = c;
+      }
+      if (sb == null) {
+        sb = new StringBuilder();
+      }
+      sb.append(c);
     }
+    if (sb != null) {
+      list.add(sb.toString());
+    }
+    Log.println(list.toString());
     return list.toArray(new String[list.size()]);
   }
   
@@ -64,11 +98,14 @@ public class Bash implements ProcessGroup.Console {
   
   
   void parseCommand(String args[]) {
-    String strChain = settings.string(Settings.BASH_CHAIN_STRING);
-    String strOutfile = settings.string(Settings.BASH_OUTPUT_STRING);
-    String strOutappend = settings.string(Settings.BASH_APPEND_STRING);
-    String strInfile = settings.string(Settings.BASH_INPUT_STRING);
-    String strPipe = settings.string(Settings.BASH_PIPE_STRING);
+    final String strChain = settings.string(Settings.BASH_CHAIN_STRING);
+    final String strOutfile = settings.string(Settings.BASH_OUTPUT_STRING);
+    final String strOutappend = settings.string(Settings.BASH_APPEND_STRING);
+    final String strErrfile = settings.string(Settings.BASH_ERR_OUTPUT_STRING);
+    final String strErrappend = settings.string(Settings.BASH_ERR_APPEND_STRING);
+    final String strInfile = settings.string(Settings.BASH_INPUT_STRING);
+    final String strPipe = settings.string(Settings.BASH_PIPE_STRING);
+    final String strLastRet = settings.string(Settings.BASH_LAST_RET_STRING);
     
     List<List<SubCommand>> cmds = new ArrayList<List<SubCommand>>();
     List<SubCommand> subCmds = new ArrayList<SubCommand>();
@@ -91,10 +128,20 @@ public class Bash implements ProcessGroup.Console {
       else if (arg.equals(strOutfile)) {
         sc.stdout = FILE;
         sc.stdoutPath = args[++i].trim();
+        try {new File(sc.stdoutPath).delete();} catch (Throwable t) {}
       }
       else if (arg.equals(strOutappend)) {
         sc.stdout = FILE_APPEND;
         sc.stdoutPath = args[++i].trim();
+      }
+      else if (arg.equals(strErrfile)) {
+        sc.stderr = FILE;
+        sc.stderrPath = args[++i].trim();
+        try {new File(sc.stderrPath).delete();} catch (Throwable t) {}
+      }
+      else if (arg.equals(strErrappend)) {
+        sc.stderr = FILE_APPEND;
+        sc.stderrPath = args[++i].trim();
       }
       else if (arg.equals(strInfile)) {
         sc.stdin = FILE;
@@ -108,6 +155,9 @@ public class Bash implements ProcessGroup.Console {
         sc.stdin = PIPE;
         curArgs = null;
       } else {
+        if (arg.equals(strLastRet)) {
+          arg = Integer.toString(lastReturnCode);
+        }
         if (sc == null) sc = new SubCommand();
         if (curArgs == null) curArgs = new ArrayList<String>();
         curArgs.add(arg);
@@ -131,7 +181,7 @@ public class Bash implements ProcessGroup.Console {
   }
   
   void startProcessGroup(List<SubCommand> cmds) throws IOException {
-    final String strSerial = settings.string(Settings.BASH_SERIAL_STREAM_STRING);
+    final String strConn = settings.string(Settings.BASH_CONNECTION_STREAM_STRING);
     ProcessGroup pg = new ProcessGroup();
     InputStream serialInputStream = null;
     OutputStream serialOutputStream = null;
@@ -139,27 +189,27 @@ public class Bash implements ProcessGroup.Console {
       boolean serialStdin = false;
       boolean serialStdout = false;
       
-      if (c.stdinPath != null && c.stdinPath.equals(strSerial)) {
+      if (c.stdinPath != null && c.stdinPath.equals(strConn)) {
         c.stdinPath = null;
         if (serialInputStream == null) {
           serialInputStream = serialProvider.getSerialInputStream();
         }
         serialStdin = serialInputStream != null;
-        Log.println("subcommand " + c.args[0] + " stdin from serial");
+        Log.println("subcommand " + c.args[0] + " stdin from conn");
       }
-      if (c.stdoutPath != null && c.stdoutPath.equals(strSerial)) {
+      if (c.stdoutPath != null && c.stdoutPath.equals(strConn)) {
         c.stdoutPath = null;
         if (serialOutputStream == null) {
           serialOutputStream = serialProvider.getSerialOutputStream();
         }
         serialStdout = serialOutputStream != null;
-        Log.println("subcommand " + c.args[0] + " stdout to serial");
+        Log.println("subcommand " + c.args[0] + " stdout to conn");
       }
       pg.addCmd(c.args, pwd, 
           c.stdin == PIPE, 
           c.stdinPath, 
           c.stdoutPath,
-          null,
+          c.stderrPath,
           serialStdin,
           serialStdout,
           false);
@@ -179,6 +229,10 @@ public class Bash implements ProcessGroup.Console {
       } else if (args[0].toLowerCase().equals("cd")) {
         
         cd(args);
+        
+      } else if (args.length > 1 && args[1].equals("=")) {
+        
+        // TODO, perhaps, if ever...
         
       } else {
         
@@ -215,7 +269,7 @@ public class Bash implements ProcessGroup.Console {
     int stdout = CONSOLE;
     String stdoutPath;
     int stderr = CONSOLE;
-    String stdoutErr;
+    String stderrPath;
   }
 
   List<String> bashCompletions = new ArrayList<String>(); 
@@ -271,6 +325,7 @@ public class Bash implements ProcessGroup.Console {
 
   @Override
   public void exit(int ret) {
+    lastReturnCode = ret;
     if (ret == 0) {
       try {
         if (chainIx < chain.size()) {

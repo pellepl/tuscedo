@@ -206,6 +206,13 @@ public class Tuscedo {
               return bash[istate].suggestFileSystemCompletions(bashPrefix, userInput.substring(bashPrefix.length()), 
                   "cd", false, true);
             }
+            else if (userInput.startsWith(bashPrefix)) {
+              int spaceIx = userInput.lastIndexOf(' ');
+              if (spaceIx > 0) {
+                return bash[istate].suggestFileSystemCompletions(bashPrefix, userInput.substring(bashPrefix.length()), 
+                    userInput.substring(bashPrefix.length(), spaceIx).trim(), true, true);
+              }
+            }
           }
           return null;
         }

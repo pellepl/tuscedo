@@ -21,9 +21,12 @@ public class Settings {
   public final static String BASH_CHAIN_STRING = "bashchain.string";
   public final static String BASH_OUTPUT_STRING = "bashoutput.string";
   public final static String BASH_APPEND_STRING = "bashappend.string";
+  public final static String BASH_ERR_OUTPUT_STRING = "bashoutputerr.string";
+  public final static String BASH_ERR_APPEND_STRING = "bashappenderr.string";
   public final static String BASH_INPUT_STRING = "bashinput.string";
   public final static String BASH_PIPE_STRING = "bashpipe.string";
-  public final static String BASH_SERIAL_STREAM_STRING = "bashserial.string";
+  public final static String BASH_CONNECTION_STREAM_STRING = "bashconn.string";
+  public final static String BASH_LAST_RET_STRING = "bashlastret.string";
 
   public static final int MAX_LIST_ENTRIES = 9;
   
@@ -47,9 +50,12 @@ public class Settings {
     props.setProperty(BASH_CHAIN_STRING, "&&");
     props.setProperty(BASH_OUTPUT_STRING, ">");
     props.setProperty(BASH_APPEND_STRING, ">>");
+    props.setProperty(BASH_ERR_OUTPUT_STRING, "2>");
+    props.setProperty(BASH_ERR_APPEND_STRING, "2>>");
     props.setProperty(BASH_INPUT_STRING, "<");
     props.setProperty(BASH_PIPE_STRING, "|");
-    props.setProperty(BASH_SERIAL_STREAM_STRING, "$SERIAL");
+    props.setProperty(BASH_CONNECTION_STREAM_STRING, "@CONN");
+    props.setProperty(BASH_LAST_RET_STRING, "$?");
   }
   
   public void saveSettings() {

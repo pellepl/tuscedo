@@ -33,7 +33,7 @@ public class ProcessGroup {
   
   void startProcess(final Command cmd, 
       final InputStream toStdIn, final OutputStream toStdOut, final OutputStream toStdErr) throws IOException {
-    Log.println(cmd.args[0] + " starting, in:" + cmd.stdin + " out:" + cmd.stdout);
+    Log.println(cmd.args[0] + " starting, in:" + cmd.stdin + " out:" + cmd.stdout + " err:" + cmd.stderr);
     final Process process = Runtime.getRuntime().exec(cmd.args, null, cmd.pwd);
     cmd.process = process;
     cmd.in = process.getOutputStream();
@@ -214,6 +214,7 @@ public class ProcessGroup {
     cmd.stderr = (stderrFile != null ? FILE : (otherStderr ? OTHER : CONSOLE));
     cmd.stdinPath = stdinFile;
     cmd.stdoutPath = stdoutFile;
+    cmd.stderrPath = stderrFile;
     cmd.args = args;
     cmd.pwd = pwd;
     if (pipeWithPrevious) {
@@ -245,14 +246,14 @@ public class ProcessGroup {
         pipeIn = new PipedInputStream(pipeOut); // this is saved till next iteration
         curOut = pipeOut;
       } else if (c.stdout == FILE) {
-        FileOutputStream fos = new FileOutputStream(new File(c.stdoutPath));
+        FileOutputStream fos = new FileOutputStream(new File(c.stdoutPath), true);
         curOut = fos;
       } else if (c.stdout == OTHER) {
         curOut = otherout;
       }
 
       if (c.stderr == FILE) {
-        FileOutputStream fos = new FileOutputStream(new File(c.stderrPath));
+        FileOutputStream fos = new FileOutputStream(new File(c.stderrPath), true);
         curErr = fos;
       } else if (c.stdout == OTHER) {
         curErr = othererr;
