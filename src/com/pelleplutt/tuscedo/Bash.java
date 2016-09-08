@@ -8,20 +8,23 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.Log;
 
-public class Bash implements ProcessGroup.Console {
+public class Bash implements ProcessGroup.ProcessConsole {
   ProcessHandler handler;
   File pwd;
-  Console console;
+  BashConsole console;
   static Pattern argBreak = Pattern.compile("([^\"]\\S*|\".+?\")\\s*");
   List<List<SubCommand>> chain;
+  boolean background;
   volatile int chainIx;
   Settings settings = Settings.inst();
   SerialStreamProvider serialProvider;
   int lastReturnCode = 0;
+  List<ProcessGroup> activeProcessGroups = new ArrayList<ProcessGroup>();
 
-  public Bash(ProcessHandler ph, Console c, SerialStreamProvider ssp) {
+  public Bash(ProcessHandler ph, BashConsole c, SerialStreamProvider ssp) {
     handler = ph;
     console = c;
     pwd = new File(".");
@@ -49,13 +52,13 @@ public class Bash implements ProcessGroup.Console {
           sb = null;
         }
         continue;
-      } else if (c == '=') {
-        if (sb != null) {
-          list.add(sb.toString());
-        }
-        list.add(Character.toString(c));
-        sb = null;
-        continue;
+//      } else if (c == '=') {
+//        if (sb != null) {
+//          list.add(sb.toString());
+//        }
+//        list.add(Character.toString(c));
+//        sb = null;
+//        continue;
       } else if (c == '\'' || c == '"') {
         quoteChar = c;
       }
@@ -96,6 +99,28 @@ public class Bash implements ProcessGroup.Console {
     }
   }
   
+  void jobs() {
+    synchronized (activeProcessGroups) {
+      for (ProcessGroup pg : activeProcessGroups) {
+        String id = "[" + (pg.id) + "]";
+        console.stdout(String.format("%-16s%s\n", id, pg.toString()));
+      }
+    }
+  }
+  
+  void fg(String args[]) {
+    if (args.length < 2) {
+      synchronized (activeProcessGroups) {
+        ProcessGroup pg = activeProcessGroups.get(activeProcessGroups.size()-1); 
+        console.stdout(pg.toString() + "\n");
+        pg.setBackground(false);
+        handler.linkToProcess(pg);
+      }
+    } else {
+      // TODO
+    }
+  }
+  
   
   void parseCommand(String args[]) {
     final String strChain = settings.string(Settings.BASH_CHAIN_STRING);
@@ -106,10 +131,10 @@ public class Bash implements ProcessGroup.Console {
     final String strInfile = settings.string(Settings.BASH_INPUT_STRING);
     final String strPipe = settings.string(Settings.BASH_PIPE_STRING);
     final String strLastRet = settings.string(Settings.BASH_LAST_RET_STRING);
-    
+    final String strBackground = settings.string(Settings.BASH_BACKGROUND_STRING);
     List<List<SubCommand>> cmds = new ArrayList<List<SubCommand>>();
     List<SubCommand> subCmds = new ArrayList<SubCommand>();
-
+    
     SubCommand sc = null;
     List<String> curArgs = null;
     
@@ -154,6 +179,10 @@ public class Bash implements ProcessGroup.Console {
         sc = new SubCommand();
         sc.stdin = PIPE;
         curArgs = null;
+      }
+      else if (arg.equals(strBackground)) {
+        background = true;
+        continue;
       } else {
         if (arg.equals(strLastRet)) {
           arg = Integer.toString(lastReturnCode);
@@ -182,9 +211,11 @@ public class Bash implements ProcessGroup.Console {
   
   void startProcessGroup(List<SubCommand> cmds) throws IOException {
     final String strConn = settings.string(Settings.BASH_CONNECTION_STREAM_STRING);
+    
     ProcessGroup pg = new ProcessGroup();
     InputStream serialInputStream = null;
     OutputStream serialOutputStream = null;
+    
     for (SubCommand c : cmds) {
       boolean serialStdin = false;
       boolean serialStdout = false;
@@ -214,8 +245,21 @@ public class Bash implements ProcessGroup.Console {
           serialStdout,
           false);
     }
+    AppSystem.addDisposable(pg);
+    synchronized (activeProcessGroups) {
+      activeProcessGroups.add(pg);
+    }
+    pg.setBackground(background);
     pg.start(serialInputStream, serialOutputStream, null, this);
-    handler.linkToProcess(pg);
+    if (!pg.isBackground()) {
+      handler.linkToProcess(pg);
+    }
+  }
+  
+  public void sendCurrentToBack() {
+    if (handler.isLinkedToProcess()) {
+      handler.sendToBack();
+    }
   }
   
   public void input(String input) {
@@ -230,10 +274,18 @@ public class Bash implements ProcessGroup.Console {
         
         cd(args);
         
-      } else if (args.length > 1 && args[1].equals("=")) {
+      } else if (args[0].toLowerCase().equals("jobs")) {
         
-        // TODO, perhaps, if ever...
+        jobs();
         
+      } else if (args[0].toLowerCase().equals("fg")) {
+        
+        fg(args);
+        
+//      } else if (args.length > 1 && args[1].equals("=")) {
+//        
+//        // TODO, perhaps, if ever...
+//        
       } else {
         
         chain = null;
@@ -248,7 +300,7 @@ public class Bash implements ProcessGroup.Console {
     }
   }
 
-  interface Console {
+  interface BashConsole {
     void stdout(String s);
 
     void stderr(String s);
@@ -276,10 +328,19 @@ public class Bash implements ProcessGroup.Console {
   public List<String> suggestFileSystemCompletions(String prefix, String s, String cmd, boolean includeFiles, boolean includeDirs) {
     if (s.startsWith(cmd + " ")) {
       final int cmdIx = cmd.length() + 1;
+      final int sLen = s.length();
       bashCompletions.clear();
       int lastFS = s.lastIndexOf(File.separator);
-      String path = lastFS < 0 ? "" : s.substring(cmdIx, lastFS+1);
-      String filter = lastFS < 0 ? s.substring(cmdIx) : s.substring(lastFS+1);
+      int lastSep = s.lastIndexOf(' ');
+      int endIx = Math.max(lastSep, lastFS);
+      String path = "";
+      String filter = "";
+      path = endIx < 0 ? 
+          "" : 
+            s.substring(Math.min(cmdIx, sLen), Math.min(endIx+1, sLen));
+      filter = endIx < 0 ? 
+          s.substring(Math.min(cmdIx, sLen)) : 
+            s.substring(Math.min(endIx+1, sLen));
       
       File srcDir;
       if (path.startsWith(File.separator)) {
@@ -301,7 +362,7 @@ public class Bash implements ProcessGroup.Console {
                   (includeDirs && f.isDirectory()) || 
                   (includeFiles && f.isFile())
               )) {
-            String c = prefix + s + f.getName().substring(filter.length());
+            String c = prefix + s + f.getName().substring(filter.length()) + (f.isDirectory() ? File.separator : "");
             bashCompletions.add(c);
           }
         } catch (Throwable e) {
@@ -314,31 +375,41 @@ public class Bash implements ProcessGroup.Console {
   }
 
   @Override
-  public void outln(String s) {
+  public void outln(ProcessGroup pg, String s) {
     console.stdout(s + "\n");
   }
 
   @Override
-  public void errln(String s) {
+  public void errln(ProcessGroup pg, String s) {
     console.stderr(s + "\n");
   }
 
   @Override
-  public void exit(int ret) {
+  public void exit(ProcessGroup pg, int ret) {
     lastReturnCode = ret;
+    synchronized (activeProcessGroups) {
+      activeProcessGroups.remove(pg);
+    }
+
     if (ret == 0) {
       try {
         if (chainIx < chain.size()) {
           start();
         } else {
-          handler.unlinkFromProcess();
+          if (!pg.isBackground()) {
+            handler.unlinkFromProcess();
+          }
         }
       } catch (Throwable t) {
-        handler.unlinkFromProcess();
+        if (!pg.isBackground()) {
+          handler.unlinkFromProcess();
+        }
         t.printStackTrace();
       }
     } else {
-      handler.unlinkFromProcess();
+      if (!pg.isBackground()) {
+        handler.unlinkFromProcess();
+      }
     }
     
   }

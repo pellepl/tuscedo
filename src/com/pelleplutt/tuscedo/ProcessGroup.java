@@ -14,9 +14,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.pelleplutt.util.AppSystem;
+import com.pelleplutt.util.AppSystem.Disposable;
 import com.pelleplutt.util.Log;
 
-public class ProcessGroup {
+public class ProcessGroup implements Disposable {
 
   static final int CONSOLE = 0;
   static final int FILE = 1;
@@ -26,10 +27,24 @@ public class ProcessGroup {
   OutputStream stdin;
   InputStream stdout;
   InputStream stderr;
-  
-  Console cons;
+  private boolean background;
+  ProcessConsole cons;
+  public final int id;
+  static int __id;
   
   List<Command> commands = new ArrayList<Command>();
+  
+  public ProcessGroup() {
+    id = ++__id;
+  }
+  
+  public synchronized void setBackground(boolean b) {
+    background = b;
+  }
+  
+  public synchronized boolean isBackground() {
+    return background;
+  }
   
   void startProcess(final Command cmd, 
       final InputStream toStdIn, final OutputStream toStdOut, final OutputStream toStdErr) throws IOException {
@@ -78,7 +93,9 @@ public class ProcessGroup {
             BufferedReader out = new BufferedReader(
                 new InputStreamReader(cmd.out));
             while ((line = out.readLine()) != null) {
-              if (cons != null) cons.outln(line);
+              if (cons != null) {
+                cons.outln(ProcessGroup.this, line);
+              }
             }
             
           } else {
@@ -116,7 +133,9 @@ public class ProcessGroup {
             BufferedReader out = new BufferedReader(
                 new InputStreamReader(cmd.err));
             while ((line = out.readLine()) != null) {
-              if (cons != null) cons.errln(line);
+              if (cons != null) {
+                cons.errln(ProcessGroup.this, line);
+              }
             }
             
           } else {
@@ -154,8 +173,13 @@ public class ProcessGroup {
           cmd.thrOut.join();
         } catch (InterruptedException e) {
         }
+        finally {
+          AppSystem.dispose(ProcessGroup.this);
+          if (cons != null) {
+            cons.exit(ProcessGroup.this, ret);
+          }
+        }
         Log.println(cmd.args[0] + " exited " + ret);
-        if (cons != null) cons.exit(ret);
       }
     }, "proc:" + cmd.args[0]);
     processWatch.setDaemon(true);
@@ -223,43 +247,51 @@ public class ProcessGroup {
     commands.add(cmd);
   }
   
-  public void start(InputStream otherin, OutputStream otherout, OutputStream othererr, Console cons) throws IOException {
-    stdin = null;
-    this.cons = cons;
-    PipedInputStream pipeIn = null;
-    PipedOutputStream pipeOut = null;
-    for (int cix = 0; cix < commands.size(); cix++) {
-      Command c = commands.get(cix);
-      InputStream curIn = null;
-      OutputStream curOut = null;
-      OutputStream curErr = null;
-      if (c.stdin == PIPE) {
-        curIn = pipeIn;
-      } else if (c.stdin == FILE) {
-        FileInputStream fis = new FileInputStream(new File(c.stdinPath));
-        curIn = fis;
-      } else if (c.stdin == OTHER) {
-        curIn = otherin;
+  public void start(InputStream otherin, OutputStream otherout, OutputStream othererr, ProcessConsole cons) throws IOException {
+    try {
+      stdin = null;
+      this.cons = cons;
+      PipedInputStream pipeIn = null;
+      PipedOutputStream pipeOut = null;
+      for (int cix = 0; cix < commands.size(); cix++) {
+        Command c = commands.get(cix);
+        InputStream curIn = null;
+        OutputStream curOut = null;
+        OutputStream curErr = null;
+        if (c.stdin == PIPE) {
+          curIn = pipeIn;
+        } else if (c.stdin == FILE) {
+          FileInputStream fis = new FileInputStream(new File(c.stdinPath));
+          curIn = fis;
+        } else if (c.stdin == OTHER) {
+          curIn = otherin;
+        }
+        if (c.stdout == PIPE) {
+          pipeOut = new PipedOutputStream();
+          pipeIn = new PipedInputStream(pipeOut); // this is saved till next iteration
+          curOut = pipeOut;
+        } else if (c.stdout == FILE) {
+          FileOutputStream fos = new FileOutputStream(new File(c.stdoutPath), true);
+          curOut = fos;
+        } else if (c.stdout == OTHER) {
+          curOut = otherout;
+        }
+  
+        if (c.stderr == FILE) {
+          FileOutputStream fos = new FileOutputStream(new File(c.stderrPath), true);
+          curErr = fos;
+        } else if (c.stdout == OTHER) {
+          curErr = othererr;
+        }
+        
+        startProcess(c, curIn, curOut, curErr);
       }
-      if (c.stdout == PIPE) {
-        pipeOut = new PipedOutputStream();
-        pipeIn = new PipedInputStream(pipeOut); // this is saved till next iteration
-        curOut = pipeOut;
-      } else if (c.stdout == FILE) {
-        FileOutputStream fos = new FileOutputStream(new File(c.stdoutPath), true);
-        curOut = fos;
-      } else if (c.stdout == OTHER) {
-        curOut = otherout;
+    } catch (Throwable t) {
+      AppSystem.dispose(ProcessGroup.this);
+      if (cons != null) {
+        cons.exit(ProcessGroup.this, -1);
       }
-
-      if (c.stderr == FILE) {
-        FileOutputStream fos = new FileOutputStream(new File(c.stderrPath), true);
-        curErr = fos;
-      } else if (c.stdout == OTHER) {
-        curErr = othererr;
-      }
-      
-      startProcess(c, curIn, curOut, curErr);
+      throw t;
     }
   }
 
@@ -274,13 +306,15 @@ public class ProcessGroup {
   public int kill(boolean synchronous) {
     int returnCode = -1;
     for (Command c : commands) {
+      boolean wasAlive = false;
       try {
         AppSystem.closeSilently(c.in);
         AppSystem.closeSilently(c.err);
         AppSystem.closeSilently(c.out);
-        c.process.destroy();
+        wasAlive = c.process.isAlive();
+        if (wasAlive) c.process.destroy();
       } catch (Throwable t) {}
-      if (synchronous) {
+      if (synchronous && wasAlive) {
         try {
           if (c != null && c.process != null) {
             returnCode = c.process.waitFor();
@@ -290,8 +324,8 @@ public class ProcessGroup {
     }
     return returnCode;
   }
-
-  class Command {
+  
+  public class Command {
     Thread thrOut;
     File pwd;
     
@@ -311,9 +345,25 @@ public class ProcessGroup {
     InputStream err;
   }
   
-  public interface Console {
-    public void outln(String s);
-    public void errln(String s);
-    public void exit(int ret);
+  public interface ProcessConsole {
+    public void outln(ProcessGroup pg, String s);
+    public void errln(ProcessGroup pg, String s);
+    public void exit(ProcessGroup pg, int ret);
+  }
+
+  @Override
+  public void dispose() {
+    kill(true);
+  }
+  
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    for (Command c : commands) {
+      for (String a : c.args) {
+        sb.append(a + " ");
+      }
+    }
+    return sb.toString();
   }
 }

@@ -27,6 +27,7 @@ public class Settings {
   public final static String BASH_PIPE_STRING = "bashpipe.string";
   public final static String BASH_CONNECTION_STREAM_STRING = "bashconn.string";
   public final static String BASH_LAST_RET_STRING = "bashlastret.string";
+  public final static String BASH_BACKGROUND_STRING = "bashbackground.string";
 
   public static final int MAX_LIST_ENTRIES = 9;
   
@@ -56,6 +57,7 @@ public class Settings {
     props.setProperty(BASH_PIPE_STRING, "|");
     props.setProperty(BASH_CONNECTION_STREAM_STRING, "@CONN");
     props.setProperty(BASH_LAST_RET_STRING, "$?");
+    props.setProperty(BASH_BACKGROUND_STRING, "&");
   }
   
   public void saveSettings() {

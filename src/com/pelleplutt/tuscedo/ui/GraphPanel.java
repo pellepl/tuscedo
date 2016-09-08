@@ -53,7 +53,7 @@ public class GraphPanel extends JPanel {
   Color colSelEdge = new Color(0,255,255,128);
   Color colSelArea = new Color(0,255,255,64);
 
-  int graphType = GRAPH_BAR;
+  int graphType = GRAPH_LINE;
   
   public GraphPanel() {
     samples = new ArrayList<Double>();

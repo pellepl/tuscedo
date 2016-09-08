@@ -15,57 +15,87 @@ public class ProcessACTextField extends ACTextField implements ProcessHandler {
   ProcessGroup process;
   static final KeyStroke killKey = KeyStroke.getKeyStroke(KeyEvent.VK_C, KeyEvent.CTRL_DOWN_MASK);
   static final KeyStroke EOFKey = KeyStroke.getKeyStroke(KeyEvent.VK_D, KeyEvent.CTRL_DOWN_MASK);
+  static final KeyStroke backgroundKey = KeyStroke.getKeyStroke(KeyEvent.VK_Z, KeyEvent.CTRL_DOWN_MASK);
   Object stdKillKeyAction;
   Object stdEOFKeyAction;
+  Object stdBGKeyAction;
   
   public ProcessACTextField() {
   }
   
+  @Override
   public void linkToProcess(ProcessGroup p) {
     setBackground(Tuscedo.colInputBashBg);
     process = p;
+    stdKillKeyAction = getInputMap().get(killKey);
     getInputMap().put(killKey, "kill");
     getActionMap().put("kill", actionKill);
     stdEOFKeyAction = getInputMap().get(EOFKey);
     getInputMap().put(EOFKey, "eof");
     getActionMap().put("eof", actionEOF);
+    stdBGKeyAction = getInputMap().get(backgroundKey);
+    getInputMap().put(backgroundKey, "bg");
+    getActionMap().put("bg", actionBG);
   }
   
+  @Override
   public boolean isLinkedToProcess() {
     return process != null;
   }
   
+  @Override
   public void closeStdin() {
     try {
       process.close();
     } catch (Throwable t) {}
   }
   
+  @Override
   public void sendToStdIn(String line) {
-    try {
-      process.writeLine(line);
-    } catch (IOException e) {
-      System.out.println("WRITELINE " + line);
-      e.printStackTrace();
+    if (process != null) {
+      try {
+        process.writeLine(line);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
   }
   
-  public int unlinkFromProcess() {
+  @Override
+  public void sendToBack() {
+    if (isLinkedToProcess()) {
+      process.setBackground(true);
+      unlinkFromProcess();
+    }
+  }
+  
+  @Override
+  public void unlinkFromProcess() {
     setBackground(Tuscedo.colInputBg);
-    int returnCode = -1;
     if (process != null) {
-      returnCode = process.kill(true);
       getInputMap().put(killKey, stdKillKeyAction);
       getInputMap().put(EOFKey, stdEOFKeyAction);
       process = null;
     }
-    return returnCode;
+  }
+  
+  @Override
+  public ProcessGroup getLinkedProcess() {
+    return process;
+  }
+  
+  @Override
+  public void kill()  {
+      if (process != null) {
+      process.kill(true);
+      unlinkFromProcess();
+    }
   }
   
   AbstractAction actionKill = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      unlinkFromProcess();
+      kill();
     }
   };
 
@@ -73,6 +103,13 @@ public class ProcessACTextField extends ACTextField implements ProcessHandler {
     @Override
     public void actionPerformed(ActionEvent e) {
       closeStdin();
+    }
+  };
+
+  AbstractAction actionBG = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      sendToBack();
     }
   };
 }

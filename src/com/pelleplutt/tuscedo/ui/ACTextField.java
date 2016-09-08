@@ -188,10 +188,9 @@ public class ACTextField extends JTextPane implements CaretListener {
    * Accepts current suggestion wholly.
    */
   public void acceptSuggestionWholly() {
-    Model m = userStringFullySuggested ? history : model;
-    if (m.index < 0) return;
     String s = super.getText();
     setText(s);
+    lastKnownSuggestion = false;
   }
   
   /**
@@ -289,7 +288,13 @@ public class ACTextField extends JTextPane implements CaretListener {
       lastKnownSuggestion = false;
     } else {
       List<String> foundSuggestions = acceptSuggestion();
-      if (suggestionListener != null) suggestionListener.gotSuggestions(foundSuggestions);
+      if (foundSuggestions != null && foundSuggestions.size() == 1) {
+        acceptSuggestionWholly();
+        lastKnownSuggestion = false;
+        if (suggestionListener != null) suggestionListener.gotSuggestions(null);
+      } else {
+        if (suggestionListener != null) suggestionListener.gotSuggestions(foundSuggestions);
+      }
     }
   }
   

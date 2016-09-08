@@ -14,6 +14,8 @@ import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -44,6 +46,7 @@ import com.pelleplutt.Essential;
 import com.pelleplutt.tuscedo.ui.ACTextField;
 import com.pelleplutt.tuscedo.ui.KeyMap;
 import com.pelleplutt.tuscedo.ui.ProcessACTextField;
+import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.FastTextPane;
 import com.pelleplutt.util.io.Port;
 
@@ -144,7 +147,7 @@ public class Tuscedo {
   		key = KeyMap.fromString(keys);
   		KeyMap.set(name, keys);
   	}
-  	c.getInputMap().put(
+  	c.getInputMap(JComponent.WHEN_FOCUSED).put(
         KeyStroke.getKeyStroke(key.keyCode, key.modifiers),
         name);
     c.getActionMap().put(name, action);
@@ -156,6 +159,12 @@ public class Tuscedo {
     f.getContentPane().setLayout(new BorderLayout());
     f.setSize(600, 400);
     f.setLocationByPlatform(true);
+    f.addWindowListener(new WindowAdapter() {
+      @Override
+      public void windowClosing(WindowEvent e) {
+        AppSystem.disposeAll();
+      }
+    });
 
     ftp = new FastTextPane();
     decorateFTP(ftp);
@@ -261,7 +270,7 @@ public class Tuscedo {
       inputPanel.add(ip[i], Integer.toString(i));
       
       final ProcessHandler ph = input[i];
-      bash[i] = new Bash(input[i], new Bash.Console() {
+      bash[i] = new Bash(input[i], new Bash.BashConsole() {
         @Override
         public void stdout(String s) {
           ftp.addText(s, 1, colProcessFg, null, false);
