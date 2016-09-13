@@ -1,10 +1,12 @@
 package com.pelleplutt.tuscedo;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
@@ -89,15 +91,15 @@ public class ProcessGroup implements Disposable {
         try {
           if (cmd.stdout == CONSOLE) {
 //            String line;
-//            BufferedReader out = new BufferedReader(
-//                new InputStreamReader(cmd.out));
+            BufferedReader out = new BufferedReader(
+                new InputStreamReader(cmd.out));
 //            while ((line = out.readLine()) != null) {
 //              if (cons != null) {
 //                cons.outln(ProcessGroup.this, line);
 //              }
 //            }
             int d;
-            while ((d = cmd.out.read()) != -1) {
+            while ((d = out.read()) != -1) {
               cons.out(ProcessGroup.this, (byte)d);
             }
           } else {
@@ -132,15 +134,15 @@ public class ProcessGroup implements Disposable {
         try {
           if (cmd.stderr == CONSOLE) {
 //            String line;
-//            BufferedReader out = new BufferedReader(
-//                new InputStreamReader(cmd.err));
+            BufferedReader out = new BufferedReader(
+                new InputStreamReader(cmd.err));
 //            while ((line = out.readLine()) != null) {
 //              if (cons != null) {
 //                cons.errln(ProcessGroup.this, line);
 //              }
 //            }
             int d;
-            while ((d = cmd.err.read()) != -1) {
+            while ((d = out.read()) != -1) {
               cons.err(ProcessGroup.this, (byte)d);
             }
           } else {
