@@ -9,7 +9,6 @@ import javax.swing.KeyStroke;
 
 import com.pelleplutt.tuscedo.ProcessGroup;
 import com.pelleplutt.tuscedo.ProcessHandler;
-import com.pelleplutt.tuscedo.Tuscedo;
 
 public class ProcessACTextField extends ACTextField implements ProcessHandler {
   ProcessGroup process;
@@ -19,13 +18,15 @@ public class ProcessACTextField extends ACTextField implements ProcessHandler {
   Object stdKillKeyAction;
   Object stdEOFKeyAction;
   Object stdBGKeyAction;
+  WorkArea workarea;
   
-  public ProcessACTextField() {
+  public ProcessACTextField(WorkArea workarea) {
+    this.workarea = workarea;
   }
   
   @Override
   public void linkToProcess(ProcessGroup p) {
-    setBackground(Tuscedo.colInputBashBg);
+    workarea.onLinkedProcess(this, p);
     process = p;
     stdKillKeyAction = getInputMap().get(killKey);
     getInputMap().put(killKey, "kill");
@@ -71,7 +72,7 @@ public class ProcessACTextField extends ACTextField implements ProcessHandler {
   
   @Override
   public void unlinkFromProcess() {
-    setBackground(Tuscedo.colInputBg);
+    workarea.onUnlinkedProcess(this, process);
     if (process != null) {
       getInputMap().put(killKey, stdKillKeyAction);
       getInputMap().put(EOFKey, stdEOFKeyAction);

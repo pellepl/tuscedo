@@ -1,12 +1,10 @@
 package com.pelleplutt.tuscedo;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
@@ -30,12 +28,11 @@ public class ProcessGroup implements Disposable {
   private boolean background;
   ProcessConsole cons;
   public final int id;
-  static int __id;
   
   List<Command> commands = new ArrayList<Command>();
   
-  public ProcessGroup() {
-    id = ++__id;
+  public ProcessGroup(int id) {
+    this.id = id;
   }
   
   public synchronized void setBackground(boolean b) {
@@ -49,7 +46,9 @@ public class ProcessGroup implements Disposable {
   void startProcess(final Command cmd, 
       final InputStream toStdIn, final OutputStream toStdOut, final OutputStream toStdErr) throws IOException {
     Log.println(cmd.args[0] + " starting, in:" + cmd.stdin + " out:" + cmd.stdout + " err:" + cmd.stderr);
-    final Process process = Runtime.getRuntime().exec(cmd.args, null, cmd.pwd);
+    String[] envp = null;
+    //String[] envp = { "TERM=xterm" };
+    final Process process = Runtime.getRuntime().exec(cmd.args, envp, cmd.pwd);
     cmd.process = process;
     cmd.in = process.getOutputStream();
     cmd.out = process.getInputStream();
@@ -89,15 +88,18 @@ public class ProcessGroup implements Disposable {
       public void run() {
         try {
           if (cmd.stdout == CONSOLE) {
-            String line;
-            BufferedReader out = new BufferedReader(
-                new InputStreamReader(cmd.out));
-            while ((line = out.readLine()) != null) {
-              if (cons != null) {
-                cons.outln(ProcessGroup.this, line);
-              }
+//            String line;
+//            BufferedReader out = new BufferedReader(
+//                new InputStreamReader(cmd.out));
+//            while ((line = out.readLine()) != null) {
+//              if (cons != null) {
+//                cons.outln(ProcessGroup.this, line);
+//              }
+//            }
+            int d;
+            while ((d = cmd.out.read()) != -1) {
+              cons.out(ProcessGroup.this, (byte)d);
             }
-            
           } else {
             int b;
             switch (cmd.stdout) {
@@ -129,15 +131,18 @@ public class ProcessGroup implements Disposable {
       public void run() {
         try {
           if (cmd.stderr == CONSOLE) {
-            String line;
-            BufferedReader out = new BufferedReader(
-                new InputStreamReader(cmd.err));
-            while ((line = out.readLine()) != null) {
-              if (cons != null) {
-                cons.errln(ProcessGroup.this, line);
-              }
+//            String line;
+//            BufferedReader out = new BufferedReader(
+//                new InputStreamReader(cmd.err));
+//            while ((line = out.readLine()) != null) {
+//              if (cons != null) {
+//                cons.errln(ProcessGroup.this, line);
+//              }
+//            }
+            int d;
+            while ((d = cmd.err.read()) != -1) {
+              cons.err(ProcessGroup.this, (byte)d);
             }
-            
           } else {
             int b;
             switch (cmd.stderr) {
@@ -152,7 +157,7 @@ public class ProcessGroup implements Disposable {
               break;
             }
           }
-        } catch (Throwable t) { t.printStackTrace(); }
+        } catch (Throwable t) { }
         finally {
           if (cmd.stderr != OTHER) {
             AppSystem.closeSilently(toStdErr);
@@ -261,6 +266,7 @@ public class ProcessGroup implements Disposable {
         if (c.stdin == PIPE) {
           curIn = pipeIn;
         } else if (c.stdin == FILE) {
+          @SuppressWarnings("resource")
           FileInputStream fis = new FileInputStream(new File(c.stdinPath));
           curIn = fis;
         } else if (c.stdin == OTHER) {
@@ -271,6 +277,7 @@ public class ProcessGroup implements Disposable {
           pipeIn = new PipedInputStream(pipeOut); // this is saved till next iteration
           curOut = pipeOut;
         } else if (c.stdout == FILE) {
+          @SuppressWarnings("resource")
           FileOutputStream fos = new FileOutputStream(new File(c.stdoutPath), true);
           curOut = fos;
         } else if (c.stdout == OTHER) {
@@ -278,6 +285,7 @@ public class ProcessGroup implements Disposable {
         }
   
         if (c.stderr == FILE) {
+          @SuppressWarnings("resource")
           FileOutputStream fos = new FileOutputStream(new File(c.stderrPath), true);
           curErr = fos;
         } else if (c.stdout == OTHER) {
@@ -311,7 +319,7 @@ public class ProcessGroup implements Disposable {
         AppSystem.closeSilently(c.in);
         AppSystem.closeSilently(c.err);
         AppSystem.closeSilently(c.out);
-        wasAlive = c.process.isAlive();
+        wasAlive = true; // 1.8 c.process.isAlive();
         if (wasAlive) c.process.destroy();
       } catch (Throwable t) {}
       if (synchronous && wasAlive) {
@@ -347,13 +355,15 @@ public class ProcessGroup implements Disposable {
   
   public interface ProcessConsole {
     public void outln(ProcessGroup pg, String s);
+    public void out(ProcessGroup pg, byte b);
     public void errln(ProcessGroup pg, String s);
+    public void err(ProcessGroup pg, byte b);
     public void exit(ProcessGroup pg, int ret);
   }
 
   @Override
   public void dispose() {
-    kill(true);
+    kill(false);
   }
   
   @Override

@@ -24,8 +24,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JViewport;
 import javax.swing.WindowConstants;
 
-import com.pelleplutt.tuscedo.Tuscedo;
-
 public class GraphPanel extends JPanel {
   public static final int GRAPH_LINE = 0;
   public static final int GRAPH_BAR = 1;
@@ -61,7 +59,7 @@ public class GraphPanel extends JPanel {
     scrl = new JScrollPane(renderer, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, 
         JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
     scrl.getViewport().setScrollMode(JViewport.SIMPLE_SCROLL_MODE); // fix artefacts 
-    Tuscedo.decorateScrollPane(scrl);
+    WorkArea.decorateScrollPane(scrl);
     setLayout(new BorderLayout());
     add(scrl, BorderLayout.CENTER);
     renderer.addMouseWheelListener(mouseHandler);

@@ -34,7 +34,7 @@ public class ACTextField extends JTextPane implements CaretListener {
   Model userModel;
   String lastUserModelQuery;
   /** User has selected a suggestion */
-  boolean lastKnownSuggestion = false;
+  boolean userSelectedSuggestion = false;
   /** Suggestion listener */
   SuggestionListener suggestionListener;
   /** If user must enter strings comprised in model only */
@@ -106,6 +106,10 @@ public class ACTextField extends JTextPane implements CaretListener {
     forceSuggest();
   }
   
+  /**
+   * Adds a suggestion to the suggestion model
+   * @param text
+   */
   public void addSuggestion(String text) {
     if (history.size() == 0 || !history.get(history.size()-1).equals(text)) {
       history.add(text);
@@ -163,7 +167,7 @@ public class ACTextField extends JTextPane implements CaretListener {
       }
       setText(userString);
     }
-    lastKnownSuggestion = true;
+    userSelectedSuggestion = true;
   }
   
   void prevSuggestion() {
@@ -190,7 +194,7 @@ public class ACTextField extends JTextPane implements CaretListener {
   public void acceptSuggestionWholly() {
     String s = super.getText();
     setText(s);
-    lastKnownSuggestion = false;
+    userSelectedSuggestion = false;
   }
   
   /**
@@ -200,7 +204,7 @@ public class ACTextField extends JTextPane implements CaretListener {
   public List<String> acceptSuggestion() {
     final String ref = userString;
     Model m = userStringFullySuggested ? history : model;
-    if (!userString.equals(lastUserModelQuery)) {
+    if (!userString.equals(lastUserModelQuery) && suggestionListener != null) {
       lastUserModelQuery = userString;
       userModel.suggestions = suggestionListener.giveSuggestions(userString);
       userModel.index = -1;
@@ -229,8 +233,8 @@ public class ACTextField extends JTextPane implements CaretListener {
     if (curSug != null) {
       String s = curSug.substring(0, minOffs);
       setText(s);
-      lastKnownSuggestion = true;
     }
+
     return found;
   }
   
@@ -274,7 +278,7 @@ public class ACTextField extends JTextPane implements CaretListener {
     }
     if (curSug != null) {
       setText(curSug.substring(0, minOffs));
-      lastKnownSuggestion = true;
+      userSelectedSuggestion = true;
     }
   }
   
@@ -282,24 +286,25 @@ public class ACTextField extends JTextPane implements CaretListener {
    * Accepts current suggestion. Accepts wholly if previous suggestion was accepted.
    */
   public void accept() {
-    if (lastKnownSuggestion) {
+    if (userSelectedSuggestion) {
       acceptSuggestionWholly();
       if (suggestionListener != null) suggestionListener.gotSuggestions(null);
-      lastKnownSuggestion = false;
+      userSelectedSuggestion = false;
     } else {
       List<String> foundSuggestions = acceptSuggestion();
-      if (foundSuggestions != null && foundSuggestions.size() == 1) {
-        acceptSuggestionWholly();
-        lastKnownSuggestion = false;
-        if (suggestionListener != null) suggestionListener.gotSuggestions(null);
+      if (suggestionListener != null) {
+        suggestionListener.gotSuggestions(foundSuggestions);
+      }
+      if (foundSuggestions != null && foundSuggestions.size() > 1) {
+        userSelectedSuggestion = true;
       } else {
-        if (suggestionListener != null) suggestionListener.gotSuggestions(foundSuggestions);
+        userSelectedSuggestion = false;
       }
     }
   }
   
   void handleUpdate(FilterBypass fb, int offset, String newUserString) throws BadLocationException {
-    lastKnownSuggestion = false;
+    userSelectedSuggestion = false;
     if (suggestionListener != null) suggestionListener.gotSuggestions(null);
     if (!forced || newUserString.length() == 0) {
       userString = newUserString;

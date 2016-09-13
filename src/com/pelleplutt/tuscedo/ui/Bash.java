@@ -1,4 +1,4 @@
-package com.pelleplutt.tuscedo;
+package com.pelleplutt.tuscedo.ui;
 
 import java.io.File;
 import java.io.IOException;
@@ -8,6 +8,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import com.pelleplutt.tuscedo.ProcessGroup;
+import com.pelleplutt.tuscedo.ProcessHandler;
+import com.pelleplutt.tuscedo.SerialStreamProvider;
+import com.pelleplutt.tuscedo.Settings;
 import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.Log;
 
@@ -23,12 +27,14 @@ public class Bash implements ProcessGroup.ProcessConsole {
   SerialStreamProvider serialProvider;
   int lastReturnCode = 0;
   List<ProcessGroup> activeProcessGroups = new ArrayList<ProcessGroup>();
+  WorkArea area;
 
-  public Bash(ProcessHandler ph, BashConsole c, SerialStreamProvider ssp) {
+  public Bash(ProcessHandler ph, BashConsole c, SerialStreamProvider ssp, WorkArea area) {
     handler = ph;
     console = c;
     pwd = new File(".");
     serialProvider = ssp;
+    this.area = area;
   }
   
   String[] breakArgs(String input) {
@@ -97,27 +103,46 @@ public class Bash implements ProcessGroup.ProcessConsole {
         console.stdout(pwd.getCanonicalPath() + "\n");
       }
     }
+    area.updateTitle();
   }
   
   void jobs() {
     synchronized (activeProcessGroups) {
       for (ProcessGroup pg : activeProcessGroups) {
         String id = "[" + (pg.id) + "]";
-        console.stdout(String.format("%-16s%s\n", id, pg.toString()));
+        console.stdout(String.format("%-24s%s\n", id, pg.toString()));
       }
     }
   }
   
   void fg(String args[]) {
-    if (args.length < 2) {
-      synchronized (activeProcessGroups) {
+    synchronized (activeProcessGroups) {
+      if (args.length < 2) {
+        if (activeProcessGroups.isEmpty()) {
+          console.stderr("fg: current: no such job\n");
+          return;
+        }
         ProcessGroup pg = activeProcessGroups.get(activeProcessGroups.size()-1); 
         console.stdout(pg.toString() + "\n");
         pg.setBackground(false);
         handler.linkToProcess(pg);
+      } else {
+        try {
+          int id = Integer.parseInt(args[1].substring(1));
+          ProcessGroup pg = null; 
+          for (ProcessGroup pg2 : activeProcessGroups) {
+            if (pg2.id == id) {
+              pg = pg2;
+              break;
+            }
+          }
+          console.stdout(pg.toString() + "\n");
+          pg.setBackground(false);
+          handler.linkToProcess(pg);
+        } catch (Throwable t) {
+          console.stderr("fg: " + args[1] + ": no such job\n");
+        }
       }
-    } else {
-      // TODO
     }
   }
   
@@ -137,7 +162,7 @@ public class Bash implements ProcessGroup.ProcessConsole {
     
     SubCommand sc = null;
     List<String> curArgs = null;
-    
+    background = false;
     for (int i = 0; i < args.length; i++) {
       String arg = args[i].trim();
       if (arg.length() == 0) continue;
@@ -211,8 +236,13 @@ public class Bash implements ProcessGroup.ProcessConsole {
   
   void startProcessGroup(List<SubCommand> cmds) throws IOException {
     final String strConn = settings.string(Settings.BASH_CONNECTION_STREAM_STRING);
-    
-    ProcessGroup pg = new ProcessGroup();
+    int id = 0;
+    synchronized (activeProcessGroups) {
+      for (ProcessGroup pg : activeProcessGroups) {
+        id = Math.max(id, pg.id);
+      }
+    }
+    ProcessGroup pg = new ProcessGroup(id+1);
     InputStream serialInputStream = null;
     OutputStream serialOutputStream = null;
     
@@ -270,15 +300,15 @@ public class Bash implements ProcessGroup.ProcessConsole {
         // process linked, send input to process
         handler.sendToStdIn(input);
         
-      } else if (args[0].toLowerCase().equals("cd")) {
+      } else if (args.length > 0 && args[0].toLowerCase().equals("cd")) {
         
         cd(args);
         
-      } else if (args[0].toLowerCase().equals("jobs")) {
+      } else if (args.length > 0 && args[0].toLowerCase().equals("jobs")) {
         
         jobs();
         
-      } else if (args[0].toLowerCase().equals("fg")) {
+      } else if (args.length > 0 && args[0].toLowerCase().equals("fg")) {
         
         fg(args);
         
@@ -286,7 +316,7 @@ public class Bash implements ProcessGroup.ProcessConsole {
 //        
 //        // TODO, perhaps, if ever...
 //        
-      } else {
+      } else if (args.length > 0) {
         
         chain = null;
         chainIx = 0;
@@ -303,7 +333,11 @@ public class Bash implements ProcessGroup.ProcessConsole {
   interface BashConsole {
     void stdout(String s);
 
+    void stdout(byte b);
+
     void stderr(String s);
+
+    void stderr(byte b);
     
     void stdin(String s);
   }
@@ -380,10 +414,29 @@ public class Bash implements ProcessGroup.ProcessConsole {
   }
 
   @Override
+  public void out(ProcessGroup pg, byte b) {
+    console.stdout(b);
+  }
+
+  @Override
   public void errln(ProcessGroup pg, String s) {
     console.stderr(s + "\n");
   }
 
+  @Override
+  public void err(ProcessGroup pg, byte b) {
+    console.stderr(b);
+  }
+
+  void handleExit(ProcessGroup pg, int ret) {
+    if (!pg.isBackground()) {
+      handler.unlinkFromProcess();
+    } else {
+      String id = "[" + (pg.id) + "] " + (ret == 0 ? "Done" : "Exit " + ret);
+      console.stdout(String.format("%-24s%s\n", id, pg.toString()));
+    }
+  }
+  
   @Override
   public void exit(ProcessGroup pg, int ret) {
     lastReturnCode = ret;
@@ -396,21 +449,21 @@ public class Bash implements ProcessGroup.ProcessConsole {
         if (chainIx < chain.size()) {
           start();
         } else {
-          if (!pg.isBackground()) {
-            handler.unlinkFromProcess();
-          }
+          handleExit(pg, ret);
         }
       } catch (Throwable t) {
-        if (!pg.isBackground()) {
-          handler.unlinkFromProcess();
-        }
+        handleExit(pg, ret);
         t.printStackTrace();
       }
     } else {
-      if (!pg.isBackground()) {
-        handler.unlinkFromProcess();
-      }
+      handleExit(pg, ret);
     }
     
+  }
+  
+  public void close() {
+    for (ProcessGroup pg : activeProcessGroups) {
+      AppSystem.dispose(pg);
+    }
   }
 }

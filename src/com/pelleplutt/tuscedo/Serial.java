@@ -1,6 +1,5 @@
 package com.pelleplutt.tuscedo;
 
-import java.awt.Color;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -12,9 +11,8 @@ import java.util.List;
 
 import javax.swing.SwingUtilities;
 
+import com.pelleplutt.tuscedo.ui.WorkArea;
 import com.pelleplutt.util.AppSystem;
-import com.pelleplutt.util.FastTextPane;
-import com.pelleplutt.util.Log;
 import com.pelleplutt.util.io.Port;
 import com.pelleplutt.util.io.PortConnector;
 
@@ -26,17 +24,26 @@ public class Serial implements SerialStreamProvider {
   volatile boolean serialRun;
   volatile boolean serialRunning;
   List<OutputStream> attachedSerialIOs = new ArrayList<OutputStream>();
+  Port setting;
   
   final Object LOCK_SERIAL = new Object();
 
   byte serialBuf[] = new byte[256*64];
   volatile int serialBufIx = 0;
   
-  FastTextPane ftp;
+  WorkArea area;
   
-  public Serial(FastTextPane stdout) {
-    this.ftp = stdout;
+  public Serial(WorkArea area) {
+    this.area = area;
     serial = PortConnector.getPortConnector();
+  }
+  
+  public boolean isConnected() {
+    return serialRunning;
+  }
+  
+  public Port getSerialConfig() {
+    return serialRunning ? setting : null;
   }
   
   public void transmit(String s) {
@@ -54,8 +61,9 @@ public class Serial implements SerialStreamProvider {
     return serial.getDevices();
   }
 
-  void open(Port portSetting) throws Exception {
+  public void open(Port portSetting) throws Exception {
     synchronized (LOCK_SERIAL) {
+      setting = portSetting;
       serial.connect(portSetting);
       serial.setTimeout(1000);
       serialIn = serial.getInputStream();
@@ -67,13 +75,15 @@ public class Serial implements SerialStreamProvider {
     }
   }
   
-  void closeSerial() {
+  public void closeSerial() {
+    //Log.println("closing attached streams");
     synchronized(attachedSerialIOs) {
       for (OutputStream o : attachedSerialIOs) {
         AppSystem.closeSilently(o);
       }
       attachedSerialIOs.clear();
     }
+    //Log.println("closing serial streams, running " + serialRunning);
     synchronized (LOCK_SERIAL) {
       if (serialIn != null) {
         serial.disconnectSilently();
@@ -81,27 +91,29 @@ public class Serial implements SerialStreamProvider {
         serialOut = null;
         serialRun = false;
         while (serialRunning) {
+          //Log.println("await close serial streams..");
           AppSystem.waitSilently(LOCK_SERIAL, 1000);
         }
       }
     }
+    //Log.println("serial closed");
   }
   
-  void deattachSerialIO(OutputStream o) {
+  public void deattachSerialIO(OutputStream o) {
     synchronized (attachedSerialIOs) {
-      Log.println("deattach " + o);
+      //Log.println("deattach " + o);
       attachedSerialIOs.remove(o);
     }
   }
   
-  InputStream attachSerialIO() {
+  public InputStream attachSerialIO() {
     XPipedInputStream pis = null;
     try {
       pis = new XPipedInputStream(64);
       PipedOutputStream pos;
       pos = new PipedOutputStream(pis);
       synchronized (attachedSerialIOs) {
-        Log.println("attach " + pos);
+        //Log.println("attach " + pos);
         attachedSerialIOs.add(pos);
       }
       pis.attached = pos;
@@ -129,7 +141,7 @@ public class Serial implements SerialStreamProvider {
         t = new String(serialBuf, 0, serialBufIx);
         serialBufIx = 0;
       }
-      ftp.addText(t);
+      area.onSerialData(t);
     }
   };
 
@@ -138,6 +150,7 @@ public class Serial implements SerialStreamProvider {
     public void run() {
       int b;
       serialRunning = true;
+      //Log.println("serial thread started");
       try {
         while (serialRun) {
           try {
@@ -167,14 +180,15 @@ public class Serial implements SerialStreamProvider {
           }
         } // while
       } catch (IOException e) {
-        e.printStackTrace();
+        //e.printStackTrace();
       }
       finally {
+        //Log.println("serial thread dead, enter serial lock");
         synchronized (LOCK_SERIAL) {
           serialRunning = false;
           serialRun = false;
-          ftp.addText("Disconnected\n", 1, Color.green, null, true);
-
+          area.onSerialDisconnect();
+          //Log.println("serial thread dead, notify");
           LOCK_SERIAL.notifyAll();
         }
       }
@@ -189,7 +203,7 @@ public class Serial implements SerialStreamProvider {
     }
     @Override
     public void close() throws IOException {
-      Log.println("closing attached stream " + this);
+      //Log.println("closing attached stream " + this);
       super.close();
       deattachSerialIO(attached);
     }
