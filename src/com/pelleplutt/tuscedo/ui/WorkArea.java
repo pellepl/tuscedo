@@ -9,8 +9,10 @@ import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Paint;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
@@ -27,14 +29,17 @@ import java.util.regex.PatternSyntaxException;
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.BoundedRangeModel;
+import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextPane;
+import javax.swing.JWindow;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
@@ -42,11 +47,11 @@ import javax.swing.plaf.basic.BasicScrollBarUI;
 
 import com.pelleplutt.Essential;
 import com.pelleplutt.tuscedo.ProcessGroup;
-import com.pelleplutt.tuscedo.ProcessHandler;
 import com.pelleplutt.tuscedo.Serial;
 import com.pelleplutt.tuscedo.Settings;
 import com.pelleplutt.tuscedo.Tuscedo;
 import com.pelleplutt.util.AppSystem.Disposable;
+import com.pelleplutt.util.FastTermPane;
 import com.pelleplutt.util.FastTextPane;
 import com.pelleplutt.util.io.Port;
 
@@ -88,30 +93,30 @@ public class WorkArea extends JPanel implements Disposable {
   public static final Color colFindBg = colInputFg;
   public static final Color colFindMarkFg = new Color(255,192,255);
   public static final Color colFindMarkBg = null;
-  static final int STYLE_ID_CONN_IN = 1;
-  static final int STYLE_ID_HELP = 5;
-  static final int STYLE_ID_BASH_OUT = 10;
-  static final int STYLE_ID_BASH_ERR = 11;
-  static final int STYLE_ID_BASH_INPUT = 12;
-  static final int STYLE_ID_SERIAL_INFO = 20;
-  static final int STYLE_ID_SERIAL_ERR = 21;
-  static final int STYLE_ID_FIND = 30;
-  static final int STYLE_ID_FIND_ALL = 31;
-  static final FastTextPane.Style STYLE_CONN_IN = 
+  public static final int STYLE_ID_CONN_IN = 1;
+  public static final int STYLE_ID_HELP = 5;
+  public static final int STYLE_ID_BASH_OUT = 10;
+  public static final int STYLE_ID_BASH_ERR = 11;
+  public static final int STYLE_ID_BASH_INPUT = 12;
+  public static final int STYLE_ID_SERIAL_INFO = 20;
+  public static final int STYLE_ID_SERIAL_ERR = 21;
+  public static final int STYLE_ID_FIND = 30;
+  public static final int STYLE_ID_FIND_ALL = 31;
+  public static final FastTextPane.Style STYLE_CONN_IN = 
       new FastTextPane.Style(STYLE_ID_CONN_IN, colInputFg, null, false); 
-  static final FastTextPane.Style STYLE_BASH_OUT = 
+  public static final FastTextPane.Style STYLE_BASH_OUT = 
       new FastTextPane.Style(STYLE_ID_BASH_OUT, colProcessFg, null, false);
-  static final FastTextPane.Style STYLE_BASH_ERR = 
+  public static final FastTextPane.Style STYLE_BASH_ERR = 
       new FastTextPane.Style(STYLE_ID_BASH_ERR, colProcessErrFg, null, false);
-  static final FastTextPane.Style STYLE_BASH_INPUT = 
+  public static final FastTextPane.Style STYLE_BASH_INPUT = 
       new FastTextPane.Style(STYLE_ID_BASH_INPUT, colBashFg, null, false);
-  static final FastTextPane.Style STYLE_FIND = 
+  public static final FastTextPane.Style STYLE_FIND = 
       new FastTextPane.Style(STYLE_ID_FIND, colFindFg, colFindBg, true);
-  static final FastTextPane.Style STYLE_FIND_ALL = 
+  public static final FastTextPane.Style STYLE_FIND_ALL = 
       new FastTextPane.Style(STYLE_ID_FIND_ALL, colFindMarkFg, colFindMarkBg, true);
-  static final FastTextPane.Style STYLE_SERIAL_INFO = 
+  public static final FastTextPane.Style STYLE_SERIAL_INFO = 
       new FastTextPane.Style(STYLE_ID_SERIAL_INFO, Color.green, null, true);
-  static final FastTextPane.Style STYLE_SERIAL_ERR = 
+  public static final FastTextPane.Style STYLE_SERIAL_ERR = 
       new FastTextPane.Style(STYLE_ID_SERIAL_ERR, Color.red, null, true);
   
   int lastFindIndex = -1;
@@ -122,6 +127,61 @@ public class WorkArea extends JPanel implements Disposable {
   
   static String[] prevSerialDevices;
   
+  static final int[] baudRates = {
+      Port.BAUD_921600,
+      Port.BAUD_115200,
+      Port.BAUD_57600,
+      Port.BAUD_38400,
+      Port.BAUD_19200,
+      Port.BAUD_14400,
+      Port.BAUD_9600,
+      Port.BAUD_460800,
+      Port.BAUD_256000,
+      Port.BAUD_230400,
+      Port.BAUD_128000,
+      Port.BAUD_4800,
+      Port.BAUD_2400,
+      Port.BAUD_1200,
+      Port.BAUD_600,
+      Port.BAUD_300,
+      Port.BAUD_110,
+  };
+  static final int databits[] = {
+      Port.BYTESIZE_8,
+      Port.BYTESIZE_7,
+      Port.BYTESIZE_6,
+      Port.BYTESIZE_5,
+  };
+  static final String parities[] = {
+      Port.PARITY_NONE_S.toLowerCase(),
+      Port.PARITY_EVEN_S.toLowerCase(),
+      Port.PARITY_ODD_S.toLowerCase(),
+  };
+  static final int stopbits[] = {
+      Port.STOPBIT_ONE,
+      Port.STOPBIT_TWO,
+  };
+  
+  static final String sugBaudRate[];
+  static final String sugDataBits[];
+  static final String sugParities[];
+  static final String sugStopBits[];
+  
+  static {
+    sugBaudRate = new String[baudRates.length];
+    for (int i = 0; i < baudRates.length; i++) sugBaudRate[i] = PORT_ARG_BAUD + baudRates[baudRates.length - 1 - i];
+    sugDataBits = new String[databits.length];
+    for (int i = 0; i < databits.length; i++) sugDataBits[i] = PORT_ARG_DATABITS + databits[databits.length - 1 - i];
+    sugParities = new String[parities.length];
+    for (int i = 0; i < parities.length; i++) sugParities[i] = PORT_ARG_PARITY + parities[parities.length - 1 - i];
+    sugStopBits = new String[stopbits.length];
+    for (int i = 0; i < stopbits.length; i++) sugStopBits[i] = PORT_ARG_STOPBITS + stopbits[stopbits.length - 1 - i];
+  }
+  
+  JWindow winSug;
+  JList<String> winSugList;
+
+
   public WorkArea() {
     settings = Settings.inst();
     serial = new Serial(this);
@@ -131,6 +191,12 @@ public class WorkArea extends JPanel implements Disposable {
     ftp.setForeground(colTextFg);
     ftp.setBackground(colGenericBg);
     ftp.setFont(COMMON_FONT);
+  }
+  
+  public static void decorateComponent(JComponent c) {
+    c.setForeground(colTextFg);
+    c.setBackground(colGenericBg);
+    c.setFont(COMMON_FONT);
   }
   
   public static void decorateScrollPane(JScrollPane sp) {
@@ -183,6 +249,7 @@ public class WorkArea extends JPanel implements Disposable {
     inputPanel.setLayout(new CardLayout(0,0));
     
     for (int i = 0; i < _ISTATE_NUM; i++) {
+      final int istateNum = i;
       View view = null;
       if (i == ISTATE_INPUT || i == ISTATE_BASH) {
         view = new View();
@@ -192,6 +259,7 @@ public class WorkArea extends JPanel implements Disposable {
       input[i].setSuggestionListener(new ACTextField.SuggestionListener() {
         @Override
         public void gotSuggestions(List<String> suggestions) {
+          onGotSuggestions(istateNum, suggestions);
           if (suggestions == null) {
             setInfo(null);
           } else {
@@ -206,24 +274,13 @@ public class WorkArea extends JPanel implements Disposable {
         
         @Override
         public List<String> giveSuggestions(final String userInput) {
-          final String bashPrefix = istate != ISTATE_BASH ? 
-              settings.string(Settings.BASH_PREFIX_STRING) :
-                "";
-          if (userInput.startsWith(settings.string(bashPrefix)) && 
-              userInput.length() >= bashPrefix.length()) {
-            if (userInput.startsWith(bashPrefix + "cd ")) {
-              return bash[istate].suggestFileSystemCompletions(bashPrefix, userInput.substring(bashPrefix.length()), 
-                  "cd", false, true);
-            }
-            else if (userInput.startsWith(bashPrefix)) {
-              int spaceIx = userInput.lastIndexOf(' ');
-              if (spaceIx > 0) {
-                return bash[istate].suggestFileSystemCompletions(bashPrefix, userInput.substring(bashPrefix.length()), 
-                    userInput.substring(bashPrefix.length(), spaceIx).trim(), true, true);
-              }
-            }
+          List<String> sugs = null;
+          if (istateNum == ISTATE_OPEN_SERIAL) {
+            sugs = giveOpenSerialSuggestions(userInput);
+          } else {
+            sugs = giveInputBashSuggestions(userInput, istateNum);
           }
-          return null;
+          return sugs;
         }
       });
       defineAction(input[i], "input.find", "ctrl+f", actionOpenFind);
@@ -239,8 +296,9 @@ public class WorkArea extends JPanel implements Disposable {
       defineAction(input[i], "input.addtab", "ctrl+shift+t", actionAddTab);
       defineAction(input[i], "input.closetab", "ctrl+d", actionCloseTab);
       defineAction(input[i], "input.bash", "ctrl+b", actionOpenBash);
+      defineAction(input[i], "input.complete", "ctrl+space", actionOpenCompletion);
       defineAction(input[i], "log.input.split", "ctrl+w", actionSplit);
-      defineAction(input[i], "log.input.clear", "ctrl+delete", actionClear);
+      defineAction(input[i], "log.input.clear", "ctrl+l", actionClear);
       defineAction(input[i], "log.input.pageup", "alt+page_up", actionLogPageUp);
       defineAction(input[i], "log.input.pagedown", "alt+page_down", actionLogPageDown);
       defineAction(input[i], "log.input.scrollup", "alt+up", actionLogUp);
@@ -274,34 +332,11 @@ public class WorkArea extends JPanel implements Disposable {
       }
       inputPanel.add(ip[i], Integer.toString(i));
       
-      final ProcessHandler ph = input[i];
-      final View v = view;
       if (i == ISTATE_INPUT || i == ISTATE_BASH) {
-        bash[i] = new Bash(input[i], new Bash.BashConsole() {
-          @Override
-          public void stdout(String s) {
-            v.ftp.addText(s, STYLE_BASH_OUT);
-          }
-  
-          @Override
-          public void stdout(byte b) {
-            v.ftp.addText(Character.toString((char)b), STYLE_BASH_OUT);
-          }
-  
-          @Override
-          public void stderr(String s) {
-            v.ftp.addText(s, STYLE_BASH_ERR);
-          }
-          
-          public void stderr(byte b) {
-            v.ftp.addText(Character.toString((char)b), STYLE_BASH_ERR);
-          }
-          
-          @Override
-          public void stdin(String s) {
-            ph.sendToStdIn(s);
-          }
-        }, serial, this);
+        bash[i] = new Bash(input[i], 
+            new XtermConsole(view, input[i], "UTF-8"), 
+            serial, 
+            this);
       }
       
       views[i] = view;
@@ -317,6 +352,21 @@ public class WorkArea extends JPanel implements Disposable {
     input[ISTATE_INPUT].requestFocus();
     
     curView = views[ISTATE_INPUT];
+    
+    winSug = new JWindow(SwingUtilities.getWindowAncestor(input[ISTATE_INPUT]));
+    winSug.setLayout(new BorderLayout());
+    winSugList = new JList<String>();
+    winSugList.setForeground(colInputFg);
+    winSugList.setBackground(colInputBg);
+    winSugList.setFont(COMMON_FONT);
+    winSugList.setSelectionBackground(colInputFg);
+    winSugList.setSelectionForeground(colInputBg);
+    JScrollPane sp = new JScrollPane(winSugList, 
+        JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+        JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+    decorateScrollPane(sp);
+    //sp.setBorder(BorderFactory.createLineBorder(colTextFg, 1));
+    winSug.add(sp, BorderLayout.CENTER);
   }
 
   public void setInfo(String s) {
@@ -473,6 +523,7 @@ public class WorkArea extends JPanel implements Disposable {
   }
 
   public void enterInputState(int istate) {
+    winSug.setVisible(false);
     if (istate == this.istate) return;
     leaveInputState(this.istate);
     this.istate = istate;
@@ -519,6 +570,11 @@ public class WorkArea extends JPanel implements Disposable {
   }
   
   void actionInputEnter(boolean shift) {
+    if (winSug.isVisible()) {
+      input[istate].setText(winSugList.getSelectedValue());
+      winSug.setVisible(false);
+      return;
+    }
     String in = input[istate].getText(); 
     if (!input[istate].isForcedModel() && in.length() > 0) {
       input[istate].addSuggestion(in);
@@ -552,6 +608,93 @@ public class WorkArea extends JPanel implements Disposable {
       break;
     }
   }
+  
+  String serialMatch(final String prefix, final String in, final String[] defs, 
+      final List<String> suggestions) {
+    // get defined part of the input, incomplete or not
+    int nextSpace = in.indexOf(' ');
+    String defInput;
+    if (nextSpace < 0) {
+      defInput = in;
+    } else {
+      defInput = in.substring(0, nextSpace);
+    }
+    
+    // find exact match or submatches among defs
+    boolean match = false;
+    for (String dev : defs) {
+      if (defInput.equals(dev)) {
+        match = true;
+      } else if (dev.startsWith(defInput)) {
+        suggestions.add(prefix + dev);
+      }
+    }
+    return match ? defInput : null;
+  }
+  
+  List<String> giveOpenSerialSuggestions(final String input) {
+    List<String> suggestions = new ArrayList<String>();
+    String restInput = input;
+    String match;
+    String pre = "";
+    
+    // get device part of the input
+    match = serialMatch(pre, restInput, prevSerialDevices, suggestions);
+    if (match == null) {
+      return suggestions.isEmpty() ? null : suggestions;
+    }
+    restInput = restInput.substring(match.length()).trim();
+    pre = pre + match + " ";
+
+    // get baudrate part of the input
+    match = serialMatch(pre, restInput, sugBaudRate, suggestions);
+    if (match == null) {
+      return suggestions.isEmpty() ? null : suggestions;
+    }
+    restInput = restInput.substring(match.length()).trim();
+    pre = pre + match + " ";
+    
+    // get databit part of the input
+    match = serialMatch(pre, restInput, sugDataBits, suggestions);
+    if (match == null) {
+      return suggestions.isEmpty() ? null : suggestions;
+    }
+    restInput = restInput.substring(match.length()).trim();
+    pre = pre + match + " ";
+    
+    // get parity part of the input
+    match = serialMatch(pre, restInput, sugParities, suggestions);
+    if (match == null) {
+      return suggestions.isEmpty() ? null : suggestions;
+    }
+    restInput = restInput.substring(match.length()).trim();
+    pre = pre + match + " ";
+    
+    // get stopbit part of the input
+    match = serialMatch(pre, "", sugStopBits, suggestions);
+    return suggestions.isEmpty() ? null : suggestions;
+  }
+  
+  List<String> giveInputBashSuggestions(final String userInput, final int istateNum) {
+    final String bashPrefix = istate != ISTATE_BASH ? 
+        settings.string(Settings.BASH_PREFIX_STRING) :
+          "";
+    if (userInput.startsWith(settings.string(bashPrefix)) && 
+        userInput.length() >= bashPrefix.length()) {
+      if (userInput.startsWith(bashPrefix + "cd ")) {
+        return bash[istate].suggestFileSystemCompletions(bashPrefix, userInput.substring(bashPrefix.length()), 
+            "cd", false, true);
+      }
+      else if (userInput.startsWith(bashPrefix)) {
+        int spaceIx = userInput.lastIndexOf(' ');
+        if (spaceIx > 0) {
+          return bash[istate].suggestFileSystemCompletions(bashPrefix, userInput.substring(bashPrefix.length()), 
+              userInput.substring(bashPrefix.length(), spaceIx).trim(), true, true);
+        }
+      }
+    }
+    return null;
+  }
 
   void actionFind(boolean shift, boolean regex) {
     if (istate != ISTATE_FIND && !regex) {
@@ -565,6 +708,72 @@ public class WorkArea extends JPanel implements Disposable {
   
   void actionBash() {
     WorkArea.this.enterInputState(ISTATE_BASH);
+  }
+  
+  
+  public void onGotSuggestions(final int istateNum, List<String> suggestions) {
+    if (winSug.isVisible()) {
+      updateSuggestionWindow(suggestions);
+    }
+  }
+
+  void actionOpenCompletion() {
+    List<String> s = input[istate].getCurrentSuggestions();
+    if (s == null || s.isEmpty()) {
+      return;
+    }
+    if (s.size() == 1) {
+      input[istate].setText(s.get(0));
+      return;
+    }
+    String[] arr = s.toArray(new String[s.size()]);
+    Window w = SwingUtilities.getWindowAncestor(input[istate]);
+    Point p = w.getLocation();
+    Point p2 = SwingUtilities.convertPoint(input[istate], 0,0, w);
+    int fh = getFontMetrics(COMMON_FONT).getHeight()+2;
+    int h = fh * Math.min(6, arr.length);
+    p.x += p2.x;
+    p.y += p2.y;
+    p.y -= h;
+    showSuggestionWindow(p.x, p.y, input[istate].getWidth(), h, arr);
+  }
+  
+  void showSuggestionWindow(int x, int y, int w, int h, String items[]) {
+    DefaultListModel<String> lm = new DefaultListModel<String>();
+    for (String item : items) {
+      lm.addElement(item);
+    }
+    winSugList.setModel(lm);
+    winSugList.setSelectedIndex(items.length-1);
+    winSugList.ensureIndexIsVisible(items.length-1);
+    winSug.setSize(w, h);
+    winSug.setLocation(x, y);
+    winSug.setVisible(true);
+  }
+  
+  void updateSuggestionWindow(List<String> items) {
+    if (items == null) return;
+    if (items.size() == 1) {
+      winSug.setVisible(false);
+      return;
+    }
+    DefaultListModel<String> lm = new DefaultListModel<String>();
+    for (String item : items) {
+      lm.addElement(item);
+    }
+    winSugList.setModel(lm);
+    winSugList.setSelectedIndex(items.size()-1);
+    winSugList.ensureIndexIsVisible(items.size()-1);
+    Window w = SwingUtilities.getWindowAncestor(input[istate]);
+    Point p = w.getLocation();
+    Point p2 = SwingUtilities.convertPoint(input[istate], 0,0, w);
+    int fh = getFontMetrics(COMMON_FONT).getHeight()+2;
+    int h = fh * Math.min(6, items.size());
+    p.x += p2.x;
+    p.y += p2.y;
+    p.y -= h;
+    winSug.setLocation(p);
+    winSug.setSize(input[istate].getWidth(), h);
   }
   
   void showHelp() {
@@ -601,77 +810,25 @@ public class WorkArea extends JPanel implements Disposable {
   }
   
   void openSerialConfig() {
+    String[] prevDev = prevSerialDevices;
     String[] devices = serial.getDevices();
+    prevSerialDevices = devices;
+
     List<String> model = new ArrayList<String>();
-    int[] baudRates = {
-        Port.BAUD_921600,
-        Port.BAUD_115200,
-        Port.BAUD_57600,
-        Port.BAUD_38400,
-        Port.BAUD_19200,
-        Port.BAUD_14400,
-        Port.BAUD_9600,
-        Port.BAUD_460800,
-        Port.BAUD_256000,
-        Port.BAUD_230400,
-        Port.BAUD_128000,
-        Port.BAUD_4800,
-        Port.BAUD_2400,
-        Port.BAUD_1200,
-        Port.BAUD_600,
-        Port.BAUD_300,
-        Port.BAUD_110,
-    };
-    int databits[] = {
-        Port.BYTESIZE_8,
-        Port.BYTESIZE_7,
-        Port.BYTESIZE_6,
-        Port.BYTESIZE_5,
-    };
-    String parities[] = {
-        Port.PARITY_NONE_S.toLowerCase(),
-        Port.PARITY_EVEN_S.toLowerCase(),
-        Port.PARITY_ODD_S.toLowerCase(),
-    };
-    int stopbits[] = {
-        Port.STOPBIT_ONE,
-        Port.STOPBIT_TWO,
-    };
     for (int d = 0; d < devices.length; d++) {
       String device = devices[devices.length - d - 1];
-      for (int baud = 0; baud < baudRates.length; baud++) {
-        for (int db = 0; db < databits.length; db++) {
-          for (int p = 0; p < parities.length; p++) {
-            for (int s = 0; s < stopbits.length; s++) {
-              model.add(device + 
-                  " " + PORT_ARG_BAUD + baudRates[baudRates.length - baud -1] + 
-                  " " + PORT_ARG_DATABITS + databits[databits.length - db - 1] +
-                  " " + PORT_ARG_PARITY + parities[parities.length - p - 1] + 
-                  " " + PORT_ARG_STOPBITS + stopbits[stopbits.length -s -1] 
-                      );
-            }
-          }
-        }
-      }
-    }
-    for (int d = 0; d < devices.length; d++) {
-      String device = devices[devices.length - d - 1];
-      for (int baud = 0; baud < baudRates.length; baud++) {
-              model.add(device + 
-                  " " + PORT_ARG_BAUD + baudRates[baudRates.length - baud -1]
-                      );
-      }
+      model.add(device); 
     }
     input[ISTATE_OPEN_SERIAL].setSuggestions(model);
     enterInputState(ISTATE_OPEN_SERIAL);
     
-    if (prevSerialDevices == null) {
+    if (prevDev == null) {
       if (devices != null) {
         setInfo((devices.length == 0 ? "NO" : devices.length) + " SERIAL" + (devices.length != 1 ? "S" : ""));
       }
     } else if (devices != null) {
       List<String> added = new ArrayList<String>(Arrays.asList(devices));
-      List<String> removed = new ArrayList<String>(Arrays.asList(prevSerialDevices));
+      List<String> removed = new ArrayList<String>(Arrays.asList(prevDev));
     match: while (true) {
         for (int i = 0; i < added.size(); i++) {
           String ai = added.get(i);
@@ -698,7 +855,6 @@ public class WorkArea extends JPanel implements Disposable {
         setInfo(sb.toString().trim());
       }
     }
-    prevSerialDevices = devices;
   }
   
   public void closeSerial() {
@@ -716,6 +872,13 @@ public class WorkArea extends JPanel implements Disposable {
     @Override
     public void actionPerformed(ActionEvent e) {
       actionBash();
+    }
+  };
+
+  AbstractAction actionOpenCompletion = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      actionOpenCompletion();
     }
   };
 
@@ -749,6 +912,7 @@ public class WorkArea extends JPanel implements Disposable {
       } else {
         WorkArea.this.enterInputState(ISTATE_INPUT);
       }
+      onKeyEsc(e);
     }
   };
 
@@ -756,6 +920,7 @@ public class WorkArea extends JPanel implements Disposable {
     @Override
     public void actionPerformed(ActionEvent e) {
       actionInputEnter(false);
+      onKeyEnter(e);
     }
   };
 
@@ -832,28 +997,52 @@ public class WorkArea extends JPanel implements Disposable {
   AbstractAction actionLogUp = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      curView.ftp.scrollLinesRelative(-1);
+      if (istate == ISTATE_BASH && input[istate].isLinkedToProcess()) {
+        input[istate].sendToStdIn(new byte[] {(byte)0x1b, (byte)'[', (byte)'A'});
+        //input[istate].sendToStdIn(new byte[] {(byte)0x8f, (byte)'A'});
+        //curView.ftp.setCursorRow(curView.ftp.getCursorRow() - 1);
+      } else {
+        curView.ftp.scrollLinesRelative(-1);
+      }
     }
   };
 
   AbstractAction actionLogDown = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      curView.ftp.scrollLinesRelative(1);
+      if (istate == ISTATE_BASH && input[istate].isLinkedToProcess()) {
+        input[istate].sendToStdIn(new byte[] {(byte)0x1b, (byte)'[', (byte)'B'});
+        //input[istate].sendToStdIn(new byte[] {(byte)0x8f, (byte)'B'});
+        //curView.ftp.setCursorRow(curView.ftp.getCursorRow() + 1);
+      } else {
+        curView.ftp.scrollLinesRelative(1);
+      }
     }
   };
 
   AbstractAction actionLogLeft = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      curView.ftp.scrollHorizontalRelative(-1);
+      if (istate == ISTATE_BASH && input[istate].isLinkedToProcess()) {
+        input[istate].sendToStdIn(new byte[] {(byte)0x1b, (byte)'[', (byte)'D'});
+        //input[istate].sendToStdIn(new byte[] {(byte)0x8f, (byte)'D'});
+        //curView.ftp.setCursorColumn(curView.ftp.getCursorColumn() - 1);
+      } else {
+        curView.ftp.scrollHorizontalRelative(-1);
+      }
     }
   };
 
   AbstractAction actionLogRight = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      curView.ftp.scrollHorizontalRelative(1);
+      if (istate == ISTATE_BASH && input[istate].isLinkedToProcess()) {
+        input[istate].sendToStdIn(new byte[] {(byte)0x1b, (byte)'[', (byte)'C'});
+        //input[istate].sendToStdIn(new byte[] {(byte)0x8f, (byte)'C'});
+        //curView.ftp.setCursorColumn(curView.ftp.getCursorColumn() + 1);
+      } else {
+        curView.ftp.scrollHorizontalRelative(1);
+      }
     }
   };
 
@@ -884,6 +1073,7 @@ public class WorkArea extends JPanel implements Disposable {
   public void dispose() {
     //Log.println("workarea close serial");
     serial.closeSerial();
+    winSug.dispose();
     for (Bash b : bash) {
       //Log.println("workarea close bash " + b);
       if (b != null) b.close();
@@ -912,6 +1102,53 @@ public class WorkArea extends JPanel implements Disposable {
   public void onTabSelected(SimpleTabPane.Tab t) {
     input[istate].requestFocus();
   }
+  
+  // these functions intercept the key events from autocompletetextfield
+  // return true to pass the event back to the textfield
+  
+  public boolean onKeyUp(ActionEvent e) {
+    if (winSug.isVisible()) {
+      winSugList.setSelectedIndex(winSugList.getSelectedIndex()-1);
+      winSugList.ensureIndexIsVisible(winSugList.getSelectedIndex());
+      return false;
+    }
+    return true;
+  }
+  
+  public boolean onKeyDown(ActionEvent e) {
+    if (winSug.isVisible()) {
+      winSugList.setSelectedIndex(winSugList.getSelectedIndex()+1);
+      winSugList.ensureIndexIsVisible(winSugList.getSelectedIndex());
+      return false;
+    }
+    return true;
+  }
+  
+  public boolean onKeyEnter(ActionEvent e) {
+    if (winSug.isVisible()) {
+      ((ProcessACTextField)e.getSource()).setText(winSugList.getSelectedValue());
+      winSug.setVisible(false);
+      return false;
+    }
+    return true;
+  }
+  
+  public boolean onKeyTab(ActionEvent e) {
+//    if (winSug.isVisible()) {
+//      winSug.setVisible(false);
+//      return false;
+//    }
+    return true;
+  }
+  
+  public boolean onKeyEsc(ActionEvent e) {
+    if (winSug.isVisible()) {
+      winSug.setVisible(false);
+      return false;
+    }
+    return true;
+  }
+  
   
   static class SpecScrollBarUI extends BasicScrollBarUI {
     Paint ptrack, ttrack;
@@ -1012,14 +1249,15 @@ public class WorkArea extends JPanel implements Disposable {
   } // class AutoAdjustmentListener
 
   class View extends JPanel {
-    FastTextPane ftp, ftpSec;
+    FastTermPane ftp;
+    FastTextPane ftpSec;
     JSplitPane splitVer, splitHor;
     JScrollPane mainScrollPane;
     JScrollPane secScrollPane;
     JComponent curSplit;
     
     public View() {
-      ftp = new FastTextPane();
+      ftp = new FastTermPane();
       decorateFTP(ftp);
       
       ftpSec = new FastTextPane();

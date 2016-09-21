@@ -1,12 +1,10 @@
 package com.pelleplutt.tuscedo;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
@@ -19,6 +17,9 @@ import com.pelleplutt.util.Log;
 
 public class ProcessGroup implements Disposable {
 
+  static final int READER_TICK_RATE_MIN_MS = 2;
+  static final int READER_TICK_RATE_MAX_MS = 200;
+  
   static final int CONSOLE = 0;
   static final int FILE = 1;
   static final int PIPE = 2;
@@ -48,8 +49,8 @@ public class ProcessGroup implements Disposable {
   void startProcess(final Command cmd, 
       final InputStream toStdIn, final OutputStream toStdOut, final OutputStream toStdErr) throws IOException {
     Log.println(cmd.args[0] + " starting, in:" + cmd.stdin + " out:" + cmd.stdout + " err:" + cmd.stderr);
-    String[] envp = null;
-    //String[] envp = { "TERM=xterm" };
+    //String[] envp = null;
+    String[] envp = { "TERM=xterm" };
     final Process process = Runtime.getRuntime().exec(cmd.args, envp, cmd.pwd);
     cmd.process = process;
     cmd.in = process.getOutputStream();
@@ -90,17 +91,24 @@ public class ProcessGroup implements Disposable {
       public void run() {
         try {
           if (cmd.stdout == CONSOLE) {
-//            String line;
-            BufferedReader out = new BufferedReader(
-                new InputStreamReader(cmd.out));
-//            while ((line = out.readLine()) != null) {
-//              if (cons != null) {
-//                cons.outln(ProcessGroup.this, line);
-//              }
-//            }
             int d;
-            while ((d = out.read()) != -1) {
-              cons.out(ProcessGroup.this, (byte)d);
+            byte buf[] = new byte[256];
+////            String line;
+//            BufferedReader out = new BufferedReader(
+//                new InputStreamReader(cmd.out));
+////            while ((line = out.readLine()) != null) {
+////              if (cons != null) {
+////                cons.outln(ProcessGroup.this, line);
+////              }
+////            }
+//            while ((d = out.read()) != -1) {
+//              cons.out(ProcessGroup.this, (byte)d);
+//            }
+
+            TickableReader out = new TickableReader(cmd.out, 1024,
+                READER_TICK_RATE_MIN_MS, READER_TICK_RATE_MAX_MS);
+            while ((d = out.read(buf)) != -1) {
+              cons.out(ProcessGroup.this, buf, d);
             }
           } else {
             int b;
@@ -116,7 +124,7 @@ public class ProcessGroup implements Disposable {
               break;
             }
           }
-        } catch (Throwable t) { /*t.printStackTrace();*/ }
+        } catch (Throwable t) { t.printStackTrace(); }
         finally {
           if (cmd.stdout != OTHER) {
             AppSystem.closeSilently(toStdOut);
@@ -133,18 +141,26 @@ public class ProcessGroup implements Disposable {
       public void run() {
         try {
           if (cmd.stderr == CONSOLE) {
-//            String line;
-            BufferedReader out = new BufferedReader(
-                new InputStreamReader(cmd.err));
-//            while ((line = out.readLine()) != null) {
-//              if (cons != null) {
-//                cons.errln(ProcessGroup.this, line);
-//              }
-//            }
             int d;
-            while ((d = out.read()) != -1) {
-              cons.err(ProcessGroup.this, (byte)d);
+            byte buf[] = new byte[256];
+
+////            String line;
+//            BufferedReader out = new BufferedReader(
+//                new InputStreamReader(cmd.err));
+////            while ((line = out.readLine()) != null) {
+////              if (cons != null) {
+////                cons.errln(ProcessGroup.this, line);
+////              }
+////            }
+//            while ((d = out.read()) != -1) {
+//              cons.err(ProcessGroup.this, (byte)d);
+//            }
+            TickableReader err = new TickableReader(cmd.err, 1024, 
+                READER_TICK_RATE_MIN_MS, READER_TICK_RATE_MAX_MS);
+            while ((d = err.read(buf)) != -1) {
+              cons.err(ProcessGroup.this, buf, d);
             }
+
           } else {
             int b;
             switch (cmd.stderr) {
@@ -199,10 +215,12 @@ public class ProcessGroup implements Disposable {
 
   public void write(byte[] b) throws IOException {
     stdin.write(b);
+    stdin.flush();
   }
 
   public void write(byte[] b, int off, int len) throws IOException {
     stdin.write(b, off, len);
+    stdin.flush();
   }
   
   public void writeLine(String s) throws IOException {
@@ -254,7 +272,8 @@ public class ProcessGroup implements Disposable {
     commands.add(cmd);
   }
   
-  public void start(InputStream otherin, OutputStream otherout, OutputStream othererr, ProcessConsole cons) throws IOException {
+  public void start(InputStream otherin, OutputStream otherout, OutputStream othererr, 
+      ProcessConsole cons) throws IOException {
     try {
       stdin = null;
       this.cons = cons;
@@ -358,8 +377,10 @@ public class ProcessGroup implements Disposable {
   public interface ProcessConsole {
     public void outln(ProcessGroup pg, String s);
     public void out(ProcessGroup pg, byte b);
+    public void out(ProcessGroup pg, byte b[], int len);
     public void errln(ProcessGroup pg, String s);
     public void err(ProcessGroup pg, byte b);
+    public void err(ProcessGroup pg, byte b[], int len);
     public void exit(ProcessGroup pg, int ret);
   }
 

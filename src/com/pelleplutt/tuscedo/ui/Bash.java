@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import com.pelleplutt.tuscedo.Console;
 import com.pelleplutt.tuscedo.ProcessGroup;
 import com.pelleplutt.tuscedo.ProcessHandler;
 import com.pelleplutt.tuscedo.SerialStreamProvider;
@@ -18,7 +19,7 @@ import com.pelleplutt.util.Log;
 public class Bash implements ProcessGroup.ProcessConsole {
   ProcessHandler handler;
   File pwd;
-  BashConsole console;
+  Console console;
   static Pattern argBreak = Pattern.compile("([^\"]\\S*|\".+?\")\\s*");
   List<List<SubCommand>> chain;
   boolean background;
@@ -29,7 +30,7 @@ public class Bash implements ProcessGroup.ProcessConsole {
   List<ProcessGroup> activeProcessGroups = new ArrayList<ProcessGroup>();
   WorkArea area;
 
-  public Bash(ProcessHandler ph, BashConsole c, SerialStreamProvider ssp, WorkArea area) {
+  public Bash(ProcessHandler ph, Console c, SerialStreamProvider ssp, WorkArea area) {
     handler = ph;
     console = c;
     pwd = new File(".");
@@ -289,6 +290,7 @@ public class Bash implements ProcessGroup.ProcessConsole {
   public void sendCurrentToBack() {
     if (handler.isLinkedToProcess()) {
       handler.sendToBack();
+      console.reset();
     }
   }
   
@@ -328,18 +330,6 @@ public class Bash implements ProcessGroup.ProcessConsole {
       console.stderr(e.getMessage() + "\n");
       e.printStackTrace();
     }
-  }
-
-  interface BashConsole {
-    void stdout(String s);
-
-    void stdout(byte b);
-
-    void stderr(String s);
-
-    void stderr(byte b);
-    
-    void stdin(String s);
   }
 
   static final int CONSOLE = 0;
@@ -419,6 +409,11 @@ public class Bash implements ProcessGroup.ProcessConsole {
   }
 
   @Override
+  public void out(ProcessGroup pg, byte[] b, int len) {
+    console.stdout(b, len);
+  }
+
+  @Override
   public void errln(ProcessGroup pg, String s) {
     console.stderr(s + "\n");
   }
@@ -428,9 +423,14 @@ public class Bash implements ProcessGroup.ProcessConsole {
     console.stderr(b);
   }
 
+  @Override
+  public void err(ProcessGroup pg, byte[] b, int len) {
+    console.stderr(b, len);
+  }
   void handleExit(ProcessGroup pg, int ret) {
     if (!pg.isBackground()) {
       handler.unlinkFromProcess();
+      console.reset();
     } else {
       String id = "[" + (pg.id) + "] " + (ret == 0 ? "Done" : "Exit " + ret);
       console.stdout(String.format("%-24s%s\n", id, pg.toString()));
