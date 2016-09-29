@@ -1,6 +1,11 @@
 package com.pelleplutt.tuscedo;
 
-
+/**
+ * Feed this with xterm console output. Controls will be emitted to the
+ * given XtermHandler implementation.
+ * 
+ * @author petera
+ */
 public abstract class XtermStream implements Parser.Emitter {
   
   public static final int TEXT_DEFAULT = 0;
@@ -88,7 +93,8 @@ public abstract class XtermStream implements Parser.Emitter {
   
   private static final String CTRL_XTERM[] = {
       "\b",             //Backspace
-      
+      ESC + 'M',   // RI
+
       ESC + ' ' + 'F',  //7-bit controls (S7C1T).
       ESC + ' ' + 'G',  //8-bit controls (S8C1T).
       ESC + ' ' + 'L',  //Set ANSI conformance level 1 (dpANS X3.134.1).
@@ -667,7 +673,8 @@ public abstract class XtermStream implements Parser.Emitter {
                     Ps = 1 5  -> Report Printer status as CSI ? 1 0 n  (ready).
                   or CSI ? 1 1 n  (not ready).
                     Ps = 2 5  -> Report UDK status as CSI ? 2 0 n  (unlocked) or
-                CTRL_7BIT[CTRL_CSI] + ? 2 1 n  (locked).
+                CTRL_7BIT[CTRL_CSI] + ? 2 1 n     System.out.println("send " + len + " to parser");
+ (locked).
                     Ps = 2 6  -> Report Keyboard status as
                 CTRL_7BIT[CTRL_CSI] + ? 2 7 ; 1 ; 0 ; 0 n  (North American).
                   The last two parameters apply to VT400 & up, and denote key-
@@ -989,19 +996,22 @@ public abstract class XtermStream implements Parser.Emitter {
                   */
       CTRL_7BIT[CTRL_CSI] + '£' + '\'' + '}', //Insert Ps Column(s) (default = 1) (DECIC), VT420 and up.
       CTRL_7BIT[CTRL_CSI] + '£' + '\'' + '~', //Delete Ps Column(s) (default = 1) (DECDC), VT420 and up.
-};
+  };
   
   static int idBackspace;
+  static int idSaveCursor, idRestoreCursor;
   static int idCharacterAttributes;
   static int idSetCursorPosition;
   static int idEraseDisplay;
-  static int idDecset;
+  static int idDecset, idDecrst;
   static int idSetRow;
   static int idG0Charset0, idG0Charset1, idG0Charset2, idG0Charset3, idG0Charset4, idG0Charset5,
     idG0Charset6, idG0Charset7, idG0Charset8, idG0Charset9, idG0Charset10, idG0Charset11, idG0Charset12,
     idG0Charset13, idG0Charset14, idG0Charset15, idG0Charset16, idG0Charset17, idG0Charset18,
     idG0Charset19, idG0Charset20, idG0Charset21, idG0Charset22;
-  static int idCUU, idCUD, idCUF, idCUB;
+  static int idCUU, idCUD, idCUF, idCUB, idCNL, idCPL, idCHA, idDCH;
+  static int idEL, idRI;
+  static int idDefineScrollRegion, idScrollUp, idScrollDown;
   
   Parser parser;
   XtermHandler term;
@@ -1015,10 +1025,13 @@ public abstract class XtermStream implements Parser.Emitter {
       model.compile();
       // TODO
       idBackspace = model.getSymbolID("\b");
+      idSaveCursor = model.getSymbolID(ESC + '7');
+      idRestoreCursor = model.getSymbolID(ESC + '8');
       idCharacterAttributes = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'm');
       idSetCursorPosition = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'H');
       idEraseDisplay = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'J');
       idDecset = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '?' + '£' + 'h');
+      idDecrst = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '?' + '£' + 'l');
       idSetRow = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'd');
       idG0Charset0 = model.getSymbolID(ESC + '(' + '0');
       idG0Charset1 = model.getSymbolID(ESC + '(' + '<');
@@ -1047,6 +1060,15 @@ public abstract class XtermStream implements Parser.Emitter {
       idCUD = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'B');
       idCUF = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'C');
       idCUB = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'D');
+      idCNL = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'E');
+      idCPL = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'F');
+      idCHA = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'G');
+      idEL = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'K');
+      idDCH = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'P');
+      idRI = model.getSymbolID(ESC + 'M');
+      idDefineScrollRegion = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'r');
+      idScrollUp = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'S');
+      idScrollDown = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'T');
     }
     term = x;
     parser = new Parser(this, 256);
@@ -1054,10 +1076,13 @@ public abstract class XtermStream implements Parser.Emitter {
   }
   
   public void feed(byte b) {
+    //System.out.print(String.format("[%02x:%c]", b, b));
     parser.parse(b);
   }
 
   public void feed(byte[] b, int len) {
+    //for (int i = 0; i < len; i++)
+    //  System.out.print(String.format("[%02x:%c]", b[i], b[i]));
     parser.parse(b, 0, len);
   }
   
@@ -1067,9 +1092,15 @@ public abstract class XtermStream implements Parser.Emitter {
     lastSymLen = len;
     symDataIx = 0;
     int a;
-    if (sym == idCUB) {
+    if (sym == idBackspace) {
       System.out.println("xterm.backspace");
       term.cursorCol(-1);
+    } else if (sym == idSaveCursor) {
+      System.out.println("xterm.saveCursor");
+      term.saveCursor();
+    } else if (sym == idRestoreCursor) {
+      System.out.println("xterm.restoreCursor");
+      term.restoreCursor();
     } else if (sym == idCharacterAttributes) {
       while ((a = getNextArg()) != -1) {
         handleCharacterAttribute(a);
@@ -1084,7 +1115,7 @@ public abstract class XtermStream implements Parser.Emitter {
     } else if (sym == idSetRow) {
       int row = getNextArg();
       if (row == -1) row = 1;
-      System.out.println("xterm.setRow" + row);
+      System.out.println("xterm.setRow " + row);
       term.setCursorRow(row);
     } else if (sym == idCUU) {
       int x = getNextArg();
@@ -1106,6 +1137,38 @@ public abstract class XtermStream implements Parser.Emitter {
       if (x == -1) x = 1;
       System.out.println("xterm.cursorback " + x);
       term.cursorCol(-x);
+    } else if (sym == idCNL) {
+      int x = getNextArg();
+      if (x == -1) x = 1;
+      System.out.println("xterm.cursornewline " + x);
+      term.cursorNewline(x);
+    } else if (sym == idCPL) {
+      int x = getNextArg();
+      if (x == -1) x = 1;
+      System.out.println("xterm.cursorprevline " + x);
+      term.cursorPrevline(x);
+    } else if (sym == idCHA) {
+      int x = getNextArg();
+      if (x == -1) x = 1;
+      System.out.println("xterm.setcol " + x);
+      term.setCursorCol(x);
+    } else if (sym == idEL) {
+      int x = getNextArg();
+      if (x == -1) x = 0;
+      System.out.println("xterm.eraseline " + x);
+      switch (x) {
+      case 0: term.eraseLineRight(); break;
+      case 1: term.eraseLineLeft(); break;
+      case 2: term.eraseLineAll(); break;
+      }
+    } else if (sym == idDCH) {
+      int x = getNextArg();
+      if (x == -1) x = 1;
+      System.out.println("xterm.delchars " + x);
+      term.delete(x);
+    } else if (sym == idRI) {
+      System.out.println("xterm.reverseIndex");
+      term.cursorPrevline(1);;
     } else if (sym == idEraseDisplay) {
       int x = getNextArg();
       if (x == -1) x = 0;
@@ -1116,9 +1179,28 @@ public abstract class XtermStream implements Parser.Emitter {
       case 2: term.eraseDisplayAll(); break;
       case 3: term.eraseDisplaySavedLines(); break;
       }
+    } else if (sym == idDefineScrollRegion) {
+      int mi = getNextArg();
+      int ma = getNextArg();
+      System.out.println("xterm.defineScrollRegion " + mi + "," + ma);
+      term.setScrollRegion(mi, ma);
+    } else if (sym == idScrollUp) {
+      int x = getNextArg();
+      if (x == -1) x = 1;
+      System.out.println("xterm.scrollUp " + x);
+      term.scroll(x);
+    } else if (sym == idScrollDown) {
+      int x = getNextArg();
+      if (x == -1) x = 1;
+      System.out.println("xterm.scrollDown " + x);
+      term.scroll(-x);
     } else if (sym == idDecset) {
       while ((a = getNextArg()) != -1) {
-        handleDecsetAttribute(a);
+        handleDecSetRstAttribute(a, true);
+      }
+    } else if (sym == idDecrst) {
+      while ((a = getNextArg()) != -1) {
+        handleDecSetRstAttribute(a, false);
       }
     } else if (sym == idG0Charset0 || sym == idG0Charset1 || sym == idG0Charset2 || sym == idG0Charset3 ||
               sym == idG0Charset4 || sym == idG0Charset5 || sym == idG0Charset6 || sym == idG0Charset7 ||
@@ -1135,67 +1217,91 @@ public abstract class XtermStream implements Parser.Emitter {
   @Override
   public abstract void data(byte[] data, int len);
   
-  void handleDecsetAttribute(int a) {
+  void handleDecSetRstAttribute(int a, boolean enable) {
     switch (a) {
-    case 1  : /* TODO */ System.out.println("XTERM DECSET:Application Cursor Keys (DECCKM)."); break;
-    case 2  : /* TODO */ System.out.println("XTERM DECSET:Designate USASCII for character sets G0-G3 (DECANM), and set VT100 mode."); break;
-    case 3  : /* TODO */ System.out.println("XTERM DECSET:132 Column Mode (DECCOLM)."); break;
-    case 4  : /* TODO */ System.out.println("XTERM DECSET:Smooth (Slow) Scroll (DECSCLM)."); break;
-    case 5  : /* TODO */ System.out.println("XTERM DECSET:Reverse Video (DECSCNM)."); break;
-    case 6  : /* TODO */ System.out.println("XTERM DECSET:Origin Mode (DECOM)."); break;
-    case 7  : /* TODO */ System.out.println("XTERM DECSET:Wraparound Mode (DECAWM)."); break;
-    case 8  : /* TODO */ System.out.println("XTERM DECSET:Auto-repeat Keys (DECARM)."); break;
-    case 9  : /* TODO */ System.out.println("XTERM DECSET:Send Mouse X & Y on button press.  See the section Mouse Tracking.  This is the X10 xterm mouse protocol."); break;
-    case 10  : /* TODO */ System.out.println("XTERM DECSET:Show toolbar (rxvt)."); break;
-    case 12 : /* TODO */ System.out.println("XTERM DECSET:Start Blinking Cursor (att610)."); break;
-    case 18 : /* TODO */ System.out.println("XTERM DECSET:Print form feed (DECPFF)."); break;
-    case 19 : /* TODO */ System.out.println("XTERM DECSET:Set print extent to full screen (DECPEX)."); break;
-    case 25 : /* TODO */ System.out.println("XTERM DECSET:Show Cursor (DECTCEM)."); break;
-    case 30 : /* TODO */ System.out.println("XTERM DECSET:Show scrollbar (rxvt)."); break;
-    case 35 : /* TODO */ System.out.println("XTERM DECSET:Enable font-shifting functions (rxvt)."); break;
-    case 38 : /* TODO */ System.out.println("XTERM DECSET:Enter Tektronix Mode (DECTEK)."); break;
-    case 40 : /* TODO */ System.out.println("XTERM DECSET:Allow 80 -> 132 Mode."); break;
-    case 41 : /* TODO */ System.out.println("XTERM DECSET:more(1) fix (see curses resource)."); break;
-    case 42 : /* TODO */ System.out.println("XTERM DECSET:Enable National Replacement Character sets (DECNRCM)."); break;
-    case 44 : /* TODO */ System.out.println("XTERM DECSET:Turn On Margin Bell."); break;
-    case 45 : /* TODO */ System.out.println("XTERM DECSET:Reverse-wraparound Mode."); break;
-    case 46 : /* TODO */ System.out.println("XTERM DECSET:Start Logging.  This is normally disabled by a compile-time option."); break;
-    case 47 : /* TODO */ System.out.println("XTERM DECSET:Use Alternate Screen Buffer.  (This may be disabled by the titeInhibit resource)."); break;
-    case 66 : /* TODO */ System.out.println("XTERM DECSET:Application keypad (DECNKM)."); break;
-    case 67 : /* TODO */ System.out.println("XTERM DECSET:Backarrow key sends backspace (DECBKM)."); break;
-    case 69 : /* TODO */ System.out.println("XTERM DECSET:Enable left and right margin mode (DECLRMM), VT420 and up."); break;
-    case 95 : /* TODO */ System.out.println("XTERM DECSET:Do not clear screen when DECCOLM is set/reset (DECNCSM), VT510 and up."); break;
-    case 1000 : /* TODO */ System.out.println("XTERM DECSET:Send Mouse X & Y on button press and release.  See the section Mouse Tracking.  This is the X11 xterm mouse protocol."); break;
-    case 1001 : /* TODO */ System.out.println("XTERM DECSET:Use Hilite Mouse Tracking."); break;
-    case 1002 : /* TODO */ System.out.println("XTERM DECSET:Use Cell Motion Mouse Tracking."); break;
-    case 1003 : /* TODO */ System.out.println("XTERM DECSET:Use All Motion Mouse Tracking."); break;
-    case 1004 : /* TODO */ System.out.println("XTERM DECSET:Send FocusIn/FocusOut events."); break;
-    case 1005 : /* TODO */ System.out.println("XTERM DECSET:Enable UTF-8 Mouse Mode."); break;
-    case 1006 : /* TODO */ System.out.println("XTERM DECSET:Enable SGR Mouse Mode."); break;
-    case 1007 : /* TODO */ System.out.println("XTERM DECSET:Enable Alternate Scroll Mode."); break;
-    case 1010 : /* TODO */ System.out.println("XTERM DECSET:Scroll to bottom on tty output (rxvt)."); break;
-    case 1011 : /* TODO */ System.out.println("XTERM DECSET:Scroll to bottom on key press (rxvt)."); break;
-    case 1015 : /* TODO */ System.out.println("XTERM DECSET:Enable urxvt Mouse Mode."); break;
-    case 1034 : /* TODO */ System.out.println("XTERM DECSET:Interpret 'meta' key, sets eighth bit. (enables the eightBitInput resource)."); break;
-    case 1035 : /* TODO */ System.out.println("XTERM DECSET:Enable special modifiers for Alt and Num-Lock keys.  (This enables the numLock resource)."); break;
-    case 1036 : /* TODO */ System.out.println("XTERM DECSET:Send ESC   when Meta modifies a key.  (This enables the metaSendsEscape resource)."); break;
-    case 1037 : /* TODO */ System.out.println("XTERM DECSET:Send DEL from the editing-keypad Delete key."); break;
-    case 1039 : /* TODO */ System.out.println("XTERM DECSET:Send ESC  when Alt modifies a key.  (This enables the altSendsEscape resource)."); break;
-    case 1040 : /* TODO */ System.out.println("XTERM DECSET:Keep selection even if not highlighted. (This enables the keepSelection resource)."); break;
-    case 1041 : /* TODO */ System.out.println("XTERM DECSET:Use the CLIPBOARD selection.  (This enables the selectToClipboard resource)."); break;
-    case 1042 : /* TODO */ System.out.println("XTERM DECSET:Enable Urgency window manager hint when Control-G is received.  (This enables the bellIsUrgent resource)."); break;
-    case 1043 : /* TODO */ System.out.println("XTERM DECSET:Enable raising of the window when Control-G is received.  (enables the popOnBell resource)."); break;
-    case 1044 : /* TODO */ System.out.println("XTERM DECSET:Reuse the most recent data copied to CLIPBOARD.  (This enables the keepClipboard resource)."); break;
-    case 1047 : /* TODO */ System.out.println("XTERM DECSET:Use Alternate Screen Buffer.  (This may be disabled by the titeInhibit resource)."); break;
-    case 1048 : /* TODO */ System.out.println("XTERM DECSET:Save cursor as in DECSC.  (This may be disabled by the titeInhibit resource)."); break;
-    case 1049 : /* TODO */ System.out.println("XTERM DECSET:Save cursor as in DECSC and use Alternate Screen Buffer, clearing it first.  (This may be disabled by the titeInhibit resource).  This combines the effects of the 1 0 4 7  and 1 0 4 8  modes.  Use this with terminfo-basedapplications rather than the 4 7  mode."); break;
-    case 1050 : /* TODO */ System.out.println("XTERM DECSET:Set terminfo/termcap function-key mode."); break;
-    case 1051 : /* TODO */ System.out.println("XTERM DECSET:Set Sun function-key mode."); break;
-    case 1052 : /* TODO */ System.out.println("XTERM DECSET:Set HP function-key mode."); break;
-    case 1053 : /* TODO */ System.out.println("XTERM DECSET:Set SCO function-key mode."); break;
-    case 1060 : /* TODO */ System.out.println("XTERM DECSET:Set legacy keyboard emulation (X11R6)."); break;
-    case 1061 : /* TODO */ System.out.println("XTERM DECSET:Set VT220 keyboard emulation."); break;
-    case 2004 : /* TODO */ System.out.println("XTERM DECSET:Set bracketed paste mode."); break;
+    case 1  : /* TODO */ System.out.println("XTERM DECSETRST:Application Cursor Keys (DECCKM)."); break;
+    case 2  : /* TODO */ System.out.println("XTERM DECSETRST:Designate USASCII for character sets G0-G3 (DECANM), and set VT100 mode."); break;
+    case 3  : /* TODO */ System.out.println("XTERM DECSETRST:132 Column Mode (DECCOLM)."); break;
+    case 4  : /* TODO */ System.out.println("XTERM DECSETRST:Smooth (Slow) Scroll (DECSCLM)."); break;
+    case 5  : /* TODO */ System.out.println("XTERM DECSETRST:Reverse Video (DECSCNM)."); break;
+    case 6  : /* TODO */ System.out.println("XTERM DECSETRST:Origin Mode (DECOM)."); break;
+    case 7  : /* TODO */ System.out.println("XTERM DECSETRST:Wraparound Mode (DECAWM)."); break;
+    case 8  : /* TODO */ System.out.println("XTERM DECSETRST:Auto-repeat Keys (DECARM)."); break;
+    case 9  : /* TODO */ System.out.println("XTERM DECSETRST:Send Mouse X & Y on button press.  See the section Mouse Tracking.  This is the X10 xterm mouse protocol."); break;
+    case 10  : /* TODO */ System.out.println("XTERM DECSETRST:Show toolbar (rxvt)."); break;
+    case 12 : /* TODO */ System.out.println("XTERM DECSETRST:Start Blinking Cursor (att610)."); break;
+    case 18 : /* TODO */ System.out.println("XTERM DECSETRST:Print form feed (DECPFF)."); break;
+    case 19 : /* TODO */ System.out.println("XTERM DECSETRST:Set print extent to full screen (DECPEX)."); break;
+    case 25 : /* TODO */ System.out.println("XTERM DECSETRST:Show Cursor (DECTCEM)."); break;
+    case 30 : /* TODO */ System.out.println("XTERM DECSETRST:Show scrollbar (rxvt)."); break;
+    case 35 : /* TODO */ System.out.println("XTERM DECSETRST:Enable font-shifting functions (rxvt)."); break;
+    case 38 : /* TODO */ System.out.println("XTERM DECSETRST:Enter Tektronix Mode (DECTEK)."); break;
+    case 40 : /* TODO */ System.out.println("XTERM DECSETRST:Allow 80 -> 132 Mode."); break;
+    case 41 : /* TODO */ System.out.println("XTERM DECSETRST:more(1) fix (see curses resource)."); break;
+    case 42 : /* TODO */ System.out.println("XTERM DECSETRST:Enable National Replacement Character sets (DECNRCM)."); break;
+    case 44 : /* TODO */ System.out.println("XTERM DECSETRST:Turn On Margin Bell."); break;
+    case 45 : /* TODO */ System.out.println("XTERM DECSETRST:Reverse-wraparound Mode."); break;
+    case 46 : /* TODO */ System.out.println("XTERM DECSETRST:Start Logging.  This is normally disabled by a compile-time option."); break;
+    case 47 : System.out.println("xterm.setAlternateScreen " + enable); 
+    term.setAlternateScreenBuffer(enable);
+    break;
+    case 66 : /* TODO */ System.out.println("XTERM DECSETRST:Application keypad (DECNKM)."); break;
+    case 67 : /* TODO */ System.out.println("XTERM DECSETRST:Backarrow key sends backspace (DECBKM)."); break;
+    case 69 : /* TODO */ System.out.println("XTERM DECSETRST:Enable left and right margin mode (DECLRMM), VT420 and up."); break;
+    case 95 : /* TODO */ System.out.println("XTERM DECSETRST:Do not clear screen when DECCOLM is set/reset (DECNCSM), VT510 and up."); break;
+    case 1000 : /* TODO */ System.out.println("XTERM DECSETRST:Send Mouse X & Y on button press and release.  See the section Mouse Tracking.  This is the X11 xterm mouse protocol."); break;
+    case 1001 : /* TODO */ System.out.println("XTERM DECSETRST:Use Hilite Mouse Tracking."); break;
+    case 1002 : /* TODO */ System.out.println("XTERM DECSETRST:Use Cell Motion Mouse Tracking."); break;
+    case 1003 : /* TODO */ System.out.println("XTERM DECSETRST:Use All Motion Mouse Tracking."); break;
+    case 1004 : /* TODO */ System.out.println("XTERM DECSETRST:Send FocusIn/FocusOut events."); break;
+    case 1005 : /* TODO */ System.out.println("XTERM DECSETRST:Enable UTF-8 Mouse Mode."); break;
+    case 1006 : /* TODO */ System.out.println("XTERM DECSETRST:Enable SGR Mouse Mode."); break;
+    case 1007 : /* TODO */ System.out.println("XTERM DECSETRST:Enable Alternate Scroll Mode."); break;
+    case 1010 : /* TODO */ System.out.println("XTERM DECSETRST:Scroll to bottom on tty output (rxvt)."); break;
+    case 1011 : /* TODO */ System.out.println("XTERM DECSETRST:Scroll to bottom on key press (rxvt)."); break;
+    case 1015 : /* TODO */ System.out.println("XTERM DECSETRST:Enable urxvt Mouse Mode."); break;
+    case 1034 : /* TODO */ System.out.println("XTERM DECSETRST:Interpret 'meta' key, sets eighth bit. (enables the eightBitInput resource)."); break;
+    case 1035 : /* TODO */ System.out.println("XTERM DECSETRST:Enable special modifiers for Alt and Num-Lock keys.  (This enables the numLock resource)."); break;
+    case 1036 : /* TODO */ System.out.println("XTERM DECSETRST:Send ESC   when Meta modifies a key.  (This enables the metaSendsEscape resource)."); break;
+    case 1037 : /* TODO */ System.out.println("XTERM DECSETRST:Send DEL from the editing-keypad Delete key."); break;
+    case 1039 : /* TODO */ System.out.println("XTERM DECSETRST:Send ESC  when Alt modifies a key.  (This enables the altSendsEscape resource)."); break;
+    case 1040 : /* TODO */ System.out.println("XTERM DECSETRST:Keep selection even if not highlighted. (This enables the keepSelection resource)."); break;
+    case 1041 : /* TODO */ System.out.println("XTERM DECSETRST:Use the CLIPBOARD selection.  (This enables the selectToClipboard resource)."); break;
+    case 1042 : /* TODO */ System.out.println("XTERM DECSETRST:Enable Urgency window manager hint when Control-G is received.  (This enables the bellIsUrgent resource)."); break;
+    case 1043 : /* TODO */ System.out.println("XTERM DECSETRST:Enable raising of the window when Control-G is received.  (enables the popOnBell resource)."); break;
+    case 1044 : /* TODO */ System.out.println("XTERM DECSETRST:Reuse the most recent data copied to CLIPBOARD.  (This enables the keepClipboard resource)."); break;
+    case 1047 : System.out.println("xterm.setAlternateScreen " + enable); 
+    term.setAlternateScreenBuffer(enable);
+    break;
+    case 1048 :
+    if (enable) {
+      System.out.println("xterm.saveCursor");
+      term.saveCursor();
+    } else {
+      System.out.println("xterm.restoreCursor");
+      term.restoreCursor();
+    }
+    break;
+    case 1049 :
+    if (enable) {
+      System.out.println("xterm.saveCursor alternateScreenBuffer:true eraseAll");
+      term.saveCursor();
+      term.setAlternateScreenBuffer(true);
+      term.eraseDisplayAll();
+    } else {
+      System.out.println("xterm.eraseAll alternateScreeBuffer:false restoreCursor");
+      term.eraseDisplayAll();
+      term.setAlternateScreenBuffer(false);
+      term.restoreCursor();
+    }
+    break;
+    case 1050 : /* TODO */ System.out.println("XTERM DECSETRST:Set terminfo/termcap function-key mode."); break;
+    case 1051 : /* TODO */ System.out.println("XTERM DECSETRST:Set Sun function-key mode."); break;
+    case 1052 : /* TODO */ System.out.println("XTERM DECSETRST:Set HP function-key mode."); break;
+    case 1053 : /* TODO */ System.out.println("XTERM DECSETRST:Set SCO function-key mode."); break;
+    case 1060 : /* TODO */ System.out.println("XTERM DECSETRST:Set legacy keyboard emulation (X11R6)."); break;
+    case 1061 : /* TODO */ System.out.println("XTERM DECSETRST:Set VT220 keyboard emulation."); break;
+    case 2004 : /* TODO */ System.out.println("XTERM DECSETRST:Set bracketed paste mode."); break;
     }
   }
   void handleCharacterAttribute(int a) {

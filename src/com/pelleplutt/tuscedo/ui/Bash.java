@@ -6,7 +6,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 
 import com.pelleplutt.tuscedo.Console;
 import com.pelleplutt.tuscedo.ProcessGroup;
@@ -20,7 +19,6 @@ public class Bash implements ProcessGroup.ProcessConsole {
   ProcessHandler handler;
   File pwd;
   Console console;
-  static Pattern argBreak = Pattern.compile("([^\"]\\S*|\".+?\")\\s*");
   List<List<SubCommand>> chain;
   boolean background;
   volatile int chainIx;
@@ -465,5 +463,6 @@ public class Bash implements ProcessGroup.ProcessConsole {
     for (ProcessGroup pg : activeProcessGroups) {
       AppSystem.dispose(pg);
     }
+    console.close();
   }
 }

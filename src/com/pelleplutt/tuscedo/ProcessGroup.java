@@ -46,7 +46,7 @@ public class ProcessGroup implements Disposable {
     return background;
   }
   
-  void startProcess(final Command cmd, 
+  void startProcess(final Command cmd,
       final InputStream toStdIn, final OutputStream toStdOut, final OutputStream toStdErr) throws IOException {
     Log.println(cmd.args[0] + " starting, in:" + cmd.stdin + " out:" + cmd.stdout + " err:" + cmd.stderr);
     //String[] envp = null;
@@ -93,18 +93,7 @@ public class ProcessGroup implements Disposable {
           if (cmd.stdout == CONSOLE) {
             int d;
             byte buf[] = new byte[256];
-////            String line;
-//            BufferedReader out = new BufferedReader(
-//                new InputStreamReader(cmd.out));
-////            while ((line = out.readLine()) != null) {
-////              if (cons != null) {
-////                cons.outln(ProcessGroup.this, line);
-////              }
-////            }
-//            while ((d = out.read()) != -1) {
-//              cons.out(ProcessGroup.this, (byte)d);
-//            }
-
+            @SuppressWarnings("resource")
             TickableReader out = new TickableReader(cmd.out, 1024,
                 READER_TICK_RATE_MIN_MS, READER_TICK_RATE_MAX_MS);
             while ((d = out.read(buf)) != -1) {
@@ -143,18 +132,7 @@ public class ProcessGroup implements Disposable {
           if (cmd.stderr == CONSOLE) {
             int d;
             byte buf[] = new byte[256];
-
-////            String line;
-//            BufferedReader out = new BufferedReader(
-//                new InputStreamReader(cmd.err));
-////            while ((line = out.readLine()) != null) {
-////              if (cons != null) {
-////                cons.errln(ProcessGroup.this, line);
-////              }
-////            }
-//            while ((d = out.read()) != -1) {
-//              cons.err(ProcessGroup.this, (byte)d);
-//            }
+            @SuppressWarnings("resource")
             TickableReader err = new TickableReader(cmd.err, 1024, 
                 READER_TICK_RATE_MIN_MS, READER_TICK_RATE_MAX_MS);
             while ((d = err.read(buf)) != -1) {
@@ -210,7 +188,9 @@ public class ProcessGroup implements Disposable {
   }
   
   public void write(int b) throws IOException {
+    System.out.println("send " + b + " to " + commands.get(0).args[0]);
     stdin.write(b);
+    stdin.flush();
   }
 
   public void write(byte[] b) throws IOException {

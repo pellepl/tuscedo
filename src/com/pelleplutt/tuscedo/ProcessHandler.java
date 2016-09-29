@@ -6,6 +6,7 @@ public interface ProcessHandler {
   public void closeStdin();
   public void unlinkFromProcess();
   public void sendToStdIn(String line);
+  public void sendToStdIn(byte b);
   public void sendToStdIn(byte b[]);
   public void sendToStdIn(byte b[], int offs, int len);
   public void sendToBack();

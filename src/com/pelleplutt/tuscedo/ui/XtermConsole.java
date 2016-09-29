@@ -1,18 +1,32 @@
 package com.pelleplutt.tuscedo.ui;
 
 import java.awt.Color;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.io.UnsupportedEncodingException;
 
 import com.pelleplutt.tuscedo.Console;
 import com.pelleplutt.tuscedo.ProcessHandler;
 import com.pelleplutt.tuscedo.XtermHandler;
 import com.pelleplutt.tuscedo.XtermStream;
+import com.pelleplutt.util.AppSystem;
+import com.pelleplutt.util.AppSystem.Disposable;
 import com.pelleplutt.util.FastTextPane;
 
-public class XtermConsole implements Console {
+/**
+ * Contains two XtermStreamHandlers, one for stdout and one for stderr.
+ * Takes care of handling output from the XtermStreams for out and err. 
+ * Also takes care of key input events and translates them to proper
+ * VT_* sequences to the process.
+ * @author petera
+ */
+public class XtermConsole implements Console, KeyListener, Disposable, Runnable {
   WorkArea.View view;
   ProcessHandler ph;
   XtermStreamHandler xstd, xerr;
+  volatile boolean running = true;
+  long tick = 50;
+  
   Color colXtermPalette[] = {
       null,
       new Color(0x000000),
@@ -35,26 +49,43 @@ public class XtermConsole implements Console {
   public XtermConsole(WorkArea.View v, ProcessHandler ph, String textEncoding) {
     this.view = v;
     this.ph = ph;
-    xstd = new XtermStreamHandler(WorkArea.STYLE_BASH_OUT, textEncoding) {
-      @Override
-      public void data(byte[] data, int len) {
-        try {
-          view.ftp.addText(new String(data, 0, len, textEnc), defStyle.id, 
-              colInverse ? colBG : colFG, colInverse ? colFG : colBG, bold);
-        } catch (UnsupportedEncodingException e) {}
-      }
-    };
-    xerr = new XtermStreamHandler(WorkArea.STYLE_BASH_ERR, textEncoding) {
-      @Override
-      public void data(byte[] data, int len) {
-        try {
-          view.ftp.addText(new String(data, 0, len, textEnc), defStyle.id, 
-              colInverse ? colBG : colFG, colInverse ? colFG : colBG, bold);
-        } catch (UnsupportedEncodingException e) {}
-      }
-    };
+    view.ftp.setKeyListener(this);
+    xstd = new XtermStreamHandler(WorkArea.STYLE_BASH_OUT, textEncoding);
+    xerr = new XtermStreamHandler(WorkArea.STYLE_BASH_ERR, textEncoding);
+    AppSystem.addDisposable(this);
+    Thread t = new Thread(this, "XtermConsoleTickler");
+    t.setDaemon(true);
+    t.start();
   }
   
+  // implements Runnable
+  @Override
+  public void run() {
+    while (running) {
+      boolean flushedStd = xstd.flushBuf() > 0;
+      boolean flushedErr = xerr.flushBuf() > 0;
+      if (flushedStd || flushedErr) {
+        tick = Math.max(tick/2, 10);
+      } else {
+        tick = Math.min(tick*2, 250);
+      }
+      AppSystem.sleep(tick);
+    }
+  }
+  
+  // implements Disposable
+  @Override
+  public void dispose() {
+    running = false;
+  }
+  
+  // implements Console
+  @Override
+  public void close() {
+    AppSystem.dispose(this);
+  }
+  
+  @Override
   public void reset() {
     xstd.xterm.flush();
     xstd.setTextDefault();
@@ -72,7 +103,6 @@ public class XtermConsole implements Console {
     xstd.feed(b);
   }
   
-
   @Override
   public void stdout(byte[] b, int len) {
     xstd.feed(b, len);
@@ -93,7 +123,12 @@ public class XtermConsole implements Console {
     xerr.feed(b, len);
   }
 
-  abstract class XtermStreamHandler implements XtermHandler {
+  /**
+   * class XtermStreamHandler
+   * handles xterm commands and data and bridges it to the FastTermPane
+   * @author petera
+   */
+  class XtermStreamHandler implements XtermHandler {
     final XtermStream xterm;
     final FastTextPane.Style defStyle;
     Color colFG;
@@ -103,6 +138,7 @@ public class XtermConsole implements Console {
     byte buf[] = new byte[256];
     volatile int bufIx = 0;
     String textEnc;
+    int savedCursorRow, savedCursorCol;
     
     public XtermStreamHandler(FastTextPane.Style def, String textEncoding) {
       textEnc = textEncoding;
@@ -112,20 +148,20 @@ public class XtermConsole implements Console {
       
       xterm = new XtermStream(this) {
         @Override
+        public void data(byte[] data, int len) {
+          putBuf(data, len);
+        }
+        @Override
         public void symbol(byte[] symdata, int len, int sym) {
           flushBuf();
           super.symbol(symdata, len, sym);
         }
-        @Override
-        public void data(byte[] data, int len) {
-          putBuf(data, len);
-        }
       };
     }
     
-    void putBuf(final byte[] data, final int len) {
+    synchronized void putBuf(final byte[] data, final int len) {
       for (int i = 0; i < len; i++) {
-        byte b  = data[i];
+        byte b = data[i];
         buf[bufIx++] = b;
         if (b == '\n' || b == '\r'|| bufIx >= buf.length) {
           flushBuf();
@@ -133,9 +169,11 @@ public class XtermConsole implements Console {
       }
     }
     
-    void flushBuf() {
+    public synchronized int flushBuf() {
+      int oldBufIx = bufIx;
       XtermStreamHandler.this.data(buf, bufIx);
       bufIx = 0;
+      return oldBufIx;
     }
     
     public void feed(byte b) {
@@ -146,9 +184,15 @@ public class XtermConsole implements Console {
       xterm.feed(b, len);
     }
 
-    abstract public void data(byte[] data, int len);
+    public void data(byte[] data, int len) {
+      if (len <= 0) return;
+      try {
+        view.ftp.addText(new String(data, 0, len, textEnc), defStyle.id, 
+            colInverse ? colBG : colFG, colInverse ? colFG : colBG, bold);
+      } catch (UnsupportedEncodingException e) {}
+    }
   
-    // Xterm impl
+    // implements XtermHandler
     
     @Override
     public void setTextFgColor(int palette) {
@@ -186,14 +230,49 @@ public class XtermConsole implements Console {
       view.ftp.setCursorRow(x-1);
     }
     @Override
+    public void setCursorCol(int x) {
+      view.ftp.setCursorColumn(x-1);
+    }
+    @Override
     public void cursorRow(int x) {
       int n = view.ftp.getCursorRow() + x;
-      view.ftp.setCursorRow(Math.min(view.ftp.getHeightChars(), Math.max(0, n)));
+      view.ftp.setCursorRow(n);
     }
     @Override
     public void cursorCol(int x) {
       int n = view.ftp.getCursorColumn() + x;
-      view.ftp.setCursorColumn(Math.min(view.ftp.getHeightChars(), Math.max(0, n)));
+      view.ftp.setCursorColumn(n);
+    }
+    @Override
+    public void saveCursor() {
+      savedCursorRow = view.ftp.getCursorRow();
+      savedCursorCol = view.ftp.getCursorColumn();
+    }
+    @Override
+    public void cursorNewline(int x) {
+      view.ftp.nextRow();
+    }
+    @Override
+    public void cursorPrevline(int x) {
+      view.ftp.prevRow();
+    }
+    @Override
+    public void restoreCursor() {
+      System.out.println("xtermcons.restore @ " + (savedCursorCol + 1) + "," + (savedCursorRow + 1) +
+          " from " + (view.ftp.getCursorColumn() + 1) + "," + (view.ftp.getCursorRow() + 1));
+      setCursorPosition(savedCursorCol, savedCursorRow);
+    }
+    @Override
+    public void eraseLineRight() {
+      view.ftp.eraseLineAfter();
+    }
+    @Override
+    public void eraseLineLeft() {
+      view.ftp.eraseLineBefore();
+    }
+    @Override
+    public void eraseLineAll() {
+      view.ftp.eraseLineFull();
     }
     @Override
     public void eraseDisplayBelow() {
@@ -211,5 +290,66 @@ public class XtermConsole implements Console {
     public void eraseDisplaySavedLines() {
       //TODO
     }
+    @Override
+    public void delete(int chars) {
+      view.ftp.deleteChars(chars);
+    }
+    @Override
+    public void setScrollRegion(int minRow, int maxRow) {
+      view.ftp.setScrollArea(minRow-1, maxRow-1);
+    }
+    @Override
+    public void scroll(int lines) {
+      view.ftp.scroll(lines);
+    }
+    @Override
+    public void setAlternateScreenBuffer(boolean b) {
+      view.ftp.setTerminalMode(b);
+    }
+  }
+
+  // implements KeyListener
+  
+  static final byte VT_UP[] = new byte[] {(byte)0x1b, (byte)'[', (byte)'A'};
+  static final byte VT_DOWN[] = new byte[] {(byte)0x1b, (byte)'[', (byte)'B'};
+  static final byte VT_BACK[] = new byte[] {(byte)0x1b, (byte)'[', (byte)'D'};
+  static final byte VT_FORW[] = new byte[] {(byte)0x1b, (byte)'[', (byte)'C'};
+  static final byte VT_HOME[] = new byte[] {(byte)0x1b, (byte)'[', (byte)'H'};
+  static final byte VT_END[] = new byte[] {(byte)0x1b, (byte)'[', (byte)'F'};
+  static final byte VT_DELETE[] = new byte[] {(byte)0x1b, (byte)'[', (byte)'3', (byte)'~'};
+  
+  @Override
+  public void keyTyped(KeyEvent e) {
+    // TODO Auto-generated method stub
+    
+  }
+
+  @Override
+  public void keyPressed(KeyEvent e) {
+    char c = e.getKeyChar();
+    int d = e.getKeyCode();
+    if (c > 0 && c <= 255 && d != KeyEvent.VK_ENTER && d != KeyEvent.VK_DELETE) {
+      ph.sendToStdIn((byte)e.getKeyChar());
+    } else {
+      switch (d) {
+      case KeyEvent.VK_UP: ph.sendToStdIn(VT_UP); break;
+      case KeyEvent.VK_DOWN: ph.sendToStdIn(VT_DOWN); break;
+      case KeyEvent.VK_LEFT: ph.sendToStdIn(VT_BACK); break;
+      case KeyEvent.VK_RIGHT: ph.sendToStdIn(VT_FORW); break;
+      case KeyEvent.VK_ENTER: ph.sendToStdIn((byte)13); break;
+      case KeyEvent.VK_HOME: ph.sendToStdIn(VT_HOME); break;
+      case KeyEvent.VK_END: ph.sendToStdIn(VT_END); break;
+      case KeyEvent.VK_DELETE: ph.sendToStdIn(VT_DELETE); break;
+      default: 
+        System.out.println("unhandled " + e);
+        break;
+      }
+    }
+  }
+
+  @Override
+  public void keyReleased(KeyEvent e) {
+    // TODO Auto-generated method stub
+    
   }
 }

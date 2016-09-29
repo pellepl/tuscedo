@@ -349,7 +349,7 @@ public class WorkArea extends JPanel implements Disposable {
 
     ((CardLayout)inputPanel.getLayout()).show(inputPanel, Integer.toString(ISTATE_INPUT));
     ((CardLayout)viewPanel.getLayout()).show(viewPanel, Integer.toString(ISTATE_INPUT));
-    input[ISTATE_INPUT].requestFocus();
+    setStandardFocus();
     
     curView = views[ISTATE_INPUT];
     
@@ -554,7 +554,7 @@ public class WorkArea extends JPanel implements Disposable {
       curView = views[istate];
     }
     updateTitle();
-    input[istate].requestFocus();
+    setStandardFocus();
   }
   
   void leaveInputState(int istate) {
@@ -600,7 +600,11 @@ public class WorkArea extends JPanel implements Disposable {
       handleOpenSerial(in);
       break;
     case ISTATE_BASH:
-      views[ISTATE_BASH].ftp.addText(in + "\n", STYLE_BASH_INPUT);
+      if (input[istate].isLinkedToProcess() && curView.ftp.isTerminalMode()) {
+        // do not echo to running bashes
+      } else {
+        views[ISTATE_BASH].ftp.addText(in + "\n", STYLE_BASH_INPUT);
+      }
       bash[istate].input(in);
       input[istate].setText("");
       break;
@@ -794,15 +798,6 @@ public class WorkArea extends JPanel implements Disposable {
     }
   }
   
-  void addTab() {
-    WorkArea w = new WorkArea();
-    w.build();
-    SimpleTabPane stp = SimpleTabPane.getTabByComponent(this).getPane(); 
-    stp.selectTab(stp.createTab(Tuscedo.getTabID(), w));
-    w.updateTitle();
-    w.input[ISTATE_INPUT].requestFocus();
-  }
-  
   void closeTab() {
     SimpleTabPane.Tab t = SimpleTabPane.getTabByComponent(this); 
     SimpleTabPane stp = t.getPane();
@@ -969,7 +964,7 @@ public class WorkArea extends JPanel implements Disposable {
   AbstractAction actionAddTab = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      addTab();
+      Tuscedo.inst().addTab(SimpleTabPane.getTabByComponent(WorkArea.this).getPane());
     }
   };
 
@@ -997,52 +992,28 @@ public class WorkArea extends JPanel implements Disposable {
   AbstractAction actionLogUp = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      if (istate == ISTATE_BASH && input[istate].isLinkedToProcess()) {
-        input[istate].sendToStdIn(new byte[] {(byte)0x1b, (byte)'[', (byte)'A'});
-        //input[istate].sendToStdIn(new byte[] {(byte)0x8f, (byte)'A'});
-        //curView.ftp.setCursorRow(curView.ftp.getCursorRow() - 1);
-      } else {
-        curView.ftp.scrollLinesRelative(-1);
-      }
+      curView.ftp.scrollLinesRelative(-1);
     }
   };
 
   AbstractAction actionLogDown = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      if (istate == ISTATE_BASH && input[istate].isLinkedToProcess()) {
-        input[istate].sendToStdIn(new byte[] {(byte)0x1b, (byte)'[', (byte)'B'});
-        //input[istate].sendToStdIn(new byte[] {(byte)0x8f, (byte)'B'});
-        //curView.ftp.setCursorRow(curView.ftp.getCursorRow() + 1);
-      } else {
-        curView.ftp.scrollLinesRelative(1);
-      }
+      curView.ftp.scrollLinesRelative(1);
     }
   };
 
   AbstractAction actionLogLeft = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      if (istate == ISTATE_BASH && input[istate].isLinkedToProcess()) {
-        input[istate].sendToStdIn(new byte[] {(byte)0x1b, (byte)'[', (byte)'D'});
-        //input[istate].sendToStdIn(new byte[] {(byte)0x8f, (byte)'D'});
-        //curView.ftp.setCursorColumn(curView.ftp.getCursorColumn() - 1);
-      } else {
-        curView.ftp.scrollHorizontalRelative(-1);
-      }
+      curView.ftp.scrollHorizontalRelative(-1);
     }
   };
 
   AbstractAction actionLogRight = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      if (istate == ISTATE_BASH && input[istate].isLinkedToProcess()) {
-        input[istate].sendToStdIn(new byte[] {(byte)0x1b, (byte)'[', (byte)'C'});
-        //input[istate].sendToStdIn(new byte[] {(byte)0x8f, (byte)'C'});
-        //curView.ftp.setCursorColumn(curView.ftp.getCursorColumn() + 1);
-      } else {
-        curView.ftp.scrollHorizontalRelative(1);
-      }
+      curView.ftp.scrollHorizontalRelative(1);
     }
   };
 
@@ -1076,7 +1047,9 @@ public class WorkArea extends JPanel implements Disposable {
     winSug.dispose();
     for (Bash b : bash) {
       //Log.println("workarea close bash " + b);
-      if (b != null) b.close();
+      if (b != null) {
+        b.close();
+      }
     }
   }
 
@@ -1096,11 +1069,12 @@ public class WorkArea extends JPanel implements Disposable {
   
   public void onUnlinkedProcess(ACTextField tf, ProcessGroup process) {
     tf.setBackground(WorkArea.colInputBg);
+    // TODO XTERM figure out how to switch to normal screen buffer here
     updateTitle();
   }
   
   public void onTabSelected(SimpleTabPane.Tab t) {
-    input[istate].requestFocus();
+    setStandardFocus();
   }
   
   // these functions intercept the key events from autocompletetextfield
@@ -1316,4 +1290,8 @@ public class WorkArea extends JPanel implements Disposable {
     }
 
   } // class View
+
+  public void setStandardFocus() {
+    input[istate].requestFocus();
+  }
 }

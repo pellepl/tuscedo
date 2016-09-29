@@ -8,6 +8,7 @@ import java.awt.Window;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
 
 import javax.swing.JFrame;
@@ -18,6 +19,8 @@ import javax.swing.WindowConstants;
 import com.pelleplutt.tuscedo.ui.SimpleTabPane;
 import com.pelleplutt.tuscedo.ui.WorkArea;
 import com.pelleplutt.util.AppSystem;
+
+import purejavacomm.CommPortIdentifier;
 
 public class Tuscedo {
   Container mainContainer;
@@ -71,18 +74,19 @@ public class Tuscedo {
     TuscedoTabPane tabs = new TuscedoTabPane();
     tabs.setFont(WorkArea.COMMON_FONT);
 
-    WorkArea w1 = new WorkArea();
-    w1.build();
-    WorkArea w2 = new WorkArea();
-    w2.build();
-
-    tabs.createTab("MAIN", w1);
-    w1.updateTitle();
+    addTab(tabs);
     mainContainer.add(tabs);
     tabs.addWindowListener(tabs, f);
     
     f.setVisible(true);
-
+  }
+  
+  public void addTab(SimpleTabPane stp) {
+    WorkArea w = new WorkArea();
+    w.build();
+    stp.selectTab(stp.createTab(Tuscedo.getTabID(), w));
+    w.updateTitle();
+    w.setStandardFocus();
   }
   
   public class TuscedoTabPane extends SimpleTabPane implements SimpleTabPane.TabListener {
@@ -130,6 +134,41 @@ public class Tuscedo {
       UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
     } catch (Throwable ignore) {
     }
+    
+    @SuppressWarnings("rawtypes")
+    Enumeration e = purejavacomm.CommPortIdentifier.getPortIdentifiers();
+    while (e.hasMoreElements()) {
+      CommPortIdentifier portId = (CommPortIdentifier) e.nextElement();
+      if (portId.getPortType() == CommPortIdentifier.PORT_SERIAL) {
+        System.out.println(portId.getName());
+      }
+    }
+    
+/*    SerialPort port;
+    try {
+      port = (SerialPort) CommPortIdentifier.getPortIdentifier("ttyUSB3").open("tusc", 400);
+      port.setSerialPortParams(921600/2, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_NONE);
+      InputStream is = (InputStream) port.getInputStream();
+      int d;
+      while ((d = is.read()) != -1) {
+        System.out.print((char)d);
+      }
+      System.out.println("closed");
+      port.close();
+    } catch (PortInUseException e1) {
+      // TODO Auto-generated catch block
+      e1.printStackTrace();
+    } catch (NoSuchPortException e1) {
+      // TODO Auto-generated catch block
+      e1.printStackTrace();
+    } catch (UnsupportedCommOperationException e1) {
+      // TODO Auto-generated catch block
+      e1.printStackTrace();
+    } catch (IOException e1) {
+      // TODO Auto-generated catch block
+      e1.printStackTrace();
+    }
+  */  
     EventQueue.invokeLater(new Runnable() {
       public void run() {
         Tuscedo.inst().create();

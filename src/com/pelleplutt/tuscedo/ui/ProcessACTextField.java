@@ -113,6 +113,17 @@ public class ProcessACTextField extends ACTextField implements ProcessHandler {
   }
   
   @Override
+  public void sendToStdIn(byte b) {
+    if (process != null) {
+      try {
+        process.write(b);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+  }
+  
+  @Override
   public void sendToBack() {
     if (isLinkedToProcess()) {
       process.setBackground(true);

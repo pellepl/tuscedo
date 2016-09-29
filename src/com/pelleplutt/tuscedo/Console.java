@@ -14,4 +14,6 @@ public interface Console {
   void stderr(byte b[], int len);
 
   void reset();
+
+  void close();
 }
