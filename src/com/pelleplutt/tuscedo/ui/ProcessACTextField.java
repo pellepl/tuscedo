@@ -52,6 +52,8 @@ public class ProcessACTextField extends ACTextField implements ProcessHandler {
 
   }
   
+  // ProcessHandler impl
+  
   @Override
   public void linkToProcess(ProcessGroup p) {
     workarea.onLinkedProcess(this, p);
@@ -148,7 +150,7 @@ public class ProcessACTextField extends ACTextField implements ProcessHandler {
   
   @Override
   public void kill()  {
-      if (process != null) {
+    if (process != null) {
       process.kill(true);
       unlinkFromProcess();
     }

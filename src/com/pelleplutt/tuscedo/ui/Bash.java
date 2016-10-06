@@ -9,10 +9,12 @@ import java.util.List;
 
 import com.pelleplutt.tuscedo.Console;
 import com.pelleplutt.tuscedo.ProcessGroup;
+import com.pelleplutt.tuscedo.ProcessGroupInfo;
 import com.pelleplutt.tuscedo.ProcessHandler;
 import com.pelleplutt.tuscedo.SerialStreamProvider;
 import com.pelleplutt.tuscedo.Settings;
 import com.pelleplutt.util.AppSystem;
+import com.pelleplutt.util.FastTextPane;
 import com.pelleplutt.util.Log;
 
 public class Bash implements ProcessGroup.ProcessConsole {
@@ -242,6 +244,7 @@ public class Bash implements ProcessGroup.ProcessConsole {
       }
     }
     ProcessGroup pg = new ProcessGroup(id+1);
+    pg.setUserData(new ProcessGroupInfo(this, new FastTextPane.Doc()));
     InputStream serialInputStream = null;
     OutputStream serialOutputStream = null;
     

@@ -133,6 +133,7 @@ public class GraphPanel extends JPanel {
 
       g.setColor(Color.black);
       g.fillRect(0,0,ww,hh);
+      if (samples.isEmpty()) return;
       
       int origoY = (int)(magVer * - minGSample);
       
@@ -410,21 +411,4 @@ public class GraphPanel extends JPanel {
     magResize(newMagHor, newMagVer, pivot);
     repaint();
   }
-  
-  public static void main(String[] args) {
-    JFrame f = new JFrame();
-    f.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-    GraphPanel g = new GraphPanel();
-    
-    for (int i = 0; i < 30000; i++) {
-      g.addSample(Math.sin((double)i*0.001)*2000 + Math.cos((double)i)*500);
-    }
-    
-    f.getContentPane().add(g);
-    f.setSize(300, 200);
-    f.setLocationByPlatform(true);
-    f.setVisible(true);
-    g.zoomAll(true, true, new Point());
-  }
-  
 }

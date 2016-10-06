@@ -9,7 +9,9 @@ import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.AppSystem.Disposable;
@@ -30,12 +32,21 @@ public class ProcessGroup implements Disposable {
   InputStream stderr;
   private boolean background;
   ProcessConsole cons;
+  Object user;
   public final int id;
   
   List<Command> commands = new ArrayList<Command>();
   
   public ProcessGroup(int id) {
     this.id = id;
+  }
+  
+  public Object getUserData() {
+    return user;
+  }
+  
+  public void setUserData(Object o) {
+    user = o;
   }
   
   public synchronized void setBackground(boolean b) {
@@ -50,7 +61,19 @@ public class ProcessGroup implements Disposable {
       final InputStream toStdIn, final OutputStream toStdOut, final OutputStream toStdErr) throws IOException {
     Log.println(cmd.args[0] + " starting, in:" + cmd.stdin + " out:" + cmd.stdout + " err:" + cmd.stderr);
     //String[] envp = null;
-    String[] envp = { "TERM=xterm" };
+    Map<String, String> env = new HashMap<String,String>(System.getenv());
+    env.put("TERM", "xterm");
+    List<String> stupid = new ArrayList<String>();
+    for (String key : env.keySet()) {
+      String value = env.get(key);
+      if (value != null) {
+          stupid.add(String.format("%s=%s", key, value));
+      } else {
+        stupid.add(String.format("%s=", key));
+      }
+    }
+    String[] envp = stupid.toArray(new String[stupid.size()]);
+    //String[] envp = { "TERM=xterm" };
     final Process process = Runtime.getRuntime().exec(cmd.args, envp, cmd.pwd);
     cmd.process = process;
     cmd.in = process.getOutputStream();

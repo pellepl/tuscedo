@@ -6,7 +6,7 @@ package com.pelleplutt.tuscedo;
  * 
  * @author petera
  */
-public abstract class XtermStream implements Parser.Emitter {
+public abstract class XtermStream implements Lexer.Emitter {
   
   public static final int TEXT_DEFAULT = 0;
   public static final int TEXT_BLACK = 1;
@@ -26,7 +26,7 @@ public abstract class XtermStream implements Parser.Emitter {
   public static final int TEXT_BWHITE = 15;
 
   
-  static Parser model = null;
+  static Lexer model = null;
   
   private static final int PARSE_CHAR = 0;
   private static final int PARSE_CTRL = 1;
@@ -68,8 +68,8 @@ public abstract class XtermStream implements Parser.Emitter {
       ESC + '[',   // CSI
       ESC + '\\',  // ST
       ESC + ']',   // OSC
-      ESC + '^',   // PM
-      ESC + '_',   // APC
+      ESC + "\\^",   // PM
+      ESC + "\\_", // APC
   };
   
   private static final String CTRL_8BIT[] = {
@@ -91,22 +91,58 @@ public abstract class XtermStream implements Parser.Emitter {
       "\u009f", // APC
   };
   
-  private static final String CTRL_XTERM[] = {
-      "\b",             //Backspace
-      ESC + 'M',   // RI
+  static class Sym {
+    String sym;
+    int id;
+    public Sym(String s, int i) {
+      sym = s; id = i;
+    }
+  }
+  
+  static final int X_BS = 1;
+  static final int X_RI = 2;
+  static final int X_S7C1T = 3;
+  static final int X_S8C1T = 4;
+  static final int X_DECSC = 5; 
+  static final int X_DECRC = 6; 
+  static final int X_SGR  = 7;
+  static final int X_CUP  = 8;
+  static final int X_VPA  = 9;
+  static final int X_CUU  = 10;
+  static final int X_CUD  = 11;
+  static final int X_CUF  = 12;
+  static final int X_CUB  = 13;
+  static final int X_CNL  = 14;
+  static final int X_CPL  = 15;
+  static final int X_CHA  = 16;
+  static final int X_CHT  = 17;
+  static final int X_EL  = 18;
+  static final int X_DCH  = 19;
+  static final int X_ED  = 20;
+  static final int X_DECSTBM  = 21;
+  static final int X_SU  = 22;
+  static final int X_SD  = 23;
+  static final int X_DECSET  = 24;
+  static final int X_DECRST  = 25;
+  static final int X_CHARSET0   = 26;
+  static final int X_CHARSET1   = 27;
+  
+  private static final Sym CTRL_XTERM[] = {
+      new Sym("\b", X_BS),             //Backspace
+      new Sym(ESC + 'M', X_RI),        // RI
 
-      ESC + ' ' + 'F',  //7-bit controls (S7C1T).
-      ESC + ' ' + 'G',  //8-bit controls (S8C1T).
-      ESC + ' ' + 'L',  //Set ANSI conformance level 1 (dpANS X3.134.1).
-      ESC + ' ' + 'M',  //Set ANSI conformance level 2 (dpANS X3.134.1).
-      ESC + ' ' + 'N',  //Set ANSI conformance level 3 (dpANS X3.134.1).
-      ESC + '#' + '3',   //DEC double-height line, top half (DECDHL).
-      ESC + '#' + '4',   //DEC double-height line, bottom half (DECDHL).
-      ESC + '#' + '5',   //DEC single-width line (DECSWL).
-      ESC + '#' + '6',   //DEC double-width line (DECDWL).
-      ESC + '#' + '8',   //DEC Screen Alignment Test (DECALN).
-      ESC + '£' + '@',   //Select default character set.  That is ISO 8859-1 (ISO 2022).
-      ESC + '£' + 'G',   //Select UTF-8 character set (ISO 2022).
+      new Sym(ESC + ' ' + 'F', X_S7C1T),  //7-bit controls (S7C1T).
+      new Sym(ESC + ' ' + 'G', X_S8C1T),  //8-bit controls (S8C1T).
+      new Sym(ESC + ' ' + 'L', -1),  //Set ANSI conformance level 1 (dpANS X3.134.1).
+      new Sym(ESC + ' ' + 'M', -1),  //Set ANSI conformance level 2 (dpANS X3.134.1).
+      new Sym(ESC + ' ' + 'N', -1),  //Set ANSI conformance level 3 (dpANS X3.134.1).
+      new Sym(ESC + '#' + '3', -1),   //DEC double-height line, top half (DECDHL).
+      new Sym(ESC + '#' + '4', -1),   //DEC double-height line, bottom half (DECDHL).
+      new Sym(ESC + '#' + '5', -1),   //DEC single-width line (DECSWL).
+      new Sym(ESC + '#' + '6', -1),   //DEC double-width line (DECDWL).
+      new Sym(ESC + '#' + '8', -1),   //DEC Screen Alignment Test (DECALN).
+      new Sym(ESC + "*^0" + '@', -1),   //Select default character set.  That is ISO 8859-1 (ISO 2022).
+      new Sym(ESC + "*^0" + 'G', -1),   //Select UTF-8 character set (ISO 2022).
       /**
       C = 0  -> DEC Special Character and Line Drawing Set.
       C = <  -> DEC Supplementary (VT200).
@@ -126,120 +162,119 @@ public abstract class XtermStream implements Parser.Emitter {
       C = H  or 7  -> Swedish.
       C = =  -> Swiss.
       */
-      ESC + '(' + '0',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + '<',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + "\\%" + '5',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + '>',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + 'A',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + 'B',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + '4',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + 'C',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + '5',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + 'R',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + 'f',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + 'Q',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + '9',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + 'K',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + 'Y',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + '\'',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + 'E',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + '6',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + "\\%" + '6',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + 'Z',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + 'H',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + '7',   //Designate G0 Character Set (ISO 2022, VT100).
-      ESC + '(' + '=',   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + '0', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + '<', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + "\\%" + '5', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + '>', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + 'A', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + 'B', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + '4', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + 'C', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + '5', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + 'R', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + 'f', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + 'Q', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + '9', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + 'K', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + 'Y', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + '\'', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + 'E', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + '6', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + "\\%" + '6', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + 'Z', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + 'H', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + '7', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
+      new Sym(ESC + '(' + '=', X_CHARSET0),   //Designate G0 Character Set (ISO 2022, VT100).
       
-      ESC + ')' + '0',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + '<',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + "\\%" + '5',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + '>',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + 'A',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + 'B',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + '4',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + 'C',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + '5',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + 'R',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + 'f',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + 'Q',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + '9',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + 'K',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + 'Y',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + '\'',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + 'E',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + '6',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + "\\%" + '6',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + 'Z',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + 'H',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + '7',   //Designate G1 Character Set (ISO 2022, VT100).
-      ESC + ')' + '=',   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + '0', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + '<', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + "\\%" + '5', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + '>', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + 'A', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + 'B', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + '4', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + 'C', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + '5', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + 'R', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + 'f', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + 'Q', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + '9', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + 'K', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + 'Y', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + '\'', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + 'E', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + '6', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + "\\%" + '6', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + 'Z', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + 'H', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + '7', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
+      new Sym(ESC + ')' + '=', X_CHARSET1),   //Designate G1 Character Set (ISO 2022, VT100).
       
-      ESC + '*' + 'C',   //Designate G2 Character Set (ISO 2022, VT220).
-      ESC + '+' + 'C',   //Designate G3 Character Set (ISO 2022, VT220).
-      ESC + '-' + 'C',   //Designate G1 Character Set (VT300).
-      ESC + '.' + 'C',   //Designate G2 Character Set (VT300).
-      ESC + '/' + 'C',   //Designate G3 Character Set (VT300).
-      ESC + '6',   //Back Index (DECBI), VT420 and up.
-      ESC + '7',   //Save Cursor (DECSC).
-      ESC + '8',   //Restore Cursor (DECRC).
-      ESC + '9',   //Forward Index (DECFI), VT420 and up.
-      ESC + '=',   //Application Keypad (DECKPAM).
-      ESC + '>',   //Normal Keypad (DECKPNM).
-      ESC + 'F',   //Cursor to lower left corner of screen.  This is enabled by the
+      new Sym(ESC + "\\*" + 'C', -1),   //Designate G2 Character Set (ISO 2022, VT220).
+      new Sym(ESC + '+' + 'C', -1),   //Designate G3 Character Set (ISO 2022, VT220).
+      new Sym(ESC + '-' + 'C', -1),   //Designate G1 Character Set (VT300).
+      new Sym(ESC + '.' + 'C', -1),   //Designate G2 Character Set (VT300).
+      new Sym(ESC + '/' + 'C', -1),   //Designate G3 Character Set (VT300).
+      new Sym(ESC + '6', -1),   //Back Index (DECBI), VT420 and up.
+      new Sym(ESC + '7', X_DECSC),   //Save Cursor (DECSC).
+      new Sym(ESC + '8', X_DECRC),   //Restore Cursor (DECRC).
+      new Sym(ESC + '9', -1),   //Forward Index (DECFI), VT420 and up.
+      new Sym(ESC + '=', -1),   //Application Keypad (DECKPAM).
+      new Sym(ESC + '>', -1),   //Normal Keypad (DECKPNM).
+      new Sym(ESC + 'F', -1),   //Cursor to lower left corner of screen.  This is enabled by the
                 //hpLowerleftBugCompat resource.
-      ESC + 'c',   //Full Reset (RIS).
-      ESC + 'l',   //Memory Lock (per HP terminals).  Locks memory above the cursor.
-      ESC + 'm',   //Memory Unlock (per HP terminals).
-      ESC + 'n',   //Invoke the G2 Character Set as GL (LS2).
-      ESC + 'o',   //Invoke the G3 Character Set as GL (LS3).
-      ESC + '|',   //Invoke the G3 Character Set as GR (LS3R).
-      ESC + '}',   //Invoke the G2 Character Set as GR (LS2R).
-      ESC + '~',   //Invoke the G1 Character Set as GR (LS1R).
+      new Sym(ESC + 'c', -1),   //Full Reset (RIS).
+      new Sym(ESC + 'l', -1),   //Memory Lock (per HP terminals).  Locks memory above the cursor.
+      new Sym(ESC + 'm', -1),   //Memory Unlock (per HP terminals).
+      new Sym(ESC + 'n', -1),   //Invoke the G2 Character Set as GL (LS2).
+      new Sym(ESC + 'o', -1),   //Invoke the G3 Character Set as GL (LS3).
+      new Sym(ESC + '|', -1),   //Invoke the G3 Character Set as GR (LS3R).
+      new Sym(ESC + '}', -1),   //Invoke the G2 Character Set as GR (LS2R).
+      new Sym(ESC + '~', -1),   //Invoke the G1 Character Set as GR (LS1R).
       
       // Device Control funcs TODO
-      CTRL_7BIT[CTRL_DCS] + "*" + CTRL_7BIT[CTRL_ST],  
-
+      new Sym(CTRL_7BIT[CTRL_DCS] + "\\*" + CTRL_7BIT[CTRL_ST], -1),  
       // CSI funcs TODO
-      CTRL_7BIT[CTRL_CSI] + '£' + '@', //Insert Ps (Blank) Character(s) (default = 1) (ICH).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'A', //Cursor Up Ps Times (default = 1) (CUU).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'B', //Cursor Down Ps Times (default = 1) (CUD).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'C', //Cursor Forward Ps Times (default = 1) (CUF).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'D', //Cursor Backward Ps Times (default = 1) (CUB).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'E', //Cursor Next Line Ps Times (default = 1) (CNL).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'F', //Cursor Preceding Line Ps Times (default = 1) (CPL).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'G', //Cursor Character Absolute  [column] (default = [row,1]) (CHA).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'H', //Cursor Position [row;column] (default = [1,1]) (CUP).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'I', //Cursor Forward Tabulation Ps tab stops (default = 1) (CHT).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'J', //Erase in Display (ED).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '@', -1), //Insert Ps (Blank) Character(s) (default = 1) (ICH).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'A', X_CUU), //Cursor Up Ps Times (default = 1) (CUU).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'B', X_CUD), //Cursor Down Ps Times (default = 1) (CUD).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'C', X_CUF), //Cursor Forward Ps Times (default = 1) (CUF).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'D', X_CUB), //Cursor Backward Ps Times (default = 1) (CUB).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'E', X_CNL), //Cursor Next Line Ps Times (default = 1) (CNL).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'F', X_CPL), //Cursor Preceding Line Ps Times (default = 1) (CPL).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'G', X_CHA), //Cursor Character Absolute  [column] (default = [row,1]) (CHA).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'H', X_CUP), //Cursor Position [row;column] (default = [1,1]) (CUP).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'I', X_CHT), //Cursor Forward Tabulation Ps tab stops (default = 1) (CHT).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'J', X_ED), //Erase in Display (ED).
         /**
                     Ps = 0  -> Erase Below (default).
                     Ps = 1  -> Erase Above.
                     Ps = 2  -> Erase All.
                     Ps = 3  -> Erase Saved Lines (xterm).
                    */
-      CTRL_7BIT[CTRL_CSI] + '?' + '£' + 'J', //Erase in Display (DECSED).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "\\?" + "*^0" + 'J', -1), //Erase in Display (DECSED).
             /**
                     Ps = 0  -> Selective Erase Below (default).
                     Ps = 1  -> Selective Erase Above.
                     Ps = 2  -> Selective Erase All.
                     */
-      CTRL_7BIT[CTRL_CSI] + '£' + 'K', //Erase in Line (EL).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'K', X_EL), //Erase in Line (EL).
         /**
                     Ps = 0  -> Erase to Right (default).
                     Ps = 1  -> Erase to Left.
                     Ps = 2  -> Erase All.
                     */
-      CTRL_7BIT[CTRL_CSI] + '?' + '£' + 'K', //Erase in Line (DECSEL).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "\\?" + "*^0" + 'K', -1), //Erase in Line (DECSEL).
             /**
                     Ps = 0  -> Selective Erase to Right (default).
                     Ps = 1  -> Selective Erase to Left.
                     Ps = 2  -> Selective Erase All.
                     */
-      CTRL_7BIT[CTRL_CSI] + '£' + 'L', //Insert Ps Line(s) (default = 1) (IL).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'M', //Delete Ps Line(s) (default = 1) (DL).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'P', //Delete Ps Character(s) (default = 1) (DCH).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'S', //Scroll up Ps lines (default = 1) (SU).
-      CTRL_7BIT[CTRL_CSI] + '?' + '£' + 'S', //If configured to support either Sixel Graphics or ReGIS Graph-
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'L', -1), //Insert Ps Line(s) (default = 1) (IL).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'M', -1), //Delete Ps Line(s) (default = 1) (DL).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'P', X_DCH), //Delete Ps Character(s) (default = 1) (DCH).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'S', X_SU), //Scroll up Ps lines (default = 1) (SU).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "\\?" + "*^0" + 'S', -1), //If configured to support either Sixel Graphics or ReGIS Graph-
                             //ics, xterm accepts a three-parameter control sequence, where
                             //Pi, Pa and Pv are the item, action and value.
         /**
@@ -249,16 +284,16 @@ public abstract class XtermStream implements Parser.Emitter {
                     Pa = 3  -> set the number of color registers to the value Pv
                   The control sequence returns a response using the same form:
   
-                     CTRL_7BIT[CTRL_CSI] + ? Pi; Ps; Pv S
+                     new Sym(CTRL_7BIT[CTRL_CSI] + ? Pi; Ps; Pv S
   
                   where Ps is the status:
                     Ps = 0  -> success
                     Ps = 3  -> failure
                     */
-      /*CTRL_7BIT[CTRL_CSI] + '£' + 'T',*/ //Scroll down Ps lines (default = 1) (SD).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'T', //Initiate highlight mouse tracking.  Parameters are
+      /*new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'T',*/ //Scroll down Ps lines (default = 1) (SD).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'T', X_SD), //Initiate highlight mouse tracking.  Parameters are
                                      //[func;startx;starty;firstrow;lastrow].  See the section Mouse Tracking.
-      CTRL_7BIT[CTRL_CSI] + '>' + '£' + 'T', //Reset one or more features of the title modes to the default
+      new Sym(CTRL_7BIT[CTRL_CSI] + '>' + "*^0" + 'T', -1), //Reset one or more features of the title modes to the default
         //value.  Normally, "reset" disables the feature.  It is possi-
         //ble to disable the ability to reset features by compiling a
         //different default for the title modes into xterm.
@@ -270,12 +305,12 @@ public abstract class XtermStream implements Parser.Emitter {
                     Ps = 3  -> Do not query window/icon labels using UTF-8.
                   (See discussion of "Title Modes").
                   */
-      CTRL_7BIT[CTRL_CSI] + '£' + 'X', //Erase Ps Character(s) (default = 1) (ECH).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'Z', //Cursor Backward Tabulation Ps tab stops (default = 1) (CBT).
-      CTRL_7BIT[CTRL_CSI] + '£' + '`', //Character Position Absolute  [column] (default = [row,1]) (HPA).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'a', //Character Position Relative  [columns] (default = [row,col+1]) (HPR).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'b', //Repeat the preceding graphic character Ps times (REP).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'c', //Send Device Attributes (Primary DA).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'X', -1), //Erase Ps Character(s) (default = 1) (ECH).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'Z', -1), //Cursor Backward Tabulation Ps tab stops (default = 1) (CBT).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '`', -1), //Character Position Absolute  [column] (default = [row,1]) (HPA).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'a', -1), //Character Position Relative  [columns] (default = [row,col+1]) (HPR).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'b', -1), //Repeat the preceding graphic character Ps times (REP).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'c', -1), //Send Device Attributes (Primary DA).
         /**
                     Ps = 0  or omitted -> request attributes from terminal.  The
                   response depends on the decTerminalID resource setting.
@@ -301,7 +336,7 @@ public abstract class XtermStream implements Parser.Emitter {
                     Ps = 2 2  -> ANSI color, e.g., VT525.
                     Ps = 2 9  -> ANSI text locator (i.e., DEC Locator mode).
                     */
-      CTRL_7BIT[CTRL_CSI] + '>' + '£' + 'c', //Send Device Attributes (Secondary DA).
+      new Sym(CTRL_7BIT[CTRL_CSI] + '>' + "*^0" + 'c', -1), //Send Device Attributes (Secondary DA).
         /**
                     Ps = 0  or omitted -> request the terminal's identification
                   code.  The response depends on the decTerminalID resource set-
@@ -324,22 +359,22 @@ public abstract class XtermStream implements Parser.Emitter {
                   nal, Pc indicates the ROM cartridge registration number and is
                   always zero.
                   */
-      CTRL_7BIT[CTRL_CSI] + '£' + 'd', //Line Position Absolute  [row] (default = [1,column]) (VPA).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'e', //Line Position Relative  [rows] (default = [row+1,column]) (VPR).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'f', //Horizontal and Vertical Position [row;column] (default = [1,1]) (HVP).
-      CTRL_7BIT[CTRL_CSI] + '£' + 'g', //Tab Clear (TBC).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'd', X_VPA), //Line Position Absolute  [row] (default = [1,column]) (VPA).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'e', -1), //Line Position Relative  [rows] (default = [row+1,column]) (VPR).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'f', -1), //Horizontal and Vertical Position [row;column] (default = [1,1]) (HVP).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'g', -1), //Tab Clear (TBC).
         /**
                     Ps = 0  -> Clear Current Column (default).
                     Ps = 3  -> Clear All.
                   */
-      CTRL_7BIT[CTRL_CSI] + '£' + 'h', //Set Mode (SM).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'h', -1), //Set Mode (SM).
             /**
                     Ps = 2  -> Keyboard Action Mode (AM).
                     Ps = 4  -> Insert Mode (IRM).
                     Ps = 1 2  -> Send/receive (SRM).
                     Ps = 2 0  -> Automatic Newline (LNM).
                   */
-      CTRL_7BIT[CTRL_CSI] + '?' + '£' + 'h', //DEC Private Mode Set (DECSET).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "\\?" + "*^0" + 'h', X_DECSET), //DEC Private Mode Set (DECSET).
             /**
                     Ps = 1  -> Application Cursor Keys (DECCKM).
                     Ps = 2  -> Designate USASCII for character sets G0-G3
@@ -427,7 +462,7 @@ public abstract class XtermStream implements Parser.Emitter {
                     Ps = 1 0 6 1  -> Set VT220 keyboard emulation.
                     Ps = 2 0 0 4  -> Set bracketed paste mode.
                   */
-      CTRL_7BIT[CTRL_CSI] + '£' + 'i', //Media Copy (MC).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'i', -1), //Media Copy (MC).
         /**
                     Ps = 0  -> Print screen (default).
                     Ps = 4  -> Turn off printer controller mode.
@@ -435,7 +470,7 @@ public abstract class XtermStream implements Parser.Emitter {
                     Ps = 1  0  -> HTML screen dump.
                     Ps = 1  1  -> SVG screen dump.
                         */
-      CTRL_7BIT[CTRL_CSI] + '?' + '£' + 'i', //Media Copy (MC, DEC-specific).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "\\?" + "*^0" + 'i', -1), //Media Copy (MC, DEC-specific).
             /**
                     Ps = 1  -> Print line containing cursor.
                     Ps = 4  -> Turn off autoprint mode.
@@ -443,14 +478,14 @@ public abstract class XtermStream implements Parser.Emitter {
                     Ps = 1  0  -> Print composed display, ignores DECPEX.
                     Ps = 1  1  -> Print all pages.
                         */
-      CTRL_7BIT[CTRL_CSI] + '£' + 'l', //Reset Mode (RM).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'l', -1), //Reset Mode (RM).
         /**
                     Ps = 2  -> Keyboard Action Mode (AM).
                     Ps = 4  -> Replace Mode (IRM).
                     Ps = 1 2  -> Send/receive (SRM).
                     Ps = 2 0  -> Normal Linefeed (LNM).
                         */
-      CTRL_7BIT[CTRL_CSI] + '?' + '£' + 'l', //DEC Private Mode Reset (DECRST).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "\\?" + "*^0" + 'l', X_DECRST), //DEC Private Mode Reset (DECRST).
             /**
                     Ps = 1  -> Normal Cursor Keys (DECCKM).
                     Ps = 2  -> Designate VT52 mode (DECANM).
@@ -533,7 +568,7 @@ public abstract class XtermStream implements Parser.Emitter {
                     Ps = 1 0 6 1  -> Reset keyboard emulation to Sun/PC style.
                     Ps = 2 0 0 4  -> Reset bracketed paste mode.
                         */
-      CTRL_7BIT[CTRL_CSI] + '£' + 'm', //Character Attributes (SGR).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'm', X_SGR), //Character Attributes (SGR).
         /**
                     Ps = 0  -> Normal (default).
                     Ps = 1  -> Bold.
@@ -615,7 +650,7 @@ public abstract class XtermStream implements Parser.Emitter {
                     Pm = 4 8 ; 5 ; Ps -> Set background color to Ps.
   
                     */
-      CTRL_7BIT[CTRL_CSI] + '>' + '£' + 'm', //Set or reset resource-values used by xterm to decide whether
+      new Sym(CTRL_7BIT[CTRL_CSI] + '>' + "*^0" + 'm', -1), //Set or reset resource-values used by xterm to decide whether
                         //to construct escape sequences holding information about the
                         //modifiers pressed with a given key.  The first parameter iden-
                         //tifies the resource to set/reset.  The second parameter is the
@@ -629,7 +664,7 @@ public abstract class XtermStream implements Parser.Emitter {
                   If no parameters are given, all resources are reset to their
                   initial values.
                   */
-      CTRL_7BIT[CTRL_CSI] + '£' + 'n', //Device Status Report (DSR).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'n', -1), //Device Status Report (DSR).
         /**
                     Ps = 5  -> Status Report.
                   Result ("OK") is CSI 0 n
@@ -640,9 +675,9 @@ public abstract class XtermStream implements Parser.Emitter {
                   tion key.  For example, with the default keyboard configura-
                   tion the shifted F1 key may send (with shift-, control-, alt-
                   modifiers)
-                  CTRL_7BIT[CTRL_CSI] + 1  ; 2  R , or
-                  CTRL_7BIT[CTRL_CSI] + 1  ; 5  R , or
-                  CTRL_7BIT[CTRL_CSI] + 1  ; 6  R , etc.
+                  new Sym(CTRL_7BIT[CTRL_CSI] + 1  ; 2  R , or
+                  new Sym(CTRL_7BIT[CTRL_CSI] + 1  ; 5  R , or
+                  new Sym(CTRL_7BIT[CTRL_CSI] + 1  ; 6  R , etc.
                   The second parameter encodes the modifiers; values range from
                   2 to 16.  See the section PC-Style Function Keys for the
                   codes.  The modifyFunctionKeys and modifyKeyboard resources
@@ -650,7 +685,7 @@ public abstract class XtermStream implements Parser.Emitter {
                   key.
   
                   */
-      CTRL_7BIT[CTRL_CSI] + '>' + '£' + 'n', //
+      new Sym(CTRL_7BIT[CTRL_CSI] + '>' + "*^0" + 'n', -1), //
         /**
                   Disable modifiers which may be enabled via the CSI > Ps; Ps m
                   sequence.  This corresponds to a resource value of "-1", which
@@ -666,15 +701,14 @@ public abstract class XtermStream implements Parser.Emitter {
                   adding a parameter to each function key to denote the modi-
                   fiers.
                   */
-      CTRL_7BIT[CTRL_CSI] + '?' + '£' + 'n', //Device Status Report (DSR, DEC-specific).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "\\?" + "*^0" + 'n', -1), //Device Status Report (DSR, DEC-specific).
             /**
                     Ps = 6  -> Report Cursor Position (DECXCPR) [row;column] as
                 CTRL_7BIT[CTRL_CSI] + ? r ; c R (assumes the default page, i.e., "1").
                     Ps = 1 5  -> Report Printer status as CSI ? 1 0 n  (ready).
                   or CSI ? 1 1 n  (not ready).
                     Ps = 2 5  -> Report UDK status as CSI ? 2 0 n  (unlocked) or
-                CTRL_7BIT[CTRL_CSI] + ? 2 1 n     System.out.println("send " + len + " to parser");
- (locked).
+                (locked).
                     Ps = 2 6  -> Report Keyboard status as
                 CTRL_7BIT[CTRL_CSI] + ? 2 7 ; 1 ; 0 ; 0 n  (North American).
                   The last two parameters apply to VT400 & up, and denote key-
@@ -696,7 +730,7 @@ public abstract class XtermStream implements Parser.Emitter {
                     Ps = 8 5  -> Report multi-session configuration as CSI ? 8 3
                   n  (not configured for multiple-session operation).
                   */
-      CTRL_7BIT[CTRL_CSI] + '>' + '£' + 'p', //
+      new Sym(CTRL_7BIT[CTRL_CSI] + '>' + "*^0" + 'p', -1), //
             /**
                   Set resource value pointerMode.  This is used by xterm to
                   decide whether to hide the pointer cursor as the user types.
@@ -709,11 +743,11 @@ public abstract class XtermStream implements Parser.Emitter {
                   the window.  If no parameter is given, xterm uses the default,
                   which is 1 .
                   */
-      CTRL_7BIT[CTRL_CSI] + '!' + 'p', //Soft terminal reset (DECSTR).
-      CTRL_7BIT[CTRL_CSI] + '£' + '$' + 'p', //
+      new Sym(CTRL_7BIT[CTRL_CSI] + "\\!" + 'p', -1), //Soft terminal reset (DECSTR).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '$' + 'p', -1), //
         /**
                   Request ANSI mode (DECRQM).  For VT300 and up, reply is
-                  CTRL_7BIT[CTRL_CSI] + '£'; Pm$ y
+                  CTRL_7BIT[CTRL_CSI] + "*^0"; Pm$ y
                   where Ps is the mode number as in RM, and Pm is the mode
                   value:
                     0 - not recognized
@@ -722,14 +756,14 @@ public abstract class XtermStream implements Parser.Emitter {
                     3 - permanently set
                     4 - permanently reset
                     */
-      CTRL_7BIT[CTRL_CSI] + '?' + '£'+ '$' + 'p', //
+      new Sym(CTRL_7BIT[CTRL_CSI] + "\\?" + "*^0"+ '$' + 'p', -1), //
             /**
                   Request DEC private mode (DECRQM).  For VT300 and up, reply is
-                  CTRL_7BIT[CTRL_CSI] + ? Ps; Pm$ y
+                  new Sym(CTRL_7BIT[CTRL_CSI] + ? Ps; Pm$ y
                   where Ps is the mode number as in DECSET, Pm is the mode value
                   as in the ANSI DECRQM.
                   */
-      CTRL_7BIT[CTRL_CSI] + '£' + '"' + 'p', //
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '"' + 'p', -1), //
         /**
                   Set conformance level (DECSCL).  Valid values for the first
                   parameter:
@@ -741,7 +775,7 @@ public abstract class XtermStream implements Parser.Emitter {
                     Ps = 1  -> 7-bit controls (always set for VT100).
                     Ps = 2  -> 8-bit controls.
                         */
-      CTRL_7BIT[CTRL_CSI] + '£' + 'q', //Load LEDs (DECLL).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'q', -1), //Load LEDs (DECLL).
         /**
                     Ps = 0  -> Clear all LEDS (default).
                     Ps = 1  -> Light Num Lock.
@@ -751,7 +785,7 @@ public abstract class XtermStream implements Parser.Emitter {
                     Ps = 2  2  -> Extinguish Caps Lock.
                     Ps = 2  3  -> Extinguish Scroll Lock.
                         */
-      CTRL_7BIT[CTRL_CSI] + '£' + ' ' + 'q', // Set cursor style (DECSCUSR, VT520).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + ' ' + 'q', -1), // Set cursor style (DECSCUSR, VT520).
         /**
                     Ps = 0  -> blinking block.
                     Ps = 1  -> blinking block (default).
@@ -761,7 +795,7 @@ public abstract class XtermStream implements Parser.Emitter {
                     Ps = 5  -> blinking bar (xterm).
                     Ps = 6  -> steady bar (xterm).
                         */
-      CTRL_7BIT[CTRL_CSI] + '£' + '"' + 'q', //
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '"' + 'q', -1), //
         /**
                   Select character protection attribute (DECSCA).  Valid values
                   for the parameter:
@@ -769,26 +803,26 @@ public abstract class XtermStream implements Parser.Emitter {
                     Ps = 1  -> DECSED and DECSEL cannot erase.
                     Ps = 2  -> DECSED and DECSEL can erase.
                         */
-      CTRL_7BIT[CTRL_CSI] + '£' + 'r', //
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'r', X_DECSTBM), //
         /**
                   Set Scrolling Region [top;bottom] (default = full size of win-
                   dow) (DECSTBM).
                   */
-      CTRL_7BIT[CTRL_CSI] + '?' + '£' + 'r', //
+      new Sym(CTRL_7BIT[CTRL_CSI] + "\\?" + "*^0" + 'r', -1), //
       /**
                   Restore DEC Private Mode Values.  The value of Ps previously
                   saved is restored.  Ps values are the same as for DECSET.
                   */
-      CTRL_7BIT[CTRL_CSI] + '£' + '$' + 'r', //
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '$' + 'r', -1), //
         /**
                   Change Attributes in Rectangular Area (DECCARA), VT400 and up.
                     Pt; Pl; Pb; Pr denotes the rectangle.
                     Ps denotes the SGR attributes to change: 0, 1, 4, 5, 7.
                     */
-      CTRL_7BIT[CTRL_CSI] + '£' + 's', // Set left and right margins (DECSLRM), available only when DECLRMM is enabled (VT420 and up).
-      /*CTRL_7BIT[CTRL_CSI] + 's',*/ // Save cursor (ANSI.SYS), available only when DECLRMM is dis- abled.
-      CTRL_7BIT[CTRL_CSI] + '?' + '£' + 's', // Save DEC Private Mode Values.  Ps values are the same as for DECSET.
-      CTRL_7BIT[CTRL_CSI] + '£' + 't', //
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 's', -1), // Set left and right margins (DECSLRM), available only when DECLRMM is enabled (VT420 and up).
+      /*new Sym(CTRL_7BIT[CTRL_CSI] + 's',*/ // Save cursor (ANSI.SYS), available only when DECLRMM is dis- abled.
+      new Sym(CTRL_7BIT[CTRL_CSI] + "\\?" + "*^0" + 's', -1), // Save DEC Private Mode Values.  Ps values are the same as for DECSET.
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 't', -1), //
         /**
                   Window manipulation (from dtterm, as well as extensions).
                   These controls may be disabled using the allowWindowOps
@@ -843,12 +877,12 @@ public abstract class XtermStream implements Parser.Emitter {
                     Ps = 2 3  ;  2  -> Restore xterm window title from stack.
                     Ps >= 2 4  -> Resize to Ps lines (DECSLPP).
                         */
-      CTRL_7BIT[CTRL_CSI] + '£' + '$' + 't', // Reverse Attributes in Rectangular Area (DECRARA), VT400 and up.
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '$' + 't', -1), // Reverse Attributes in Rectangular Area (DECRARA), VT400 and up.
         /**
                     Pt; Pl; Pb; Pr denotes the rectangle.
                     Ps denotes the attributes to reverse, i.e.,  1, 4, 5, 7.
                     */
-      CTRL_7BIT[CTRL_CSI] + '>' + '£' + 't', // Set one or more features of the title modes.  Each parameter enables a single feature.
+      new Sym(CTRL_7BIT[CTRL_CSI] + '>' + "*^0" + 't', -1), // Set one or more features of the title modes.  Each parameter enables a single feature.
         /**
                     Ps = 0  -> Set window/icon labels using hexadecimal.
                     Ps = 1  -> Query window/icon labels using hexadecimal.
@@ -856,27 +890,27 @@ public abstract class XtermStream implements Parser.Emitter {
                     Ps = 3  -> Query window/icon labels using UTF-8.  (See dis-
                   cussion of "Title Modes")
                         */
-      CTRL_7BIT[CTRL_CSI] + '£' + ' ' + 't', // Set warning-bell volume (DECSWBV, VT520).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + ' ' + 't', -1), // Set warning-bell volume (DECSWBV, VT520).
         /**
                     Ps = 0  or 1  -> off.
                     Ps = 2 , 3  or 4  -> low.
                     Ps = 5 , 6 , 7 , or 8  -> high.
                         */
-      CTRL_7BIT[CTRL_CSI] + 'u', //Restore cursor (ANSI.SYS).
-      CTRL_7BIT[CTRL_CSI] + '£' + ' ' + 'u', //Set margin-bell volume (DECSMBV, VT520).
+      new Sym(CTRL_7BIT[CTRL_CSI] + 'u', -1), //Restore cursor (ANSI.SYS).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + ' ' + 'u', -1), //Set margin-bell volume (DECSMBV, VT520).
         /**
                     Ps = 1  -> off.
                     Ps = 2 , 3  or 4  -> low.
                     Ps = 0 , 5 , 6 , 7 , or 8  -> high.
                         */
-      CTRL_7BIT[CTRL_CSI] + '£' + '$' + 'v', //Copy Rectangular Area (DECCRA, VT400 and up).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '$' + 'v', -1), //Copy Rectangular Area (DECCRA, VT400 and up).
         /**
                     Pt; Pl; Pb; Pr denotes the rectangle.
                     Pp denotes the source page.
                     Pt; Pl denotes the target location.
                     Pp denotes the target page.
                     */
-      CTRL_7BIT[CTRL_CSI] + '£' + '\'' + 'w', //Enable Filter Rectangle (DECEFR), VT420 and up.
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '\'' + 'w', -1), //Enable Filter Rectangle (DECEFR), VT420 and up.
         /**
                   Parameters are [top;left;bottom;right].
                   Defines the coordinates of a filter rectangle and activates
@@ -888,7 +922,7 @@ public abstract class XtermStream implements Parser.Emitter {
                   ted, any locator motion will be reported.  DECELR always can-
                   cels any prevous rectangle definition.
                   */
-      CTRL_7BIT[CTRL_CSI] + '£' + 'x', //Request Terminal Parameters (DECREQTPARM).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + 'x', -1), //Request Terminal Parameters (DECREQTPARM).
         /**
                   if Ps is a "0" (default) or "1", and xterm is emulating VT100,
                   the control sequence elicits a response of the same form whose
@@ -901,13 +935,13 @@ public abstract class XtermStream implements Parser.Emitter {
                     Pn = 1  <- clock multiplier.
                     Pn = 0  <- STP flags.
                         */
-      CTRL_7BIT[CTRL_CSI] + '£' + "\\*" + 'x', //Select Attribute Change Extent (DECSACE).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + "\\*" + 'x', -1), //Select Attribute Change Extent (DECSACE).
         /**
                     Ps = 0  -> from start to end position, wrapped.
                     Ps = 1  -> from start to end position, wrapped.
                     Ps = 2  -> rectangle (exact).
                         */
-      CTRL_7BIT[CTRL_CSI] + '£' +"\\*" + 'y', //Request Checksum of Rectangular Area (DECRQCRA), VT420 and up.
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" +"\\*" + 'y', -1), //Request Checksum of Rectangular Area (DECRQCRA), VT420 and up.
         /**
                   Response is
                   DCS Pi ! x x x x ST
@@ -916,12 +950,12 @@ public abstract class XtermStream implements Parser.Emitter {
                     Pt; Pl; Pb; Pr denotes the rectangle.
                     The x's are hexadecimal digits 0-9 and A-F.
                     */
-      CTRL_7BIT[CTRL_CSI] + '£' + '$' + 'x', //Fill Rectangular Area (DECFRA), VT420 and up.
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '$' + 'x', -1), //Fill Rectangular Area (DECFRA), VT420 and up.
         /**
                     Pc is the character to use.
                     Pt; Pl; Pb; Pr denotes the rectangle.
                     */
-      CTRL_7BIT[CTRL_CSI] + '£' + '\'' + 'z', //Enable Locator Reporting (DECELR).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '\'' + 'z', -1), //Enable Locator Reporting (DECELR).
         /**
                   Valid values for the first parameter:
                     Ps = 0  -> Locator disabled (default).
@@ -934,11 +968,11 @@ public abstract class XtermStream implements Parser.Emitter {
                     Pu = 1  <- device physical pixels.
                     Pu = 2  <- character cells.
                         */
-      CTRL_7BIT[CTRL_CSI] + '£' + '$' + 'z', //Erase Rectangular Area (DECERA), VT400 and up.
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '$' + 'z', -1), //Erase Rectangular Area (DECERA), VT400 and up.
         /**
                     Pt; Pl; Pb; Pr denotes the rectangle.
                     */
-      CTRL_7BIT[CTRL_CSI] + '£' + '\'' + '{', //Select Locator Events (DECSLE).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '\'' + '{', -1), //Select Locator Events (DECSLE).
         /**
                   Valid values for the first (and any additional parameters)
                   are:
@@ -950,11 +984,11 @@ public abstract class XtermStream implements Parser.Emitter {
                     Ps = 3  -> report button up transitions.
                     Ps = 4  -> do not report button up transitions.
                         */
-      CTRL_7BIT[CTRL_CSI] + '£' + '$' + '{', //Selective Erase Rectangular Area (DECSERA), VT400 and up.
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '$' + '{', -1), //Selective Erase Rectangular Area (DECSERA), VT400 and up.
           /**
                     Pt; Pl; Pb; Pr denotes the rectangle.
                     */
-      CTRL_7BIT[CTRL_CSI] + '£' + '\'' + '|', //Request Locator Position (DECRQLP).
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '\'' + '|', -1), //Request Locator Position (DECRQLP).
         /**
                   Valid values for the parameter are:
                     Ps = 0 , 1 or omitted -> transmit a single DECLRP locator
@@ -994,96 +1028,37 @@ public abstract class XtermStream implements Parser.Emitter {
                   mal.
                   The "page" parameter is not used by xterm.
                   */
-      CTRL_7BIT[CTRL_CSI] + '£' + '\'' + '}', //Insert Ps Column(s) (default = 1) (DECIC), VT420 and up.
-      CTRL_7BIT[CTRL_CSI] + '£' + '\'' + '~', //Delete Ps Column(s) (default = 1) (DECDC), VT420 and up.
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '\'' + '}', -1), //Insert Ps Column(s) (default = 1) (DECIC), VT420 and up.
+      new Sym(CTRL_7BIT[CTRL_CSI] + "*^0" + '\'' + '~', -1), //Delete Ps Column(s) (default = 1) (DECDC), VT420 and up.
   };
   
-  static int idBackspace;
-  static int idSaveCursor, idRestoreCursor;
-  static int idCharacterAttributes;
-  static int idSetCursorPosition;
-  static int idEraseDisplay;
-  static int idDecset, idDecrst;
-  static int idSetRow;
-  static int idG0Charset0, idG0Charset1, idG0Charset2, idG0Charset3, idG0Charset4, idG0Charset5,
-    idG0Charset6, idG0Charset7, idG0Charset8, idG0Charset9, idG0Charset10, idG0Charset11, idG0Charset12,
-    idG0Charset13, idG0Charset14, idG0Charset15, idG0Charset16, idG0Charset17, idG0Charset18,
-    idG0Charset19, idG0Charset20, idG0Charset21, idG0Charset22;
-  static int idCUU, idCUD, idCUF, idCUB, idCNL, idCPL, idCHA, idDCH;
-  static int idEL, idRI;
-  static int idDefineScrollRegion, idScrollUp, idScrollDown;
-  
-  Parser parser;
+  Lexer lexer;
   XtermHandler term;
   
   public XtermStream(XtermHandler x) {
     if (model == null) {
-      model = new Parser(null, 256);
-      for (String ctrl : CTRL_XTERM) {
-        model.addSymbol(ctrl);
+      model = new Lexer(null, 256);
+      for (Sym sym : CTRL_XTERM) {
+        model.addSymbol(sym.sym, sym.id);
       }
       model.compile();
-      // TODO
-      idBackspace = model.getSymbolID("\b");
-      idSaveCursor = model.getSymbolID(ESC + '7');
-      idRestoreCursor = model.getSymbolID(ESC + '8');
-      idCharacterAttributes = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'm');
-      idSetCursorPosition = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'H');
-      idEraseDisplay = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'J');
-      idDecset = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '?' + '£' + 'h');
-      idDecrst = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '?' + '£' + 'l');
-      idSetRow = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'd');
-      idG0Charset0 = model.getSymbolID(ESC + '(' + '0');
-      idG0Charset1 = model.getSymbolID(ESC + '(' + '<');
-      idG0Charset2 = model.getSymbolID(ESC + '(' + "\\%" + '5');
-      idG0Charset3 = model.getSymbolID(ESC + '(' + '>');
-      idG0Charset4 = model.getSymbolID(ESC + '(' + 'A');
-      idG0Charset5 = model.getSymbolID(ESC + '(' + 'B');
-      idG0Charset6 = model.getSymbolID(ESC + '(' + '4');
-      idG0Charset7 = model.getSymbolID(ESC + '(' + 'C');
-      idG0Charset8 = model.getSymbolID(ESC + '(' + '5');
-      idG0Charset9 = model.getSymbolID(ESC + '(' + 'R');
-      idG0Charset10 = model.getSymbolID(ESC + '(' + 'f');
-      idG0Charset11 = model.getSymbolID(ESC + '(' + 'Q');
-      idG0Charset12 = model.getSymbolID(ESC + '(' + '9');
-      idG0Charset13 = model.getSymbolID(ESC + '(' + 'K');
-      idG0Charset14 = model.getSymbolID(ESC + '(' + 'Y');
-      idG0Charset15 = model.getSymbolID(ESC + '(' + '\'');
-      idG0Charset16 = model.getSymbolID(ESC + '(' + 'E');
-      idG0Charset17 = model.getSymbolID(ESC + '(' + '6');
-      idG0Charset18 = model.getSymbolID(ESC + '(' + "\\%" + '6');
-      idG0Charset19 = model.getSymbolID(ESC + '(' + 'Z');
-      idG0Charset20 = model.getSymbolID(ESC + '(' + 'H');
-      idG0Charset21 = model.getSymbolID(ESC + '(' + '7');
-      idG0Charset22 = model.getSymbolID(ESC + '(' + '=');
-      idCUU = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'A');
-      idCUD = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'B');
-      idCUF = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'C');
-      idCUB = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'D');
-      idCNL = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'E');
-      idCPL = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'F');
-      idCHA = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'G');
-      idEL = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'K');
-      idDCH = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'P');
-      idRI = model.getSymbolID(ESC + 'M');
-      idDefineScrollRegion = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'r');
-      idScrollUp = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'S');
-      idScrollDown = model.getSymbolID(CTRL_7BIT[CTRL_CSI] + '£' + 'T');
+      model.defineUserSet("0123456789;", 0);
+      model.printTree();
     }
     term = x;
-    parser = new Parser(this, 256);
-    model.transferModel(parser);
+    lexer = new Lexer(this, 256);
+    model.transferModel(lexer);
   }
   
   public void feed(byte b) {
     //System.out.print(String.format("[%02x:%c]", b, b));
-    parser.parse(b);
+    lexer.feed(b);
   }
 
   public void feed(byte[] b, int len) {
     //for (int i = 0; i < len; i++)
     //  System.out.print(String.format("[%02x:%c]", b[i], b[i]));
-    parser.parse(b, 0, len);
+    lexer.feed(b, 0, len);
   }
   
   @Override
@@ -1092,67 +1067,94 @@ public abstract class XtermStream implements Parser.Emitter {
     lastSymLen = len;
     symDataIx = 0;
     int a;
-    if (sym == idBackspace) {
+    switch (sym) {
+    case X_BS: {
       System.out.println("xterm.backspace");
       term.cursorCol(-1);
-    } else if (sym == idSaveCursor) {
+      break; 
+    } 
+    case X_DECSC: {
       System.out.println("xterm.saveCursor");
       term.saveCursor();
-    } else if (sym == idRestoreCursor) {
+      break; 
+    } 
+    case X_DECRC: {
       System.out.println("xterm.restoreCursor");
       term.restoreCursor();
-    } else if (sym == idCharacterAttributes) {
+      break; 
+    } 
+    case X_SGR: {
       while ((a = getNextArg()) != -1) {
         handleCharacterAttribute(a);
       }
-    } else if (sym == idSetCursorPosition) {
+      break; 
+    } 
+    case X_CUP: {
       int row = getNextArg();
       int col = getNextArg();
       if (row == -1) row = 1;
       if (col == -1) col = 1;
       System.out.println("xterm.setCursorPos " + col + "," + row);
       term.setCursorPosition(col, row);
-    } else if (sym == idSetRow) {
+      break; 
+    } 
+    case X_VPA: {
       int row = getNextArg();
       if (row == -1) row = 1;
       System.out.println("xterm.setRow " + row);
       term.setCursorRow(row);
-    } else if (sym == idCUU) {
+      break; 
+    } 
+    case X_CUU: {
       int x = getNextArg();
       if (x == -1) x = 1;
       System.out.println("xterm.cursorUp " + x);
       term.cursorRow(-x);
-    } else if (sym == idCUD) {
+      break; 
+    } 
+    case X_CUD: {
       int x = getNextArg();
       if (x == -1) x = 1;
       System.out.println("xterm.cursorDown " + x);
       term.cursorRow(x);
-    } else if (sym == idCUF) {
+      break; 
+    } 
+    case X_CUF: {
       int x = getNextArg();
       if (x == -1) x = 1;
       System.out.println("xterm.cursorForw " + x);
       term.cursorCol(x);
-    } else if (sym == idCUB) {
+      break; 
+    } 
+    case X_CUB: {
       int x = getNextArg();
       if (x == -1) x = 1;
       System.out.println("xterm.cursorback " + x);
       term.cursorCol(-x);
-    } else if (sym == idCNL) {
+      break; 
+    } 
+    case X_CNL: {
       int x = getNextArg();
       if (x == -1) x = 1;
       System.out.println("xterm.cursornewline " + x);
       term.cursorNewline(x);
-    } else if (sym == idCPL) {
+      break; 
+    } 
+    case X_CPL: {
       int x = getNextArg();
       if (x == -1) x = 1;
       System.out.println("xterm.cursorprevline " + x);
       term.cursorPrevline(x);
-    } else if (sym == idCHA) {
+      break; 
+    } 
+    case X_CHA: {
       int x = getNextArg();
       if (x == -1) x = 1;
       System.out.println("xterm.setcol " + x);
       term.setCursorCol(x);
-    } else if (sym == idEL) {
+      break; 
+    } 
+    case X_EL: {
       int x = getNextArg();
       if (x == -1) x = 0;
       System.out.println("xterm.eraseline " + x);
@@ -1161,15 +1163,21 @@ public abstract class XtermStream implements Parser.Emitter {
       case 1: term.eraseLineLeft(); break;
       case 2: term.eraseLineAll(); break;
       }
-    } else if (sym == idDCH) {
+      break; 
+    } 
+    case X_DCH: {
       int x = getNextArg();
       if (x == -1) x = 1;
       System.out.println("xterm.delchars " + x);
       term.delete(x);
-    } else if (sym == idRI) {
+      break; 
+    } 
+    case X_RI: {
       System.out.println("xterm.reverseIndex");
       term.cursorPrevline(1);;
-    } else if (sym == idEraseDisplay) {
+      break; 
+    } 
+    case X_ED: {
       int x = getNextArg();
       if (x == -1) x = 0;
       System.out.println("xterm.eraseDisplay " + x);
@@ -1179,38 +1187,48 @@ public abstract class XtermStream implements Parser.Emitter {
       case 2: term.eraseDisplayAll(); break;
       case 3: term.eraseDisplaySavedLines(); break;
       }
-    } else if (sym == idDefineScrollRegion) {
+      break; 
+    } 
+    case X_DECSTBM: {
       int mi = getNextArg();
       int ma = getNextArg();
       System.out.println("xterm.defineScrollRegion " + mi + "," + ma);
       term.setScrollRegion(mi, ma);
-    } else if (sym == idScrollUp) {
+      break; 
+    } 
+    case X_SU: {
       int x = getNextArg();
       if (x == -1) x = 1;
       System.out.println("xterm.scrollUp " + x);
       term.scroll(x);
-    } else if (sym == idScrollDown) {
+      break; 
+    } 
+    case X_SD: {
       int x = getNextArg();
       if (x == -1) x = 1;
       System.out.println("xterm.scrollDown " + x);
       term.scroll(-x);
-    } else if (sym == idDecset) {
+      break; 
+    } 
+    case X_DECSET: {
       while ((a = getNextArg()) != -1) {
         handleDecSetRstAttribute(a, true);
       }
-    } else if (sym == idDecrst) {
+      break; 
+    } 
+    case X_DECRST: {
       while ((a = getNextArg()) != -1) {
         handleDecSetRstAttribute(a, false);
       }
-    } else if (sym == idG0Charset0 || sym == idG0Charset1 || sym == idG0Charset2 || sym == idG0Charset3 ||
-              sym == idG0Charset4 || sym == idG0Charset5 || sym == idG0Charset6 || sym == idG0Charset7 ||
-              sym == idG0Charset8 || sym == idG0Charset9 || sym == idG0Charset10 || sym == idG0Charset11 ||
-              sym == idG0Charset12 || sym == idG0Charset13 || sym == idG0Charset14 || sym == idG0Charset15 ||
-              sym == idG0Charset16 || sym == idG0Charset17 || sym == idG0Charset18 || sym == idG0Charset19 ||
-              sym == idG0Charset20 || sym == idG0Charset21 || sym == idG0Charset22) {
+      break; 
+    } 
+    case X_CHARSET0: {
       handleCharacterAttribute(0); // TODO
-    } else {
+      break;
+    }
+    default:
       System.out.println("XTERMSYM:" + new String(symdata, 0, len) + " " + String.format("%08x", sym));
+      break;
     }
   }
 
@@ -1228,7 +1246,7 @@ public abstract class XtermStream implements Parser.Emitter {
     case 7  : /* TODO */ System.out.println("XTERM DECSETRST:Wraparound Mode (DECAWM)."); break;
     case 8  : /* TODO */ System.out.println("XTERM DECSETRST:Auto-repeat Keys (DECARM)."); break;
     case 9  : /* TODO */ System.out.println("XTERM DECSETRST:Send Mouse X & Y on button press.  See the section Mouse Tracking.  This is the X10 xterm mouse protocol."); break;
-    case 10  : /* TODO */ System.out.println("XTERM DECSETRST:Show toolbar (rxvt)."); break;
+    case 10 : /* TODO */ System.out.println("XTERM DECSETRST:Show toolbar (rxvt)."); break;
     case 12 : /* TODO */ System.out.println("XTERM DECSETRST:Start Blinking Cursor (att610)."); break;
     case 18 : /* TODO */ System.out.println("XTERM DECSETRST:Print form feed (DECPFF)."); break;
     case 19 : /* TODO */ System.out.println("XTERM DECSETRST:Set print extent to full screen (DECPEX)."); break;
@@ -1243,6 +1261,8 @@ public abstract class XtermStream implements Parser.Emitter {
     case 45 : /* TODO */ System.out.println("XTERM DECSETRST:Reverse-wraparound Mode."); break;
     case 46 : /* TODO */ System.out.println("XTERM DECSETRST:Start Logging.  This is normally disabled by a compile-time option."); break;
     case 47 : System.out.println("xterm.setAlternateScreen " + enable); 
+    //Ps = 4 7  -> Use Alternate Screen Buffer.  (This may be disabled by the titeInhibit resource).
+    //Ps = 4 7  -> Use Normal Screen Buffer, clearing screen first if in the Alternate Screen.  (This may be disabled by the titeInhibit resource).
     term.setAlternateScreenBuffer(enable);
     break;
     case 66 : /* TODO */ System.out.println("XTERM DECSETRST:Application keypad (DECNKM)."); break;
@@ -1270,10 +1290,14 @@ public abstract class XtermStream implements Parser.Emitter {
     case 1042 : /* TODO */ System.out.println("XTERM DECSETRST:Enable Urgency window manager hint when Control-G is received.  (This enables the bellIsUrgent resource)."); break;
     case 1043 : /* TODO */ System.out.println("XTERM DECSETRST:Enable raising of the window when Control-G is received.  (enables the popOnBell resource)."); break;
     case 1044 : /* TODO */ System.out.println("XTERM DECSETRST:Reuse the most recent data copied to CLIPBOARD.  (This enables the keepClipboard resource)."); break;
-    case 1047 : System.out.println("xterm.setAlternateScreen " + enable); 
+    case 1047 : 
+    //Ps = 1 0 4 7  -> Use Alternate Screen Buffer.  (This may be disabled by the titeInhibit resource).
+    //Ps = 1 0 4 7  -> Use Normal Screen Buffer, clearing screen first if in the Alternate Screen.  (This may be disabled by the titeInhibit resource).
     term.setAlternateScreenBuffer(enable);
     break;
     case 1048 :
+    //Ps = 1 0 4 8  -> Save cursor as in DECSC.  (This may be disabled by the titeInhibit resource).
+    //Ps = 1 0 4 8  -> Restore cursor as in DECRC.  (This may be disabled by the titeInhibit resource).
     if (enable) {
       System.out.println("xterm.saveCursor");
       term.saveCursor();
@@ -1283,6 +1307,12 @@ public abstract class XtermStream implements Parser.Emitter {
     }
     break;
     case 1049 :
+    //Ps = 1 0 4 9  -> Save cursor as in DECSC and use Alternate Screen Buffer, clearing it first.
+    // (This may be disabled by the titeInhibit resource).  This combines the effects of the 1 0 4 7 
+    // and 1 0 4 8  modes.  Use this with terminfo-based applications rather than the 4 7  mode.
+    //Ps = 1 0 4 9  -> Use Normal Screen Buffer and restore cursor as in DECRC.  
+    // (This may be disabled by the titeInhibit resource).  This combines the effects of the 1 0 4 7
+    // and 1 0 4 8  modes.  Use this with terminfo-based applications rather than the 4 7  mode.
     if (enable) {
       System.out.println("xterm.saveCursor alternateScreenBuffer:true eraseAll");
       term.saveCursor();
@@ -1305,7 +1335,7 @@ public abstract class XtermStream implements Parser.Emitter {
     }
   }
   void handleCharacterAttribute(int a) {
-    System.out.println("xterm.handleCharacterAttrib:" + a);
+    //System.out.println("xterm.handleCharacterAttrib:" + a);
     switch (a) {
       case 0: term.setTextDefault(); break; //Normal (default).
       case 1: term.setTextBold(true); break; //Bold.
@@ -1388,6 +1418,6 @@ public abstract class XtermStream implements Parser.Emitter {
   }
 
   public void flush() {
-    parser.flush();
+    lexer.flush();
   }
 }

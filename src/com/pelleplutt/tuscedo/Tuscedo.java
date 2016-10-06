@@ -4,9 +4,13 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.EventQueue;
+import java.awt.Point;
 import java.awt.Window;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -16,6 +20,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 
+import com.pelleplutt.tuscedo.ui.GraphPanel;
 import com.pelleplutt.tuscedo.ui.SimpleTabPane;
 import com.pelleplutt.tuscedo.ui.WorkArea;
 import com.pelleplutt.util.AppSystem;
@@ -74,19 +79,37 @@ public class Tuscedo {
     TuscedoTabPane tabs = new TuscedoTabPane();
     tabs.setFont(WorkArea.COMMON_FONT);
 
-    addTab(tabs);
+    addWorkAreaTab(tabs);
     mainContainer.add(tabs);
     tabs.addWindowListener(tabs, f);
     
     f.setVisible(true);
   }
   
-  public void addTab(SimpleTabPane stp) {
+  public void addWorkAreaTab(SimpleTabPane stp) {
     WorkArea w = new WorkArea();
     w.build();
     stp.selectTab(stp.createTab(Tuscedo.getTabID(), w));
     w.updateTitle();
     w.setStandardFocus();
+  }
+  
+  public void addGraphTab(SimpleTabPane stp, String input) {
+    GraphPanel gp = new GraphPanel();
+    stp.selectTab(stp.createTab(Tuscedo.getTabID(), gp));
+    BufferedReader reader = new BufferedReader(new StringReader(input));
+    String line;
+    try {
+      while ((line = reader.readLine()) != null) {
+        try {
+          double d = Double.parseDouble(line);
+          gp.addSample(d);
+        } catch (NumberFormatException nfe) {} 
+      }
+      gp.zoomAll(true, true, new Point());
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
   }
   
   public class TuscedoTabPane extends SimpleTabPane implements SimpleTabPane.TabListener {

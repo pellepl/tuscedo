@@ -16,6 +16,8 @@ import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,14 +49,27 @@ import javax.swing.plaf.basic.BasicScrollBarUI;
 
 import com.pelleplutt.Essential;
 import com.pelleplutt.tuscedo.ProcessGroup;
+import com.pelleplutt.tuscedo.ProcessGroupInfo;
 import com.pelleplutt.tuscedo.Serial;
 import com.pelleplutt.tuscedo.Settings;
 import com.pelleplutt.tuscedo.Tuscedo;
 import com.pelleplutt.util.AppSystem.Disposable;
 import com.pelleplutt.util.FastTermPane;
 import com.pelleplutt.util.FastTextPane;
+import com.pelleplutt.util.Log;
 import com.pelleplutt.util.io.Port;
 
+/**
+ * Major workarea.
+ * This is a JPanel containing the viewPanel in center and the inputPanel at bottom.
+ * viewPanel and inputPanel are card layouts.
+ * inputPanels card layout holds ProcessACTextfields.
+ * viewPanels card layout holds Views.
+ * A View contains a FastTermPane and a FastTextPane. These are wrapped in 
+ * scroll panes which are wrapped in two diffent split panes.
+ *  
+ * @author petera
+ */
 public class WorkArea extends JPanel implements Disposable {
   static final int ISTATE_INPUT = 0;
   static final int ISTATE_FIND = 1;
@@ -82,8 +97,8 @@ public class WorkArea extends JPanel implements Disposable {
   ProcessACTextField input[] = new ProcessACTextField[_ISTATE_NUM];
   
   public static final Color colGenericBg = new Color(0, 0, 32);
-  public static final Color colTextFg = new Color(255, 255, 192);
-  public static final Color colInputFg = new Color(192, 255, 255);
+  public static final Color colTextFg = new Color(255, 255, 128);
+  public static final Color colInputFg = new Color(128, 255, 255);
   public static final Color colInputBg = new Color(48, 48, 64);
   public static final Color colInputBashBg = new Color(64, 64, 64);
   public static final Color colBashFg = new Color(255, 255, 255);
@@ -229,7 +244,8 @@ public class WorkArea extends JPanel implements Disposable {
     tp.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
   }
   
-  public static void defineAction(JComponent c, String name, String keys, AbstractAction action) {
+  public static void defineAction(JComponent c, String name, String keys, 
+      AbstractAction action) {
     KeyMap key = KeyMap.getKeyDef(name);
     if (key == null) {
       key = KeyMap.fromString(keys);
@@ -333,10 +349,8 @@ public class WorkArea extends JPanel implements Disposable {
       inputPanel.add(ip[i], Integer.toString(i));
       
       if (i == ISTATE_INPUT || i == ISTATE_BASH) {
-        bash[i] = new Bash(input[i], 
-            new XtermConsole(view, input[i], "UTF-8"), 
-            serial, 
-            this);
+        XtermConsole xc = new XtermConsole(view, input[i], "UTF-8"); 
+        bash[i] = new Bash(input[i], xc, serial, this);
       }
       
       views[i] = view;
@@ -386,8 +400,9 @@ public class WorkArea extends JPanel implements Disposable {
       public void run() {
         Port portSetting = serial.getSerialConfig();
         if (portSetting != null) {
-          titleConn = portSetting.portName + "@" + portSetting.baud + "/" + portSetting.databits +
-              Port.parityToString(portSetting.parity).charAt(0) + portSetting.stopbits;
+          titleConn = portSetting.portName + "@" + portSetting.baud + "/" + 
+            portSetting.databits + Port.parityToString(portSetting.parity).charAt(0) + 
+            portSetting.stopbits;
         } else {
           titleConn = "";
         }
@@ -418,7 +433,7 @@ public class WorkArea extends JPanel implements Disposable {
         SimpleTabPane.Tab t = SimpleTabPane.getTabByComponent(WorkArea.this);
         if (t != null) {
           if (istate == ISTATE_BASH) {
-            title = "BASH:" + title;
+            title = "[BASH] " + title;
           }
           t.setText(title);
         }
@@ -506,13 +521,14 @@ public class WorkArea extends JPanel implements Disposable {
           }
         }
       }
-      views[ISTATE_INPUT].ftp.addText("Opening " + portSetting.portName + " " + portSetting.baud + " " + portSetting.databits +
+      views[ISTATE_INPUT].ftp.addText("Opening " + portSetting.portName + " " + 
+          portSetting.baud + " " + portSetting.databits + 
           Port.parityToString(portSetting.parity).charAt(0) + portSetting.stopbits + "...\n", 
           STYLE_SERIAL_INFO);
       
       serial.open(portSetting);
       
-      views[ISTATE_INPUT].ftp.addText("Connected\n", STYLE_ID_SERIAL_INFO, Color.green, null, true);
+      views[ISTATE_INPUT].ftp.addText("Connected\n", STYLE_SERIAL_INFO);
       enterInputState(ISTATE_INPUT);
     } catch (Exception e) {
       views[ISTATE_INPUT].ftp.addText("Failed [" + e.getMessage() + "]\n", STYLE_SERIAL_ERR);
@@ -686,13 +702,15 @@ public class WorkArea extends JPanel implements Disposable {
     if (userInput.startsWith(settings.string(bashPrefix)) && 
         userInput.length() >= bashPrefix.length()) {
       if (userInput.startsWith(bashPrefix + "cd ")) {
-        return bash[istate].suggestFileSystemCompletions(bashPrefix, userInput.substring(bashPrefix.length()), 
+        return bash[istate].suggestFileSystemCompletions(bashPrefix, 
+            userInput.substring(bashPrefix.length()), 
             "cd", false, true);
       }
       else if (userInput.startsWith(bashPrefix)) {
         int spaceIx = userInput.lastIndexOf(' ');
         if (spaceIx > 0) {
-          return bash[istate].suggestFileSystemCompletions(bashPrefix, userInput.substring(bashPrefix.length()), 
+          return bash[istate].suggestFileSystemCompletions(bashPrefix, 
+              userInput.substring(bashPrefix.length()), 
               userInput.substring(bashPrefix.length(), spaceIx).trim(), true, true);
         }
       }
@@ -783,17 +801,20 @@ public class WorkArea extends JPanel implements Disposable {
   void showHelp() {
     // TODO this should be its own view
     curView.ftp.clear();
-    String name = Essential.name + " v" + Essential.vMaj + "." + Essential.vMin + "." + Essential.vMic; 
+    String name = Essential.name + " v" + Essential.vMaj + "." +
+        Essential.vMin + "." + Essential.vMic; 
     int midLen = Essential.longname.length() / 2;
     curView.ftp.addText( String.format("%" + (midLen + name.length()/2) + "s\n", name), 
         STYLE_ID_HELP, Color.white, null, true);
-    curView.ftp.addText(Essential.longname + "\n\n", STYLE_ID_HELP, Color.lightGray, null, false);
+    curView.ftp.addText(Essential.longname + "\n\n", STYLE_ID_HELP, 
+        Color.lightGray, null, false);
     Set<String> unsorted = KeyMap.getActions();
     List<String> sorted = new ArrayList<String>(unsorted);
     java.util.Collections.sort(sorted);
     for (String d : sorted) {
       KeyMap km = KeyMap.getKeyDef(d);
-      curView.ftp.addText(String.format("%" + (midLen-1) + "s  ", d), STYLE_ID_HELP, Color.cyan, null, false);
+      curView.ftp.addText(String.format("%" + (midLen-1) + "s  ", d), STYLE_ID_HELP, 
+          Color.cyan, null, false);
       curView.ftp.addText(km.toString() + "\n", STYLE_ID_HELP, Color.yellow, null, false);
     }
   }
@@ -819,7 +840,8 @@ public class WorkArea extends JPanel implements Disposable {
     
     if (prevDev == null) {
       if (devices != null) {
-        setInfo((devices.length == 0 ? "NO" : devices.length) + " SERIAL" + (devices.length != 1 ? "S" : ""));
+        setInfo((devices.length == 0 ? "NO" : devices.length) + 
+            " SERIAL" + (devices.length != 1 ? "S" : ""));
       }
     } else if (devices != null) {
       List<String> added = new ArrayList<String>(Arrays.asList(devices));
@@ -839,7 +861,8 @@ public class WorkArea extends JPanel implements Disposable {
       }
       StringBuilder sb = new StringBuilder();
       if (added.isEmpty() && removed.isEmpty()) {
-        setInfo((devices.length == 0 ? "NO" : devices.length) + " SERIAL" + (devices.length != 1 ? "S" : ""));
+        setInfo((devices.length == 0 ? "NO" : devices.length) + 
+            " SERIAL" + (devices.length != 1 ? "S" : ""));
       } else {
         for (String d : added) {
           sb.append("+" + d + " ");
@@ -964,7 +987,8 @@ public class WorkArea extends JPanel implements Disposable {
   AbstractAction actionAddTab = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      Tuscedo.inst().addTab(SimpleTabPane.getTabByComponent(WorkArea.this).getPane());
+      Tuscedo.inst().addWorkAreaTab(
+          SimpleTabPane.getTabByComponent(WorkArea.this).getPane());
     }
   };
 
@@ -1062,14 +1086,21 @@ public class WorkArea extends JPanel implements Disposable {
     updateTitle();
   }
   
-  public void onLinkedProcess(ACTextField tf, ProcessGroup process) {
+  public void onLinkedProcess(ProcessACTextField tf, ProcessGroup process) {
+    Log.println("link process " + process.toString());
     tf.setBackground(WorkArea.colInputBashBg);
+    Bash bash = ((ProcessGroupInfo)process.getUserData()).bash;
+    ((XtermConsole)bash.console).reviveScreenBuffer(process);
     updateTitle();
   }
   
-  public void onUnlinkedProcess(ACTextField tf, ProcessGroup process) {
+  public void onUnlinkedProcess(ProcessACTextField tf, ProcessGroup process) {
+    if (process != null) {
+      Log.println("unlink process " + process.toString());
+      Bash bash = ((ProcessGroupInfo)process.getUserData()).bash;
+      ((XtermConsole)bash.console).forceOriginalScreenBuffer();
+    }
     tf.setBackground(WorkArea.colInputBg);
-    // TODO XTERM figure out how to switch to normal screen buffer here
     updateTitle();
   }
   
@@ -1222,7 +1253,7 @@ public class WorkArea extends JPanel implements Disposable {
     }
   } // class AutoAdjustmentListener
 
-  class View extends JPanel {
+  class View extends JPanel implements MouseListener {
     FastTermPane ftp;
     FastTextPane ftpSec;
     JSplitPane splitVer, splitHor;
@@ -1236,6 +1267,10 @@ public class WorkArea extends JPanel implements Disposable {
       
       ftpSec = new FastTextPane();
       ftpSec.setDocument(ftp.getDocument());
+      
+      ftp.addMouseListener(this);
+      ftpSec.addMouseListener(this);
+      
       decorateFTP(ftpSec);
       mainScrollPane = new JScrollPane(ftp,
           JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
@@ -1284,9 +1319,39 @@ public class WorkArea extends JPanel implements Disposable {
         splitHor.setRightComponent(secScrollPane);
         add(splitHor, BorderLayout.CENTER);
         revalidate();
-        splitVer.setDividerLocation(mainScrollPane.getWidth()/2);
+        splitHor.setDividerLocation(mainScrollPane.getWidth()/2);
         curSplit = splitHor;
       }
+    }
+
+    
+    // impl MouseListener for ftps
+    @Override
+    public void mouseClicked(MouseEvent e) {
+    }
+
+    @Override
+    public void mousePressed(MouseEvent e) {
+      if (SwingUtilities.isRightMouseButton(e)) {
+        // TODO menuize
+        String input = ((FastTextPane)e.getSource()).getSelectedText();
+        if (input != null) {
+          Tuscedo.inst().addGraphTab(SimpleTabPane.getTabByComponent(WorkArea.this).getPane(),
+              input);
+        }
+      }
+    }
+
+    @Override
+    public void mouseReleased(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseEntered(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseExited(MouseEvent e) {
     }
 
   } // class View

@@ -6,12 +6,15 @@ import java.awt.event.KeyListener;
 import java.io.UnsupportedEncodingException;
 
 import com.pelleplutt.tuscedo.Console;
+import com.pelleplutt.tuscedo.ProcessGroup;
+import com.pelleplutt.tuscedo.ProcessGroupInfo;
 import com.pelleplutt.tuscedo.ProcessHandler;
 import com.pelleplutt.tuscedo.XtermHandler;
 import com.pelleplutt.tuscedo.XtermStream;
 import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.AppSystem.Disposable;
 import com.pelleplutt.util.FastTextPane;
+import com.pelleplutt.util.Log;
 
 /**
  * Contains two XtermStreamHandlers, one for stdout and one for stderr.
@@ -26,6 +29,9 @@ public class XtermConsole implements Console, KeyListener, Disposable, Runnable 
   XtermStreamHandler xstd, xerr;
   volatile boolean running = true;
   long tick = 50;
+  FastTextPane.Doc originalDoc;
+  FastTextPane.Doc alternateDoc;
+  boolean alternateScreenBuffer;
   
   Color colXtermPalette[] = {
       null,
@@ -49,6 +55,8 @@ public class XtermConsole implements Console, KeyListener, Disposable, Runnable 
   public XtermConsole(WorkArea.View v, ProcessHandler ph, String textEncoding) {
     this.view = v;
     this.ph = ph;
+    originalDoc = view.ftp.getDocument();
+    alternateDoc = new FastTextPane.Doc();
     view.ftp.setKeyListener(this);
     xstd = new XtermStreamHandler(WorkArea.STYLE_BASH_OUT, textEncoding);
     xerr = new XtermStreamHandler(WorkArea.STYLE_BASH_ERR, textEncoding);
@@ -122,6 +130,41 @@ public class XtermConsole implements Console, KeyListener, Disposable, Runnable 
   public void stderr(byte[] b, int len) {
     xerr.feed(b, len);
   }
+  
+  protected void setAlternateScreenBuffer(boolean b) {
+    FastTextPane.Doc alt = alternateDoc;
+    ProcessGroup pg = ph.getLinkedProcess();
+    Log.println("set alt screen for " + (pg == null ? "null" : pg.toString()) + " : " + b);
+    if (pg != null) {
+      ProcessGroupInfo pgi = (ProcessGroupInfo)pg.getUserData();
+      alt = pgi.alternateScreenBuffer;
+      pgi.displayAlternateScreenBuffer = b;
+    }
+    if (b) {
+      view.ftp.setDocument(alt);
+      view.ftp.setTerminalMode(true);
+    } else {
+      view.ftp.setDocument(originalDoc);
+      view.ftp.setTerminalMode(false);
+    }
+  }
+
+  public void reviveScreenBuffer(ProcessGroup pg) {
+    Log.println("revive screen for " + (pg == null ? "null" : pg.toString()));
+    if (pg != null) {
+      ProcessGroupInfo pgi = (ProcessGroupInfo)pg.getUserData();
+      if (pgi.displayAlternateScreenBuffer) {
+        view.ftp.setDocument(pgi.alternateScreenBuffer);
+        view.ftp.setTerminalMode(true);
+      }
+    }
+  }
+
+  public void forceOriginalScreenBuffer() {
+    view.ftp.setDocument(originalDoc);
+    view.ftp.setTerminalMode(false);
+  }
+
 
   /**
    * class XtermStreamHandler
@@ -187,8 +230,13 @@ public class XtermConsole implements Console, KeyListener, Disposable, Runnable 
     public void data(byte[] data, int len) {
       if (len <= 0) return;
       try {
+        Color fg = colInverse ? colBG : colFG;
+        Color bg = colInverse ? colFG : colBG;
+        if (fg == null) {
+          fg = colInverse ? view.ftp.getBackground() : view.ftp.getForeground();
+        }
         view.ftp.addText(new String(data, 0, len, textEnc), defStyle.id, 
-            colInverse ? colBG : colFG, colInverse ? colFG : colBG, bold);
+            fg, bg, bold);
       } catch (UnsupportedEncodingException e) {}
     }
   
@@ -197,12 +245,10 @@ public class XtermConsole implements Console, KeyListener, Disposable, Runnable 
     @Override
     public void setTextFgColor(int palette) {
       colFG = palette > 0 ? colXtermPalette[palette] : defStyle.getFg();
-      if (colFG == null) colFG = view.ftp.getForeground();
     }
     @Override
     public void setTextBgColor(int palette) {
       colBG = palette > 0 ? colXtermPalette[palette] : defStyle.getBg();
-      if (colBG == null) colBG = view.ftp.getBackground();
     }
     @Override
     public void setTextBold(boolean b) {
@@ -214,8 +260,6 @@ public class XtermConsole implements Console, KeyListener, Disposable, Runnable 
       colBG = defStyle.getBg();
       bold = defStyle.getBold();
       colInverse = false;
-      if (colFG == null) colFG = view.ftp.getForeground();
-      if (colBG == null) colBG = view.ftp.getBackground();
     }
     @Override
     public void setTextInverse(boolean b) {
@@ -304,7 +348,7 @@ public class XtermConsole implements Console, KeyListener, Disposable, Runnable 
     }
     @Override
     public void setAlternateScreenBuffer(boolean b) {
-      view.ftp.setTerminalMode(b);
+      XtermConsole.this.setAlternateScreenBuffer(b);
     }
   }
 
