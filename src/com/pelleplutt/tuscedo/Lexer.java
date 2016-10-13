@@ -253,6 +253,7 @@ public class Lexer {
       b.flags = new byte[b.lids.size()];
       b.children = new ByteNodes[b.lids.size()];
       b.symids = new int[b.lids.size()];
+      b.closed = new boolean[b.lids.size()];
       int entryIx = 0;
       // definits
       for (int i = 0; i < b.lids.size(); i++) {
@@ -325,14 +326,14 @@ public class Lexer {
 
       if (b < 0) {
         // finalizer byte, emit what we have buffered
-        curNodes = null;
-        if (pathIx > 0 && (branches.flags[branchIx] & FLAG_DANGLING) != 0) {
+        if (pathIx > 0 && (curNodes.flags[branchIx] & FLAG_DANGLING) != 0) {
           // finalized on a dangling symbol, emit symbol
-          emitter.symbol(buffer, bufIx, branches.symids[branchIx]);
+          emitter.symbol(buffer, bufIx, curNodes.symids[branchIx]);
         } else if (bufIx > 0) {
           // just plain data, emit data
           emitter.data(buffer, bufIx);
         }
+        curNodes = null;
         reset();
         return;
       }
@@ -346,6 +347,7 @@ public class Lexer {
 //      System.out.print("'" + (char) b + "' pathIx:" + pathIx + " cur:"
 //          + curNodes + " brn:" + branches + " [" + printPath() + "] ");
       for (int i = 0; i < branches.ids.length; i++) {
+        if (branches.closed[i]) continue;
         byte id = branches.ids[i];
         byte flags = branches.flags[i];
         boolean wildone = (flags & FLAG_WILD_ONE) != 0;
@@ -398,17 +400,21 @@ public class Lexer {
             reparse = true;
             curNodes = null;
           } else {
-            curNodes = null;
             if (bufIx == 1) {
               // no match on this byte, emit data
+              curNodes = null;
               emitter.data(buffer, 1);
               reset();
             } else if (bufIx > 1) {
               // branch broken, reparse buffered data
-              int len = bufIx - 1;
-              emitter.data(buffer, 1);
+              int closedIx = branchIx;
+              ByteNodes closedEntryNodes = curNodes;
+              int len = bufIx;
               reset();
-              feed(buffer, 1, len);
+              curNodes = null;
+              closedEntryNodes.closed[closedIx] = true;
+              feed(buffer, 0, len);
+              closedEntryNodes.closed[closedIx] = false;
               break;
             }
           }
@@ -504,32 +510,37 @@ public class Lexer {
       
       if ((nodeflags & FLAG_WILD_MANY) != 0) {
         
-        // e.g. "a!*b" 
+        // e.g. "a*?b" 
         // =>
         //        ____b___
         //       /        \
-        // O-a->O-!*->O-b->X 
+        // O-a->O-*?->O-b->X 
         //           ^ \
-        //           |  *
+        //           |  ?
         //           \_/
         //       
         // =>
         // case A          case B
-        // O-a->O-b->X  ,  O-a->O-*->O-b->X
+        // O-a->O-b->X  ,  O-a->O-?->O-b->X
         //                          ^ \
-        //                          |  *
+        //                          |  ?
         //                          \_/
         
         // case A
         if (!isLast) {
+          // if stuff is following the wildcard, add this directly under parent
+          // (case no wildcard match)
           createSymbol(cur, sym.substring(symix+1), symid);
         }
         // case B
+        // add the first single char wildcard match
         cur = addToken(cur, c, nodeid, 
             (byte)((nodeflags & ~FLAG_WILD_MANY) | FLAG_WILD_ONE | (isLast ? FLAG_DANGLING : 0)), 
             false, symid);
-        addToken(cur, c, nodeid, nodeflags, true, symid);
+        // then, under the single char wildcard match, add zero or many match 
+        addToken(cur, c, nodeid, nodeflags, isLast, symid);
         if (!isLast) {
+          // if stuff is following the wildcard, add this directly under parent
           createSymbol(cur, sym.substring(symix+1), symid);
         }
         return;
@@ -549,14 +560,12 @@ public class Lexer {
 
   protected ByteNodes addToken(ByteNodes cur, char c, byte nodeid,
       byte nodeflags, boolean isLast, int symid) {
-    if (cur.lids == null)
+    if (cur.lids == null) {
       cur.lids = new ArrayList<Byte>();
-    if (cur.lflags == null)
       cur.lflags = new ArrayList<Byte>();
-    if (cur.lchildren == null)
       cur.lchildren = new ArrayList<ByteNodes>();
-    if (cur.lsymids == null)
       cur.lsymids = new ArrayList<Integer>();
+    }
 
     // see if there already is a matching id in current branch
     boolean match = false;
@@ -579,13 +588,14 @@ public class Lexer {
       if (!isLast) {
         // more symbol stuff, add new children
         ByteNodes newChildren = new ByteNodes();
-        cur.lsymids.add((nodeflags & FLAG_DANGLING) != 0 ? symid : 0);
         cur.lchildren.add(newChildren);
+        cur.lsymids.add((nodeflags & FLAG_DANGLING) != 0 ? symid : 0);
+        //cur.lsymids.add(symid);
         return newChildren;
       } else {
-        // no more symbol stuff, fill with nullmarker
-        cur.lsymids.add(symid);
+        // no more symbol stuff, fill with nullmarker and assign symbol id
         cur.lchildren.add(new NullNodes());
+        cur.lsymids.add(symid);
         return null;
       }
 
@@ -678,6 +688,7 @@ public class Lexer {
     byte flags[];
     ByteNodes children[];
     int symids[];
+    boolean closed[];
     List<Byte> lids;
     List<Byte> lflags;
     List<ByteNodes> lchildren;
@@ -693,7 +704,7 @@ public class Lexer {
   } // class ByteNodes
 
   protected class NullNodes extends ByteNodes {
-  }
+  } // class NullNodes
 
   public interface Emitter {
     void data(byte data[], int len);
@@ -715,17 +726,10 @@ public class Lexer {
     };
     Lexer p = new Lexer(emitter, 256);
     p.addSymbol("*%", 10);
-    p.addSymbol("*^0", 12);
-    p.addSymbol("ba*?a", 1);
-    p.addSymbol("num*%;", 2);
-    p.addSymbol("umber", 5);
-    p.addSymbol("umb", 6);
-    p.addSymbol("umbra", 7);
-    p.addSymbol("foo", 11);
+    p.addSymbol("*%.*%", 11);
     p.compile();
-    p.defineUserSet(" \t\r\n", 0);
     p.printTree();
-    p.feed("  23 bane  banana num123;  \tnumber123; foobar\n".getBytes());
+    p.feed("0 .0 0.0;\n".getBytes());
     p.flush();
 
   }
