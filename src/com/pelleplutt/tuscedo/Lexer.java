@@ -256,7 +256,7 @@ public class Lexer {
       b.closed = new boolean[b.lids.size()];
       int entryIx = 0;
       // definits
-      for (int i = 0; i < b.lids.size(); i++) {
+      for (int i = 0; i < b.ids.length; i++) {
         if ((b.lflags.get(i) & (FLAG_WILD_ONE | FLAG_WILD_MANY)) == 0) {
           b.ids[entryIx] = b.lids.get(i);
           b.flags[entryIx] = b.lflags.get(i);
@@ -267,7 +267,7 @@ public class Lexer {
         }
       }
       // single wildcards
-      for (int i = 0; i < b.lids.size(); i++) {
+      for (int i = 0; i < b.ids.length; i++) {
         if ((b.lflags.get(i) & FLAG_WILD_ONE) != 0) {
           b.ids[entryIx] = b.lids.get(i);
           b.flags[entryIx] = b.lflags.get(i);
@@ -278,7 +278,7 @@ public class Lexer {
         }
       }
       // zero or many wildcards
-      for (int i = 0; i < b.lids.size(); i++) {
+      for (int i = 0; i < b.ids.length; i++) {
         if ((b.lflags.get(i) & FLAG_WILD_MANY) != 0) {
           b.ids[entryIx] = b.lids.get(i);
           b.flags[entryIx] = b.lflags.get(i);
@@ -287,6 +287,10 @@ public class Lexer {
           b.symids[entryIx] = b.lsymids.get(i);
           entryIx++;
         }
+      }
+      // set parents
+      for (int i = 0; i < b.ids.length; i++) {
+        if (b.children[i] != null) b.children[i].parent = b;
       }
     }
     // remove all worker lists
@@ -409,17 +413,30 @@ public class Lexer {
               // branch broken, reparse buffered data
               int closedIx = branchIx;
               ByteNodes closedEntryNodes = curNodes;
+              // optimise: if this is a leaf on a non-bifurcated branch then  search up to 
+              // bifurcation and close that node instead so we minimise retraversal
+              while (closedEntryNodes.parent != null && 
+                     closedEntryNodes.parent.parent != null && // never close root 
+                     closedEntryNodes.parent.children.length == 1) {
+                closedEntryNodes = closedEntryNodes.parent;
+                closedIx = 0;
+              }
               int len = bufIx;
               reset();
               curNodes = null;
               closedEntryNodes.closed[closedIx] = true;
+              //System.out.print("refeed "+ len + " [" + new String(buffer, 0, len)  + "], close "); printTreeNode(closedEntryNodes, closedIx);
+              //System.out.println();
               feed(buffer, 0, len);
               closedEntryNodes.closed[closedIx] = false;
+              //System.out.print("refed  " + len + ",reopen "); printTreeNode(closedEntryNodes, closedIx);
+              //System.out.println();
               break;
             }
           }
         } else {
           // match in midst of branch
+          //System.out.println("'" + (char)b + "' match, path " + printPath());
         }
       }
     } while (reparse);
@@ -679,11 +696,13 @@ public class Lexer {
       post += ">";
     else
       post += "]";
+    if (bn.closed[i]) post +="X";
     post += bn.symids[i] == 0 ? "" : (" -> " + bn.symids[i]);
     System.out.print(pre + id + post);
   }
 
   protected class ByteNodes {
+    ByteNodes parent;
     byte ids[];
     byte flags[];
     ByteNodes children[];
@@ -725,11 +744,11 @@ public class Lexer {
       }
     };
     Lexer p = new Lexer(emitter, 256);
-    p.addSymbol("*%", 10);
-    p.addSymbol("*%.*%", 11);
+    p.addSymbol("a*%b", 10);
+    p.addSymbol("a1234567b", 11);
     p.compile();
     p.printTree();
-    p.feed("0 .0 0.0;\n".getBytes());
+    p.feed("a12345678b a1234567b a12341111118b".getBytes());
     p.flush();
 
   }

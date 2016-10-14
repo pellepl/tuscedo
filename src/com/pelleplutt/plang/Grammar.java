@@ -82,19 +82,23 @@ public class Grammar {
     try {
       g.build();
     } catch (IOException ioe) {}
-    //checkRecurse(exprs);
+    checkRecurse(exprs);
+    System.out.println();
   }
   
   static void checkRecurse(List<ASTNode> exprs) {
     for (ASTNode a : exprs) {
-      if (a.op != AST.OP_COMP) {
-        System.out.print("[" + a.op + (a.op >= 0 ? (" " + AST.OPS[a.op].toString()) : "") + "] ");
+      if (a.op == AST.OP_COMP) {
+        System.out.print("{");
+      } else {
+        System.out.print("[" + a.op + (a.op >= 0 ? (" " + AST.OPS[a.op].toString()) : " ") + "] ");
       }
       if (a.operands != null) {
         checkRecurse(a.operands);
       }
+      if (a.op == AST.OP_COMP) {
+        System.out.print("}");
+      }
     }
-    System.out.println();
   }
-
 }

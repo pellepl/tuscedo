@@ -27,7 +27,9 @@ public class Compiler {
         "}\n"+
         "blaj:\n"+
         "for (b=10; a < 10; a++) {\n" +
-        "  q = (x+y)*8;\n" + 
+        "  for (y in 0#100) {\n" +
+        "    q = (x+y)*8;\n" + 
+        "  }\n"+
         "  print(q);\n" + 
         "}\n"+
         "blaj2:\n"+

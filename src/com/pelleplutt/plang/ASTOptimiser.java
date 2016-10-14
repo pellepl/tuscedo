@@ -156,6 +156,22 @@ public class ASTOptimiser {
         rNode = new ASTNodeNumeric(r, false);
         parent.operands.set(parent.operands.indexOf(a), rNode);
       }
+      if (opNode.op == AST.OP_SHLEFT) {
+        ASTNodeNumeric e1 = (ASTNodeNumeric)opNode.operands.get(0);
+        ASTNodeNumeric e2 = (ASTNodeNumeric)opNode.operands.get(1);
+        if (e1.frac || e2.frac) throw new CompilerError("Can only shift integers");
+        int r = (int)e1.value << (int)e2.value; 
+        rNode = new ASTNodeNumeric(r, false);
+        parent.operands.set(parent.operands.indexOf(a), rNode);
+      }
+      if (opNode.op == AST.OP_SHRIGHT) {
+        ASTNodeNumeric e1 = (ASTNodeNumeric)opNode.operands.get(0);
+        ASTNodeNumeric e2 = (ASTNodeNumeric)opNode.operands.get(1);
+        if (e1.frac || e2.frac) throw new CompilerError("Can only shift integers");
+        int r = (int)e1.value >>> (int)e2.value; 
+        rNode = new ASTNodeNumeric(r, false);
+        parent.operands.set(parent.operands.indexOf(a), rNode);
+      }
       if (opNode.op == AST.OP_PLUS) {
         ASTNodeNumeric e1 = (ASTNodeNumeric)opNode.operands.get(0);
         ASTNodeNumeric e2 = (ASTNodeNumeric)opNode.operands.get(1);
