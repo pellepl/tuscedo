@@ -13,34 +13,32 @@ public class Compiler {
 
     System.out.println("* check grammar");
     Grammar.check(ast.exprs);
+
+    System.out.println("* codegen");
+    //CodeGen.check(ast.exprs);
+    CodeGenFront.check(ast.exprs);
   }
   
   public static void main(String[] args) {
     Compiler.compile(
-        "for (i in 1#100+4#1001) {\n"+
-        "  if (a*0 == 9) goto blaj;" +
-        "  elseif (a == 9) {\n" +
-        "    q = q*2;\n"+
-        "    w = 3*(q+w);\n"+
-        "    goto blaj2;" +
-        "  } else break;" +
-        "}\n"+
-        "blaj:\n"+
-        "for (b=10; a < 10; a++) {\n" +
-        "  for (y in 0#100) {\n" +
-        "    q = (x+y)*8;\n" + 
-        "  }\n"+
-        "  print(q);\n" + 
-        "}\n"+
-        "blaj2:\n"+
-        "a = a + 1;\n"+
-        "b = a * 10;"+
-        
-//        "for (a=0;a<9;a++) {}\n" +
-//        "for (a in 0#2#100) {}\n" +
-//        "print('here be dragons' + '\\n', 10*(12+5), debug);"+
-        
-//        "1+2*3-(4*(7+8)+5)" +
+    "a = 1;\n" +
+    "b = 2;\n" +
+    "c = (a + b)*3;\n" +
+    "for (i = 0; i < 10; i=i+1) {\n" +
+    "  tmp = a;\n" +
+    "  a = b*0.5;\n" +
+    "  b = tmp*2.5;\n" +
+    "  c = c + (i*c) + 2*a + 3.5*b;\n" +
+    "}" +
+    "if (c >= 1000) {\n" +
+    "  print('c is huge (' + c + ')');\n" + 
+    "} else if (c < 100) {\n" +
+    "  print('c is small (' + c + ')');\n" + 
+    "} else {\n" +
+    "  print('c is med (' + c + ')');\n" +
+    "}\n" +
+    "print('res:', niceify(c));\n" +
+    //"print('res:' + niceify(c));\n" + // TODO FIX
  ""
 );
   }

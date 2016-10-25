@@ -1,6 +1,7 @@
 package com.pelleplutt.plang;
 
 import java.io.BufferedReader;
+
 import java.io.IOException;
 import java.io.StringReader;
 import java.lang.reflect.Field;
@@ -8,51 +9,206 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import static com.pelleplutt.plang.AST.*;
 
 public class Grammar {
   static final String GRAMMAR_DEF =
-          "numi:   OP_NUMERIC0 | OP_NUMERICI\n" +
-          "numd:   OP_NUMERICD\n" +
-          "numih:  OP_NUMERICH1 | OP_NUMERICH2\n" +
-          "num:    numi | numd | numih\n" +
+          "numi:          OP_NUMERICI\n" +
+          "numd:          OP_NUMERICD\n" +
+          "numih:         OP_NUMERICH1 OP_NUMERICH2\n" +
+          "numib:         OP_NUMERICB1 OP_NUMERICB2\n" +
+          "nil:           OP_NIL\n" +
+          "sym:           OP_SYMBOL\n" +
+          "str:           OP_QUOTE1 OP_QUOTE2\n" +
+          "rel_op:        OP_EQ2 OP_GT OP_LT OP_GE OP_LE OP_NEQ\n" +
+          "expr_op_add:   OP_PLUS OP_MINUS\n" +
+          "expr_op_mul:   OP_MUL OP_DIV OP_MOD\n" +
+          "expr_op_log:   OP_AND OP_OR OP_XOR OP_SHLEFT OP_SHRIGHT\n" +
+          "expr_op_bin:   expr_op_log expr_op_add expr_op_mul\n" +
+          "expr_op_una:   OP_MINUS_UNARY OP_PLUS_UNARY OP_PLUS2 OP_MINUS2 OP_NOT\n" + 
+          "assign:        OP_EQ\n"+
+          "assign_op_add: OP_PLUSEQ OP_MINUSEQ\n" +
+          "assign_op_mul: OP_DIVEQ OP_MODEQ OP_MULEQ\n" +
+          "assign_op_log: OP_ANDEQ OP_OREQ OP_XOREQ OP_SHLEFTEQ OP_SHRIGHTEQ OP_NOTEQ\n"+
+          "assign_op:     assign_op_log assign_op_add assign_op_mul\n" +
+          "dot:           OP_DOT\n" +
+          "in:            OP_IN\n" +
+          "range:         OP_HASH\n" +
+          "array:         OP_ARRAY\n" +
+          "call:          OP_CALL\n" +
+          "blok:          OP_BLOK\n" + 
+          "if:            OP_IF\n" +
+          "elseif:        OP_ELSEIF\n" +
+          "else:          OP_ELSE\n" +
+          "goto:          OP_GOTO\n" +
+          "for:           OP_FOR\n" +
+          "while:         OP_WHILE\n" +
+          "break:         OP_BREAK\n" +
+          "label:         OP_LABEL\n" +
+          "global:        OP_GLOBAL\n" +
+          
+          "cond:          if elseif else\n" +
+          "expr:          expr_op_bin expr_op_una\n" +
+          "num:           numi numd numih numib\n" +
+          "val:           num sym call expr dot array\n" +
+          "arg:           val str code range nil\n" +
+          "op:            expr assign_op\n" +
+          "jmp:           goto for while break label\n" +
+          "stat:          assign global op call cond\n" + 
+          "oper:          stat jmp\n" + 
+          "code:          blok oper sym\n" + 
   "";
-  
+  static final String GRAMMAR_RULES = 
+          "OP_LABEL:      sym\n" +
+          "dot:           sym | dot , sym\n" +
+          "assign:        sym | array , op | val | range | nil | assign | blok | rel_op | array\n" +
+          "assign_op:     sym , op | call | val\n" +
+          "assign_op_add: sym , str\n" +
+          "range:         val | range , val\n" +
+          "global:        sym\n" +
+          "rel_op:        val , val\n" +
+          "expr_op_add:   str | val , str | val\n" +
+          "expr_op_bin:   val , val\n" +
+          "expr_op_una:   val\n" +
+          "in:            range | sym | call | dot | array\n" +
+          "array:         array | sym , val\n" +
+          "goto:          sym\n" +
+          "call:          arg*\n" +
+          "blok:          code*\n" +
+          "for:           stat | sym , rel_op , stat , code\n" +
+          "for:           sym , in , code\n" +
+          "if:            rel_op , code\n" + 
+          "elseif:        rel_op , code\n" + 
+          "else:          code\n" + 
+  "";
+      
   Map<String, List<String>> defMap = new HashMap<String, List<String>>();
+  Map<String, List<Integer>> idMap = new HashMap<String, List<Integer>>();
+  // contains the rules for each operator.
+  // operator = list of rules. If more than one rule per operator, any rule may apply (OR).
+  // For each rule, there is a list of OperandAccepts. Each entry in the list denotes list of possible
+  // operators for given operand index == list index.
+  Map<Integer, List<Rule>> ruleMap = new HashMap<Integer, List<Rule>>();
   
   void build() throws IOException {
+    // read all definitions
     BufferedReader reader = new BufferedReader(new StringReader(GRAMMAR_DEF));
     String def;
     while ((def = reader.readLine()) != null) {
-      parse(def);
+      parseDefs(def);
     }
-    compile();
+    
+    // resolve all definitions
+    resolveDefs();
+    
+    // read all rules
+    reader = new BufferedReader(new StringReader(GRAMMAR_RULES));
+    String rule;
+    while ((rule = reader.readLine()) != null) {
+      parseRules(rule);
+    }
+    defMap = null;
+    idMap = null;
   }
  
-  void parse(String def) {
+  void parseDefs(String def) {
     String key = null;
-    int op = -1;
-    String subKey = null;
-    String[] defsub = def.split("[\\s+\\|]");
+    String[] defsub = def.split("[\\s+]");
+    List<String> seqDef = new ArrayList<String>();
     for (String sub : defsub) {
-      if (sub.trim().length() == 0) continue;
+      sub = sub.trim();
+      if (sub.length() == 0) continue;
       if (sub.endsWith(":")) {
         key = sub.substring(0, sub.length()-1);
       } else {
-        addDef(key, sub);
+        seqDef.add(sub);
       }
     }
+    if (seqDef.size() > 0) addDef(key, seqDef);
   }
  
-  void addDef(String key, String def) {
+  void addDef(String key, List<String> def) {
     List<String> defs = defMap.get(key);
     if (defs == null) {
       defs = new ArrayList<String>();
       defMap.put(key, defs);
     }
-    defs.add(def);
+    defs.addAll(def);
+  }
+  
+  void resolveDefs() {
+    for (String k : defMap.keySet()) {
+      List<Integer> ids = lookupOperatorIDs(k);
+      idMap.put(k, ids);
+    }
+  }
+  
+  List<Integer> lookupOperatorIDs(String def) {
+    List<Integer> l = new ArrayList<Integer>();
+    lookupOperatorRecurse(def, l); 
+    return l;
+  }
+  
+  void lookupOperatorRecurse(String def, List<Integer> r) {
+    if (def.startsWith("OP_")) {
+      int op = getOpNumber(def);
+      if (!r.contains(op)) {
+        r.add(op);
+      }
+    } else {
+      List<String> subDef = defMap.get(def);
+      if (subDef == null) {
+        System.out.println('"' + def + "\" undef");
+      } else {
+        for (String sdef : subDef) {
+          lookupOperatorRecurse(sdef, r);
+        }
+      }
+    }
+  }
+  
+  void parseRules(String rule) {
+    String key = null;
+    String[] rulesub = rule.split("[\\s+]");
+    List<OperandAccept> ruleDef = new ArrayList<OperandAccept>();
+    OperandAccept oa = new OperandAccept();
+    for (String sub : rulesub) {
+      sub = sub.trim();
+      if (sub.length() == 0) continue;
+      if (sub.endsWith(":")) {
+        key = sub.substring(0, sub.length()-1);
+      } else if (sub.equals(",")) {
+        if (oa.ops.size() > 0) ruleDef.add(oa); 
+        oa = new OperandAccept();
+      } else if (!sub.equals("|")) {
+        if (sub.endsWith("*")) {
+          oa.zeroOrMany = true;
+          sub = sub.substring(0, sub.length()-1);
+        }
+        List<Integer> ops = idMap.get(sub); 
+        for (int op : ops) {
+          if (!oa.ops.contains(op))
+          oa.ops.add(op);
+        }
+      }
+    }
+    if (oa.ops.size() > 0) ruleDef.add(oa);
+    addRule(key, ruleDef);
   }
  
+  void addRule(String key, List<OperandAccept> ruleDef) {
+    List<Integer> ruleKeys = lookupOperatorIDs(key);
+    for (int k : ruleKeys) {
+      List<Rule> r = ruleMap.get(k); 
+      if (r == null) {
+        r = new ArrayList<Rule>();
+        ruleMap.put(k, r);
+      }
+      Rule rule = new Rule(ruleDef);
+      r.add(rule);
+    }
+  }
+  
   int getOpNumber(String def) {
     int id = Integer.MIN_VALUE;
     try {
@@ -69,11 +225,73 @@ public class Grammar {
     return id;
   }
   
-  void compile() {
-    Set<String> keys = defMap.keySet();
-    for (String key : keys) {
-      List<String> defs = defMap.get(key);
-      
+  void checkNode(ASTNode e) {
+    if (e.op >= 0 && AST.OPS[e.op].operands == 0) return;
+    List<Rule> rules = ruleMap.get(e.op);
+    if (rules == null) {
+      System.out.println("warning: no rule for op " + AST.opString(e.op));
+      return;
+    }
+
+    // special case, no operands
+    if (e.operands == null || e.operands.size() == 0) {
+      for (Rule rule : rules) {
+        if (rule.approvedOpSequence.size() == 0 || 
+            (rule.approvedOpSequence.size() == 1 && rule.approvedOpSequence.get(0).zeroOrMany)) {
+          // there is a rule allowing no operands
+          return;
+        }
+      }
+      throw new CompilerError("Missing operands for " + e);
+    }
+    
+    // run thru all rules and see if everything matches
+    //System.out.println("CHEK: " + e);
+    boolean ruleMatch = false;
+    for (Rule rule : rules) {
+      //System.out.println("  RULE: " + rule);
+      int nodeOpIx = 0;
+      int ruleOpIx = 0;
+      int nodeOpLen = e.operands.size();
+      int ruleOpLen = rule.approvedOpSequence.size();
+      while (nodeOpIx < nodeOpLen && ruleOpIx < ruleOpLen) {
+        OperandAccept oa = rule.approvedOpSequence.get(ruleOpIx);
+        ASTNode opNode = e.operands.get(nodeOpIx);
+
+        if (oa.matches(opNode.op)) {
+          if (!oa.zeroOrMany) {
+            ruleOpIx++;
+          }
+          nodeOpIx++;
+        } else {
+          if (oa.zeroOrMany) {
+            ruleOpIx++;
+          } else {
+            //System.out.println("  FAIL @ " + opNode);
+            break; // rule fail
+          }
+        }
+      }
+      ruleMatch = 
+          (nodeOpIx == nodeOpLen && 
+          (ruleOpIx == ruleOpLen || 
+            (ruleOpIx == ruleOpLen - 1 && rule.approvedOpSequence.get(ruleOpIx).zeroOrMany)
+          ));
+      if (ruleMatch) break;
+    } // per rule
+    if (!ruleMatch) {
+      throw new CompilerError("Bad operands for " + e);
+    } else {
+      //System.out.println("  PASS");
+    }
+  }
+  
+  void checkTree(List<ASTNode> es) {
+    for (ASTNode e : es) {
+      checkNode(e);
+      if (e.operands != null) {
+        checkTree(e.operands);
+      }
     }
   }
   
@@ -81,24 +299,53 @@ public class Grammar {
     Grammar g = new Grammar();
     try {
       g.build();
+      g.checkTree(exprs);
     } catch (IOException ioe) {}
-    checkRecurse(exprs);
-    System.out.println();
   }
   
-  static void checkRecurse(List<ASTNode> exprs) {
-    for (ASTNode a : exprs) {
-      if (a.op == AST.OP_COMP) {
-        System.out.print("{");
-      } else {
-        System.out.print("[" + a.op + (a.op >= 0 ? (" " + AST.OPS[a.op].toString()) : " ") + "] ");
+  class Rule {
+    List<OperandAccept> approvedOpSequence;
+    public Rule(List<OperandAccept> oas) {
+      approvedOpSequence = oas;
+    }
+    public void add(List<Integer> r) {
+      OperandAccept oa = new OperandAccept();
+      oa.ops = r;
+      approvedOpSequence.add(oa);
+    }
+    public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append('{');
+      for (int i = 0; i < approvedOpSequence.size(); i++) {
+        OperandAccept oa = approvedOpSequence.get(i);
+        sb.append(oa.toString());
+        if (i < approvedOpSequence.size()-1) sb.append(',');
       }
-      if (a.operands != null) {
-        checkRecurse(a.operands);
+      sb.append('}');
+      return sb.toString();
+    }
+  }
+  
+  class OperandAccept {
+    boolean zeroOrMany;
+    List<Integer> ops;
+    public OperandAccept() {
+      ops = new ArrayList<Integer>();
+    }
+    public boolean matches(int op) {
+      return ops.contains(op);
+    }
+    public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append('[');
+      for (int i = 0; i < ops.size(); i++) {
+        int op = ops.get(i);
+        sb.append(AST.opString(op));
+        if (i < ops.size()-1) sb.append(' ');
       }
-      if (a.op == AST.OP_COMP) {
-        System.out.print("}");
-      }
+      sb.append(']');
+      if (zeroOrMany) sb.append('*');
+      return sb.toString();
     }
   }
 }

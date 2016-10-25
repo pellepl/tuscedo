@@ -39,16 +39,16 @@ import java.util.List;
  * @author petera
  */
 public class Lexer {
-  static final int FLAG_DANGLING = (1 << 0); // if no sub match, this was a leaf
+  static final int FLAG_DANGLING = (1 << 0); // if no sub match, this is a leaf
   static final int FLAG_WILD_MANY = (1 << 1); // range match, 0 or more
   static final int FLAG_WILD_ONE = (1 << 2); // range match, once
   static final int FLAG_WILD_NOT = (1 << 3); // range match, negated
-  static final int FLAG_USER0 = (1 << 4); // user match set 1
-  static final int FLAG_USER1 = (1 << 5); // user match set 2
-  static final int FLAG_USER2 = (1 << 6); // user match set 3
-  static final int FLAG_USER3 = (1 << 7); // user match set 4
+  static final int FLAG_USER_BIT = 4;
+  static final int FLAG_USERL = (1 << FLAG_USER_BIT); // user match set low bit
+  static final int FLAG_USERH = (1 << (FLAG_USER_BIT+1)); // user match set high bit
+  static final int FLAG_COMP = (1 << 6); // compound symbol
 
-  static final int FLAG_MASK = ~FLAG_DANGLING;
+  static final int FLAG_UNIQUE_PATH_MASK = ~FLAG_DANGLING;
 
   static final char CHAR_MATCHMANY = '*';
   static final char CHAR_WILDCARD = '?';
@@ -62,10 +62,12 @@ public class Lexer {
   static final int MAP_NUM = (1 << 0);
   static final int MAP_SPC = (1 << 1);
   static final int MAP_XARG = (1 << 2);
-  static final int MAP_USER0 = (1 << 4);
-  static final int MAP_USER1 = (1 << 5);
-  static final int MAP_USER2 = (1 << 6);
-  static final int MAP_USER3 = (1 << 7);
+  static final int MAP_COMP = (1 << 3);
+  static final int MAP_USER_BIT = 4;
+  static final int MAP_USER0 = (1 << MAP_USER_BIT);
+  static final int MAP_USER1 = (1 << (MAP_USER_BIT+1));
+  static final int MAP_USER2 = (1 << (MAP_USER_BIT+2));
+  static final int MAP_USER3 = (1 << (MAP_USER_BIT+3));
 
   ByteNodes root;
   ByteNodes curNodes;
@@ -73,7 +75,13 @@ public class Lexer {
   byte buffer[];
   int pathIx;
   int bufIx;
+  boolean compoundPrev = false;
+  boolean compoundDangling = false;
+  byte rbuffer[];
+  int rix, wix;
   Emitter emitter;
+  
+  boolean dbg = false;
 
   byte[] flagmap = new byte[256];
 
@@ -88,6 +96,7 @@ public class Lexer {
     this.emitter = emitter;
     path = new int[maxSymLen];
     buffer = new byte[maxSymLen];
+    rbuffer = new byte[maxSymLen+1];
     for (int i = 0; i < flagmap.length; i++) {
       boolean isNum = i >= '0' && i <= '9';
       boolean isSpc = i == ' ' || i == '\t' || i == '\r' || i == '\n';
@@ -111,6 +120,7 @@ public class Lexer {
    * Resets the lexers state
    */
   public void reset() {
+    rix = wix = 0;
     internalReset();
   }
   
@@ -123,17 +133,26 @@ public class Lexer {
     case 3: matchFlag = MAP_USER3; break;
     default: throw new Error("Bad match set (0-3)");
     }
+    markMapCharacters(chars, matchFlag);
+  }
+
+  public void defineCompoundChars(String chars) {
+    markMapCharacters(chars, MAP_COMP);
+  }
+  
+  public void markMapCharacters(String chars, int flag) {
     for (int i = 0; i < flagmap.length; i++) {
-      flagmap[i] &= ~matchFlag;
+      flagmap[i] &= ~flag;
     }
     for (int i = 0; i < chars.length(); i++) {
       char c = chars.charAt(i);
-      flagmap[c & 0xff] |= matchFlag;
+      flagmap[c & 0xff] |= flag;
     }
-    
   }
 
   protected void internalReset() {
+    compoundDangling = false;
+    compoundPrev = false; // TODO?
     pathIx = 0;
     bufIx = 0;
   }
@@ -146,12 +165,12 @@ public class Lexer {
     return (flagmap[b] & MAP_SPC) != 0;
   }
 
-  protected boolean isNspc(int b) {
-    return (flagmap[b] & MAP_SPC) == 0;
-  }
-
   protected boolean isXarg(int b) {
     return (flagmap[b] & MAP_XARG) != 0;
+  }
+
+  protected boolean isComp(int b) {
+    return (flagmap[b] & MAP_COMP) != 0;
   }
 
   protected boolean isUserSet(int b, int mask) {
@@ -230,7 +249,14 @@ public class Lexer {
     if (root == null) {
       root = new ByteNodes();
     }
-    createSymbol(root, sym, symid);
+    createSymbol(root, sym, symid, 0);
+  }
+
+  public void addSymbolCompound(String sym, int symid) {
+    if (root == null) {
+      root = new ByteNodes();
+    }
+    createSymbol(root, sym, symid, FLAG_COMP);
   }
 
   /**
@@ -243,19 +269,19 @@ public class Lexer {
   protected void compile(ByteNodes b) {
     if (b.lids != null && b.lids.size() > 0) {
       // Here, we sort the symbols.
-      // First prioritize the non wildcard ones (definit),
+      // First prioritize the non wildcard ones,
       // then prioritize the single wildcards,
       // finally prioritize the zero or many wildcards.
-      // This is because if a wildcard precedes a definit,
-      // the wildcard will be chosen before the definit, where
-      // the definit is more defined than a wildcard.
+      // This is because if a wildcard precedes an actual token,
+      // the wildcard will be chosen before the token, where
+      // the token is more more likely to be a terminal.
       b.ids = new byte[b.lids.size()];
       b.flags = new byte[b.lids.size()];
       b.children = new ByteNodes[b.lids.size()];
       b.symids = new int[b.lids.size()];
       b.closed = new boolean[b.lids.size()];
       int entryIx = 0;
-      // definits
+      // terminals
       for (int i = 0; i < b.ids.length; i++) {
         if ((b.lflags.get(i) & (FLAG_WILD_ONE | FLAG_WILD_MANY)) == 0) {
           b.ids[entryIx] = b.lids.get(i);
@@ -310,12 +336,46 @@ public class Lexer {
     String s = "";
     ByteNodes b = root;
     for (int i = 0; i < pathIx; i++) {
-      s += (char) (b.ids[path[i]]) + " ";
+      s += (char) (b.ids[path[i]]);
+      s += (b.flags[path[i]] & FLAG_COMP) != 0 ? "C" : "";
+      s += " ";
       b = b.children[path[i]];
     }
     return s;
   }
 
+  void rbufAdd(byte b) {
+    rbuffer[wix++] = b;
+    if (wix >= rbuffer.length) wix = 0;
+    if (wix == rix) {
+      rix++;
+      if (rix >= rbuffer.length) rix = 0;
+    }
+  }
+  
+  int rbufLen() {
+    if (rix > wix) 
+      return rbuffer.length - (rix - wix);
+    else {
+      return wix - rix;
+    }
+  }
+  
+  void rbufRewind(int len) {
+    if (len > rbufLen()) 
+      throw new ArrayIndexOutOfBoundsException("rewind rbuf " + len + ", while having only " + rbufLen());
+    wix -= len;
+    if (wix < 0) wix += rbuffer.length;
+  }
+  
+  int rbufPeek(int len) {
+    if (len > rbufLen()) return -1;
+    int ix = wix - len;
+    if (ix < 0) ix += rbuffer.length;
+    return rbuffer[ix];
+  }
+  
+  
   /**
    * Parses given byte.
    * 
@@ -323,6 +383,11 @@ public class Lexer {
    */
   public void feed(int b) {
     boolean reparse;
+    if (b >= 0) rbufAdd((byte)b);
+    if (rbufLen() > 1) { 
+      compoundPrev = isComp(rbufPeek(2));
+      if (dbg) System.out.println("  prevchar '" + (char)rbufPeek(2) + "', comp " + compoundPrev);
+    }
     do {
       reparse = false;
       int branchIx = pathIx == 0 ? 0 : path[pathIx - 1];
@@ -331,7 +396,7 @@ public class Lexer {
       if (b < 0) {
         // finalizer byte, emit what we have buffered
         if (pathIx > 0 && (curNodes.flags[branchIx] & FLAG_DANGLING) != 0) {
-          // finalized on a dangling symbol, emit symbol
+          // finalized on a maybe compound dangling symbol, emit symbol
           emitter.symbol(buffer, bufIx, curNodes.symids[branchIx]);
         } else if (bufIx > 0) {
           // just plain data, emit data
@@ -341,6 +406,19 @@ public class Lexer {
         reset();
         return;
       }
+      
+      if (compoundDangling) {
+        compoundDangling = false;
+        if (!isComp(b)) {
+          emitter.symbol(buffer, bufIx, curNodes.symids[branchIx]);
+          curNodes = null;
+          internalReset();
+          reparse = true;
+          continue;
+        } else {
+          // TODO close compound path and retry 
+        }
+      }
 
       // store current byte
       buffer[bufIx++] = (byte) b;
@@ -348,51 +426,60 @@ public class Lexer {
       // see if current byte matches anything in current branch
       int matchIx = -1;
       boolean matchWildMany = false;
-//      System.out.print("'" + (char) b + "' pathIx:" + pathIx + " cur:"
-//          + curNodes + " brn:" + branches + " [" + printPath() + "] ");
-      for (int i = 0; i < branches.ids.length; i++) {
+      boolean compound = false;
+      if (dbg) System.out.print("'" + (char) b + "' pathIx:" + pathIx + " cur:"
+          + curNodes + " brn:" + branches + " [" + printPath() + "] ");
+      for (int i = 0; branches != null && i < branches.ids.length; i++) {
         if (branches.closed[i]) continue;
         byte id = branches.ids[i];
         byte flags = branches.flags[i];
         boolean wildone = (flags & FLAG_WILD_ONE) != 0;
         boolean wildmany = (flags & FLAG_WILD_MANY) != 0;
         boolean wildnot = (flags & FLAG_WILD_NOT) != 0;
+        boolean comp = (flags & FLAG_COMP) != 0;
+        // convert FLAG_USERH | FLAG_USERL to MAP_USERx
+        int userFlagMap = 1 << (((flags & (FLAG_USERH | FLAG_USERL)) >> FLAG_USER_BIT) + MAP_USER_BIT);
         boolean match = (!wildone && !wildmany && id == b)
             || (wildone || wildmany)
             && (id == CHAR_WILDCARD || 
                 id == CHAR_WILDNUM && (wildnot && !isNum(b) || !wildnot && isNum(b)) ||
                 id == CHAR_WILDSPC && (wildnot && !isSpc(b)  || !wildnot && isSpc(b)) || 
-                id == CHAR_WILDUSR && (wildnot && !isUserSet(b, flags&0xf0) || !wildnot && isUserSet(b, flags&0xf0)));
+                id == CHAR_WILDUSR && (wildnot && !isUserSet(b, userFlagMap) || !wildnot && isUserSet(b, userFlagMap)));
+        if (bufIx == 1 && comp && compoundPrev) match = false;
         if (match) {
           // got match
-//          System.out.print("match " + (char) id + (wildone ? "?" : "")
-//              + (wildmany ? "*" : ""));
+          if (dbg) System.out.print("match " + (char) id + (wildone ? "?" : "") + (wildmany ? "*" : ""));
           matchIx = i;
           path[pathIx] = i;
           matchWildMany = wildmany;
+          compound = comp;
           if (!matchWildMany) {
             curNodes = branches;
-            if (pathIx == 0) {
-              // symComp = (flags & FLAG_COMPOUND) != 0;
-            }
           }
           break;
         }
       } // per branch child id
 
-//      if (matchIx < 0) System.out.print("no match");
-//      System.out.print("  buf:'" + new String(buffer, 0, bufIx) + "'");
-//      System.out.println();
+      if (dbg) {
+        if (matchIx < 0) System.out.print("no match");
+        System.out.println("  buf:'" + new String(buffer, 0, bufIx) + "'");
+      }
 
       if (!matchWildMany) {
         pathIx++;
       }
 
       if (!matchWildMany && matchIx >= 0 && branches.children[matchIx] == null) {
-        // matched out to a leaf, emit symbol
-        curNodes = null;
-        emitter.symbol(buffer, bufIx, branches.symids[matchIx]);
-        internalReset();
+        // matched out to a non-compound leaf, emit symbol
+        if (!compound) {
+          curNodes = null;
+          emitter.symbol(buffer, bufIx, branches.symids[matchIx]);
+          internalReset();
+        } else {
+          compoundDangling = true;
+          if (dbg) System.out.println("COMPOUND DANGLING");
+          break;
+        }
       } else {
         if (matchIx < 0) {
           // no match
@@ -400,7 +487,7 @@ public class Lexer {
               && (curNodes.flags[branchIx] & FLAG_DANGLING) != 0 && bufIx > 0) {
             // intermittent leaf node, emit symbol
             emitter.symbol(buffer, bufIx - 1, curNodes.symids[branchIx]);
-            reset();
+            internalReset();
             reparse = true;
             curNodes = null;
           } else {
@@ -408,12 +495,12 @@ public class Lexer {
               // no match on this byte, emit data
               curNodes = null;
               emitter.data(buffer, 1);
-              reset();
+              internalReset();
             } else if (bufIx > 1) {
               // branch broken, reparse buffered data
               int closedIx = branchIx;
               ByteNodes closedEntryNodes = curNodes;
-              // optimise: if this is a leaf on a non-bifurcated branch then  search up to 
+              // optimise: if this is a leaf on a straight path then search up to nearest 
               // bifurcation and close that node instead so we minimise retraversal
               while (closedEntryNodes.parent != null && 
                      closedEntryNodes.parent.parent != null && // never close root 
@@ -422,21 +509,28 @@ public class Lexer {
                 closedIx = 0;
               }
               int len = bufIx;
-              reset();
+              internalReset();
               curNodes = null;
               closedEntryNodes.closed[closedIx] = true;
-              //System.out.print("refeed "+ len + " [" + new String(buffer, 0, len)  + "], close "); printTreeNode(closedEntryNodes, closedIx);
-              //System.out.println();
+              if (dbg) {
+                System.out.print("refeed "+ len + " [" + new String(buffer, 0, len)  + "], close "); printTreeNode(closedEntryNodes, closedIx);
+                System.out.println();
+              }
+              compoundPrev = rbufLen() < len+1 ? false : isComp(rbufPeek(len+1));
+              if (dbg) System.out.println("  rewind " + len + " to char " + (char)rbufPeek(len+1) + ", comp " + compoundPrev);
+              rbufRewind(len);
               feed(buffer, 0, len);
               closedEntryNodes.closed[closedIx] = false;
-              //System.out.print("refed  " + len + ",reopen "); printTreeNode(closedEntryNodes, closedIx);
-              //System.out.println();
+              if (dbg) {
+                System.out.print("refed  " + len + ",reopen "); printTreeNode(closedEntryNodes, closedIx);
+                System.out.println();
+              }
               break;
             }
           }
         } else {
           // match in midst of branch
-          //System.out.println("'" + (char)b + "' match, path " + printPath());
+          if (dbg) System.out.println("  '" + (char)b + "' match, path " + printPath());
         }
       }
     } while (reparse);
@@ -455,15 +549,7 @@ public class Lexer {
         || c == CHAR_WILDNOT || c == CHAR_WILDUSR);
   }
 
-  protected int makePathNum(int[] path, int len) {
-    int n = 0;
-    for (int i = 0; i < len; i++) {
-      n = (n * 31) ^ (path[i] + ' ');
-    }
-    return n;
-  }
-
-  protected void createSymbol(ByteNodes cur, String sym, int symid) {
+  protected void createSymbol(ByteNodes cur, String sym, int symid, int xtraFlags) {
     int len = sym.length();
     boolean esc = false;
     boolean many = false;
@@ -502,7 +588,7 @@ public class Lexer {
       }
       
       // make flags
-      byte nodeflags = 0;
+      byte nodeflags = (byte)xtraFlags;
       if (!esc) {
         if (checkEscChar(c)) {
           if (many) {
@@ -514,12 +600,7 @@ public class Lexer {
             nodeflags |= FLAG_WILD_NOT;
           }
           if (user) {
-            switch (userIx) {
-            case 0: nodeflags |= FLAG_USER0; break;
-            case 1: nodeflags |= FLAG_USER1; break;
-            case 2: nodeflags |= FLAG_USER2; break;
-            case 3: nodeflags |= FLAG_USER3; break;
-            }
+            nodeflags |= (userIx << FLAG_USER_BIT) & (FLAG_USERH | FLAG_USERL);
           }
           
         }
@@ -547,7 +628,7 @@ public class Lexer {
         if (!isLast) {
           // if stuff is following the wildcard, add this directly under parent
           // (case no wildcard match)
-          createSymbol(cur, sym.substring(symix+1), symid);
+          createSymbol(cur, sym.substring(symix+1), symid, xtraFlags);
         }
         // case B
         // add the first single char wildcard match
@@ -558,7 +639,7 @@ public class Lexer {
         addToken(cur, c, nodeid, nodeflags, isLast, symid);
         if (!isLast) {
           // if stuff is following the wildcard, add this directly under parent
-          createSymbol(cur, sym.substring(symix+1), symid);
+          createSymbol(cur, sym.substring(symix+1), symid, xtraFlags);
         }
         return;
       }
@@ -590,7 +671,7 @@ public class Lexer {
     for (nodeix = 0; nodeix < cur.lids.size(); nodeix++) {
       byte id = cur.lids.get(nodeix);
       byte flags = cur.lflags.get(nodeix);
-      if (id == nodeid && (nodeflags & FLAG_MASK) == (flags & FLAG_MASK)) {
+      if (id == nodeid && (nodeflags & FLAG_UNIQUE_PATH_MASK) == (flags & FLAG_UNIQUE_PATH_MASK)) {
         match = true;
         break;
       }
@@ -607,7 +688,6 @@ public class Lexer {
         ByteNodes newChildren = new ByteNodes();
         cur.lchildren.add(newChildren);
         cur.lsymids.add((nodeflags & FLAG_DANGLING) != 0 ? symid : 0);
-        //cur.lsymids.add(symid);
         return newChildren;
       } else {
         // no more symbol stuff, fill with nullmarker and assign symbol id
@@ -630,7 +710,7 @@ public class Lexer {
         return null;
       } else {
         if (cur.lchildren.get(nodeix) instanceof NullNodes) {
-          // current branch has no children, but this symbol keeps on - mark
+          // current branch reached a leaf, but this symbol keeps on - mark
           // dangling
           cur.lflags.set(nodeix,
               (byte) (cur.lflags.get(nodeix) | FLAG_DANGLING));
@@ -677,10 +757,7 @@ public class Lexer {
     id += "" + (char) bn.ids[i];
     if ((bn.flags[i] & (FLAG_WILD_ONE | FLAG_WILD_MANY)) != 0 && bn.ids[i] == CHAR_WILDUSR) {
       int x = bn.flags[i] & 0xf0;
-      if (x == FLAG_USER0) id += "0";
-      if (x == FLAG_USER1) id += "1";
-      if (x == FLAG_USER2) id += "2";
-      if (x == FLAG_USER3) id += "3";
+      id += (char)((int)'0' + (int)((x & (FLAG_USERL | FLAG_USERH) >> FLAG_USER_BIT))); 
     }
     if ((bn.flags[i] & (FLAG_WILD_ONE | FLAG_WILD_MANY)) != 0)
       id += ")";
@@ -690,6 +767,8 @@ public class Lexer {
       post += "?";
     else if ((bn.flags[i] & FLAG_WILD_MANY) != 0)
       post += "*";
+    if ((bn.flags[i] & FLAG_COMP) != 0)
+      post += "C";
     if ((bn.flags[i] & FLAG_DANGLING) != 0)
       post += ":";
     else if (bn.children[i] != null)
@@ -744,12 +823,16 @@ public class Lexer {
       }
     };
     Lexer p = new Lexer(emitter, 256);
+    p.defineCompoundChars("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_");
     p.addSymbol("a*%b", 10);
     p.addSymbol("a1234567b", 11);
+    p.addSymbolCompound("a12345", 22);
     p.compile();
     p.printTree();
-    p.feed("a12345678b a1234567b a12341111118b".getBytes());
+    p.feed((
+        //"a12345678b a1234567b a12341111118b " +
+        "a12345 a123a12345 a12345 a12345"
+        ).getBytes());
     p.flush();
-
   }
 }

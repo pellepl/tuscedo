@@ -2,6 +2,7 @@ package com.pelleplutt.plang;
 
 import java.util.ArrayList;
 import java.util.List;
+import static com.pelleplutt.plang.AST.*;
 
 public abstract class ASTNode {
   int op;
@@ -42,15 +43,36 @@ public abstract class ASTNode {
     return sb.toString();
   }
   
-  public static class ASTNodeExpr extends ASTNode {
-    public ASTNodeExpr(ASTNode... operands) {
-      super(AST.OP_COMP, operands);
+  public String threeAddrOp() {
+    if (op == OP_EQ) return "=";
+    if (op == OP_EQ2) return "==";
+    if (op == OP_GT) return ">";
+    if (op == OP_GE) return ">=";
+    if (op == OP_LT) return "<";
+    if (op == OP_LE) return "<=";
+    if (op == OP_NEQ) return "!=";
+    if (op == OP_AND) return "and";
+    if (op == OP_OR) return "or";
+    if (op == OP_XOR) return "xor";
+    if (op == OP_SHLEFT) return ">>";
+    if (op == OP_SHRIGHT) return "<<";
+    if (op == OP_NOT) return "not";
+    if (op == OP_PLUS) return "+";
+    if (op == OP_MINUS) return "-";
+    if (op == OP_MUL) return "*";
+    if (op == OP_DIV) return "/";
+    return null;
+  }
+  
+  public static class ASTNodeBlok extends ASTNode {
+    public ASTNodeBlok(ASTNode... operands) {
+      super(AST.OP_BLOK, operands);
     }
 
     public String toString() {
       StringBuilder sb = new StringBuilder();
       // operation
-      sb.append("EXPR");
+      sb.append("");
       sb.append('{');
       for (int i = 0; i < operands.size(); i++) {
         sb.append(operands.get(i).toString());
@@ -136,6 +158,10 @@ public abstract class ASTNode {
       super(AST.OP_CALL, operands);
       this.callid = callid;
       name = s;
+    }
+    
+    public void setArguments(List<ASTNode> args) {
+      operands = args;
     }
 
     public String toString() {

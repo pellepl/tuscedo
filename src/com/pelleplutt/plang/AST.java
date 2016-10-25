@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
 
-import com.pelleplutt.plang.ASTNode.ASTNodeExpr;
+import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
 import com.pelleplutt.plang.ASTNode.ASTNodeFuncCall;
 import com.pelleplutt.plang.ASTNode.ASTNodeNumeric;
 import com.pelleplutt.plang.ASTNode.ASTNodeOp;
@@ -19,13 +19,16 @@ public class AST implements Lexer.Emitter {
   final static int OP_COMMENTMULTI = __id++;
   final static int OP_COMMENTLINE  = __id++;
   final static int OP_SPACES       = __id++;
+  
   final static int OP_QUOTE1       = __id++;
   final static int OP_QUOTE2       = __id++;
   final static int OP_BRACEO       = __id++;
+  final static int OP_BRACEC       = __id++;
   final static int OP_BRACKETO     = __id++;
   final static int OP_BRACKETC     = __id++;
   final static int OP_PARENO       = __id++;
   final static int OP_PARENC       = __id++;
+  
   final static int OP_LABEL        = __id++;
   final static int OP_FUNCDEF      = __id++;
   final static int OP_WHILE        = __id++;
@@ -38,6 +41,7 @@ public class AST implements Lexer.Emitter {
   final static int OP_CONTINUE     = __id++;
   final static int OP_RETURN       = __id++;
   final static int OP_GOTO         = __id++;
+  
   final static int OP_EQ           = __id++;
   final static int OP_EQ2          = __id++;
   final static int OP_GT           = __id++;
@@ -56,6 +60,7 @@ public class AST implements Lexer.Emitter {
   final static int OP_SHLEFTEQ     = __id++;
   final static int OP_SHRIGHT      = __id++;
   final static int OP_SHRIGHTEQ    = __id++;
+  final static int OP_NOTEQ        = __id++;
   final static int OP_PLUS         = __id++;
   final static int OP_PLUSEQ       = __id++;
   final static int OP_MINUS        = __id++;
@@ -69,31 +74,45 @@ public class AST implements Lexer.Emitter {
   final static int OP_PLUS2        = __id++;
   final static int OP_MINUS2       = __id++;
   final static int OP_DOT          = __id++;
+  final static int OP_NOT          = __id++;
+  final static int OP_GLOBAL       = __id++;
+  
   final static int OP_SEMI         = __id++;
   final static int OP_COMMA        = __id++;
-  final static int OP_NUMERIC0     = __id++;
+//  final static int OP_NUMERIC0     = __id++;
   final static int OP_NUMERICI     = __id++;
   final static int OP_NUMERICD     = __id++;
   final static int OP_NUMERICH1    = __id++;
   final static int OP_NUMERICH2    = __id++;
+  final static int OP_NUMERICB1    = __id++;
+  final static int OP_NUMERICB2    = __id++;
+  final static int OP_NIL          = __id++;
   final static int OP_SYMBOL       = __id++;
-  final static int OP_BRACEC       = __id++;
+  
+  // non lexeme tokens
   final static int _OP_FINAL       = __id++;
+  final static int OP_ARRAY        = __id++;
+  final static int OP_MINUS_UNARY  = __id++;
+  final static int OP_PLUS_UNARY   = __id++;
   final static int OP_FINALIZER    = -1;
-  final static int OP_COMP         = -2;
+  final static int OP_BLOK         = -2;
   final static int OP_CALL         = -3;
+  //final static int OP_FOR          = -4;
   
   public final static Op[] OPS = {
       new Op("/\\**?\\*/", OP_COMMENTMULTI),
       new Op("//*?\n", OP_COMMENTLINE),
       new Op("*_", OP_SPACES),
+      
       new Op("\"*?\"", OP_QUOTE1),
       new Op("'*?'", OP_QUOTE2),
       new Op("{", OP_BRACEO),
+      new Op("}", OP_BRACEC),
       new Op("[", OP_BRACKETO),
       new Op("]", OP_BRACKETC),
       new Op("(", OP_PARENO),
       new Op(")", OP_PARENC),
+      
       new Op(":", OP_LABEL, 1),
       new Op("func", OP_FUNCDEF, 1),
       new Op("while", OP_WHILE, 2),
@@ -104,9 +123,10 @@ public class AST implements Lexer.Emitter {
       new Op("if", OP_IF, 2),
       new Op("break", OP_BREAK),
       new Op("continue", OP_CONTINUE),
-      new Op("goto", OP_GOTO, 1),
       new Op("return", OP_RETURN, 1),
-      new Op("=", OP_EQ, 2),
+      new Op("goto", OP_GOTO, 1),
+      
+      new Op("=", OP_EQ, 2, Op.LEFT_ASSOCIATIVITY),
       new Op("==", OP_EQ2, 2),
       new Op(">", OP_GT, 2),
       new Op("<", OP_LT, 2),
@@ -124,6 +144,7 @@ public class AST implements Lexer.Emitter {
       new Op("<<=", OP_SHLEFTEQ, 2),
       new Op(">>", OP_SHRIGHT, 2),
       new Op(">>=", OP_SHRIGHTEQ, 2),
+      new Op("~=", OP_NOTEQ, 2),
       new Op("+", OP_PLUS, 2),
       new Op("+=", OP_PLUSEQ, 2),
       new Op("-", OP_MINUS, 2),
@@ -137,16 +158,26 @@ public class AST implements Lexer.Emitter {
       new Op("++", OP_PLUS2, 1), 
       new Op("--", OP_MINUS2, 1),
       new Op(".", OP_DOT, 2),
+      new Op("~", OP_NOT, 1),
+      new Op("global", OP_GLOBAL, 1),
+      
       new Op(";", OP_SEMI),
       new Op(",", OP_COMMA),
-      new Op("0", OP_NUMERIC0),
+//      new Op("ZeRo", OP_NUMERIC0),
       new Op("*%", OP_NUMERICI),
       new Op("*%.*%", OP_NUMERICD),
       new Op("0x*^1", OP_NUMERICH1),
       new Op("0X*^1", OP_NUMERICH2),
+      new Op("0b*^2", OP_NUMERICB1),
+      new Op("0B*^2", OP_NUMERICB2),
+      new Op("nil", OP_NIL),
       new Op("*^0", OP_SYMBOL),
-      new Op("}", OP_BRACEC),
-      new Op("-", _OP_FINAL),
+      
+      new Op("<@>", _OP_FINAL),
+      
+      new Op("arr", OP_ARRAY, 2),
+      new Op("U-", OP_MINUS_UNARY, 1),
+      new Op("U+", OP_PLUS_UNARY, 1),
   };
 
   Stack<ASTNode> exprs = new Stack<ASTNode>();
@@ -159,12 +190,19 @@ public class AST implements Lexer.Emitter {
   public AST() {
     lexer = new Lexer(this, 65536);
     for (int i = 0; i < _OP_FINAL; i++) {
-      lexer.addSymbol(OPS[i].str, OPS[i].id);
+      if (i >= OP_FUNCDEF && i <= OP_GOTO ||
+          i == OP_GLOBAL) {
+        lexer.addSymbolCompound(OPS[i].str, OPS[i].id);
+      } else {
+        lexer.addSymbol(OPS[i].str, OPS[i].id);
+      }
     }
     lexer.compile();
     lexer.defineUserSet("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_", 0);
     lexer.defineUserSet("abcdefABCDEF0123456789", 1);
-    //lexer.printTree();
+    lexer.defineUserSet("01", 2);
+    lexer.defineCompoundChars("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_");
+    lexer.printTree();
   }
   
   public void buildTree(String s) {
@@ -192,27 +230,34 @@ public class AST implements Lexer.Emitter {
 
   @Override
   public void symbol(byte[] symdata, int len, int tokix) {
-    if (dbg) System.out.println("SYMBOL: <" + new String(symdata, 0, len) + "> " + tokix);
-    if (dbg) System.out.println("        >> EX:" + exprs);
-    if (dbg) System.out.println("        >> OP:" + opersString());
+    if (tokix != OP_SPACES) {
+      if (dbg) System.out.println("SYMBOL: <" + new String(symdata, 0, len) + "> " + tokix);
+      if (dbg) System.out.println("        >> EX:" + exprs);
+      if (dbg) System.out.println("        >> OP:" + opersString());
+    }
     
     if (tokix == OP_COMMENTLINE || tokix == OP_COMMENTMULTI) {
       if (dbg) System.out.println(new String(symdata, 0, len));
     } else if (tokix == OP_SPACES) {
-      if (dbg) System.out.println("");
+      //if (dbg) System.out.println("");
+      return;
     } 
     
     else if (tokix == OP_NUMERICD) {
       try {
         onNumber(Double.parseDouble(new String(symdata, 0, len)), true);
       } catch (Throwable t) {t.printStackTrace();}
-    } else if (tokix == OP_NUMERICI || tokix == OP_NUMERIC0) {
+    } else if (tokix == OP_NUMERICI) {
       try {
         onNumber(Integer.parseInt(new String(symdata, 0, len)), false);
       } catch (Throwable t) {t.printStackTrace();}
     } else if (tokix == OP_NUMERICH1 || tokix== OP_NUMERICH2) {
       try {
         onNumber(Integer.parseInt(new String(symdata, 2, len-2), 16), false);
+      } catch (Throwable t) {t.printStackTrace();}
+    } else if (tokix == OP_NUMERICB1 || tokix== OP_NUMERICB2) {
+      try {
+        onNumber(Integer.parseInt(new String(symdata, 2, len-2), 2), false);
       } catch (Throwable t) {t.printStackTrace();}
     } 
     
@@ -225,8 +270,7 @@ public class AST implements Lexer.Emitter {
     }
     
     else if (tokix == OP_LABEL) {
-      onOperator(tokix);
-      onStatemendEnd();
+      onLabel(tokix);
     }
     
     else if (tokix == OP_PARENO) {
@@ -234,6 +278,13 @@ public class AST implements Lexer.Emitter {
     }
     else if (tokix == OP_PARENC) {
       onParenthesisClose(tokix);
+    }
+
+    else if (tokix == OP_BRACKETO) {
+      onBracketOpen(tokix);
+    }
+    else if (tokix == OP_BRACKETC) {
+      onBracketClose(tokix);
     }
 
     else if (tokix == OP_BRACEO) {
@@ -248,6 +299,32 @@ public class AST implements Lexer.Emitter {
     }
     else if (tokix == OP_SEMI) {
       onSemi(tokix);
+    }
+
+    else if (tokix == OP_MINUS) {
+      if (prevTokix == OP_SYMBOL || prevTokix == OP_QUOTE1 || prevTokix == OP_QUOTE2 ||  
+          prevTokix == OP_NUMERICD || prevTokix == OP_NUMERICH1 ||
+          prevTokix == OP_NUMERICH2 || prevTokix == OP_NUMERICI ||
+          prevTokix == OP_NUMERICB1 || prevTokix == OP_NUMERICB2 ||
+          prevTokix == OP_PARENC || prevTokix == OP_BRACKETC) {
+        // binary minus
+        onOperator(tokix);
+      } else {
+        // unary minus
+        onOperator(OP_MINUS_UNARY);
+      }
+    } else if (tokix == OP_PLUS) {
+      if (prevTokix == OP_SYMBOL || prevTokix == OP_QUOTE1 || prevTokix == OP_QUOTE2 ||  
+          prevTokix == OP_NUMERICD || prevTokix == OP_NUMERICH1 ||
+          prevTokix == OP_NUMERICH2 || prevTokix == OP_NUMERICI ||
+          prevTokix == OP_NUMERICB1 || prevTokix == OP_NUMERICB2 ||
+          prevTokix == OP_PARENC || prevTokix == OP_BRACKETC) {
+        // binary plus
+        onOperator(tokix);
+      } else {
+        // unary plus
+        onOperator(OP_PLUS_UNARY);
+      }
     }
 
     else {
@@ -278,19 +355,31 @@ public class AST implements Lexer.Emitter {
     exprs.push(new ASTNodeSymbol(symbol));
   }
   
+  void onLabel(int tokix) {
+    // collapse all before label
+    ASTNode a = exprs.pop();
+    collapseStack(OP_FINALIZER, OP_BRACEO);
+    // collapse label
+    exprs.push(a);
+    onOperator(tokix);
+    collapseStack(OP_FINALIZER, OP_BRACEO);
+  }
+  
   void onParenthesisOpen(int tokix) {
     if (prevTokix == OP_SYMBOL) {
       if (prevPrevTokix == OP_FUNCDEF) {
         // function definition
+        //TODO
       } else {
         // function call
         ASTNodeSymbol funcName = (ASTNodeSymbol)exprs.pop();
+        collapseStack(OP_LABEL); // collapse all keywords, thus the label prio
         int callid = getCallId();
-        ASTNodeFuncCall call = new ASTNodeFuncCall(funcName.symbol, callid);
-        OpCall op = new OpCall(funcName.symbol, callid);
-        opers.push(op);
-        if (dbg) System.out.println("      opush pareno " + opString(tokix) + ", funccall " + call);
-        exprs.push(call);
+        ASTNodeFuncCall callnode = new ASTNodeFuncCall(funcName.symbol, callid);
+        OpCall callop = new OpCall(funcName.symbol, callid);
+        opers.push(callop);
+        if (dbg) System.out.println("      opush pareno " + opString(tokix) + ", funccall " + callnode);
+        exprs.push(callnode);
       }
     } else {
       // simple parenthesis
@@ -300,6 +389,10 @@ public class AST implements Lexer.Emitter {
   }
   
   void onParenthesisClose(int tokix) {
+    if (!opers.isEmpty() && opers.peek().id == OP_PARENO) {
+      // empty paren (), push empty block
+      exprs.push(new ASTNodeBlok());
+    }
     int endedAtTokix = collapseStack(tokix, OP_PARENO, OP_CALL);
     if (endedAtTokix == OP_PARENO) {
       if (dbg) System.out.println("      opop  " + opers.peek());
@@ -311,13 +404,33 @@ public class AST implements Lexer.Emitter {
       while (!exprs.isEmpty()) {
         ASTNode a = exprs.pop();
         if (a instanceof ASTNodeFuncCall && ((ASTNodeFuncCall)a).callid == call.callid) {
-          a.operands = args;
+          ((ASTNodeFuncCall)a).setArguments(args);
           exprs.push(a);
           break;
         } else {
           args.add(0, a);
         }
       }
+    } else {
+      throw new CompilerError("missing left parenthesis");
+    }
+  }
+  
+  void onBracketOpen(int tokix) {
+    if (dbg) System.out.println("      opush bracketo " + opString(tokix));
+    opers.push(OPS[tokix]);
+  }
+  
+  void onBracketClose(int tokix) {
+    int endedAtTokix = collapseStack(OP_FINALIZER, OP_BRACKETO);
+    if (endedAtTokix == OP_BRACKETO) {
+      if (dbg) System.out.println("      opop  " + opers.peek());
+      opers.pop(); // pop off the [
+      ASTNode e2 = exprs.pop();
+      ASTNode e1 = exprs.pop();
+      exprs.push(new ASTNodeOp(OP_ARRAY, e1, e2));
+    } else {
+      throw new CompilerError("missing left bracket");
     }
   }
   
@@ -337,20 +450,35 @@ public class AST implements Lexer.Emitter {
     while (exprs.size() > blckSize) {
       arguments.add(0, exprs.pop());
     }
-    ASTNode result = new ASTNodeExpr(arguments.toArray(new ASTNode[arguments.size()]));
-    if (dbg) System.out.println("      opop  " + opers.peek());
-    opers.pop(); // pop off the {
+    ASTNode result = new ASTNodeBlok(arguments.toArray(new ASTNode[arguments.size()]));
     if (dbg) System.out.println("      epush " + result);
     exprs.push(result);
-    collapseStack(OP_FINALIZER, OP_BRACEO);
+    if (collapseStack(OP_FINALIZER, OP_BRACEO) != OP_BRACEO) {
+      throw new CompilerError("missing left brace");
+    };
+    if (dbg) System.out.println("      opop  " + opers.peek());
+    opers.pop(); // pop off the {
+    if (!opers.isEmpty() && (
+        opers.peek().id == OP_FOR || opers.peek().id == OP_WHILE || opers.peek().id == OP_IF ||
+        opers.peek().id == OP_ELSEIF || opers.peek().id == OP_ELSE)) {
+      collapseStack(opers.peek().id);
+    }
   }
   
   void onComma(int tokix) {
-    collapseStack(tokix, OP_PARENO, OP_CALL, OP_BRACEO);
+    int etokix = collapseStack(OP_FINALIZER, OP_PARENO, OP_CALL, OP_BRACEO);
+    if (etokix != OP_CALL && etokix != OP_BRACEO && etokix != OP_PARENO) {
+      throw new CompilerError("missing delimiter (parenthesis or brace)");
+    }
   }
   
   void onSemi(int tokix) {
-    collapseStack(tokix, OP_PARENO, OP_CALL, OP_BRACEO);
+    // check if empty semi, if so push empty ASTNodeBlok on ex stack
+    if (prevTokix == OP_PARENO || prevTokix == OP_BRACEO || prevTokix == OP_SEMI) {
+      exprs.push(new ASTNodeBlok());
+    } else {
+      collapseStack(tokix, OP_PARENO, OP_CALL, OP_BRACEO);
+    }
   }
   
   void onStatemendEnd() {
@@ -395,6 +523,7 @@ public class AST implements Lexer.Emitter {
     }
     while (!opers.isEmpty()) {
       int topTokix = opers.isEmpty() ? OP_FINALIZER : opers.peek().id;
+      boolean ass = opers.isEmpty() ? Op.RIGHT_ASSOCIATIVITY : opers.peek().associativity;
       if (until) {
         for (int untilTokid : untilTokixs) {
           if (topTokix == untilTokid) {
@@ -403,7 +532,7 @@ public class AST implements Lexer.Emitter {
           }
         }
       } else {
-        if (topTokix < tokix) {
+        if (topTokix < tokix || ass == Op.LEFT_ASSOCIATIVITY && topTokix == tokix) {
           return topTokix;
         } else {
           if (dbg) System.out.print("      " + opString(topTokix) + " < " + opString(tokix));
@@ -442,11 +571,13 @@ public class AST implements Lexer.Emitter {
     return sb.toString();
   }
   
-  String opString(int tokix) {
-    if (tokix >= 0 && tokix < _OP_FINAL) 
-      return OPS[tokix].str;
+  static String opString(int tokix) {
+    if (tokix >= 0/* && tokix < _OP_FINAL*/) 
+      return OPS[tokix].toString();
     else if (tokix == OP_CALL) {
       return "call";
+    } else if (tokix == OP_BLOK) {
+      return "blok";
     } else {
       return Integer.toString(tokix);
     }
@@ -457,7 +588,15 @@ public class AST implements Lexer.Emitter {
   //
   
   static class Op {
-    String str; int id; int operands; 
+    String str; 
+    int id;
+    int operands; 
+    boolean associativity = RIGHT_ASSOCIATIVITY;
+    public static final boolean LEFT_ASSOCIATIVITY = true;
+    public static final boolean RIGHT_ASSOCIATIVITY = false;
+    public Op(String s, int i, int operands, boolean ass) {
+      str=s; id=i; this.operands=operands; this.associativity = ass;
+    }
     public Op(String s, int i, int operands) {
       str=s; id=i; this.operands=operands;
     }
@@ -466,17 +605,23 @@ public class AST implements Lexer.Emitter {
     }
     public String toString() {
       if (id == OP_QUOTE1 || id == OP_QUOTE2) {
-        return "STR";
-      } else if (id == OP_NUMERIC0 || id == OP_NUMERICI) {
-        return "NUMI";
+        return "string";
+      } else if (id == OP_NUMERICI) {
+        return "nint";
       } else if (id == OP_NUMERICD) {
-        return "NUMD";
+        return "ndec";
       } else if (id == OP_NUMERICH1 || id == OP_NUMERICH2) {
-        return "NUMIh";
+        return "ninth";
+      } else if (id == OP_NUMERICB1 || id == OP_NUMERICB2) {
+        return "nintb";
       } else if (id == OP_SYMBOL) {
-        return "SYM";
+        return "symbol";
+      } else if (id == OP_PLUS_UNARY) {
+        return "u+";
+      } else if (id == OP_MINUS_UNARY) {
+        return "u-";
       }
-      return str.replace('\\', ' ');
+      return str.startsWith("\\") ? str.substring(1) : str;
     }
   }
 
@@ -490,163 +635,5 @@ public class AST implements Lexer.Emitter {
       return "<" + super.toString() + ">";
     }
   }
-
-  /*
-   *     // handle opening parenthesis
-    if (tokix == OP_PARENO) {
-      // check if this is a function call
-      // TODO
-//      if (!exprs.isEmpty() && exprs.peek() instanceof ASTNodeSymbol && 
-//          (opers.isEmpty() || opers.peek().id != OP_FUNCDEF)) {
-      if (prevPrevTokix != OP_FUNCDEF && prevTokix == OP_SYMBOL) {
-        ASTNodeSymbol funcName = (ASTNodeSymbol)exprs.pop();
-        ASTNodeFuncCall call = new ASTNodeFuncCall(funcName.symbol);
-        OpCall op = new OpCall(funcName.symbol);
-        opers.push(op);
-        if (dbg) System.out.println("     opush func " + op);
-        exprs.push(call);
-        opers.push(OPS[tokix]);
-      } else
-      {
-        if (dbg) System.out.println("     opush pareno");
-        opers.push(OPS[tokix]);
-      }
-    }
-    // handle opening bracket
-    else if (tokix == OP_BRACKETO) {
-      if (dbg) System.out.println("     opush bracketo");
-      opers.push(OPS[tokix]);
-    }
-    // handle opening brace
-    else if (tokix == OP_BRACEO) {
-      if (dbg) System.out.println("     bpush braceo");
-      opers.push(OPS[tokix]);
-      blcks.push(exprs.size());
-    }
-    // handle closing brace
-    else if (tokix == OP_BRACEC) {
-      // wrap all expressions within starting brace and this brace
-      if (blcks.isEmpty()) {
-        throw new Error("'" + OPS[OP_BRACEC] + "' missing '" + OPS[OP_BRACEO] + "'");
-      }
-      int blckSize = blcks.pop();
-      List<ASTNode> arguments = new ArrayList<ASTNode>();
-      while (exprs.size() > blckSize) {
-        arguments.add(0, exprs.pop());
-      }
-      ASTNode result = new ASTNodeExpr(arguments.toArray(new ASTNode[arguments.size()]));
-      if (dbg) System.out.println("     brkc -> opop the braceo " + opers.peek());
-      opers.pop(); // pop off the {
-      // check if this end brace defines the body of a function
-      if (!exprs.isEmpty() && exprs.peek() instanceof ASTNodeFuncDef) {
-        ASTNodeFuncDef f = (ASTNodeFuncDef)exprs.peek();
-        f.operands.add(result);
-      } else {
-        if (dbg) System.out.println("   epush " + result);
-        exprs.push(result);
-      }
-      onOperator(_OP_FINALIZER);
-    }
-    // handle all other operators
-    else {
-      // check if stack is to be collapsed
-      while (!opers.isEmpty()) {
-        boolean popBrack = (tokix == OP_BRACKETC && opers.peek().id != OP_BRACKETO);
-        boolean popParen = (tokix == OP_PARENC && opers.peek().id != OP_PARENO);
-        boolean popPrio = (opers.peek().id >= tokix);
-        if (!popBrack && !popParen && !popPrio) {
-          break;
-        }
-        
-        if (tokix >= 0) {
-          if (popParen) if (dbg) System.out.print("     pare [");
-          if (popPrio)  if (dbg) System.out.print("     prio [");
-          if (dbg) System.out.print(opers.peek() + 
-              " >= " + OPS[tokix] + "], opop " + opers.peek() + ", ");
-        }
-        if (tokix == _OP_FINALIZER && 
-            (opers.peek().id == OP_BRACEO || 
-             opers.peek().id == OP_BRACKETO || 
-             opers.peek().id == OP_PARENO)) {
-          break;
-        }
-        
-        Op operator = opers.pop();
-        List<ASTNode> arguments = new ArrayList<ASTNode>(operator.operands);
-        for (int i = 0; i < operator.operands; i++) {
-          if (exprs.isEmpty()) {
-            throw new CompilerError("'" + operator + "' missing operators, got " + i + " of " + operator.operands);
-          }
-          ASTNode e = exprs.pop();
-          if (operator.id == OP_FOR && e.op == OP_IN) {
-            // for / in, skip one arg
-            i++;
-          }
-          arguments.add(0, e);
-        }
-        ASTNode result = new ASTNodeOp(operator.id, arguments.toArray(new ASTNode[arguments.size()]));
-        if (dbg) System.out.println("   epush " + result);
-        exprs.push(result);
-      }
-      if (tokix == _OP_FINALIZER) {
-        ASTNodeExpr e = new ASTNodeExpr();
-        while (!exprs.isEmpty() && !(exprs.peek() instanceof ASTNodeExpr)) {
-          e.operands.add(exprs.pop());
-        }
-        exprs.push(e);
-      }
-      
-      // handle closing parenthesis
-      if (tokix == OP_PARENC) {
-        if (dbg) System.out.println("     parc -> opop the pareno " + opers.peek());
-        opers.pop(); // pop off the (
-        // check if this is the end of argument definition in a funcdef
-        if (!opers.isEmpty() && opers.peek().id == OP_FUNCDEF) {
-          opers.pop(); // pop off the func
-          List<ASTNode> arguments = new ArrayList<ASTNode>();
-          while (!exprs.isEmpty() && (exprs.peek() instanceof ASTNodeSymbol)) {
-            arguments.add(0, exprs.pop());
-          }
-          if (arguments.isEmpty()) {
-            throw new Error("Expected function name");
-          }
-          ASTNode funcName = arguments.remove(0);
-          if (!(funcName instanceof ASTNodeSymbol)) {
-            throw new Error("Expected function name");
-          }
-          ASTNode result = new ASTNodeFuncDef(((ASTNodeSymbol)funcName).symbol);
-          result.operands = arguments;
-          exprs.push(result);
-        }
-        // check if this is the end of argument definition in a funccall
-        // TODO 
-//        else if (!opers.isEmpty() && opers.peek().id == OP_CALL) {
-//          opers.pop(); // pop off the func
-//          List<ASTNode> arguments = new ArrayList<ASTNode>();
-//          while (!exprs.isEmpty() && !(exprs.peek() instanceof ASTNodeFuncCall)) {
-//            arguments.add(0, exprs.pop());
-//          }
-//          if (arguments.isEmpty()) {
-//            throw new CompilerError("Expected function call");
-//          }
-//          ASTNode funcCall = exprs.isEmpty() ? null : exprs.peek();
-//          if (!(funcCall instanceof ASTNodeFuncCall)) {
-//            throw new CompilerError("Expected function call");
-//          }
-//          funcCall.operands = arguments;
-//        }
-      } 
-      // handle closing bracket
-      else if (tokix == OP_BRACKETC) {
-        if (dbg) System.out.println("     brkc -> opop the bracko " + opers.peek());
-        opers.pop(); // pop off the [
-      } 
-      // handle non finalizer
-      else if (tokix != _OP_FINALIZER) {
-        if (dbg) System.out.println("     opush " + OPS[tokix]);
-        opers.push(OPS[tokix]);
-      }
-    }
-*/
 }
 
