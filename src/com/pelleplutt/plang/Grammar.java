@@ -1,7 +1,6 @@
 package com.pelleplutt.plang;
 
 import java.io.BufferedReader;
-
 import java.io.IOException;
 import java.io.StringReader;
 import java.lang.reflect.Field;
@@ -9,7 +8,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import static com.pelleplutt.plang.AST.*;
+
+import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
 
 public class Grammar {
   static final String GRAMMAR_DEF =
@@ -38,7 +38,6 @@ public class Grammar {
           "call:          OP_CALL\n" +
           "blok:          OP_BLOK\n" + 
           "if:            OP_IF\n" +
-          "elseif:        OP_ELSEIF\n" +
           "else:          OP_ELSE\n" +
           "goto:          OP_GOTO\n" +
           "for:           OP_FOR\n" +
@@ -47,7 +46,7 @@ public class Grammar {
           "label:         OP_LABEL\n" +
           "global:        OP_GLOBAL\n" +
           
-          "cond:          if elseif else\n" +
+          "cond:          if else\n" +
           "expr:          expr_op_bin expr_op_una\n" +
           "num:           numi numd numih numib\n" +
           "val:           num sym call expr dot array\n" +
@@ -66,7 +65,7 @@ public class Grammar {
           "assign_op_add: sym , str\n" +
           "range:         val | range , val\n" +
           "global:        sym\n" +
-          "rel_op:        val , val\n" +
+          "rel_op:        val | assign , val | assign\n" +
           "expr_op_add:   str | val , str | val\n" +
           "expr_op_bin:   val , val\n" +
           "expr_op_una:   val\n" +
@@ -77,8 +76,9 @@ public class Grammar {
           "blok:          code*\n" +
           "for:           stat | sym , rel_op , stat , code\n" +
           "for:           sym , in , code\n" +
+          "while:         rel_op , code\n" +
           "if:            rel_op , code\n" + 
-          "elseif:        rel_op , code\n" + 
+          "if:            rel_op , code , else\n" + 
           "else:          code\n" + 
   "";
       
@@ -89,6 +89,7 @@ public class Grammar {
   // For each rule, there is a list of OperandAccepts. Each entry in the list denotes list of possible
   // operators for given operand index == list index.
   Map<Integer, List<Rule>> ruleMap = new HashMap<Integer, List<Rule>>();
+  boolean dbg = false;
   
   void build() throws IOException {
     // read all definitions
@@ -246,10 +247,10 @@ public class Grammar {
     }
     
     // run thru all rules and see if everything matches
-    //System.out.println("CHEK: " + e);
+    if (dbg) System.out.println("CHEK: " + e);
     boolean ruleMatch = false;
     for (Rule rule : rules) {
-      //System.out.println("  RULE: " + rule);
+      if (dbg) System.out.println("  RULE: " + rule);
       int nodeOpIx = 0;
       int ruleOpIx = 0;
       int nodeOpLen = e.operands.size();
@@ -267,7 +268,7 @@ public class Grammar {
           if (oa.zeroOrMany) {
             ruleOpIx++;
           } else {
-            //System.out.println("  FAIL @ " + opNode);
+            if (dbg) System.out.println("  FAIL @ " + opNode);
             break; // rule fail
           }
         }
@@ -277,12 +278,15 @@ public class Grammar {
           (ruleOpIx == ruleOpLen || 
             (ruleOpIx == ruleOpLen - 1 && rule.approvedOpSequence.get(ruleOpIx).zeroOrMany)
           ));
-      if (ruleMatch) break;
+      if (ruleMatch) 
+        break;
+      else 
+        if (dbg) System.out.println("  FAIL ops:" + nodeOpIx + " opLen:" + nodeOpLen + " ruleOps:" + ruleOpIx + " ruleLen:" + ruleOpLen);
     } // per rule
     if (!ruleMatch) {
       throw new CompilerError("Bad operands for " + e);
     } else {
-      //System.out.println("  PASS");
+      if (dbg) System.out.println("  PASS");
     }
   }
   
@@ -295,11 +299,11 @@ public class Grammar {
     }
   }
   
-  public static void check(List<ASTNode> exprs) {
+  public static void check(ASTNodeBlok e) {
     Grammar g = new Grammar();
     try {
       g.build();
-      g.checkTree(exprs);
+      g.checkNode(e);
     } catch (IOException ioe) {}
   }
   

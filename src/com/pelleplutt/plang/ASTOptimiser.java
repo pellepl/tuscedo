@@ -1,20 +1,16 @@
 package com.pelleplutt.plang;
 
-import java.util.List;
-
+import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
 import com.pelleplutt.plang.ASTNode.ASTNodeNumeric;
 import com.pelleplutt.plang.ASTNode.ASTNodeOp;
 import com.pelleplutt.plang.ASTNode.ASTNodeSymbol;
 
 public class ASTOptimiser {
-  public static void optimise(List<ASTNode> exprs) {
+  public static void optimise(ASTNodeBlok a) {
     // optimise constants
-    for (ASTNode a : exprs) {
-      constFolding(a, null);
-    }
-    for (ASTNode a : exprs) {
-      optimiseDeadCode(a);
-    }
+    System.out.println("  * constant folding");
+    constFolding(a, null);
+    optimiseDeadCode(a);
   }
   
   public static void constFolding(ASTNode a, ASTNode parent) {
@@ -208,65 +204,66 @@ public class ASTOptimiser {
   static final int S_IFALWAYS = 2;
   
   public static void optimiseDeadCode(ASTNode parent) {
-    if (parent.operands == null) return;
-  
-    int prevState = S_NONE;
-    for (int i = 0; i < parent.operands.size(); i++) {
-      ASTNode a = parent.operands.get(i);
-      if (a.op == AST.OP_IF) {
-        ASTNode branch = a.operands.get(0);
-        if (branch instanceof ASTNodeNumeric) {
-          if (((ASTNodeNumeric)branch).value != 0) {
-            int ix = parent.operands.indexOf(a);
-            parent.operands.set(ix, a.operands.get(1));
-            prevState = S_IFALWAYS;
-          } else {
-            parent.operands.remove(a);
-            i--;
-            prevState = S_IFNEVER;
-          }
-        }
-      }
-      else if (a.op == AST.OP_ELSEIF) {
-        if (prevState == S_IFNEVER) {
-          a.op = AST.OP_IF;
-          prevState = S_NONE;
-        } else if (prevState == S_IFALWAYS) {
-          parent.operands.remove(a);
-          i--;
-          prevState = S_NONE;
-          continue;
-        }
-        ASTNode branch = a.operands.get(0);
-        if (branch instanceof ASTNodeNumeric) {
-          if (((ASTNodeNumeric)branch).value != 0) {
-            int ix = parent.operands.indexOf(a);
-            parent.operands.set(ix, a.operands.get(1));
-            prevState = S_IFALWAYS;
-          } else {
-            parent.operands.remove(a);
-            i--;
-            prevState = S_IFNEVER;
-          }
-        }
-      }
-      else if (a.op == AST.OP_ELSE) {
-        if (prevState == S_IFNEVER) {
-          int ix = parent.operands.indexOf(a);
-          parent.operands.set(ix, a.operands.get(0));
-        } else if (prevState == S_IFALWAYS) {
-          parent.operands.remove(a);
-          i--;
-        }
-        prevState = S_NONE;
-      } 
-      else {
-        prevState = S_NONE;
-      }
-    }
-    for (ASTNode a : parent.operands) {
-      optimiseDeadCode(a);
-    }
+// TODO if/else redefined fix
+//    if (parent.operands == null) return;
+//  
+//    int prevState = S_NONE;
+//    for (int i = 0; i < parent.operands.size(); i++) {
+//      ASTNode a = parent.operands.get(i);
+//      if (a.op == AST.OP_IF) {
+//        ASTNode branch = a.operands.get(0);
+//        if (branch instanceof ASTNodeNumeric) {
+//          if (((ASTNodeNumeric)branch).value != 0) {
+//            int ix = parent.operands.indexOf(a);
+//            parent.operands.set(ix, a.operands.get(1));
+//            prevState = S_IFALWAYS;
+//          } else {
+//            parent.operands.remove(a);
+//            i--;
+//            prevState = S_IFNEVER;
+//          }
+//        }
+//      }
+//      else if (a.op == AST.OP_ELSEIF) {
+//        if (prevState == S_IFNEVER) {
+//          a.op = AST.OP_IF;
+//          prevState = S_NONE;
+//        } else if (prevState == S_IFALWAYS) {
+//          parent.operands.remove(a);
+//          i--;
+//          prevState = S_NONE;
+//          continue;
+//        }
+//        ASTNode branch = a.operands.get(0);
+//        if (branch instanceof ASTNodeNumeric) {
+//          if (((ASTNodeNumeric)branch).value != 0) {
+//            int ix = parent.operands.indexOf(a);
+//            parent.operands.set(ix, a.operands.get(1));
+//            prevState = S_IFALWAYS;
+//          } else {
+//            parent.operands.remove(a);
+//            i--;
+//            prevState = S_IFNEVER;
+//          }
+//        }
+//      }
+//      else if (a.op == AST.OP_ELSE) {
+//        if (prevState == S_IFNEVER) {
+//          int ix = parent.operands.indexOf(a);
+//          parent.operands.set(ix, a.operands.get(0));
+//        } else if (prevState == S_IFALWAYS) {
+//          parent.operands.remove(a);
+//          i--;
+//        }
+//        prevState = S_NONE;
+//      } 
+//      else {
+//        prevState = S_NONE;
+//      }
+//    }
+//    for (ASTNode a : parent.operands) {
+//      optimiseDeadCode(a);
+//    }
   }
   
 

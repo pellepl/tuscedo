@@ -1,5 +1,34 @@
 package com.pelleplutt.plang;
 
+import static com.pelleplutt.plang.AST.OP_AND;
+import static com.pelleplutt.plang.AST.OP_ANDEQ;
+import static com.pelleplutt.plang.AST.OP_DIV;
+import static com.pelleplutt.plang.AST.OP_DIVEQ;
+import static com.pelleplutt.plang.AST.OP_EQ2;
+import static com.pelleplutt.plang.AST.OP_GE;
+import static com.pelleplutt.plang.AST.OP_GT;
+import static com.pelleplutt.plang.AST.OP_LE;
+import static com.pelleplutt.plang.AST.OP_LT;
+import static com.pelleplutt.plang.AST.OP_MINUS;
+import static com.pelleplutt.plang.AST.OP_MINUSEQ;
+import static com.pelleplutt.plang.AST.OP_MOD;
+import static com.pelleplutt.plang.AST.OP_MODEQ;
+import static com.pelleplutt.plang.AST.OP_MUL;
+import static com.pelleplutt.plang.AST.OP_MULEQ;
+import static com.pelleplutt.plang.AST.OP_NEQ;
+import static com.pelleplutt.plang.AST.OP_NOT;
+import static com.pelleplutt.plang.AST.OP_NOTEQ;
+import static com.pelleplutt.plang.AST.OP_OR;
+import static com.pelleplutt.plang.AST.OP_OREQ;
+import static com.pelleplutt.plang.AST.OP_PLUS;
+import static com.pelleplutt.plang.AST.OP_PLUSEQ;
+import static com.pelleplutt.plang.AST.OP_SHLEFT;
+import static com.pelleplutt.plang.AST.OP_SHLEFTEQ;
+import static com.pelleplutt.plang.AST.OP_SHRIGHT;
+import static com.pelleplutt.plang.AST.OP_SHRIGHTEQ;
+import static com.pelleplutt.plang.AST.OP_XOR;
+import static com.pelleplutt.plang.AST.OP_XOREQ;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
@@ -14,7 +43,7 @@ import com.pelleplutt.tuscedo.Lexer;
 
 public class AST implements Lexer.Emitter {
   Lexer lexer;
-  boolean dbg = true;
+  boolean dbg = false;
   static int __id = 0;
   final static int OP_COMMENTMULTI = __id++;
   final static int OP_COMMENTLINE  = __id++;
@@ -35,7 +64,6 @@ public class AST implements Lexer.Emitter {
   final static int OP_IN           = __id++;
   final static int OP_FOR          = __id++;
   final static int OP_ELSE         = __id++;
-  final static int OP_ELSEIF       = __id++;
   final static int OP_IF           = __id++;
   final static int OP_BREAK        = __id++;
   final static int OP_CONTINUE     = __id++;
@@ -97,7 +125,7 @@ public class AST implements Lexer.Emitter {
   final static int OP_FINALIZER    = -1;
   final static int OP_BLOK         = -2;
   final static int OP_CALL         = -3;
-  //final static int OP_FOR          = -4;
+  final static int OP_RANGE        = -4;
   
   public final static Op[] OPS = {
       new Op("/\\**?\\*/", OP_COMMENTMULTI),
@@ -119,8 +147,7 @@ public class AST implements Lexer.Emitter {
       new Op("in", OP_IN, 1),
       new Op("for", OP_FOR, 4),
       new Op("else", OP_ELSE, 1),
-      new Op("elseif", OP_ELSEIF, 2),
-      new Op("if", OP_IF, 2),
+      new Op("if", OP_IF, 2), //, Op.LEFT_ASSOCIATIVITY),
       new Op("break", OP_BREAK),
       new Op("continue", OP_CONTINUE),
       new Op("return", OP_RETURN, 1),
@@ -202,10 +229,9 @@ public class AST implements Lexer.Emitter {
     lexer.defineUserSet("abcdefABCDEF0123456789", 1);
     lexer.defineUserSet("01", 2);
     lexer.defineCompoundChars("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_");
-    lexer.printTree();
   }
   
-  public void buildTree(String s) {
+  public ASTNodeBlok buildTree(String s) {
     callid = 0;
     byte tst[] = s.getBytes();
     for (byte b : tst) {
@@ -213,6 +239,9 @@ public class AST implements Lexer.Emitter {
     }
     lexer.flush();
     onOperator(OP_FINALIZER);
+    ASTNodeBlok e = new ASTNodeBlok();
+    e.operands = exprs;
+    return e;
   }
   
   int getCallId() {
@@ -373,7 +402,8 @@ public class AST implements Lexer.Emitter {
       } else {
         // function call
         ASTNodeSymbol funcName = (ASTNodeSymbol)exprs.pop();
-        collapseStack(OP_LABEL); // collapse all keywords, thus the label prio
+//        if (dbg) System.out.println("      collapse all keywords (until :)");
+//        collapseStack(OP_LABEL); // collapse all keywords, thus the label prio
         int callid = getCallId();
         ASTNodeFuncCall callnode = new ASTNodeFuncCall(funcName.symbol, callid);
         OpCall callop = new OpCall(funcName.symbol, callid);
@@ -460,7 +490,7 @@ public class AST implements Lexer.Emitter {
     opers.pop(); // pop off the {
     if (!opers.isEmpty() && (
         opers.peek().id == OP_FOR || opers.peek().id == OP_WHILE || opers.peek().id == OP_IF ||
-        opers.peek().id == OP_ELSEIF || opers.peek().id == OP_ELSE)) {
+        opers.peek().id == OP_ELSE)) {
       collapseStack(opers.peek().id);
     }
   }
@@ -489,7 +519,8 @@ public class AST implements Lexer.Emitter {
     if (tokix == OP_FINALIZER) {
       if (dbg) System.out.println("   hndle tok finalizer");
     } else {
-      if (dbg) System.out.println("   hndle tok " + OPS[tokix]);
+      if (dbg) System.out.println("   hndle tok '" + OPS[tokix] + 
+          "' ass:" + (OPS[tokix].associativity == Op.LEFT_ASSOCIATIVITY ? "L" : "R"));
     }
     
     do {
@@ -523,7 +554,7 @@ public class AST implements Lexer.Emitter {
     }
     while (!opers.isEmpty()) {
       int topTokix = opers.isEmpty() ? OP_FINALIZER : opers.peek().id;
-      boolean ass = opers.isEmpty() ? Op.RIGHT_ASSOCIATIVITY : opers.peek().associativity;
+      boolean ass = opers.peek().associativity;
       if (until) {
         for (int untilTokid : untilTokixs) {
           if (topTokix == untilTokid) {
@@ -532,10 +563,12 @@ public class AST implements Lexer.Emitter {
           }
         }
       } else {
-        if (topTokix < tokix || ass == Op.LEFT_ASSOCIATIVITY && topTokix == tokix) {
+        if (topTokix < tokix || 
+            ass == Op.LEFT_ASSOCIATIVITY && topTokix == tokix) {
           return topTokix;
         } else {
-          if (dbg) System.out.print("      " + opString(topTokix) + " < " + opString(tokix));
+          if (dbg) System.out.print("      " + opString(topTokix) + " precedes " + opString(tokix) + " (ass:" +
+            (ass == Op.LEFT_ASSOCIATIVITY ? "L)" : "R)"));
         }
       }
 
@@ -543,7 +576,7 @@ public class AST implements Lexer.Emitter {
       List<ASTNode> arguments = new ArrayList<ASTNode>(operator.operands);
       for (int i = 0; i < operator.operands; i++) {
         if (exprs.isEmpty()) {
-          throw new CompilerError("'" + operator + "' missing operators, got " + i + " of " + operator.operands);
+          throw new CompilerError("'" + operator + "' missing operators, got " + i + ", but expected " + operator.operands);
         }
         ASTNode e = exprs.pop();
         if (operator.id == OP_FOR && e.op == OP_IN) {
@@ -553,8 +586,27 @@ public class AST implements Lexer.Emitter {
         arguments.add(0, e);
       }
       ASTNode result = new ASTNodeOp(operator.id, arguments.toArray(new ASTNode[arguments.size()]));
-      if (dbg) System.out.println("      epush " + result + " collapse");
-      exprs.push(result);
+      if (result.op == OP_ELSE) {
+        // handle else speically, look for preceding if and enter the 
+        // else op as the if's third operand
+        if (dbg) System.out.println("      epush " + result + " collapse, else");
+        if (exprs.isEmpty() || exprs.peek().op != OP_IF) {
+          throw new CompilerError("else without if", result);
+        }
+        ASTNodeOp ifop = (ASTNodeOp)exprs.peek();
+        while (ifop.operands.size() == 3) {
+          ASTNodeOp elseop = (ASTNodeOp)ifop.operands.get(2);
+          if (elseop.operands.get(0).op == OP_IF) {
+            ifop = (ASTNodeOp)elseop.operands.get(0);
+          } else {
+            throw new CompilerError("else on else, expected else if", elseop);
+          }
+        }
+        ifop.operands.add(result);
+      } else {
+        if (dbg) System.out.println("      epush " + result + " collapse");
+        exprs.push(result);
+      }
     }
     return OP_FINALIZER;
   }
@@ -583,6 +635,45 @@ public class AST implements Lexer.Emitter {
     }
   }
   
+  static boolean isOperator(int op) {
+    return isConditionalOperator(op) ||
+        isLogicalOperator(op) ||
+        isAdditiveOperator(op) ||
+        isMultiplicativeOperator(op);
+  }
+  
+  static boolean isAssignOperator(int op) {
+    return op == OP_ANDEQ || op == OP_NOTEQ || op == OP_OREQ ||
+        op == OP_SHLEFTEQ || op == OP_SHRIGHTEQ || op == OP_XOREQ ||
+        op == OP_MINUSEQ || op == OP_PLUSEQ || op == OP_DIVEQ ||
+        op == OP_MODEQ || op == OP_MULEQ;
+  }
+  
+  static boolean isUnaryOperator(int op) {
+    return op == OP_NOT || op == OP_MINUS_UNARY || op == OP_PLUS_UNARY ||
+        op == OP_PLUS2 || op == OP_MINUS2;
+  }
+  
+  static boolean isConditionalOperator(int op) {
+    return op == OP_EQ2 ||
+        op == OP_GE || op == OP_GT || op == OP_LE || op == OP_LT || op == OP_NEQ;
+ 
+  }
+  
+  static boolean isLogicalOperator(int op) {
+    return op == OP_AND || op == OP_ANDEQ || op == OP_NOT || op == OP_NOTEQ || 
+        op == OP_OR || op == OP_OREQ || op == OP_SHLEFT || op == OP_SHLEFTEQ || 
+        op == OP_SHRIGHT || op == OP_SHRIGHTEQ || op == OP_XOR || op == OP_XOREQ;
+  }
+  
+  static boolean isAdditiveOperator(int op) {
+    return op == OP_MINUS || op == OP_MINUSEQ || op == OP_PLUS || op == OP_PLUSEQ ||
+        op == OP_MINUS_UNARY || op == OP_PLUS_UNARY || op == OP_PLUS2 || op == OP_MINUS2;
+  }
+  
+  static boolean isMultiplicativeOperator(int op) {
+    return op == OP_DIV || op == OP_DIVEQ || op == OP_MOD || op == OP_MODEQ || op == OP_MUL || op == OP_MULEQ; 
+  }
   /////////////////////////////////////////////////////////////////////////////
   // Operator nodes
   //

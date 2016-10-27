@@ -2,6 +2,8 @@ package com.pelleplutt.plang;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+
 import static com.pelleplutt.plang.AST.*;
 
 public abstract class ASTNode {
@@ -19,7 +21,7 @@ public abstract class ASTNode {
       this.operands.add(n);
     }
   }
-
+  
   public String toString() {
     StringBuilder sb = new StringBuilder();
     if (operands != null) {
@@ -65,8 +67,31 @@ public abstract class ASTNode {
   }
   
   public static class ASTNodeBlok extends ASTNode {
+    Map<String, ASTNode> symMap;
+    String id;
+    String module;
+    ASTNodeBlok parent;
+    int type;
+    static final int MAIN = 0;
+    static final int FUNC = 1;
+    static final int ANON = 2;
     public ASTNodeBlok(ASTNode... operands) {
       super(AST.OP_BLOK, operands);
+    }
+    public void setAnnotation(Map<String, ASTNode> symMap, String id, String module, int type) {
+      this.symMap = symMap;
+      this.id = id;
+      this.module = module;
+      this.type = type;
+    }
+    public Map<String, ASTNode> getVariables() {
+      return this.symMap;
+    }
+    public String getModule() {
+      return this.module;
+    }
+    public String getId() {
+      return this.id;
     }
 
     public String toString() {
@@ -87,12 +112,6 @@ public abstract class ASTNode {
   public static class ASTNodeOp extends ASTNode {
     public ASTNodeOp(int op, ASTNode... operands) {
       super(op, operands);
-    }
-  }
-
-  public static class ASTNodeDelim extends ASTNode {
-    public ASTNodeDelim(int op) {
-      super(op);
     }
   }
 
@@ -190,6 +209,27 @@ public abstract class ASTNode {
       return "\"" + string + "\"";
     }
   }
-
+  
+  public static class ASTNodeRange extends ASTNode {
+    public ASTNodeRange(ASTNode from, ASTNode step, ASTNode to) {
+      super(OP_RANGE, from, step, to);
+    }
+    public ASTNodeRange(ASTNode from, ASTNode to) {
+      super(OP_RANGE, from, to);
+    }
+    public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("range<");
+      if (operands.size() == 2) {
+        sb.append(operands.get(0));
+        sb.append(".." + operands.get(1));
+      } else {
+        sb.append(operands.get(0));
+        sb.append(".." + operands.get(1));
+        sb.append(".." + operands.get(2));
+      }
+      sb.append('>');
+      return sb.toString();
+    }
+  }
 }
-
