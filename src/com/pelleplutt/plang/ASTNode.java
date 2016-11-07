@@ -67,31 +67,43 @@ public abstract class ASTNode {
   }
   
   public static class ASTNodeBlok extends ASTNode {
-    Map<String, ASTNode> symMap;
+    Map<String, ASTNodeSymbol> symMap;
+    int scopeLevel;
     String id;
     String module;
     ASTNodeBlok parent;
     int type;
+    boolean variablesHandled;
     static final int MAIN = 0;
     static final int FUNC = 1;
     static final int ANON = 2;
     public ASTNodeBlok(ASTNode... operands) {
       super(AST.OP_BLOK, operands);
     }
-    public void setAnnotation(Map<String, ASTNode> symMap, String id, String module, int type) {
+    public void setAnnotation(Map<String, ASTNodeSymbol> symMap, int scopeLevel, String id, String module, int type) {
       this.symMap = symMap;
+      this.scopeLevel = scopeLevel;
       this.id = id;
       this.module = module;
       this.type = type;
     }
-    public Map<String, ASTNode> getVariables() {
+    public Map<String, ASTNodeSymbol> getVariables() {
       return this.symMap;
     }
     public String getModule() {
       return this.module;
     }
-    public String getId() {
+    public int getScopeLevel(){
+      return scopeLevel;
+    }
+    public String getScopeId() {
       return this.id;
+    }
+    public boolean gotUnhandledVariables() {
+      return !variablesHandled && !symMap.isEmpty();
+    }
+    public void setVariablesHandled() {
+      variablesHandled = true;
     }
 
     public String toString() {

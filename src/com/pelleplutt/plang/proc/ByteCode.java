@@ -1,4 +1,4 @@
-package com.pelleplutt.plang;
+package com.pelleplutt.plang.proc;
 
 public interface ByteCode {
   static final int ICOND_AL = 0x0;
@@ -26,22 +26,44 @@ public interface ByteCode {
   static final int INOT  = 0x0d;
   static final int INEG  = 0x0e;
 
-  static final int IADI  = 0x11; // add immediate // xx+1
-  static final int ISUI  = 0x12; // sub immediate // xx+1
-  static final int IPUI  = 0x13; // push immediate // xx
+  static final int IADI  = 0x11; // add immediate                 push(pop() + xx+1)
+  static final int ISUI  = 0x12; // sub immediate                 push(pop() - (xx+1))
+  static final int IPUI  = 0x13; // push signed immediate         push(xx)
   
   static final int IPOP  = 0x20; 
   static final int IDUP  = 0x21; 
   static final int IROT  = 0x22;
-  static final int ICPY  = 0x23; // copy stack entry to top //xx + 1
-  static final int ISTR  = 0x24; // pop to memory
-  static final int ISTI  = 0x25; // pop to memory immediate //xxxxxx
-  static final int ILD   = 0x26; // push from memory
-  static final int ILDI  = 0x27; // push from memory immediate //xxxxxx
+  static final int ICPY  = 0x23; // copy stack entry to top       push(sp[xx+1])
+  static final int ISTR  = 0x24; // pop to memory                 mem[pop()]=pop()
+  static final int ISTI  = 0x25; // pop to memory immediate       mem[xxxxxx]=pop()
+  static final int ILD   = 0x26; // push from memory              push(mem[pop])
+  static final int ILDI  = 0x27; // push from memory immediate    push(mem[xxxxxx])
+  static final int ISTF  = 0x28; // store to stack rel fp         fp[xx]=pop()
+  static final int ILDF  = 0x29; // load from stack rel fp        push(fp[xx])
+  static final int ISTFL = 0x2a; // store to stack rel fp long    fp[xxxxxx]=pop()
+  static final int ILDFL = 0x2b; // load from stack rel fp long   push(fp[xxxxxx])
 
-  static final int IALL  = 0x28; // allocate on stack //xx+1
-  static final int IFRE  = 0x29; // deallocate from stack //xx+1
+  static final int IALL  = 0x2c; // allocate on stack             $sp += xx+1
+  static final int IFRE  = 0x2d; // deallocate from stack         $sp -= xx+1
 
+  static final int IADQ1 = 0x30; // add quick                     push(pop() + 1)
+  static final int IADQ2 = 0x31; // add quick                     push(pop() + 2)
+  static final int IADQ3 = 0x32; // add quick                     push(pop() + 3)
+  static final int IADQ4 = 0x33; // add quick                     push(pop() + 4)
+  static final int IADQ5 = 0x34; // add quick                     push(pop() + 5)
+  static final int IADQ6 = 0x35; // add quick                     push(pop() + 6)
+  static final int IADQ7 = 0x36; // add quick                     push(pop() + 7)
+  static final int IADQ8 = 0x37; // add quick                     push(pop() + 8)
+  static final int ISUQ1 = 0x38; // sub quick                     push(pop() - 1)
+  static final int ISUQ2 = 0x39; // sub quick                     push(pop() - 2)
+  static final int ISUQ3 = 0x3a; // sub quick                     push(pop() - 3)
+  static final int ISUQ4 = 0x3b; // sub quick                     push(pop() - 4)
+  static final int ISUQ5 = 0x3c; // sub quick                     push(pop() - 5)
+  static final int ISUQ6 = 0x3d; // sub quick                     push(pop() - 6)
+  static final int ISUQ7 = 0x3e; // sub quick                     push(pop() - 7)
+  static final int ISUQ8 = 0x3f; // sub quick                     push(pop() - 8)
+
+  
   static final int ICAL  = 0xe0; 
   static final int IRET  = 0xe8; 
   static final int IJMP  = 0xf0; 
@@ -58,6 +80,28 @@ public interface ByteCode {
   static final int IBRAGE  = 0xfc; 
   static final int IBRALT  = 0xfd; 
   static final int IBRALE  = 0xfe; 
+  
+  
+  static final int UD = -1;  
+  static final int ISIZE[] = {
+      //0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,UD, //00
+       UD, 2, 2, 2,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //10
+        1, 1, 1, 2, 1, 4, 1, 4, 2, 2, 4, 4, 2, 2,UD,UD, //20
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, //30
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //40
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //50
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //60
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //70
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //80
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //90
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //a0
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //b0
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //c0
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //d0
+        4,UD,UD,UD,UD,UD,UD,UD, 1,UD,UD,UD,UD,UD,UD,UD, //e0
+        4, 4, 4, 4, 4, 4, 4,UD, 4, 4, 4, 4, 4, 4, 4,UD, //f0
+ };
   
   
   /*

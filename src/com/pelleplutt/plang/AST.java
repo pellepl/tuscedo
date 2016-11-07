@@ -1,34 +1,5 @@
 package com.pelleplutt.plang;
 
-import static com.pelleplutt.plang.AST.OP_AND;
-import static com.pelleplutt.plang.AST.OP_ANDEQ;
-import static com.pelleplutt.plang.AST.OP_DIV;
-import static com.pelleplutt.plang.AST.OP_DIVEQ;
-import static com.pelleplutt.plang.AST.OP_EQ2;
-import static com.pelleplutt.plang.AST.OP_GE;
-import static com.pelleplutt.plang.AST.OP_GT;
-import static com.pelleplutt.plang.AST.OP_LE;
-import static com.pelleplutt.plang.AST.OP_LT;
-import static com.pelleplutt.plang.AST.OP_MINUS;
-import static com.pelleplutt.plang.AST.OP_MINUSEQ;
-import static com.pelleplutt.plang.AST.OP_MOD;
-import static com.pelleplutt.plang.AST.OP_MODEQ;
-import static com.pelleplutt.plang.AST.OP_MUL;
-import static com.pelleplutt.plang.AST.OP_MULEQ;
-import static com.pelleplutt.plang.AST.OP_NEQ;
-import static com.pelleplutt.plang.AST.OP_NOT;
-import static com.pelleplutt.plang.AST.OP_NOTEQ;
-import static com.pelleplutt.plang.AST.OP_OR;
-import static com.pelleplutt.plang.AST.OP_OREQ;
-import static com.pelleplutt.plang.AST.OP_PLUS;
-import static com.pelleplutt.plang.AST.OP_PLUSEQ;
-import static com.pelleplutt.plang.AST.OP_SHLEFT;
-import static com.pelleplutt.plang.AST.OP_SHLEFTEQ;
-import static com.pelleplutt.plang.AST.OP_SHRIGHT;
-import static com.pelleplutt.plang.AST.OP_SHRIGHTEQ;
-import static com.pelleplutt.plang.AST.OP_XOR;
-import static com.pelleplutt.plang.AST.OP_XOREQ;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
@@ -58,6 +29,7 @@ public class AST implements Lexer.Emitter {
   final static int OP_PARENO       = __id++;
   final static int OP_PARENC       = __id++;
   
+  final static int OP_MODULE       = __id++;
   final static int OP_LABEL        = __id++;
   final static int OP_FUNCDEF      = __id++;
   final static int OP_WHILE        = __id++;
@@ -141,6 +113,7 @@ public class AST implements Lexer.Emitter {
       new Op("(", OP_PARENO),
       new Op(")", OP_PARENC),
       
+      new Op("module", OP_MODULE, 1),
       new Op(":", OP_LABEL, 1),
       new Op("func", OP_FUNCDEF, 1),
       new Op("while", OP_WHILE, 2),
@@ -231,16 +204,17 @@ public class AST implements Lexer.Emitter {
     lexer.defineCompoundChars("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_");
   }
   
-  public ASTNodeBlok buildTree(String s) {
-    callid = 0;
+  static public ASTNodeBlok buildTree(String s) {
+    AST ast = new AST();
+    ast.callid = 0;
     byte tst[] = s.getBytes();
     for (byte b : tst) {
-      lexer.feed(b);
+      ast.lexer.feed(b);
     }
-    lexer.flush();
-    onOperator(OP_FINALIZER);
+    ast.lexer.flush();
+    ast.onOperator(OP_FINALIZER);
     ASTNodeBlok e = new ASTNodeBlok();
-    e.operands = exprs;
+    e.operands = ast.exprs;
     return e;
   }
   

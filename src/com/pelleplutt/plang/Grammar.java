@@ -43,7 +43,9 @@ public class Grammar {
           "for:           OP_FOR\n" +
           "while:         OP_WHILE\n" +
           "break:         OP_BREAK\n" +
+          "continue:      OP_CONTINUE\n" +
           "label:         OP_LABEL\n" +
+          "module:        OP_MODULE\n" +
           "global:        OP_GLOBAL\n" +
           
           "cond:          if else\n" +
@@ -55,7 +57,7 @@ public class Grammar {
           "jmp:           goto for while break label\n" +
           "stat:          assign global op call cond\n" + 
           "oper:          stat jmp\n" + 
-          "code:          blok oper sym\n" + 
+          "code:          blok oper sym break continue module\n" + 
   "";
   static final String GRAMMAR_RULES = 
           "OP_LABEL:      sym\n" +
@@ -65,6 +67,7 @@ public class Grammar {
           "assign_op_add: sym , str\n" +
           "range:         val | range , val\n" +
           "global:        sym\n" +
+          "module:        sym\n" +
           "rel_op:        val | assign , val | assign\n" +
           "expr_op_add:   str | val , str | val\n" +
           "expr_op_bin:   val , val\n" +
@@ -290,11 +293,11 @@ public class Grammar {
     }
   }
   
-  void checkTree(List<ASTNode> es) {
-    for (ASTNode e : es) {
-      checkNode(e);
-      if (e.operands != null) {
-        checkTree(e.operands);
+  void traverseNode(ASTNode e) {
+    checkNode(e);
+    if (e.operands != null) {
+      for (ASTNode e2 : e.operands) {
+        traverseNode(e2);
       }
     }
   }
@@ -303,7 +306,7 @@ public class Grammar {
     Grammar g = new Grammar();
     try {
       g.build();
-      g.checkNode(e);
+      g.traverseNode(e);
     } catch (IOException ioe) {}
   }
   

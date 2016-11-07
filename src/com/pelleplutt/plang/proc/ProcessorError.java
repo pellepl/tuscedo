@@ -1,4 +1,4 @@
-package com.pelleplutt.plang;
+package com.pelleplutt.plang.proc;
 
 public class ProcessorError extends Error {
 

@@ -1,4 +1,6 @@
-package com.pelleplutt.plang;
+package com.pelleplutt.plang.proc;
+
+import java.io.PrintStream;
 
 public class Processor implements ByteCode {
   static final int TINT = 0;
@@ -19,162 +21,231 @@ public class Processor implements ByteCode {
   public Processor(int memorySize, byte[] code) {
     sp = memorySize - 1;
     pc = 0;
-    fp = -1;
+    fp = sp;
     memory = new M[memorySize];
     for (int i = 0; i < memorySize; i++) memory[i] = new M();
     this.code = code;
   }
   
-  String disasm(int pc) {
+  public void disasm(PrintStream out, int pc, int len) {
+    while (len > 0) {
+      out.println(String.format("0x%08x %s", pc, disasm(pc)));
+      int instr = (int)(code[pc] & 0xff);
+      int step = ISIZE[instr];
+      if (step <= 0) step = 1;
+      pc += step;
+      len -= step;
+    }
+  }
+
+  public String disasm(int pc) {
     int instr = (int)(code[pc++] & 0xff);
     StringBuilder sb = new StringBuilder();
     switch (instr) {
-    case INOP:  // 0x00
-      sb.append("nop");
+    case INOP:
+      sb.append("nop     ");
       break;
-    case IADD:  // 0x01
-      sb.append("add");
+    case IADD:
+      sb.append("add     ");
       break;
-    case ISUB:  // 0x02
-      sb.append("sub");
+    case ISUB:
+      sb.append("sub     ");
       break;
-    case IMUL:  // 0x03
-      sb.append("mul");
+    case IMUL:
+      sb.append("mul     ");
       break;
-    case IDIV:  // 0x04
-      sb.append("div");
+    case IDIV:
+      sb.append("div     ");
       break;
-    case IREM:  // 0x05
-      sb.append("rem");
+    case IREM:
+      sb.append("rem     ");
       break;
-    case ISHL:  // 0x06
-      sb.append("shl");
+    case ISHL:
+      sb.append("shiftl  ");
       break;
-    case ISHR:  // 0x07
-      sb.append("shr");
+    case ISHR:
+      sb.append("shiftr  ");
       break;
-    case IAND:  // 0x08
-      sb.append("and");
+    case IAND:
+      sb.append("and     ");
       break;
-    case IOR :  // 0x09
-      sb.append("or ");
+    case IOR :
+      sb.append("or      ");
       break;
-    case IXOR:  // 0x0a
-      sb.append("xor");
+    case IXOR:
+      sb.append("xor     ");
       break;
-    case ICMP:  // 0x0b
-      sb.append("cmp");
+    case ICMP:
+      sb.append("cmp     ");
       break;
-    case ICMN:  // 0x0c
-      sb.append("cmn");
+    case ICMN:
+      sb.append("cmpn    ");
       break;
-    case INOT:  // 0x0d
-      sb.append("not");
+    case INOT:
+      sb.append("not     ");
       break;
-    case INEG:  // 0x0e
-      sb.append("neg");
+    case INEG:
+      sb.append("neg     ");
       break;
     
     case IADI:
-      sb.append("adi ");
+      sb.append("add_im  ");
       sb.append(String.format("0x%02x", codetoi(pc, 1) + 1));
       break;
     case ISUI:
-      sb.append("sui ");
+      sb.append("sub_im  ");
       sb.append(String.format("0x%02x", codetoi(pc, 1) + 1));
       break;
     case IPUI:
-      sb.append("pui ");
+      sb.append("push_im ");
       sb.append(String.format("0x%02x", codetoi(pc, 1)));
       break;
 
-    case IPOP:  // 0x20
-      sb.append("pop");
+    case IADQ1:
+      sb.append("add_q1  ");
       break;
-    case IDUP:  // 0x21
-      sb.append("dup");
+    case IADQ2:
+      sb.append("add_q2  ");
       break;
-    case IROT:  // 0x22
-      sb.append("rot");
+    case IADQ3:
+      sb.append("add_q3  ");
       break;
-    case ICPY:  // 0x23 // copy stack entry to top //xx + 1
-      sb.append("cpy ");
+    case IADQ4:
+      sb.append("add_q4  ");
+      break;
+    case IADQ5:
+      sb.append("add_q5  ");
+      break;
+    case IADQ6:
+      sb.append("add_q6  ");
+      break;
+    case IADQ7:
+      sb.append("add_q7  ");
+      break;
+    case IADQ8:
+      sb.append("add_q8  ");
+      break;
+    case ISUQ1:
+      sb.append("sub_q1  ");
+      break;
+    case ISUQ2:
+      sb.append("sub_q2  ");
+      break;
+    case ISUQ3:
+      sb.append("sub_q3  ");
+      break;
+    case ISUQ4:
+      sb.append("sub_q4  ");
+      break;
+    case ISUQ5:
+      sb.append("sub_q5  ");
+      break;
+    case ISUQ6:
+      sb.append("sub_q6  ");
+      break;
+    case ISUQ7:
+      sb.append("sub_q7  ");
+      break;
+    case ISUQ8:
+      sb.append("sub_q8  ");
+      break;
+      
+    case IPOP:
+      sb.append("pop     ");
+      break;
+    case IDUP:
+      sb.append("dup     ");
+      break;
+    case IROT:
+      sb.append("rot     ");
+      break;
+    case ICPY:
+      sb.append("cpy     ");
       sb.append(String.format("sp[0x%02x]", codetoi(pc, 1) + 1));
       break;
-    case ISTR:  // 0x24 // pop to memory
-      sb.append("str");
+    case ISTR:
+      sb.append("stor    ");
       break;
-    case ISTI:  // 0x25 // pop to memory immediate
-      sb.append("sti ");
+    case ISTI:
+      sb.append("stor_im ");
       sb.append(String.format("mem[0x%06x]", codetoi(pc, 3)));
       break;
-    case ILD :  // 0x26 // push from memory
-      sb.append("ld ");
+    case ILD :
+      sb.append("load    ");
       break;
-    case ILDI:  // 0x27 // push from memory immediate
-      sb.append("ldi ");
+    case ILDI:
+      sb.append("load_im ");
       sb.append(String.format("mem[0x%06x]", codetoi(pc, 3)));
+      break;
+    case ISTF:
+      sb.append("stor_fp ");
+      sb.append(String.format("fp[0x%02x]", codetoi(pc, 1)));
+      break;
+    case ILDF:
+      sb.append("load_fp ");
+      sb.append(String.format("fp[0x%02x]", codetoi(pc, 1)));
       break;
 
     case IALL:
-      sb.append("all ");
+      sb.append("allo_sp ");
       sb.append(String.format("%d", codetoi(pc, 1) + 1));
       break;
     case IFRE:
-      sb.append("fre ");
+      sb.append("free_sp ");
       sb.append(String.format("%d", codetoi(pc, 1) + 1));
       break;
 
-    case ICAL:  // 0xe0 
-      sb.append("cal");
+    case ICAL: 
+      sb.append("call    ");
       break;
-    case IRET:  // 0xe8 
-      sb.append("ret");
+    case IRET: 
+      sb.append("return  ");
       break;
-    case IJMP:  // 0xf0 
-      sb.append("jmp");
+    case IJMP: 
+      sb.append("jump    ");
       break;
     case IJMPEQ: 
-      sb.append("jmp eq");
+      sb.append("jump_eq ");
       break;
     case IJMPNE: 
-      sb.append("jmp ne");
+      sb.append("jump_ne ");
       break;
     case IJMPGT: 
-      sb.append("jmp gt");
+      sb.append("jump_gt ");
       break;
     case IJMPGE: 
-      sb.append("jmp ge");
+      sb.append("jump_ge ");
       break;
     case IJMPLT: 
-      sb.append("jmp lt");
+      sb.append("jump_lt ");
       break;
     case IJMPLE: 
-      sb.append("jmp le");
+      sb.append("jump_le ");
       break;
-    case IBRA:  // 0xf8 
-      sb.append("bra");
+    case IBRA: 
+      sb.append("bra     ");
+      sb.append(String.format("%d", codetos(pc, 3)));
       break;
     case IBRAEQ: 
-      sb.append("bra eq");
+      sb.append("bra_eq  ");
       break;
     case IBRANE: 
-      sb.append("bra ne");
+      sb.append("bra_ne  ");
       break;
     case IBRAGT: 
-      sb.append("bra gt");
+      sb.append("bra_gt  ");
       break;
     case IBRAGE: 
-      sb.append("bra ge");
+      sb.append("bra_ge  ");
       break;
     case IBRALT: 
-      sb.append("bra lt");
+      sb.append("bra_lt  ");
       break;
     case IBRALE: 
-      sb.append("bra le");
+      sb.append("bra_le  ");
       break;
     default:
-      sb.append("???");
+      sb.append("???     ");
       break;
     }
     return sb.toString();
@@ -204,6 +275,13 @@ public class Processor implements ByteCode {
       x <<= 8;
       x |= (((int)code[addr++]) & 0xff);
     }
+    return x;
+  }
+
+  int codetos(int addr, int bytes) {
+    int x = codetoi(addr, bytes);
+    x <<= 8*(4-bytes);
+    x >>= 8*(4-bytes);
     return x;
   }
   
@@ -280,6 +358,16 @@ public class Processor implements ByteCode {
     int addr = codetoi(pc, 3);
     pc += 3;
     push(peek(addr));
+  }
+  
+  void stf() {
+    int rel = codetoi(pc++, 1);
+    poke(fp - rel, pop());
+  }
+  
+  void ldf() {
+    int rel = codetoi(pc++, 1);
+    push(peek(fp - rel));
   }
   
   void all() {
@@ -387,6 +475,16 @@ public class Processor implements ByteCode {
     push(codetoi(pc++, 1));
   }
 
+  void adq(int x) {
+    push(x);
+    add();
+  }
+
+  void suq(int x) {
+    push(x);
+    sub();
+  }
+  
   void mul() {
     M e2 = pop();
     M e1 = pop();
@@ -440,43 +538,55 @@ public class Processor implements ByteCode {
       push(r);
     }
   }
+  
+  void cal() {
+    push(fp);
+    fp = sp;
+    // TODO
+  }
+  
+  void ret() {
+    // TODO
+    sp = fp;
+    fp = pop().i;
+  }
 
   public void exec() {
     int instr = (int)(code[pc++] & 0xff);
     switch (instr) {
-    case INOP:  // 0x00
+    case INOP:
       break;
-    case IADD:  // 0x01
+    case IADD:
       add();
       break;
-    case ISUB:  // 0x02
+    case ISUB:
       sub();
       break;
-    case IMUL:  // 0x03
+    case IMUL:
       mul();
       break;
-    case IDIV:  // 0x04
+    case IDIV:
       div();
       break;
-    case IREM:  // 0x05
+    case IREM:
       break;
-    case ISHL:  // 0x06
+    case ISHL:
       break;
-    case ISHR:  // 0x07
+    case ISHR:
       break;
-    case IAND:  // 0x08
+    case IAND:
       break;
-    case IOR :  // 0x09
+    case IOR :
       break;
-    case IXOR:  // 0x0a
+    case IXOR:
       break;
-    case ICMP:  // 0x0b
+    case ICMP:
       break;
-    case ICMN:  // 0x0c
+    case ICMN:
       break;
-    case INOT:  // 0x0d
+    case INOT:
       break;
-    case INEG:  // 0x0e
+    case INEG:
       break;
       
     case IADI:
@@ -489,45 +599,102 @@ public class Processor implements ByteCode {
       pui();
       break;
     
-    case IPOP:  // 0x20
+    case IADQ1:
+      adq(1);
+      break;
+    case IADQ2:
+      adq(2);
+      break;
+    case IADQ3:
+      adq(3);
+      break;
+    case IADQ4:
+      adq(4);
+      break;
+    case IADQ5:
+      adq(5);
+      break;
+    case IADQ6:
+      adq(6);
+      break;
+    case IADQ7:
+      adq(7);
+      break;
+    case IADQ8:
+      adq(8);
+      break;
+    case ISUQ1:
+      suq(1);
+      break;
+    case ISUQ2:
+      suq(2);
+      break;
+    case ISUQ3:
+      suq(3);
+      break;
+    case ISUQ4:
+      suq(4);
+      break;
+    case ISUQ5:
+      suq(5);
+      break;
+    case ISUQ6:
+      suq(6);
+      break;
+    case ISUQ7:
+      suq(7);
+      break;
+    case ISUQ8:
+      suq(8);
+      break;
+
+    case IPOP:
       pop();
       break;
-    case IDUP:  // 0x21
+    case IDUP:
       dup();
       break;
-    case IROT:  // 0x22
+    case IROT:
       rot();
       break;
-    case ICPY:  // 0x23 // copy stack entry to top //xx + 1
+    case ICPY:
       cpy();
       break;
-    case ISTR:  // 0x24 // pop to memory
+    case ISTR:
       str();
       break;
-    case ISTI:  // 0x25 // pop to memory immediate
+    case ISTI:
       sti();
       break;
-    case ILD :  // 0x26 // push from memory
+    case ILD :
       ld();
       break;
-    case ILDI:  // 0x27 // push from memory immediate
+    case ILDI:
       ldi();
       break;
+    case ISTF:
+      stf();
+      break;
+    case ILDF :
+      ldf();
+      break;
       
-    case IALL:  // 0x28 // allocate on stack //xx+1
+    case IALL:
       all();
       break;
-    case IFRE:  // 0x28 // deallocate from stack //xx+1
+    case IFRE:
       fre();
       break;
 
-    case ICAL:  // 0xe0 
+    case ICAL: 
+      cal();
       break;
-    case IRET:  // 0xe8 
+    case IRET: 
+      ret();
       break;
-    case IJMP:  // 0xf0 // last 3 bits conditional 
+    case IJMP: 
       break;
-    case IBRA:  // 0xf8 // last 3 bits conditional 
+    case IBRA: 
       break;
     default:
       throw new Error("unknown instruction");

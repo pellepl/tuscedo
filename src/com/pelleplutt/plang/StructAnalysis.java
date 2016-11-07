@@ -31,7 +31,10 @@ public class StructAnalysis {
   }
 
   void rec(ASTNode e, Stack<Scope> scopeStack, ASTNode parent, boolean operator, boolean loop) {
-    if (e.op == OP_BLOK) {
+    if (e.op == OP_MODULE) {
+      module = ((ASTNodeSymbol)e.operands.get(0)).symbol;
+    } 
+    else if (e.op == OP_BLOK) {
       ASTNodeBlok be = (ASTNodeBlok)e;
       Scope s = new Scope(be);
       String blockId = getBlockId();
@@ -45,10 +48,10 @@ public class StructAnalysis {
         }
       }
       Scope scope = scopeStack.pop();
-      be.setAnnotation(scope.symMap, blockId, module, ASTNodeBlok.MAIN);
+      be.setAnnotation(scope.symMap, scopeStack.size(), blockId, module, ASTNodeBlok.MAIN);
     }
     else if (e.op == OP_SYMBOL && !operator) {
-      defLocal(scopeStack, ((ASTNodeSymbol)e).symbol, e);
+      defVar(scopeStack, ((ASTNodeSymbol)e).symbol, (ASTNodeSymbol)e);
     } 
     else if (e.op == OP_SYMBOL && operator) {
       // do naught
@@ -56,8 +59,8 @@ public class StructAnalysis {
     else if (e.op == OP_EQ) {
       ASTNode asignee = e.operands.get(0);
       ASTNode tnode = e.operands.get(1);
-      String sym = getSymbol(asignee);
-      defIfUndef(scopeStack, sym, e);
+      String var = getVariableName(asignee);
+      defVarIfUndef(scopeStack, var, (ASTNodeSymbol)asignee);
       if (tnode instanceof ASTNodeBlok) {
         // anonymous scope
         ASTNodeBlok be = (ASTNodeBlok)tnode;
@@ -75,7 +78,7 @@ public class StructAnalysis {
             rec(e2, anonScopeStack, e, false, false);
           }
         }
-        be.setAnnotation(anonScope.symMap, blockId, module, ASTNodeBlok.ANON);
+        be.setAnnotation(anonScope.symMap, anonScopeStack.size(), blockId, module, ASTNodeBlok.ANON);
         System.out.println("<<< branch back anon");
       } else {
         if (e.operands != null) {
@@ -146,22 +149,23 @@ public class StructAnalysis {
     }
  }
   
-  public static void check(ASTNodeBlok e) {
+  public static void analyse(ASTNodeBlok e) {
     StructAnalysis cg = new StructAnalysis();
     System.out.println("  * analyse variables");
     cg.structAnalyse(e);
   }
   
-  String getSymbol(ASTNode e) {
+  String getVariableName(ASTNode e) {
     if (e.op == OP_SYMBOL) {
       return ((ASTNodeSymbol)e).symbol;
     } else if (e.op == OP_ARRAY) {
-      return getSymbol(e.operands.get(0));
+      return getVariableName(e.operands.get(0));
     }
     return null;
   }
 
-  void defIfUndef(Stack<Scope> scopeStack, String sym, ASTNode e) {
+  // define variable for scope if not already reachable
+  void defVarIfUndef(Stack<Scope> scopeStack, String sym, ASTNodeSymbol esym) {
     for (int i = scopeStack.size()-1; i >= 0; i--) {
       Scope s = scopeStack.get(i);
       if (s.symMap.containsKey(sym)) {
@@ -169,17 +173,19 @@ public class StructAnalysis {
         return;
       };
     }
-    scopeStack.peek().symMap.put(sym, e);
+    scopeStack.peek().symMap.put(sym, esym);
     System.out.println("  + '" + sym + "' " + (scopeStack.size() == 1 ? "GLOBAL" : "LOCAL"));
   }
   
-  void defLocal(Stack<Scope> scopeStack, String sym, ASTNode e) {
-    boolean shadow = isDefAbove(scopeStack, sym);
-    scopeStack.peek().symMap.put(sym, e);
+  // define variable for scope, if same name already reachable this will shadow ancestor
+  void defVar(Stack<Scope> scopeStack, String sym, ASTNodeSymbol esym) {
+    boolean shadow = isVarDefAbove(scopeStack, sym);
+    scopeStack.peek().symMap.put(sym, esym);
     System.out.println("  + '" + sym + "' " + (scopeStack.size() == 1 ? "GLOBAL" : "LOCAL") + (shadow ? " SHADOW" : ""));
   }
   
-  boolean isDef(Stack<Scope> scopeStack, String sym) {
+  // see if a variable is reachable from this scope and ancestors
+  boolean isVarDef(Stack<Scope> scopeStack, String sym) {
     for (int i = scopeStack.size()-1; i >= 0; i--) {
       Scope s = scopeStack.get(i);
       if (s.symMap.containsKey(sym)) return true;
@@ -187,7 +193,8 @@ public class StructAnalysis {
     return false;
   }
   
-  boolean isDefAbove(Stack<Scope> scopeStack, String sym) {
+  // see if a variable is reachable in ancestors only
+  boolean isVarDefAbove(Stack<Scope> scopeStack, String sym) {
     for (int i = scopeStack.size()-2; i >= 0; i--) {
       Scope s = scopeStack.get(i);
       if (s.symMap.containsKey(sym)) return true;
@@ -196,11 +203,11 @@ public class StructAnalysis {
   }
   
   class Scope {
-    Map<String, ASTNode> symMap;
+    Map<String, ASTNodeSymbol> symMap;
     ASTNodeBlok block;
     public Scope(ASTNodeBlok e) {
       this.block = e;
-      symMap = new HashMap<String, ASTNode>();
+      symMap = new HashMap<String, ASTNodeSymbol>();
     }
     public String toString() {
       StringBuilder sb = new StringBuilder();
