@@ -57,6 +57,17 @@ public class Serial implements SerialStreamProvider {
     }
   }
   
+  public void transmit(byte b[]) {
+    if (serialRunning) {
+      try {
+        serialOut.write(b);
+        serialOut.flush();
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+  }
+  
   public String[] getDevices() {
     return serial.getDevices();
   }

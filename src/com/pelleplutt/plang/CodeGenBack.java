@@ -1,19 +1,36 @@
 package com.pelleplutt.plang;
 
+import static com.pelleplutt.plang.AST.OP_AND;
+import static com.pelleplutt.plang.AST.OP_CALL;
 import static com.pelleplutt.plang.AST.OP_DIV;
-import static com.pelleplutt.plang.AST.OP_EQ;
+import static com.pelleplutt.plang.AST.OP_EQ2;
+import static com.pelleplutt.plang.AST.OP_GE;
+import static com.pelleplutt.plang.AST.OP_GT;
+import static com.pelleplutt.plang.AST.OP_LE;
+import static com.pelleplutt.plang.AST.OP_LT;
 import static com.pelleplutt.plang.AST.OP_MINUS;
 import static com.pelleplutt.plang.AST.OP_MUL;
+import static com.pelleplutt.plang.AST.OP_NEQ;
+import static com.pelleplutt.plang.AST.OP_OR;
 import static com.pelleplutt.plang.AST.OP_PLUS;
+import static com.pelleplutt.plang.AST.OP_SHLEFT;
+import static com.pelleplutt.plang.AST.OP_SHRIGHT;
+import static com.pelleplutt.plang.AST.OP_SYMBOL;
+import static com.pelleplutt.plang.AST.OP_XOR;
 
 import java.io.PrintStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import com.pelleplutt.plang.ASTNode.ASTNodeSymbol;
+import com.pelleplutt.plang.ModuleFragment.Link;
+import com.pelleplutt.plang.ModuleFragment.LinkGoto;
 import com.pelleplutt.plang.TAC.TACAlloc;
+import com.pelleplutt.plang.TAC.TACArg;
+import com.pelleplutt.plang.TAC.TACAssign;
+import com.pelleplutt.plang.TAC.TACBkpt;
+import com.pelleplutt.plang.TAC.TACCall;
 import com.pelleplutt.plang.TAC.TACCode;
 import com.pelleplutt.plang.TAC.TACFloat;
 import com.pelleplutt.plang.TAC.TACFree;
@@ -21,18 +38,21 @@ import com.pelleplutt.plang.TAC.TACGoto;
 import com.pelleplutt.plang.TAC.TACGotoCond;
 import com.pelleplutt.plang.TAC.TACInt;
 import com.pelleplutt.plang.TAC.TACLabel;
+import com.pelleplutt.plang.TAC.TACNil;
 import com.pelleplutt.plang.TAC.TACOp;
+import com.pelleplutt.plang.TAC.TACReturn;
 import com.pelleplutt.plang.TAC.TACString;
 import com.pelleplutt.plang.TAC.TACVar;
 import com.pelleplutt.plang.proc.ByteCode;
 import com.pelleplutt.plang.proc.Processor;
 
 public class CodeGenBack implements ByteCode {
+  static boolean dbg = false;
   int sp;
   int fp;
-  Map<TACVar, Integer> stackVars = new HashMap<TACVar, Integer>();
   
   public static void compile(List<Module> modules) {
+    TAC.dbgResolveRefs = true;
     CodeGenBack cg = new CodeGenBack();
     for (Module m : modules) {
       System.out.println("  * compile module " + m.id);
@@ -44,167 +64,363 @@ public class CodeGenBack implements ByteCode {
     for (ModuleFragment frag : m.frags) {
       sp = 0;
       fp = 0;
-      System.out.println("  * compile frgmnt " + m.id + " " + frag.name);
+      System.out.println("  * compile frgmnt " + m.id + frag.name);
       compileFrag(frag);
       byte mc[] = frag.getMachineCode();
       
-      Processor p = new Processor(0, mc);
-      PrintStream out = System.out;
-      int pc = 0;
-      int len = mc.length;
-      while (len > 0) {
-        String disasm = String.format("0x%08x %s", pc, p.disasm(pc)); 
-        out.print(disasm);
-        String com = frag.commentDbg(pc);
-        if (com != null) {
-          for (int i = 0; i < (34 - disasm.length()) + 2; i++) out.print(" ");
-          out.print("// " + com);
+      if (dbg) {
+        PrintStream out = System.out;
+        int pc = 0;
+        int len = mc.length;
+        while (len > 0) {
+          String disasm = String.format("0x%08x %s", pc, Processor.disasm(mc, pc)); 
+          out.print(disasm);
+          String com = frag.commentDbg(pc);
+          if (com != null) {
+            for (int i = 0; i < (34 - disasm.length()) + 2; i++) out.print(" ");
+            out.print("// " + com);
+          }
+          out.println();
+          int instr = (int)(mc[pc] & 0xff);
+          int step = ISIZE[instr];
+          if (step <= 0) step = 1;
+          pc += step;
+          len -= step;
         }
-        out.println();
-        int instr = (int)(mc[pc] & 0xff);
-        int step = ISIZE[instr];
-        if (step <= 0) step = 1;
-        pc += step;
-        len -= step;
       }
-
-      //p.disasm(System.out, 0, mc.length);
     }
   }
   
+  
+  void addCode(ModuleFragment frag, String comment, int i, Integer... codes) {
+    frag.addCode(comment, i, codes);
+  }
+  void addCode(ModuleFragment frag, int i, Integer... codes) {
+    addCode(frag, null, i, codes);
+  }
+    
   void compileFrag(ModuleFragment frag) {
-    for (int i = 0; i < frag.frags.size(); i++) {
-      TAC tac = frag.frags.get(i);
-      compileTAC(tac, frag);
+    // translate to machine code
+    Map<TACVar, Integer> locals = new HashMap<TACVar, Integer>();
+    frag.locals = locals;
+    for (int i = 0; i < frag.tacs.size(); i++) {
+      List<TAC> tacBlock = frag.tacs.get(i);
+      for (TAC tac : tacBlock) {
+        compileTAC(tac, frag);
+      }
+    }
+    if (frag.type == ASTNode.ASTNodeBlok.TYPE_MAIN) {
+      addCode(frag, IRET);
+    }
+    // resolve fragment branches and labels
+    for (Link l : frag.links) {
+      if (l instanceof LinkGoto) {
+        LinkGoto lgoto = (LinkGoto)l;
+        int srcgoto = lgoto.pc;
+        TACLabel ldstgoto = lgoto.label;
+        int dstgoto = frag.labels.get(ldstgoto);
+        int branchDelta = dstgoto - srcgoto;
+        frag.write(srcgoto + 1, branchDelta, 3);
+      } 
     }
   }
   
   void compileTAC(TAC tac, ModuleFragment frag) {
+    if (dbg) System.out.println("    " + tac);
+
     if (tac instanceof TACAlloc) {
-      // allocate stack variables
       TACAlloc all = (TACAlloc)tac;
-      int spBaseOffset = sp;
-      for (String varSym : all.blok.symMap.keySet()) {
-        ASTNodeSymbol esym = all.blok.symMap.get(varSym);
-        stackVars.put(new TACVar(esym, all.blok), spBaseOffset);
+      // point out argument variables
+      if (all.blok.getArguments() != null) {
+        int argc = all.blok.getArguments().size();
+        for (ASTNodeSymbol esym : all.blok.getArguments()) {
+          frag.locals.put(new TACVar(esym, all.blok), -argc-2); // -2 for pushed frame (pc, fp)
+          argc--;
+        }
       }
-      sp += all.blok.symMap.size();
-      frag.addCode(all.toString() + stackInfo(), IALL, all.blok.symMap.size()-1);
+      // allocate stack variables
+      if (!all.blok.symList.isEmpty()) {
+        int fpoffset = sp - fp;
+        for (ASTNodeSymbol esym : all.blok.symList) {
+          frag.locals.put(new TACVar(esym, all.blok), fpoffset++);
+        }
+        sp += all.blok.symList.size();
+        addCode(frag, stackInfo() + all.toString(), ISPI, all.blok.symList.size()-1);
+      }
     }
     else if (tac instanceof TACFree) {
       // free stack variables
       TACFree fre = (TACFree)tac;
-      for (String varSym : fre.blok.symMap.keySet()) {
-        ASTNodeSymbol esym = fre.blok.symMap.get(varSym);
-        stackVars.remove(new TACVar(esym, fre.blok));
+      if (!fre.blok.symList.isEmpty()) {
+        for (ASTNodeSymbol esym : fre.blok.symList) {
+          frag.locals.remove(new TACVar(esym, fre.blok));
+        }
+  
+        sp -= fre.blok.symList.size();
+        addCode(frag, stackInfo() + tac.toString(), ISPD, fre.blok.symList.size()-1);
       }
-
-      sp -= fre.blok.symMap.size();
-      frag.addCode(tac.toString() + stackInfo(), IFRE, fre.blok.symMap.size()-1);
+    }
+    else if (tac instanceof TACVar || tac instanceof TACFloat || 
+        tac instanceof TACString || tac instanceof TACCode) {
+      if (tac.referenced) {
+        pushValue(tac, frag);
+      }
+    }
+    else if (tac instanceof TACAssign) {
+      TACAssign op = (TACAssign)tac;
+      TACVar assignee = (TACVar)op.left;
+      TAC assignment = (TAC)op.right;
+      if (frag.locals.containsKey(assignee)) {
+        int fpoffset = frag.locals.get(assignee);
+        pushValue(assignment, frag);
+        if (op.referenced) {
+          sp++;
+          addCode(frag, stackInfo() + op.toString(), IDUP);
+        }
+        sp--;
+        addCode(frag, stackInfo() + op.toString(), ISTF, fpoffset);
+      } else {
+        pushValue(assignment, frag);
+        if (op.referenced) {
+          sp++;
+          addCode(frag, stackInfo() + op.toString(), IDUP);
+        }
+        frag.links.add(new ModuleFragment.LinkVar(frag.getPC(), assignee));
+        sp--;
+        addCode(frag, stackInfo() + op.toString(), ISTI, 0,0,0);
+      }
     }
     else if (tac instanceof TACOp) {
-      compileOp((TACOp)tac, frag);
+      if (AST.isUnaryOperator(((TACOp) tac).op)) {
+        compileUnaryOp((TACOp)tac, frag);
+      } else {
+        compileBinaryOp((TACOp)tac, frag);
+      }
     }
     else if (tac instanceof TACLabel) {
       frag.labels.put((TACLabel)tac, frag.getPC());
     }
     else if (tac instanceof TACGoto) {
-      frag.links.put(frag.getPC(), new ModuleFragment.LinkGoto(((TACGoto)tac).label));
-      frag.addCode(((TACGoto)tac).label.toString() + stackInfo(), IBRA, 0xff,0xff,0xff);
+      frag.links.add(new ModuleFragment.LinkGoto(frag.getPC(), ((TACGoto)tac).label));
+      addCode(frag, stackInfo() + "->" + ((TACGoto)tac).label.toString(), IBRA, 0xff,0xff,0xff);
     }
     else if (tac instanceof TACGotoCond) {
       TACGotoCond c = (TACGotoCond)tac;
       pushValue(c.cond, frag);
-      if (c.positive) {
-        frag.addCode(tac.toString() + stackInfo(), ICMP);
-      } else {
-        frag.addCode(tac.toString() + stackInfo(), ICMN);
+      boolean inverseCond = !c.positive; 
+      int instr = IBRA;
+      if (c.cond.e.op == OP_EQ2) instr = inverseCond ? IBRANE : IBRAEQ;
+      else if (c.cond.e.op == OP_NEQ) instr = inverseCond ? IBRAEQ : IBRANE;
+      else if (c.cond.e.op == OP_GE) instr = inverseCond ? IBRALT : IBRAGE;
+      else if (c.cond.e.op == OP_LT) instr = inverseCond ? IBRAGE : IBRALT;
+      else if (c.cond.e.op == OP_GT) instr = inverseCond ? IBRALE : IBRAGT;
+      else if (c.cond.e.op == OP_LE) instr = inverseCond ? IBRAGT : IBRALE;
+      else if (c.cond.e.op == OP_CALL || 
+               c.cond.e.op == OP_SYMBOL || 
+               AST.isNumber(c.cond.e.op) || 
+               AST.isString(c.cond.e.op)) {
+        pushValue(new TACInt(c.cond.e, 0), frag);
+        instr = IBRAEQ;
       }
-      frag.links.put(frag.getPC(), new ModuleFragment.LinkGoto(c.label));
-      frag.addCode(c.label.toString() + stackInfo(), IBRA, 0xff,0xff,0xff);
+      else throw new CompilerError("bad condition " + c.cond + " for " + c +  ", is " + AST.opString(c.cond.e.op));
+      sp -= 2;
+      addCode(frag, stackInfo() + tac.toString(), ICMP);
+      frag.links.add(new ModuleFragment.LinkGoto(frag.getPC(), c.label));
+      addCode(frag, stackInfo() + "->" + c.label.toString(), instr, 0xff,0xff,0xff);
+    }
+    else if (tac instanceof TACCall) {
+      TACCall call = (TACCall)tac;
+      frag.links.add(new ModuleFragment.LinkCall(frag.getPC(), call));
+      sp++;
+      addCode(frag, stackInfo() + "<" + call.func + ", " + call.args + " args>", ICALI, 0x03,0x00,0x00);
+      if (call.referenced && call.args == 0) {
+        // no args, using return value - do naught
+      } else {
+        sp -= call.args + 1;
+        addCode(frag, stackInfo() + "pop arguments and return val", ISPD, call.args-1 + 1); // +1 for the return value, is now at sp[-call.args]
+        if (call.referenced) {
+          // keep returnvalue if referenced
+          sp++;
+          addCode(frag, stackInfo() + "move return val to sp top", ICPY, -(call.args+1));
+        }
+      }
+    }
+    else if (tac instanceof TACReturn) {
+      TACReturn ret = (TACReturn)tac;
+      TAC retVal = ret.ret;
+      if (retVal == null) {
+        sp++;
+        addCode(frag, stackInfo() + "return nil", IPU0);
+      } else {
+        pushValue(retVal, frag);
+      }
+      sp--;
+      addCode(frag, stackInfo(), IRETV);
+    }
+    else if (tac instanceof TACArg) {
+      TACArg a = (TACArg)tac;
+      pushValue(a.arg, frag);
+    }
+    else if (tac instanceof TACBkpt) {
+      addCode(frag, stackInfo() + "breakpoint", IBKPT);
+    }
+    else {
+      System.out.println("unknown " + tac);
     }
   }
   
-  void compileOp(TACOp tac, ModuleFragment frag) {
-    if (tac.op == OP_EQ) {
-      TACVar assignee = (TACVar)tac.left;
-      TAC assignment = (TAC)tac.right;
-      if (stackVars.containsKey(assignee)) {
-        int baseSpOffset = stackVars.get(assignee);
-        int offs = sp - baseSpOffset;
-        pushValue(assignment, frag);
-        sp--;
-        frag.addCode(tac.toString() + stackInfo(), ISTF, offs);
-      } else {
-        pushValue(assignment, frag);
-        frag.links.put(frag.getPC(), new ModuleFragment.LinkVar(assignee));
-        sp--;
-        frag.addCode(tac.toString() + stackInfo(), ISTI, 0,0,0);
-      }
-    }
+  void compileUnaryOp(TACOp tac, ModuleFragment frag) {
+    // TODO
+  }
+  
+  void compileBinaryOp(TACOp tac, ModuleFragment frag) {
     if (tac.op == OP_PLUS) {
-      pushValue(tac.left, frag);
-      pushValue(tac.right, frag);
-      sp = sp - 2 + 1;
-      frag.addCode(tac.toString() + stackInfo(), IADD);
+      TAC l = tac.left;
+      TAC r = tac.right;
+      if (l instanceof TACInt && ((TACInt)l).x < 9) {
+        pushValue(r, frag);
+        sp = sp - 1 + 1;
+        addCode(frag, stackInfo() + tac.toString(), IADQ1 + (((TACInt)l).x - 1));
+      } else if (r instanceof TACInt && ((TACInt)r).x < 9) {
+        pushValue(l, frag);
+        sp = sp - 1 + 1;
+        addCode(frag, stackInfo() + tac.toString(), IADQ1 + (((TACInt)r).x - 1));
+      } else if (l instanceof TACInt && ((TACInt)l).x < 256) {
+        pushValue(r, frag);
+        sp = sp - 1 + 1;
+        addCode(frag, stackInfo() + tac.toString(), IADI, ((TACInt)l).x - 1);
+      } else if (r instanceof TACInt && ((TACInt)r).x < 256) {
+        pushValue(l, frag);
+        sp = sp - 1 + 1;
+        addCode(frag, stackInfo() + tac.toString(), IADI, ((TACInt)r).x - 1);
+      } else {
+        pushValues(l, r, frag);
+        sp = sp - 2 + 1;
+        addCode(frag, stackInfo() + tac.toString(), IADD);
+      }
     }
-    if (tac.op == OP_MINUS) {
-      pushValue(tac.left, frag);
-      pushValue(tac.right, frag);
-      sp = sp - 2 + 1;
-      frag.addCode(tac.toString() + stackInfo(), ISUB);
+    else if (tac.op == OP_MINUS) {
+      TAC l = tac.left;
+      TAC r = tac.right;
+      if (l instanceof TACInt && ((TACInt)l).x < 9) {
+        pushValue(r, frag);
+        sp = sp - 1 + 1;
+        addCode(frag, stackInfo() + tac.toString(), ISUQ1 + (((TACInt)l).x - 1));
+      } else if (r instanceof TACInt && ((TACInt)r).x < 9) {
+        pushValue(l, frag);
+        sp = sp - 1 + 1;
+        addCode(frag, stackInfo() + tac.toString(), ISUQ1 + (((TACInt)r).x - 1));
+      } else if (l instanceof TACInt && ((TACInt)l).x < 256) {
+        pushValue(r, frag);
+        sp = sp - 1 + 1;
+        addCode(frag, stackInfo() + tac.toString(), ISUI, ((TACInt)l).x - 1);
+      } else if (r instanceof TACInt && ((TACInt)r).x < 256) {
+        pushValue(l, frag);
+        sp = sp - 1 + 1;
+        addCode(frag, stackInfo() + tac.toString(), ISUI, ((TACInt)r).x - 1);
+      } else {
+        pushValues(l, r, frag);
+        sp = sp - 2 + 1;
+        addCode(frag, stackInfo() + tac.toString(), ISUB);
+      }
     }
-    if (tac.op == OP_MUL) {
-      pushValue(tac.left, frag);
-      pushValue(tac.right, frag);
+    else if (tac.op == OP_MUL) {
+      pushValues(tac.left, tac.right, frag);
       sp = sp - 2 + 1;
-      frag.addCode(tac.toString() + stackInfo(), IMUL);
+      addCode(frag, stackInfo() + tac.toString(), IMUL);
     }
-    if (tac.op == OP_DIV) {
-      pushValue(tac.left, frag);
-      pushValue(tac.right, frag);
+    else if (tac.op == OP_DIV) {
+      pushValues(tac.left, tac.right, frag);
       sp = sp - 2 + 1;
-      frag.addCode(tac.toString() + stackInfo(), IDIV);
+      addCode(frag, stackInfo() + tac.toString(), IDIV);
+    }
+    else if (tac.op == OP_AND) {
+      pushValues(tac.left, tac.right, frag);
+      sp = sp - 2 + 1;
+      addCode(frag, stackInfo() + tac.toString(), IAND);
+    }
+    else if (tac.op == OP_OR) {
+      pushValues(tac.left, tac.right, frag);
+      sp = sp - 2 + 1;
+      addCode(frag, stackInfo() + tac.toString(), IOR);
+    }
+    else if (tac.op == OP_XOR) {
+      pushValues(tac.left, tac.right, frag);
+      sp = sp - 2 + 1;
+      addCode(frag, stackInfo() + tac.toString(), IXOR);
+    }
+    else if (tac.op == OP_SHLEFT) {
+      pushValues(tac.left, tac.right, frag);
+      sp = sp - 2 + 1;
+      addCode(frag, stackInfo() + tac.toString(), ISHL);
+    }
+    else if (tac.op == OP_SHRIGHT) {
+      pushValues(tac.left, tac.right, frag);
+      sp = sp - 2 + 1;
+      addCode(frag, stackInfo() + tac.toString(), ISHR);
+    }
+    else if (AST.isConditionalOperator(tac.op)) {
+      pushValues(tac.left, tac.right, frag);
+    }
+    // TODO moar
+    else {
+      System.out.println("unknown op " + tac);
     }
   }
   
-  void pushValue(TAC a, ModuleFragment frag) {
-    
-    if (a instanceof TACInt) {
+  void pushValues(TAC left, TAC right, ModuleFragment frag) {
+    boolean lOnStack = pushValue(left, frag);
+    boolean rOnStack = pushValue(right, frag);
+    if (rOnStack && !lOnStack) {
+      addCode(frag, IROT);
+    }
+  }
+  
+  boolean pushValue(TAC a, ModuleFragment frag) {
+    if (a instanceof TACNil) {
+      sp++;
+      addCode(frag, stackInfo() + a.toString(), IPU0);
+    } 
+    else if (a instanceof TACInt) {
       if (((TACInt)a).x >= -128 && ((TACInt)a).x <= 127) {
         // push immediate
         sp++;
-        frag.addCode(a.toString() + stackInfo(), IPUI, ((TACInt)a).x);
+        addCode(frag, stackInfo() + a.toString() + " (constimm)", IPUI, ((TACInt)a).x);
       } else {
-        frag.links.put(frag.getPC(), new ModuleFragment.LinkConst(a));
+        frag.links.add(new ModuleFragment.LinkConst(frag.getPC(), a));
         sp++;
-        frag.addCode(a.toString() + stackInfo(), ILDI, 1,0,0);
+        addCode(frag, stackInfo() + a.toString() + " (const)", ILDI, 1,0,0);
       }
-    } else if (a instanceof TACVar) {
-      if (stackVars.containsKey(a)) {
-        int baseSpOffset = stackVars.get(a);
-        int offs = sp - baseSpOffset;
+    } 
+    else if (a instanceof TACVar) {
+      if (frag.locals.containsKey(a)) {
+        int fpoffset = frag.locals.get(a);
         sp++;
-        frag.addCode(a.toString() + stackInfo(), ILDF, offs);
+        addCode(frag, stackInfo() + a.toString() + " (local)", ILDF, fpoffset);
       } else {
-        frag.links.put(frag.getPC(), new ModuleFragment.LinkVar((TACVar)a));
+        frag.links.add(new ModuleFragment.LinkVar(frag.getPC(), (TACVar)a));
         sp++;
-        frag.addCode(a.toString() + stackInfo(), ILDI, 0,0,0);
+        addCode(frag, stackInfo() + a.toString() + " (var)", ILDI, 0,0,0);
       }
     }
-    // TODO
     else if (a instanceof TACFloat || a instanceof TACString || a instanceof TACCode) {
       // TODO RANGE?
-      frag.links.put(frag.getPC(), new ModuleFragment.LinkConst(a));
+      frag.links.add(new ModuleFragment.LinkConst(frag.getPC(), a));
       sp++;
-      frag.addCode(a.toString() + stackInfo(), ILDI, 2,0,0);
-    } else if (a instanceof TACOp) {
-      // supposed to be on stack
+      addCode(frag, stackInfo() + a.toString() + " (const)", ILDI, 2,0,0);
+    } 
+//    else if (a instanceof TACOp) {
+//      // supposed to be on stack TODO
+//      //addCode(frag, stackInfo() + "STACKREF:" + a.toString(), INOP);
+//      //System.out.println("push val ref " + a);
+//    }
+    else {
+      return true;
     }
-      
+    return false;
   }
   
   String stackInfo() {
-    return "\t\tsp=" + sp + " fp=" + fp;
+    return "sp=" + sp + "\t";
   }
 }

@@ -27,4 +27,8 @@ public class ProcessorError extends Error {
     // TODO Auto-generated constructor stub
   }
 
+  public static class ProcessorFinishedError extends ProcessorError {
+  }
+  public static class ProcessorBreakpointError extends ProcessorError {
+  }
 }

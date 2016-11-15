@@ -3,6 +3,7 @@ package com.pelleplutt.plang;
 import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
 import com.pelleplutt.plang.ASTNode.ASTNodeNumeric;
 import com.pelleplutt.plang.ASTNode.ASTNodeOp;
+import com.pelleplutt.plang.ASTNode.ASTNodeString;
 import com.pelleplutt.plang.ASTNode.ASTNodeSymbol;
 
 public class ASTOptimiser {
@@ -196,6 +197,32 @@ public class ASTOptimiser {
         parent.operands.set(parent.operands.indexOf(a), rNode);
       }
     }
+    else {
+      boolean opStringChildsOnly = false;
+      if (a instanceof ASTNodeOp && a.operands != null && !a.operands.isEmpty()) {
+        ASTNodeOp opNode = (ASTNodeOp)a;
+        opStringChildsOnly = true;
+        for (ASTNode arg : opNode.operands) {
+          if (!(arg instanceof ASTNodeString)) {
+            opStringChildsOnly = false;
+            break;
+          }
+        }
+      }
+      
+      if (opStringChildsOnly) {
+        ASTNodeOp opNode = (ASTNodeOp)a;
+        ASTNodeString rNode;
+        if (opNode.op == AST.OP_PLUS) {
+          ASTNodeString e1 = (ASTNodeString)opNode.operands.get(0);
+          ASTNodeString e2 = (ASTNodeString)opNode.operands.get(1);
+          String r = e1.string + e2.string; 
+          rNode = new ASTNodeString(r);
+          parent.operands.set(parent.operands.indexOf(a), rNode);
+        }
+      }
+    }
+
   }
 
   

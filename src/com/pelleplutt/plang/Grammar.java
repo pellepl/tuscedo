@@ -47,6 +47,9 @@ public class Grammar {
           "label:         OP_LABEL\n" +
           "module:        OP_MODULE\n" +
           "global:        OP_GLOBAL\n" +
+          "funcdef:       OP_FUNCDEF\n" +
+          "return:        OP_RETURN\n" +
+          "bkpt:          OP_BKPT\n" +
           
           "cond:          if else\n" +
           "expr:          expr_op_bin expr_op_una\n" +
@@ -57,13 +60,14 @@ public class Grammar {
           "jmp:           goto for while break label\n" +
           "stat:          assign global op call cond\n" + 
           "oper:          stat jmp\n" + 
-          "code:          blok oper sym break continue module\n" + 
+          "code:          blok oper sym break continue module funcdef return bkpt\n" + 
   "";
   static final String GRAMMAR_RULES = 
           "OP_LABEL:      sym\n" +
           "dot:           sym | dot , sym\n" +
-          "assign:        sym | array , op | val | range | nil | assign | blok | rel_op | array\n" +
-          "assign_op:     sym , op | call | val\n" +
+          "assign:        sym | array , op | val | str | range | nil | assign | blok | rel_op | array\n" +
+          "return:        op | val | str | range | nil | assign | blok | rel_op | array\n" +
+          "assign_op:     sym , op | call | val | str\n" +
           "assign_op_add: sym , str\n" +
           "range:         val | range , val\n" +
           "global:        sym\n" +
@@ -77,12 +81,13 @@ public class Grammar {
           "goto:          sym\n" +
           "call:          arg*\n" +
           "blok:          code*\n" +
-          "for:           stat | sym , rel_op , stat , code\n" +
+          "for:           stat | sym , rel_op | val , stat , code\n" +
           "for:           sym , in , code\n" +
-          "while:         rel_op , code\n" +
-          "if:            rel_op , code\n" + 
-          "if:            rel_op , code , else\n" + 
+          "while:         rel_op | val  , code\n" +
+          "if:            rel_op | val , code\n" + 
+          "if:            rel_op | val , code , else\n" + 
           "else:          code\n" + 
+          "funcdef:       blok\n" + 
   "";
       
   Map<String, List<String>> defMap = new HashMap<String, List<String>>();
@@ -92,7 +97,7 @@ public class Grammar {
   // For each rule, there is a list of OperandAccepts. Each entry in the list denotes list of possible
   // operators for given operand index == list index.
   Map<Integer, List<Rule>> ruleMap = new HashMap<Integer, List<Rule>>();
-  boolean dbg = false;
+  static boolean dbg = false;
   
   void build() throws IOException {
     // read all definitions

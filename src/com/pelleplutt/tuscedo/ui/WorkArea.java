@@ -53,6 +53,7 @@ import com.pelleplutt.tuscedo.ProcessGroupInfo;
 import com.pelleplutt.tuscedo.Serial;
 import com.pelleplutt.tuscedo.Settings;
 import com.pelleplutt.tuscedo.Tuscedo;
+import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.AppSystem.Disposable;
 import com.pelleplutt.util.FastTermPane;
 import com.pelleplutt.util.FastTextPane;
@@ -76,7 +77,8 @@ public class WorkArea extends JPanel implements Disposable {
   static final int ISTATE_FIND_REGEX = 2;
   static final int ISTATE_OPEN_SERIAL = 3;
   static final int ISTATE_BASH = 4;
-  static final int _ISTATE_NUM = 5;
+  static final int ISTATE_HEX = 5;
+  static final int _ISTATE_NUM = 6;
   
   static final String PORT_ARG_BAUD = "baud:";
   static final String PORT_ARG_DATABITS = "databits:";
@@ -303,6 +305,7 @@ public class WorkArea extends JPanel implements Disposable {
       defineAction(input[i], "input.findback", "ctrl+shift+f", actionOpenFindBack);
       defineAction(input[i], "input.findregx", "alt+f", actionOpenFindRegex);
       defineAction(input[i], "input.findregxback", "alt+shift+f", actionOpenFindRegexBack);
+      defineAction(input[i], "input.hex", "ctrl+h", actionOpenHex);
       defineAction(input[i], "input.inputclose", "escape", actionInputClose);
       defineAction(input[i], "input.inputenter", "enter", actionInputEnter);
       defineAction(input[i], "input.inputenterback", "shift+enter", actionInputEnterBack);
@@ -550,6 +553,9 @@ public class WorkArea extends JPanel implements Disposable {
     case ISTATE_FIND_REGEX:
       inputLabel[istate].setText("REGEX");
       break;
+    case ISTATE_HEX:
+      inputLabel[istate].setText("HEX");
+      break;
     case ISTATE_OPEN_SERIAL:
       inputLabel[istate].setText("OPEN SERIAL");
       break;
@@ -612,6 +618,16 @@ public class WorkArea extends JPanel implements Disposable {
     case ISTATE_FIND_REGEX:
       handleFind(in, shift, istate == ISTATE_FIND_REGEX);
       break;
+    case ISTATE_HEX:
+    {
+      byte[] b = AppSystem.parseBytes(in);
+      if (b != null && b.length > 0) {
+        String s = AppSystem.formatBytes(b);
+        views[ISTATE_INPUT].ftp.addText("[" + s + "]\n", STYLE_CONN_IN);
+        serial.transmit(b);
+      }
+      break;
+    }
     case ISTATE_OPEN_SERIAL:
       handleOpenSerial(in);
       break;
@@ -725,6 +741,12 @@ public class WorkArea extends JPanel implements Disposable {
       WorkArea.this.enterInputState(ISTATE_FIND_REGEX);
     } else {
       handleFind(input[istate].getText(), shift, regex);
+    }
+  }
+  
+  void actionHex(boolean shift) {
+    if (istate != ISTATE_HEX) {
+      WorkArea.this.enterInputState(ISTATE_HEX);
     }
   }
   
@@ -890,6 +912,13 @@ public class WorkArea extends JPanel implements Disposable {
     @Override
     public void actionPerformed(ActionEvent e) {
       actionBash();
+    }
+  };
+
+  AbstractAction actionOpenHex = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      actionHex(false);
     }
   };
 

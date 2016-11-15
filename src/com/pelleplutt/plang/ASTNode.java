@@ -67,28 +67,40 @@ public abstract class ASTNode {
   }
   
   public static class ASTNodeBlok extends ASTNode {
-    Map<String, ASTNodeSymbol> symMap;
+    List<ASTNodeSymbol> symList;
+    List<ASTNodeSymbol> argList;
     int scopeLevel;
     String id;
     String module;
-    ASTNodeBlok parent;
+    ASTNodeBlok parentBlock;
     int type;
     boolean variablesHandled;
-    static final int MAIN = 0;
-    static final int FUNC = 1;
-    static final int ANON = 2;
+    public static final int TYPE_MAIN = 0;
+    public static final int TYPE_FUNC = 1;
+    public static final int TYPE_ANON = 2;
     public ASTNodeBlok(ASTNode... operands) {
       super(AST.OP_BLOK, operands);
     }
-    public void setAnnotation(Map<String, ASTNodeSymbol> symMap, int scopeLevel, String id, String module, int type) {
-      this.symMap = symMap;
+    public void setAnnotation(List<ASTNodeSymbol> symList, int scopeLevel, String id, String module, int type) {
+      this.symList = symList;
       this.scopeLevel = scopeLevel;
       this.id = id;
       this.module = module;
       this.type = type;
     }
-    public Map<String, ASTNodeSymbol> getVariables() {
-      return this.symMap;
+    public void setAnnotation(List<ASTNodeSymbol> symList, List<ASTNodeSymbol> argList, int scopeLevel, String id, String module, int type) {
+      this.symList = symList;
+      this.argList = argList;
+      this.scopeLevel = scopeLevel;
+      this.id = id;
+      this.module = module;
+      this.type = type;
+    }
+    public List<ASTNodeSymbol> getVariables() {
+      return this.symList;
+    }
+    public List<ASTNodeSymbol> getArguments() {
+      return this.argList;
     }
     public String getModule() {
       return this.module;
@@ -100,7 +112,10 @@ public abstract class ASTNode {
       return this.id;
     }
     public boolean gotUnhandledVariables() {
-      return !variablesHandled && !symMap.isEmpty();
+      return !variablesHandled && (!symList.isEmpty() || (argList != null && !argList.isEmpty()));
+    }
+    public boolean isVariablesHandled() {
+      return variablesHandled;
     }
     public void setVariablesHandled() {
       variablesHandled = true;
@@ -157,10 +172,25 @@ public abstract class ASTNode {
     public String toString() {
       return symbol;
     }
+    
+    public boolean equals(Object o) {
+      if (o instanceof String)
+        return ((String)o).equals(symbol);
+      else if (o instanceof ASTNodeSymbol) 
+        return ((ASTNodeSymbol)o).symbol.equals(symbol);
+      else
+        return false;
+    }
+    
+    public int hashCode() {
+      return symbol.hashCode();
+    }
+    
   }
 
   public static class ASTNodeFuncDef extends ASTNode {
     String name;
+    public List<ASTNode> arguments;
 
     public ASTNodeFuncDef(String s, ASTNode... operands) {
       super(AST.OP_FUNCDEF, operands);
@@ -169,15 +199,19 @@ public abstract class ASTNode {
 
     public String toString() {
       StringBuilder sb = new StringBuilder();
-      sb.append("def:" + name);
+      sb.append(name);
       sb.append('(');
-      for (int i = 0; i < operands.size(); i++) {
-        sb.append(operands.get(i).toString());
-        if (i < operands.size() - 1)
+      for (int i = 0; arguments != null && i < arguments.size(); i++) {
+        sb.append(arguments.get(i).toString());
+        if (i < arguments.size() - 1)
           sb.append(',');
       }
-      sb.append(')');
+      sb.append("):");
+      sb.append(super.toString());
       return sb.toString();
+    }
+    public void setArguments(List<ASTNode> args) {
+      arguments = args;
     }
   }
 

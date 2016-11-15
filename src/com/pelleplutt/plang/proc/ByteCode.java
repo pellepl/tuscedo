@@ -11,40 +11,39 @@ public interface ByteCode {
   
   static final int INOP  = 0x00;
   
-  static final int IADD  = 0x01;
-  static final int ISUB  = 0x02;
-  static final int IMUL  = 0x03;
-  static final int IDIV  = 0x04;
-  static final int IREM  = 0x05;
-  static final int ISHL  = 0x06;
-  static final int ISHR  = 0x07;
-  static final int IAND  = 0x08;
-  static final int IOR   = 0x09;
-  static final int IXOR  = 0x0a;
-  static final int ICMP  = 0x0b;
-  static final int ICMN  = 0x0c;
-  static final int INOT  = 0x0d;
-  static final int INEG  = 0x0e;
+  static final int IADD  = 0x01; // add                          push(pop() + pop())
+  static final int ISUB  = 0x02; // sub                          push(pop() - pop())
+  static final int IMUL  = 0x03; // mul                          push(pop() * pop())
+  static final int IDIV  = 0x04; // div                          push(pop() / pop())
+  static final int IREM  = 0x05; // rem                          push(pop() % pop())
+  static final int ISHL  = 0x06; // shift left                   push(pop() << pop())
+  static final int ISHR  = 0x07; // shift right                  push(pop() >> pop())
+  static final int IAND  = 0x08; // and                          push(pop() & pop())
+  static final int IOR   = 0x09; // or                           push(pop() | pop())
+  static final int IXOR  = 0x0a; // xor                          push(pop() ^ pop())
+  static final int ICMP  = 0x0b; // compare                      pop() - pop()
+  static final int ICMN  = 0x0c; // compare neg                  -(pop() - pop())
+  static final int INOT  = 0x0d; // not                          push(!pop())
+  static final int INEG  = 0x0e; // negate                       push(-pop())
 
   static final int IADI  = 0x11; // add immediate                 push(pop() + xx+1)
   static final int ISUI  = 0x12; // sub immediate                 push(pop() - (xx+1))
   static final int IPUI  = 0x13; // push signed immediate         push(xx)
+  static final int IPU0  = 0x14; // push nil                      push(nil)
   
   static final int IPOP  = 0x20; 
   static final int IDUP  = 0x21; 
   static final int IROT  = 0x22;
-  static final int ICPY  = 0x23; // copy stack entry to top       push(sp[xx+1])
+  static final int ICPY  = 0x23; // copy stack entry to top       push($sp[ss])
   static final int ISTR  = 0x24; // pop to memory                 mem[pop()]=pop()
   static final int ISTI  = 0x25; // pop to memory immediate       mem[xxxxxx]=pop()
   static final int ILD   = 0x26; // push from memory              push(mem[pop])
   static final int ILDI  = 0x27; // push from memory immediate    push(mem[xxxxxx])
-  static final int ISTF  = 0x28; // store to stack rel fp         fp[xx]=pop()
-  static final int ILDF  = 0x29; // load from stack rel fp        push(fp[xx])
-  static final int ISTFL = 0x2a; // store to stack rel fp long    fp[xxxxxx]=pop()
-  static final int ILDFL = 0x2b; // load from stack rel fp long   push(fp[xxxxxx])
+  static final int ISTF  = 0x28; // store to stack rel fp         $fp[ss]=pop()
+  static final int ILDF  = 0x29; // load from stack rel fp        push($fp[ss])
 
-  static final int IALL  = 0x2c; // allocate on stack             $sp += xx+1
-  static final int IFRE  = 0x2d; // deallocate from stack         $sp -= xx+1
+  static final int ISPI  = 0x2c; // allocate on stack             $sp += xx+1
+  static final int ISPD  = 0x2d; // deallocate from stack         $sp -= xx+1
 
   static final int IADQ1 = 0x30; // add quick                     push(pop() + 1)
   static final int IADQ2 = 0x31; // add quick                     push(pop() + 2)
@@ -64,30 +63,33 @@ public interface ByteCode {
   static final int ISUQ8 = 0x3f; // sub quick                     push(pop() - 8)
 
   
-  static final int ICAL  = 0xe0; 
-  static final int IRET  = 0xe8; 
-  static final int IJMP  = 0xf0; 
+  static final int ICAL = 0xe0;  // call function                 a=pop(); push($pc+3); push($fp); $fp=sp; $pc=a
+  static final int ICALI = 0xe1; // call function immediate       push($pc+3); push($fp); $fp=sp; $pc=xxxxxx
+  static final int IRET  = 0xe8; // return                        $sp=$fp; $fp=pop(); $pc=pop();
+  static final int IRETV = 0xe9; // return val                    t=pop(); $sp=$fp; $fp=pop(); $pc=pop(); push(t);
+  static final int IJMP  = 0xf0; // jump                          $pc = xxxxxx 
   static final int IJMPEQ  = 0xf1; 
   static final int IJMPNE  = 0xf2; 
   static final int IJMPGT  = 0xf3; 
   static final int IJMPGE  = 0xf4; 
   static final int IJMPLT  = 0xf5; 
   static final int IJMPLE  = 0xf6; 
-  static final int IBRA  = 0xf8; 
+  static final int IBRA  = 0xf8; // branch                        $pc = $pc + ssssss  
   static final int IBRAEQ  = 0xf9; 
   static final int IBRANE  = 0xfa; 
   static final int IBRAGT  = 0xfb; 
   static final int IBRAGE  = 0xfc; 
   static final int IBRALT  = 0xfd; 
   static final int IBRALE  = 0xfe; 
+  static final int IBKPT   = 0xff; // breakpoint 
   
   
   static final int UD = -1;  
   static final int ISIZE[] = {
       //0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,UD, //00
-       UD, 2, 2, 2,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //10
-        1, 1, 1, 2, 1, 4, 1, 4, 2, 2, 4, 4, 2, 2,UD,UD, //20
+       UD, 2, 2, 2, 1,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //10
+        1, 1, 1, 2, 1, 4, 1, 4, 2, 2,UD,UD, 2, 2,UD,UD, //20
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, //30
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //40
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //50
@@ -99,7 +101,7 @@ public interface ByteCode {
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //b0
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //c0
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //d0
-        4,UD,UD,UD,UD,UD,UD,UD, 1,UD,UD,UD,UD,UD,UD,UD, //e0
+        1, 4,UD,UD,UD,UD,UD,UD, 1,UD,UD,UD,UD,UD,UD,UD, //e0
         4, 4, 4, 4, 4, 4, 4,UD, 4, 4, 4, 4, 4, 4, 4,UD, //f0
  };
   
