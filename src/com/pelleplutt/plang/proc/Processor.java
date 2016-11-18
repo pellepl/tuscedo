@@ -40,6 +40,7 @@ public class Processor implements ByteCode {
     sp = memorySize - 1;
     pc = 0;
     fp = sp;
+    nilM.type = TNIL;
     memory = new M[memorySize];
     for (int i = 0; i < memorySize; i++) memory[i] = new M();
     this.code = exe.getMachineCode();
@@ -111,6 +112,9 @@ public class Processor implements ByteCode {
     case INEG:
       sb.append("neg     ");
       break;
+    case ILNOT:
+      sb.append("lnot    ");
+      break;
     
     case IADI:
       sb.append("add_im  ");
@@ -126,6 +130,10 @@ public class Processor implements ByteCode {
       break;
     case IPU0:
       sb.append("push_nil");
+      break;
+    case IPUC:
+      sb.append("push_c  ");
+      sb.append(String.format("0x%06x", codetoi(code, pc, 3)));
       break;
 
     case IADQ1:
@@ -177,14 +185,24 @@ public class Processor implements ByteCode {
       sb.append("sub_q8  ");
       break;
       
+    case ITOI:
+      sb.append("cast_I  ");
+      break;
+    case ITOF:
+      sb.append("cast_F  ");
+      break;
+    case ITOS:
+      sb.append("cast_S  ");
+      break;
+      
     case IPOP:
       sb.append("pop     ");
       break;
     case IDUP:
       sb.append("dup     ");
       break;
-    case IROT:
-      sb.append("rot     ");
+    case ISWP:
+      sb.append("swap    ");
       break;
     case ICPY:
       sb.append("cpy     ");
@@ -220,6 +238,25 @@ public class Processor implements ByteCode {
     case ISPD:
       sb.append("sp_decr ");
       sb.append(String.format("%d", codetoi(code, pc, 1) + 1));
+      break;
+
+    case IIXRD:
+      sb.append("arr_rd  ");
+      break;
+    case IIXWR :
+      sb.append("arr_wr  ");
+      break;
+    case IIXADD:
+      sb.append("arr_add ");
+      break;
+    case IIXDEL:
+      sb.append("arr_del ");
+      break;
+    case IIXINS:
+      sb.append("arr_ins ");
+      break;
+    case IIXSZ:
+      sb.append("arr_sz  ");
       break;
 
     case ICAL: 
@@ -375,7 +412,7 @@ public class Processor implements ByteCode {
   }
   
   M tmpM = new M();
-  void rot() {
+  void swp() {
     M m1 = pop();
     M m2 = tmpM.copy(pop());
     push(m1);
@@ -492,9 +529,20 @@ public class Processor implements ByteCode {
     }
   }
 
+  void sub() {
+    sub(true, true);
+  }
   void sub(boolean push) {
+    sub(push, true);
+  }
+  void sub(boolean push, boolean naturalOrder) {
     M e2 = pop();
     M e1 = pop();
+    if (!naturalOrder) {
+      M tmp = e1;
+      e1 = e2;
+      e2 = tmp;
+    }
     if (e1.type == e2.type) {
       if (e1.type == TINT) {
         int r = e1.i - e2.i;
@@ -536,6 +584,39 @@ public class Processor implements ByteCode {
     sub(false);
   }
   
+  void cmn() {
+    sub(false, false);
+  }
+  
+  void not() {
+    M e1 = pop();
+    if (e1.type == TINT) {
+      push(~e1.i);
+    } else {
+      throw new ProcessorError("cannot NOT type " + TSTRING[e1.type]);
+    }
+  }
+  
+  void neg() {
+    M e1 = pop();
+    if (e1.type == TINT) {
+      push(-e1.i);
+    } else if (e1.type == TFLOAT) {
+      push(-e1.f);
+    } else {
+      throw new ProcessorError("cannot negate type " + TSTRING[e1.type]);
+    }
+  }
+  
+  void lnot() {
+    M e1 = pop();
+    if (e1.type == TINT) {
+      push(e1.i == 0 ? 1 : 0);
+    } else {
+      throw new ProcessorError("cannot logical not type " + TSTRING[e1.type]);
+    }
+  }
+  
   void adi() {
     push(codetoi(code, pc++, 1) + 1);
     add();
@@ -543,7 +624,7 @@ public class Processor implements ByteCode {
 
   void sui() {
     push(codetoi(code, pc++, 1) + 1);
-    sub(true);
+    sub();
   }
   
   void pui() {
@@ -554,6 +635,11 @@ public class Processor implements ByteCode {
     push(nilM);
   }
 
+  void puc() {
+    push(codetoi(code, pc, 3));
+    pc += 3;
+  }
+
   void adq(int x) {
     push(x);
     add();
@@ -561,7 +647,41 @@ public class Processor implements ByteCode {
 
   void suq(int x) {
     push(x);
-    sub(true);
+    sub();
+  }
+  
+  void to(int type) {
+    M m = peekStack(0);
+    switch (type) {
+    case TINT:
+      switch (m.type) {
+      case TCODE:
+      case TINT: break;
+      case TFLOAT: m.i = (int)m.f; break;
+      case TNIL: m.i = 0; break;
+      case TSTR: m.i = Integer.parseInt(m.str); break;
+      case TLIST: break;
+      case TMAP: break;
+      case TREF: break;
+      }
+      break;
+    case TFLOAT:
+      switch (m.type) {
+      case TFLOAT: break;
+      case TCODE:
+      case TINT: m.f = m.i; break;
+      case TNIL: m.f = 0; break;
+      case TSTR: m.f = Float.parseFloat(m.str); break;
+      case TLIST: break;
+      case TMAP: break;
+      case TREF: break;
+      }
+      break;
+    case TSTR:
+      m.str = m.asString();
+      break;
+    }
+    m.type = (byte)type;
   }
   
   void mul() {
@@ -718,8 +838,12 @@ public class Processor implements ByteCode {
   }
   
   void cal() {
-    int a = pop().i;
-    push(pc+3);
+    M addr = pop();
+    int a = addr.i;
+    if (addr.type != TINT && addr.type != TCODE) {
+      throw new ProcessorError("calling bad type " + TSTRING[addr.type]);
+    }
+    push(pc);
     push(fp);
     fp = sp;
     pc = a;
@@ -762,8 +886,25 @@ public class Processor implements ByteCode {
     push(t);
   }
   
-  void jmp() {
-    pc = codetoi(code, pc, 3);
+  void jmp(int icond) {
+    int dst = codetoi(code, pc, 3);
+    pc += 3;
+    switch (icond) {
+    case ICOND_AL:
+      pc = dst; break;
+    case ICOND_EQ:
+      if (zero) pc = dst; break;
+    case ICOND_NE:
+      if (!zero) pc = dst; break;
+    case ICOND_GE:
+      if (zero || !minus) pc = dst; break;
+    case ICOND_GT:
+      if (!zero && !minus) pc = dst; break;
+    case ICOND_LE:
+      if (zero || minus) pc = dst; break;
+    case ICOND_LT:
+      if (!zero && minus) pc = dst; break;
+    }
   }
   
   void bra(int icond) {
@@ -811,7 +952,7 @@ public class Processor implements ByteCode {
       add();
       break;
     case ISUB:
-      sub(true);
+      sub();
       break;
     case IMUL:
       mul();
@@ -841,10 +982,16 @@ public class Processor implements ByteCode {
       cmp();
       break;
     case ICMN:
+      cmn();
       break;
     case INOT:
+      not();
       break;
     case INEG:
+      neg();
+      break;
+    case ILNOT:
+      lnot();
       break;
       
     case IADI:
@@ -858,6 +1005,9 @@ public class Processor implements ByteCode {
       break;
     case IPU0:
       pu0();
+      break;
+    case IPUC:
+      puc();
       break;
     
     case IADQ1:
@@ -909,14 +1059,24 @@ public class Processor implements ByteCode {
       suq(8);
       break;
 
+    case ITOI:
+      to(TINT);
+      break;
+    case ITOF:
+      to(TFLOAT);
+      break;
+    case ITOS:
+      to(TSTR);
+      break;
+
     case IPOP:
       pop();
       break;
     case IDUP:
       dup();
       break;
-    case IROT:
-      rot();
+    case ISWP:
+      swp();
       break;
     case ICPY:
       cpy();
@@ -947,6 +1107,22 @@ public class Processor implements ByteCode {
       spd();
       break;
 
+    case IIXRD:
+      break;
+    case IIXWR:
+      break;
+    case IIXADD:
+      break;
+    case IIXDEL:
+      break;
+    case IIXINS:
+      break;
+    case IIXSZ:
+      break;
+
+    case ICAL: 
+      cal();
+      break;
     case ICALI: 
       cali();
       break;
@@ -957,7 +1133,25 @@ public class Processor implements ByteCode {
       retv();
       break;
     case IJMP: 
-      jmp();
+      jmp(ICOND_AL);
+      break;
+    case IJMPEQ: 
+      jmp(ICOND_EQ);
+      break;
+    case IJMPNE: 
+      jmp(ICOND_NE);
+      break;
+    case IJMPGE: 
+      jmp(ICOND_GE);
+      break;
+    case IJMPGT: 
+      jmp(ICOND_GT);
+      break;
+    case IJMPLE: 
+      jmp(ICOND_LE);
+      break;
+    case IJMPLT: 
+      jmp(ICOND_LT);
       break;
     case IBRA: 
       bra(ICOND_AL);
@@ -1020,6 +1214,9 @@ public class Processor implements ByteCode {
         return str;
       case TCODE:
         return String.format("->0x%08x", i);
+      case TLIST:
+      case TMAP:
+        return "TODO"; // TODO
       case TREF:
         return ref.asString();
       default:
@@ -1040,6 +1237,10 @@ public class Processor implements ByteCode {
         return "s\'" + asString() + "'";
       case TCODE:
         return "c" + asString();
+      case TLIST:
+        return "l" + asString();
+      case TMAP:
+        return "m" + asString();
       case TREF:
         return "ref" + asString();
       default:

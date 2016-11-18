@@ -51,6 +51,10 @@ public class StructAnalysis {
     // System.out.println("    scopeStack:" + scopeStack.id + " " + scopeStack);
     if (e.op == OP_MODULE) {
       module = ((ASTNodeSymbol)e.operands.get(0)).symbol;
+      if (scopeStack.size() > 1) {
+        throw new CompilerError("cannot declare module '"+module+"' within a scope", e);
+      }
+      
     } 
     else if (e.op == OP_BLOK) {
       ASTNodeBlok eblok = (ASTNodeBlok)e;
@@ -80,6 +84,9 @@ public class StructAnalysis {
     else if (e.op == OP_RETURN) {
       if (e.operands!=null && e.operands.size()>0) {
         analyseRecurse(e.operands.get(0), scopeStack, parentNode, true, loop);
+        if (e.operands.get(0) instanceof ASTNodeBlok) {
+          newAnonymousScope((ASTNodeBlok)e.operands.get(0), e);
+        }
       }
     }
     else if (e.op == OP_FUNCDEF) {
@@ -120,23 +127,7 @@ public class StructAnalysis {
       if (tnode instanceof ASTNodeBlok) {
         // anonymous scope
         // System.out.println("ENTER anon " + e);
-        ASTNodeBlok be = (ASTNodeBlok)tnode;
-        Scope globalScope = mainScopeStack.get(0);
-        be.parentBlock = globalScope.block;
-        
-        String blockId = getBlockId() + "A";
-        ScopeStack anonScopeStack = new ScopeStack();
-        anonScopeStack.push(globalScope);
-        Scope anonScope = new Scope(globalScope.block);
-        anonScopeStack.push(anonScope);
-        if (dbg) System.out.println(">>> branch off anon");
-        if (tnode.operands != null) {
-          for (ASTNode e2 : tnode.operands) {
-            analyseRecurse(e2, anonScopeStack, e, false, false);
-          }
-        }
-        be.setAnnotation(anonScope.symList, anonScopeStack.size(), blockId, module, ASTNodeBlok.TYPE_ANON);
-        if (dbg) System.out.println("<<< branch back anon");
+        newAnonymousScope((ASTNodeBlok)tnode, e);
         // System.out.println("LEAVE anon " + be + " got symbols " + anonScope.symList + " and args " + anonScope.symArgs);
       } else {
         if (e.operands != null) {
@@ -216,7 +207,26 @@ public class StructAnalysis {
         }
       }
     }
- }
+  }
+  
+  void newAnonymousScope(ASTNodeBlok be, ASTNode parent) {
+    Scope globalScope = mainScopeStack.get(0);
+    be.parentBlock = globalScope.block;
+    
+    String blockId = getBlockId() + "A";
+    ScopeStack anonScopeStack = new ScopeStack();
+    anonScopeStack.push(globalScope);
+    Scope anonScope = new Scope(globalScope.block);
+    anonScopeStack.push(anonScope);
+    if (dbg) System.out.println(">>> branch off anon");
+    if (be.operands != null) {
+      for (ASTNode e2 : be.operands) {
+        analyseRecurse(e2, anonScopeStack, parent, false, false);
+      }
+    }
+    be.setAnnotation(anonScope.symList, anonScopeStack.size(), blockId, module, ASTNodeBlok.TYPE_ANON);
+    if (dbg) System.out.println("<<< branch back anon");
+  }
   
   public static void analyse(ASTNodeBlok e) {
     StructAnalysis cg = new StructAnalysis();

@@ -191,13 +191,13 @@ public class XtermConsole implements Console, KeyListener, Disposable, Runnable 
       
       xterm = new XtermStream(this) {
         @Override
-        public void data(byte[] data, int len) {
+        public void data(byte[] data, int len, int offset) {
           putBuf(data, len);
         }
         @Override
-        public void symbol(byte[] symdata, int len, int sym) {
+        public void symbol(byte[] symdata, int len, int sym, int offset) {
           flushBuf();
-          super.symbol(symdata, len, sym);
+          super.symbol(symdata, len, sym, offset);
         }
       };
     }

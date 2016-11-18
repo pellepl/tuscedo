@@ -1,14 +1,34 @@
 package com.pelleplutt.plang;
 
+import static com.pelleplutt.plang.AST.OP_AND;
+import static com.pelleplutt.plang.AST.OP_DIV;
+import static com.pelleplutt.plang.AST.OP_DOT;
+import static com.pelleplutt.plang.AST.OP_EQ;
+import static com.pelleplutt.plang.AST.OP_EQ2;
+import static com.pelleplutt.plang.AST.OP_GE;
+import static com.pelleplutt.plang.AST.OP_GT;
+import static com.pelleplutt.plang.AST.OP_LE;
+import static com.pelleplutt.plang.AST.OP_LT;
+import static com.pelleplutt.plang.AST.OP_MINUS;
+import static com.pelleplutt.plang.AST.OP_MUL;
+import static com.pelleplutt.plang.AST.OP_NEQ;
+import static com.pelleplutt.plang.AST.OP_BNOT;
+import static com.pelleplutt.plang.AST.OP_OR;
+import static com.pelleplutt.plang.AST.OP_PLUS;
+import static com.pelleplutt.plang.AST.OP_RANGE;
+import static com.pelleplutt.plang.AST.OP_SHLEFT;
+import static com.pelleplutt.plang.AST.OP_SHRIGHT;
+import static com.pelleplutt.plang.AST.OP_SYMBOL;
+import static com.pelleplutt.plang.AST.OP_XOR;
+
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-
-import static com.pelleplutt.plang.AST.*;
 
 public abstract class ASTNode {
   int op;
   List<ASTNode> operands;
+  public int stroffset = -1;
+  public int strlen = -1;
 
   public ASTNode(int op) {
     this.op = op;
@@ -58,7 +78,7 @@ public abstract class ASTNode {
     if (op == OP_XOR) return "xor";
     if (op == OP_SHLEFT) return ">>";
     if (op == OP_SHRIGHT) return "<<";
-    if (op == OP_NOT) return "not";
+    if (op == OP_BNOT) return "not";
     if (op == OP_PLUS) return "+";
     if (op == OP_MINUS) return "-";
     if (op == OP_MUL) return "*";
@@ -185,7 +205,43 @@ public abstract class ASTNode {
     public int hashCode() {
       return symbol.hashCode();
     }
+  }
+
+  public static class ASTNodeCompoundSymbol extends ASTNodeSymbol {
+    ASTNode e;
+    List<ASTNodeSymbol> dots = new ArrayList<ASTNodeSymbol>();
+
+    public ASTNodeCompoundSymbol(ASTNode e) {
+      super(null);
+      op = OP_SYMBOL; // TODO
+      StringBuilder sb = new StringBuilder();
+      ASTNode de = e;
+      while (de != null) {
+        dots.add(0, ((ASTNodeSymbol)de.operands.get(1)));
+        sb.insert(0, "." + ((ASTNodeSymbol)de.operands.get(1)).symbol);
+        if (de.operands.get(0).op == OP_DOT) {
+          de = de.operands.get(0);
+        } else {
+          dots.add(0, ((ASTNodeSymbol)de.operands.get(0)));
+          sb.insert(0, ((ASTNodeSymbol)de.operands.get(0)).symbol);
+          de = null;
+        }
+      }
+      
+      symbol = sb.toString();
+    }
+
+    public String toString() {
+      return symbol;
+    }
     
+    public boolean equals(Object o) {
+      throw new Error();
+    }
+    
+    public int hashCode() {
+      throw new Error();
+    }
   }
 
   public static class ASTNodeFuncDef extends ASTNode {
@@ -216,13 +272,13 @@ public abstract class ASTNode {
   }
 
   public static class ASTNodeFuncCall extends ASTNode {
-    String name;
+    ASTNodeSymbol name;
     int callid;
 
-    public ASTNodeFuncCall(String s, int callid, ASTNode... operands) {
+    public ASTNodeFuncCall(ASTNodeSymbol sym, int callid, ASTNode... operands) {
       super(AST.OP_CALL, operands);
       this.callid = callid;
-      name = s;
+      name = sym;
     }
     
     public void setArguments(List<ASTNode> args) {

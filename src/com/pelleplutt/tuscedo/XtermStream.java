@@ -1062,7 +1062,7 @@ public abstract class XtermStream implements Lexer.Emitter {
   }
   
   @Override
-  public void symbol(byte[] symdata, int len, int sym) {
+  public void symbol(byte[] symdata, int len, int sym, int offset) {
     lastSymData = symdata;
     lastSymLen = len;
     symDataIx = 0;
@@ -1233,7 +1233,7 @@ public abstract class XtermStream implements Lexer.Emitter {
   }
 
   @Override
-  public abstract void data(byte[] data, int len);
+  public abstract void data(byte[] data, int len, int offset);
   
   void handleDecSetRstAttribute(int a, boolean enable) {
     switch (a) {

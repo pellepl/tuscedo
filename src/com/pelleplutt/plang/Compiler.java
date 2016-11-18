@@ -1,5 +1,6 @@
 package com.pelleplutt.plang;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -7,36 +8,47 @@ import java.util.Map;
 import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
 import com.pelleplutt.plang.proc.ExtCall;
 import com.pelleplutt.plang.proc.Processor;
+import com.pelleplutt.plang.proc.ProcessorError;
 import com.pelleplutt.plang.proc.ProcessorError.ProcessorFinishedError;
 
 public class Compiler {
-  public static Executable compile(String s, Map<String, ExtCall> extDefs) {
-    System.out.println("* build tree");
-    //AST.dbg = true;
-    ASTNodeBlok e = AST.buildTree(s);
-    
-    System.out.println("* optimise tree");
-    ASTOptimiser.optimise(e);
-
-    System.out.println("* check grammar");
-    //Grammar.dbg = true;
-    Grammar.check(e);
-
-    System.out.println("* structural analysis");
-    //StructAnalysis.dbg = true;
-    StructAnalysis.analyse(e);
-    
-    System.out.println("* intermediate codegen");
-    //CodeGenFront.dbg = true;
-    List<Module> mods = CodeGenFront.genIR(e);
-
-    System.out.println("* backend codegen");
-    //CodeGenBack.dbg = true;
-    CodeGenBack.compile(mods);
+  static String src;
+  public static Executable compile(Map<String, ExtCall> extDefs, String ...sources) {
+    List<Module> allMods = new ArrayList<Module>();
+    for (String src : sources) {
+      Compiler.src = src;
+      //System.out.println("* build tree");
+      //AST.dbg = true;
+      ASTNodeBlok e = AST.buildTree(src);
+      //System.out.println(e);
+      
+      System.out.println("* optimise tree");
+      ASTOptimiser.optimise(e);
+      System.out.println(e);
+  
+      System.out.println("* check grammar");
+      //Grammar.dbg = true;
+      Grammar.check(e);
+  
+      System.out.println("* structural analysis");
+      //StructAnalysis.dbg = true;
+      StructAnalysis.analyse(e);
+      
+      System.out.println("* intermediate codegen");
+      CodeGenFront.dbg = true;
+      List<Module> mods = CodeGenFront.genIR(e);
+  
+      System.out.println("* backend codegen");
+      //CodeGenBack.dbg = true;
+      CodeGenBack.compile(mods);
+      
+      allMods.addAll(mods);
+    }
+    TAC.dbgResolveRefs = true;
 
     System.out.println("* link");
     Linker.dbg = true;
-    Executable exe = Linker.link(mods, 0x000100, 0x000000, extDefs, true);
+    Executable exe = Linker.link(allMods, 0x000100, 0x000000, extDefs, true);
     
     System.out.println(".. all ok, " + exe.machineCode.length + " bytes of code");
     
@@ -57,52 +69,114 @@ public class Compiler {
         return null;
       }
     });
+    extDefs.put("cos", new ExtCall() {
+      public Processor.M exe(Processor.M[] memory, int sp, int fp) {
+        return new Processor.M((float)Math.cos(memory[fp+3].f));
+      }
+    });
+    extDefs.put("halt", new ExtCall() {
+      public Processor.M exe(Processor.M[] memory, int sp, int fp) {
+        throw new ProcessorError("halt");
+      }
+    });
     
     String src = 
         "module mandel;\n" +
-      
-        "mul = 100;" +
-        "step = 0.4;" +
+        "outln('*************');\n" + 
+        "outln('program start');\n" + 
+        "mul = 100;\n" +
+        "step = 0.4;\n" +
 
-        "func calcIterations(x, y) {" +
-        "  zr = x; zi = y; i = 0;" +
-//TODO        "  while (i++ <= mul) {" +
-        "  while ((i = i + 1) <= mul) {" +
-        "    zr2 = zr*zr; zi2 = zi*zi;" +
-        "    if (zr2 + zi2 > 2*2) break;" + //return i;" +
-        "    zrt = zr;" +
-        "    zr = zr2 - zi2 + x;" +
-        "    zi = 2*zrt*zi + y;" +
+        "func calcIterations(x, y) {\n" +
+        "  zr = x; zi = y; i = 0;\n" +
+        "  while (++i < mul) {\n" +
+        "    zr2 = zr*zr; zi2 = zi*zi;\n" +
+        "    if (zr2 + zi2 > 2*2) break;\n" + //return i;\n" +
+        "    zrt = zr;\n" +
+        "    zr = zr2 - zi2 + x;\n" +
+        "    zi = 2*zrt*zi + y;\n" +
         "  }" +
-        "  return i;" +
+        "  return i;\n" +
         "}" +
         
-        "func fib(n) {" +
-        "  if (n == 0) return 0;" +
-        "  else if (n == 1) return 1;" + 
-        "  else return fib(n - 1) + fib(n - 2);"  +
-        "}" +
+        "func fib(n) {\n" +
+        "  if (n == 0) return 0;\n" +
+        "  else if (n == 1) return 1;\n" + 
+        "  else return fib(n - 1) + fib(n - 2);\n"  +
+        "}\n" +
 
+        "output = '';\n" + 
 //TODO        "for (y in -1.0 # step # 1.0) {" +
 //TODO        "for (y = -1.0; y < 1.0; y += step) {" +
-        "output = '';" + 
         "for (y = -1.0; y < 1.0; y = y + step) {" +
-        "  for (x = -1.6; x < 0.4; x = x + step/2) {" +
-        "    iters = calcIterations(x,y);" +
-        "    if (iters & 1 == 0) output = output + '0';" +
-        "    else                output = output + '1';" +
-        "  }" +
-        "  output = output + '\n';" + 
-        "}" +
-        "out(output);" +
-        "outln('fibo10='+fib(12));" +
+        "  for (x = -1.6; x < 0.4; x = x + step/2) {\n" +
+        "    iters = calcIterations(x,y);\n" +
+        "    if (iters & 1 == 0) output = output + '0';\n" +
+        "    else                output = output + '1';\n" +
+        "  }\n" +
+        "  output = output + '\n';\n" + 
+        "}\n" +
+        "outln('cos(2):' + cos(0.1));\n" +
+        "out('mandel\n' + output);\n" +
+        "anon = {outln('calling anon');return 'hello anon ';};\n" +
+        "mojja = fib;\n" +
+        "outln('fibo='+mojja(12));\n" +
+        "outln(mandel.anon + ':' + anon());\n" +
+        "outln('sisterglobal:' + otherglobal);\n" +
+        "outln('friendglobal:' + walnut.otherglobal);\n" +
+        "sisfun = sisterfunc();\n" +
+        "outln('sisterfunc return value:'  + sisfun);\n" + 
+        "outln('calling it:' + sisfun());\n" +
+        "false = 0;\n" +
+        "true = !false;\n" +
+        "outln('true: ' + true);\n" +
+        "outln('false:' + false);\n" +
+        "if (true) walnut.friendfunc();\n" +
+        "if (!true) halt();\n" +
+//TODO        "hashmap.somekey(); // == hashmap["somekey"]()
+//TODO        "othermodule.hashmap.somekey();  // == othermodule.hashmap["somekey"]()
+//TODO        "othermodule.hashmap.somekey.somesubkey();  // == othermodule.hashmap["somekey"]["somesubkey"]()
+//TODO        "othermodule.hashmap.somekey.somesubkey = 123;  // == othermodule.hashmap["somekey"]["somesubkey"] = 123
         ""
         ;
     
-    Processor.dbgRun = false;
-    Processor.dbgMem = false;
-    Executable e = Compiler.compile(src, extDefs);
+    // DONE:   ambiguity: modulename / variablename when x.key() for x - always prefer variable name in frontend
+    // FIXME:  add 'return' to functions and anon if not explicitly set by programmer
+    // FIXME:  add number of call arguments to stack frame, ie push pc+fp and also argc
+    
+    String siblingsrc = 
+        "module mandel;"+
+        "otherglobal = 'variable sister';\n" + 
+        "func sisterfunc() {" +
+        "  return {outln('sisterfunc anon func called');return 'it worked';};\n" +
+        "}";
+    String othersrc = 
+        "module walnut; otherglobal = 'variable friend';\n" + 
+         "func friendfunc() {" +
+         "  outln('friendfunc called ' + mandel.anon);\n" +
+         "  return;\n" +
+         "}";
+
+    Executable e = null;
+    try {
+      e = Compiler.compile(extDefs, othersrc, siblingsrc, src);
+    } catch (CompilerError ce) {
+      String s = Compiler.getSource();
+      int strstart = ce.getStringStart();
+      int strend = ce.getStringEnd();
+      if (strstart > 0) {
+        int ps = Math.max(0, strstart - 50);
+        int pe = Math.min(s.length(), strend + 50);
+        System.out.println(ce.getMessage());
+        System.out.println("... " + s.substring(ps, strstart) + 
+            " -->" + s.substring(strstart, strend) + "<-- " +
+            s.substring(strend, pe) + " ...");
+      }
+      throw ce;
+    }
     Processor p = new Processor(0x10000, e);
+    //Processor.dbgRun = true;
+    //Processor.dbgMem = true;
     int i = 0;
     try {
       for (; i < 100000000; i++) {
@@ -110,5 +184,9 @@ public class Compiler {
       }
     } catch (ProcessorFinishedError pfe) {}
     System.out.println(i + " instructions executed");
+  }
+
+  private static String getSource() {
+    return src;
   }
 }

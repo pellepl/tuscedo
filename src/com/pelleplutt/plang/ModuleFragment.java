@@ -7,23 +7,24 @@ import java.util.Map;
 
 import com.pelleplutt.plang.TAC.TACCall;
 import com.pelleplutt.plang.TAC.TACLabel;
+import com.pelleplutt.plang.TAC.TACUnresolved;
 import com.pelleplutt.plang.TAC.TACVar;
 import com.pelleplutt.plang.proc.Processor;
 
 public class ModuleFragment {
-  Module module;
-  String name;
-  // three address codes
+  String modname;
+  String fragname;
+  // three address codes, block organised
   List<List<TAC>> tacs = new ArrayList<List<TAC>>();
+  // executable offset
+  int exeOffset;
   // machine codes
   List<Byte> code = new ArrayList<Byte>();
   // labels / fragment machine code offset
   Map<TACLabel, Integer> labels = new HashMap<TACLabel, Integer>();
   // unresolved references
   List<Link> links = new ArrayList<Link>();
-  // global variables for this fragment
-  List<TACVar> gvars = new ArrayList<TACVar>();
-  //fragment machine code offset / string comment
+  // fragment machine code offset / string comment
   Map<Integer, String> dbgcomments = new HashMap<Integer, String>();
   // ASTNode.ASTNodeBlok.TYPE_*
   int type;
@@ -76,7 +77,6 @@ public class ModuleFragment {
   public int getMachineCodeLength() {
     return code.size();
   }
-
   
   public String commentDbg(int codeIx) {
     return dbgcomments.get(codeIx);
@@ -88,13 +88,21 @@ public class ModuleFragment {
     public Link(int pc) {this.pc = pc;};
   }
 
-  public static class LinkVar extends Link {
+  public static class LinkGlobal extends Link {
     TACVar var;
-    public LinkVar(int pc, TACVar var) {
+    public LinkGlobal(int pc, TACVar var) {
       super(pc);
       this.var = var;
     }
     public String toString() {return String.format("link var %s @ 0x%06x", var.toString(), pc);}
+  }
+  public static class LinkUnresolved extends Link {
+    TACUnresolved sym;
+    public LinkUnresolved(int pc, TACUnresolved sym) {
+      super(pc);
+      this.sym = sym;
+    }
+    public String toString() {return String.format("link unresolved %s @ 0x%06x", sym.toString(), pc);}
   }
   public static class LinkConst extends Link {
     TAC cnst;

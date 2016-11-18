@@ -5,6 +5,7 @@ import static com.pelleplutt.plang.AST.OP_BLOK;
 import static com.pelleplutt.plang.AST.OP_BREAK;
 import static com.pelleplutt.plang.AST.OP_CALL;
 import static com.pelleplutt.plang.AST.OP_CONTINUE;
+import static com.pelleplutt.plang.AST.OP_DOT;
 import static com.pelleplutt.plang.AST.OP_EQ;
 import static com.pelleplutt.plang.AST.OP_FOR;
 import static com.pelleplutt.plang.AST.OP_FUNCDEF;
@@ -17,7 +18,6 @@ import static com.pelleplutt.plang.AST.OP_NUMERICD;
 import static com.pelleplutt.plang.AST.OP_NUMERICH1;
 import static com.pelleplutt.plang.AST.OP_NUMERICH2;
 import static com.pelleplutt.plang.AST.OP_NUMERICI;
-import static com.pelleplutt.plang.AST.OP_PLUS;
 import static com.pelleplutt.plang.AST.OP_QUOTE1;
 import static com.pelleplutt.plang.AST.OP_QUOTE2;
 import static com.pelleplutt.plang.AST.OP_RETURN;
@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Stack;
 
 import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
+import com.pelleplutt.plang.ASTNode.ASTNodeCompoundSymbol;
 import com.pelleplutt.plang.ASTNode.ASTNodeFuncCall;
 import com.pelleplutt.plang.ASTNode.ASTNodeNumeric;
 import com.pelleplutt.plang.ASTNode.ASTNodeString;
@@ -52,15 +53,16 @@ import com.pelleplutt.plang.TAC.TACNil;
 import com.pelleplutt.plang.TAC.TACOp;
 import com.pelleplutt.plang.TAC.TACReturn;
 import com.pelleplutt.plang.TAC.TACString;
+import com.pelleplutt.plang.TAC.TACUnaryOp;
+import com.pelleplutt.plang.TAC.TACUnresolved;
 import com.pelleplutt.plang.TAC.TACVar;
 
 public class CodeGenFront {
   static boolean dbg = false;
-  int code = 0;
-  int label = 0;
-  int anonIx = 0;
-  List<Context> ctxs = new ArrayList<Context>();
-  Context ctx;
+  static int label = 0;
+  static int anonIx = 0;
+  List<FrontFragment> ffrags = new ArrayList<FrontFragment>();
+  FrontFragment ffrag;
   
   public static List<Module> genIR(ASTNodeBlok e) {
     CodeGenFront cg = new CodeGenFront();
@@ -73,7 +75,7 @@ public class CodeGenFront {
   public List<Module> doIntermediateCode(ASTNodeBlok eblk) {
     genIR(eblk, eblk);
     if (dbg) printIR(System.out);
-    genCFG(ctxs);
+    genCFG(ffrags);
     //printDot(System.out);
     List<Module> res = gather();
     return res;
@@ -81,83 +83,81 @@ public class CodeGenFront {
   
   List<Module> gather() {
     Map<String, Module> mmap = new HashMap<String, Module>();
-    for (Context ctx : ctxs) {
-      Module m = mmap.get(ctx.module);
-      if (m == null) {
-        m = new Module();
-        m.id = ctx.module;
-        mmap.put(ctx.module, m);
+    for (FrontFragment ffrag : ffrags) {
+      Module module = mmap.get(ffrag.module);
+      if (module == null) {
+        module = new Module();
+        module.id = ffrag.module;
+        mmap.put(ffrag.module, module);
       }
       ModuleFragment frag = new ModuleFragment();
-      frag.name = ctx.name;
-      frag.gvars = ctx.gvars;
-      frag.module = m;
-      frag.type = ctx.type;
-      for (Block block : ctx.blocks) {
+      frag.fragname = ffrag.name;
+      frag.type = ffrag.type;
+      frag.modname = module.id;
+      for (Block block : ffrag.blocks) {
         frag.tacs.add(new ArrayList<TAC>(block.ir));
       }
-      m.frags.add(frag);
-      m.gvars.addAll(frag.gvars);
+      module.frags.add(frag);
     }
     List<Module> res = new ArrayList<Module>();
     res.addAll(mmap.values());
     return res;
   }
   
-  void printBlock(PrintStream out, Context ctx, Block block, String nl) {
+  void printBlock(PrintStream out, FrontFragment ffrag, Block block, String nl) {
     for (TAC t : block.ir) {
       if (t instanceof TACLabel) {
         out.print(t + nl);
       } else {
-        out.print("   " + ctx.ir.indexOf(t) + ":\t"+t+nl);
+        out.print("   " + ffrag.ir.indexOf(t) + ":\t"+t+nl);
       }
     }
   }
   
-  void printContext(PrintStream out, Context ctx) {
+  void printContext(PrintStream out, FrontFragment ffrag) {
     int bix = 0;
-    System.out.println("CONTEXT " + ctx.module + "" + ctx.name);
-    for (Block block : ctx.blocks) {
+    System.out.println("CONTEXT " + ffrag.module + "" + ffrag.name);
+    for (Block block : ffrag.blocks) {
       out.println("======================================== " + bix);
       bix++;
-      printBlock(out, ctx, block, System.getProperty("line.separator"));
+      printBlock(out, ffrag, block, System.getProperty("line.separator"));
     }
     out.println();
   }
   
   void printIR(PrintStream out) {
-    for (Context ctx : ctxs) {
-      printContext(out, ctx);
+    for (FrontFragment ffrag : ffrags) {
+      printContext(out, ffrag);
     }
   }
   
   void printDot(PrintStream out) {
     out.println("digraph G {");
-    int ctxIx = 0;
-    for (Context ctx : ctxs) {
-      String ctxId = ctxIx + "";
-      out.println(ctxId + " [ fontsize=6 label=\"" + ctx.module + "\"];");
-      for (Block block : ctx.blocks) {
-        String nodeId = ctxIx + "." + block.blockId;
+    int ffragIx = 0;
+    for (FrontFragment ffrag : ffrags) {
+      String ffragId = ffragIx + "";
+      out.println(ffragId + " [ fontsize=6 label=\"" + ffrag.module + "\"];");
+      for (Block block : ffrag.blocks) {
+        String nodeId = ffragIx + "." + block.blockId;
         out.print(nodeId + " [ fontsize=6 shape=box label=\"");
-        printBlock(out, ctx, block, "\\l");
+        printBlock(out, ffrag, block, "\\l");
         out.println("\"];");
       }
-      ctxIx++;
+      ffragIx++;
     }
 
-    ctxIx = 0;
-    for (Context ctx : ctxs) {
-      String ctxId = ctxIx + "";
-      out.println(ctxId + "->" + ctxIx + "." + ctx.blocks.get(0).blockId + ";");
-      for (Block block : ctx.blocks) {
-        String nodeId = ctxIx + "." + block.blockId;
+    ffragIx = 0;
+    for (FrontFragment ffrag : ffrags) {
+      String ffragId = ffragIx + "";
+      out.println(ffragId + "->" + ffragIx + "." + ffrag.blocks.get(0).blockId + ";");
+      for (Block block : ffrag.blocks) {
+        String nodeId = ffragIx + "." + block.blockId;
         for (Block eblock : block.exits) {
-          String enodeId = ctxIx + "." + eblock.blockId;
+          String enodeId = ffragIx + "." + eblock.blockId;
           out.println(nodeId + "->" + enodeId + ";");
         }
       }
-      ctxIx++;
+      ffragIx++;
     }
     out.print("}");
   }
@@ -166,27 +166,29 @@ public class CodeGenFront {
   // construct control flow graph DAG from blocks
   //
   
-  void genCFG(List<Context> ctxs) {
-    for (Context c : ctxs) {
-      for (int bix = 0; bix < c.blocks.size(); bix++) {
-        Block b = c.blocks.get(bix);
-        Block nb = bix < c.blocks.size() - 1 ? c.blocks.get(bix+1) : null;
-        TAC t = b.get(b.size()-1);
+  void genCFG(List<FrontFragment> ffrags) {
+    for (FrontFragment ffrag : ffrags) {
+      for (int bix = 0; bix < ffrag.blocks.size(); bix++) {
+        Block b = ffrag.blocks.get(bix);
+        Block nb = bix < ffrag.blocks.size() - 1 ? ffrag.blocks.get(bix+1) : null;
+        TAC last = b.get(b.size()-1);
 
-        if (t instanceof TACGoto) {
-          TACLabel l = ((TACGoto)t).label;
-          Block ob = c.getBlock(l);
+        if (last instanceof TACGoto) {
+          TACLabel l = ((TACGoto)last).label;
+          Block ob = ffrag.getBlock(l);
           b.exits.add(ob);
           ob.entries.add(b);
-        } else if (t instanceof TACGotoCond) {
-          TACLabel l = ((TACGotoCond)t).label;
-          Block ob = c.getBlock(l);
+        } else if (last instanceof TACGotoCond) {
+          TACLabel l = ((TACGotoCond)last).label;
+          Block ob = ffrag.getBlock(l);
           b.exits.add(ob);
           ob.entries.add(b);
           if (nb != null) {
             b.exits.add(nb);
             nb.entries.add(b);
           }
+        } else if (last instanceof TACReturn) {
+          // leaf
         } else {
           if (nb != null) {
             b.exits.add(nb);
@@ -204,48 +206,49 @@ public class CodeGenFront {
   TAC genIR(ASTNode e, ASTNodeBlok parentEblk) {
     if (e.op == OP_BLOK) {
       ASTNodeBlok eblk = (ASTNodeBlok)e;
-      Context oldCtx = ctx;
-      Context newctx = null;
+      FrontFragment oldFrag = ffrag;
+      FrontFragment newFrag = null;
       
       if (eblk.type == ASTNodeBlok.TYPE_ANON) {
-        newctx = new Context(oldCtx.module, ".anon" + (anonIx++));
-        newctx.type = ASTNode.ASTNodeBlok.TYPE_ANON;
-        ctxs.add(newctx);
-        ctx = newctx;
+        newFrag = new FrontFragment(oldFrag.module, ".anon" + (anonIx++));
+        newFrag.type = ASTNode.ASTNodeBlok.TYPE_ANON;
+        ffrags.add(newFrag);
+        ffrag = newFrag;
       } else if (eblk.type == ASTNodeBlok.TYPE_FUNC) {
-        newctx = new Context(oldCtx.module, ".func" + ((ASTNodeBlok)eblk).id);
-        newctx.type = ASTNode.ASTNodeBlok.TYPE_FUNC;
-        ctxs.add(newctx);
-        ctx = newctx;
-      } else if (ctx == null) {
+        newFrag = new FrontFragment(oldFrag.module, ".func" + ((ASTNodeBlok)eblk).id);
+        newFrag.type = ASTNode.ASTNodeBlok.TYPE_FUNC;
+        ffrags.add(newFrag);
+        ffrag = newFrag;
+      } else if (ffrag == null) {
         // first context, must be globals
-        ctx = new Context(eblk.module == null ? ".MAIN" : eblk.module, ".main");
-        ctx.type = ASTNode.ASTNodeBlok.TYPE_MAIN;
-        ctxs.add(ctx);
+        ffrag = new FrontFragment(eblk.module == null ? ".MAIN" : eblk.module, ".main");
+        ffrag.type = ASTNode.ASTNodeBlok.TYPE_MAIN;
+        ffrags.add(ffrag);
         if (eblk.symList != null) {
           // collect the global variables
           for (ASTNode esym : eblk.symList) {
             ASTNodeSymbol sym = (ASTNodeSymbol)esym;
-            ctx.gvars.add(new TACVar(sym, eblk));
+            ffrag.gvars.add(new TACVar(sym, sym.symbol, eblk.getModule(), eblk.getScopeId()));
           }
         }
       }
-      boolean doStackAllocation = (eblk.type != ASTNodeBlok.TYPE_MAIN && eblk.gotUnhandledVariables())||
+      boolean doStackAllocation = (eblk.type != ASTNodeBlok.TYPE_MAIN && eblk.gotUnhandledVariables()) || // TODO REMOVE THIS?
                                   (eblk.gotUnhandledVariables() && 
                                    eblk.getScopeLevel() > 0); // no variable stack allocation for top scopes, these are global vars
       if (doStackAllocation) {
         eblk.setVariablesHandled();
-        add(new TACAlloc(eblk, eblk.type == ASTNodeBlok.TYPE_FUNC));
+        add(new TACAlloc(eblk, eblk.getModule(), eblk.getScopeId(), eblk.type == ASTNodeBlok.TYPE_FUNC));
       }
       for (ASTNode e2 : e.operands) {
         genIR(e2, (ASTNodeBlok)e);
       }
       if (doStackAllocation && eblk.type == ASTNodeBlok.TYPE_MAIN) {
-        add(new TACFree(eblk));
+        add(new TACFree(eblk, eblk.getModule(), eblk.getScopeId()));
       }
-      ctx = oldCtx;
+      // TODO add 'return' if not set by programer for TYPE_ANON and TYPE_FUNC
+      ffrag = oldFrag;
       if (eblk.type == ASTNodeBlok.TYPE_ANON) {
-        return new TACCode(e, newctx);
+        return new TACCode(e, newFrag);
       }
     } 
     
@@ -259,7 +262,28 @@ public class CodeGenFront {
     }
     
     else if (e.op == OP_SYMBOL) {
-      return new TACVar((ASTNodeSymbol)e, getScope(parentEblk, (ASTNodeSymbol)e));
+      ASTNodeBlok declBlok = getScopeIfDef(parentEblk, (ASTNodeSymbol)e);
+      if (declBlok != null) {
+        return new TACVar(e, ((ASTNodeSymbol)e).symbol, declBlok.getModule(), declBlok.getScopeId());
+      } else {
+        return new TACUnresolved((ASTNodeSymbol)e, parentEblk);
+      }
+    }
+    
+    else if (e.op == OP_DOT) {
+      // a.b.c...
+      ASTNodeCompoundSymbol ce = new ASTNodeCompoundSymbol(e);
+      // first, try if initial symbol is a reachable variable. If so, prefer local
+      ASTNodeBlok declBlok = getScopeIfDef(parentEblk, (ASTNodeSymbol)ce.dots.get(0));
+      if (declBlok != null) {
+        // it was, so consider this a hash map - start unwinding it
+        // TODO hashmap
+        throw new Error();
+      } else {
+        // add unresolved for first two path entries <module>.<variable>
+        return new TACUnresolved(e, ce.dots.get(0).symbol, ce.dots.get(1).symbol);
+       // TODO unwind the rest as a hashmap
+      }
     }
     
     else if (e.op == OP_NIL) {
@@ -277,13 +301,21 @@ public class CodeGenFront {
     } 
     
     else if (AST.isOperator(e.op) && !AST.isAssignOperator(e.op)) {
-      TAC left = genIR(e.operands.get(0), parentEblk);  
-      TAC right = genIR(e.operands.get(1), parentEblk);  
-      setReferenced(left);
-      setReferenced(right);
-      TAC op = new TACOp(e, e.op, left, right);
-      add(op);
-      return op;
+      if (AST.isUnaryOperator(e.op)) {
+        TAC operand = genIR(e.operands.get(0), parentEblk);  
+        setReferenced(operand);
+        TAC op = new TACUnaryOp(e, e.op, operand);
+        add(op);
+        return op;
+      } else {
+        TAC left = genIR(e.operands.get(0), parentEblk);  
+        TAC right = genIR(e.operands.get(1), parentEblk);  
+        setReferenced(left);
+        setReferenced(right);
+        TAC op = new TACOp(e, e.op, left, right);
+        add(op);
+        return op;
+      }
     }
     
     else if (e.op == OP_IF) {
@@ -332,7 +364,7 @@ public class CodeGenFront {
         
         boolean doStackAllocation = eblk != null && eblk.gotUnhandledVariables();
         if (doStackAllocation) {
-          add(new TACAlloc(eblk));
+          add(new TACAlloc(eblk, eblk.getModule(), eblk.getScopeId()));
           eblk.setVariablesHandled();
         }
         
@@ -359,7 +391,7 @@ public class CodeGenFront {
         add(lExit);
 
         if (doStackAllocation) {
-          add(new TACFree(eblk));
+          add(new TACFree(eblk, eblk.getModule(), eblk.getScopeId()));
         }
         
       } else {
@@ -380,7 +412,7 @@ public class CodeGenFront {
       
       boolean doStackAllocation = eblk != null && eblk.gotUnhandledVariables();
       if (doStackAllocation) {
-        add(new TACAlloc(eblk));
+        add(new TACAlloc(eblk, eblk.getModule(), eblk.getScopeId()));
         eblk.setVariablesHandled();
       }
 
@@ -400,7 +432,7 @@ public class CodeGenFront {
       add(lExit);
       
       if (doStackAllocation) {
-        add(new TACFree(eblk));
+        add(new TACFree(eblk, eblk.getModule(), eblk.getScopeId()));
       }
     }
     
@@ -431,8 +463,41 @@ public class CodeGenFront {
         setReferenced(argVal);
         add(arg);
       }
-      TAC call = new TACCall(e, ((ASTNodeFuncCall)e).name, args.length);
-      add(call);
+      ASTNodeSymbol callSym = ((ASTNodeFuncCall)e).name;
+      TACCall call = null;
+      if (callSym instanceof ASTNodeCompoundSymbol) {
+        ASTNodeCompoundSymbol ce = (ASTNodeCompoundSymbol)callSym;
+        // first, try if initial symbol is a reachable variable. If so, prefer local
+        ASTNodeBlok declBlok = getScopeIfDef(parentEblk, (ASTNodeSymbol)ce.dots.get(0));
+        if (declBlok != null) {
+          // it was, so consider this calling a hash map function <mapvar>.<key>.<key>...()
+          // TODO hashmap func call unwind
+          throw new Error();
+        } else {
+          // this needs to be linked
+          if (ce.dots.size() == 2) {
+            // only a.b, so presume this is <module>.<function>
+            call = new TACCall((ASTNodeFuncCall)e, args.length, ce.dots.get(0).symbol, null);
+            add(call);
+            call.link = true;
+          } else {
+            // a.b.c..., so presume this is a hashmap call <module>.<mapvar>.<key>.<key>...()
+            // TODO hashmap func call unwind
+            throw new Error();
+          }
+        }
+      } else {
+        ASTNodeBlok scopeBlock = getScopeIfDef(parentEblk, callSym);
+        TACVar var = null;
+        if (scopeBlock != null) {
+          // found a variable with the call name, so presume we're calling a function variable
+          var = new TACVar(e, ((ASTNodeFuncCall)e).name.symbol, scopeBlock.getModule(), scopeBlock.getScopeId());
+        }
+        call = new TACCall((ASTNodeFuncCall)e, args.length, parentEblk.module, var);
+        if (var == null) call.link = true;
+
+        add(call);
+      }
       return call;
     }
 
@@ -463,53 +528,48 @@ public class CodeGenFront {
   }
   
   void add(TAC t) {
-    if (ctx.block == null) {
-      ctx.block = new Block();
-      ctx.blocks.add(ctx.block);
+    if (ffrag.block == null) {
+      ffrag.block = new Block();
+      ffrag.blocks.add(ffrag.block);
     }
-    ctx.block.add(t);
-    ctx.ir.add(t);
-    t.ctx = ctx;
+    ffrag.block.add(t);
+    ffrag.ir.add(t);
+    t.ffrag = ffrag;
   }
   
   void newBlock() {
-    if (ctx.block != null && ctx.block.size() == 1 && ctx.block.get(0) instanceof TACLabel) {
+    if (ffrag.block != null && ffrag.block.size() == 1 && ffrag.block.get(0) instanceof TACLabel) {
       return;
     }
-    ctx.block = null;
+    ffrag.block = null;
   }
   
   void pushLoop(TACLabel loop, TACLabel exit) {
-    ctx.loopStack.push(new Loop(loop, exit));
+    ffrag.loopStack.push(new Loop(loop, exit));
   }
   
   void popLoop() {
-    ctx.loopStack.pop();
+    ffrag.loopStack.pop();
   }
   
   TACLabel getLoopBreakLabel() {
-    Loop l = ctx.loopStack.peek();
+    Loop l = ffrag.loopStack.peek();
     l.wasBroken = true;
     return l.exit;
   }
   
   TACLabel getLoopContinueLabel() {
-    Loop l = ctx.loopStack.peek();
+    Loop l = ffrag.loopStack.peek();
     l.wasContinued = true;
     return l.loop;
   }
   
   boolean loopWasContinued() {
-    return ctx.loopStack.peek().wasContinued;
+    return ffrag.loopStack.peek().wasContinued;
   }
   
   boolean loopWasBraked() {
-    return ctx.loopStack.peek().wasBroken;
-  }
-  
-  String genTmp() {
-    code++;
-    return "t" + code;
+    return ffrag.loopStack.peek().wasBroken;
   }
   
   String genLabel() {
@@ -535,7 +595,7 @@ public class CodeGenFront {
     tac.referenced = true;
   }
   
-  ASTNodeBlok getScope(ASTNodeBlok eblk, ASTNodeSymbol sym) {
+  ASTNodeBlok getScopeIfDef(ASTNodeBlok eblk, ASTNodeSymbol sym) {
     while (eblk != null) {
       if (eblk.getVariables().contains(sym) ||
           (eblk.getArguments() != null && eblk.getArguments().contains(sym))) {
@@ -543,24 +603,22 @@ public class CodeGenFront {
       }
       eblk = eblk.parentBlock;
     }
-    throw new CompilerError("variable '" + sym + "' not found");
+    return null;
   }
 
-  static String varMapString(List<ASTNodeSymbol> vars) {
-    StringBuilder sb = new StringBuilder();
-    sb.append("[ ");
-    for (ASTNodeSymbol var : vars) {
-      sb.append(var.symbol + " ");
+  ASTNodeBlok getScope(ASTNodeBlok eblk, ASTNodeSymbol sym) {
+    ASTNodeBlok scopeBlock = getScopeIfDef(eblk, sym);
+    if (scopeBlock == null) {
+      throw new CompilerError("variable '" + sym + "' not found", sym);
     }
-    sb.append(']');
-    return sb.toString();
+    return scopeBlock;
   }
-  
+
   //
   // IR context (e.g. main, func def, anonymous)
   //
   
-  class Context {
+  class FrontFragment {
     String module, name;
     Block block; 
     List<Block> blocks = new ArrayList<Block>();
@@ -569,7 +627,7 @@ public class CodeGenFront {
     List<TACVar> gvars = new ArrayList<TACVar>();
     int type; // ASTNode.ASTNodeBlok.TYPE_*
     
-    public Context(String module, String name) {
+    public FrontFragment(String module, String name) {
       this.module = module;
       this.name = name;
     }

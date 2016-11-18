@@ -25,11 +25,11 @@ public class Grammar {
           "expr_op_mul:   OP_MUL OP_DIV OP_MOD\n" +
           "expr_op_log:   OP_AND OP_OR OP_XOR OP_SHLEFT OP_SHRIGHT\n" +
           "expr_op_bin:   expr_op_log expr_op_add expr_op_mul\n" +
-          "expr_op_una:   OP_MINUS_UNARY OP_PLUS_UNARY OP_PLUS2 OP_MINUS2 OP_NOT\n" + 
+          "expr_op_una:   OP_MINUS_UNARY OP_PLUS_UNARY OP_POSTINC OP_PREINC OP_POSTDEC OP_PREDEC OP_BNOT OP_LNOT\n" + 
           "assign:        OP_EQ\n"+
           "assign_op_add: OP_PLUSEQ OP_MINUSEQ\n" +
           "assign_op_mul: OP_DIVEQ OP_MODEQ OP_MULEQ\n" +
-          "assign_op_log: OP_ANDEQ OP_OREQ OP_XOREQ OP_SHLEFTEQ OP_SHRIGHTEQ OP_NOTEQ\n"+
+          "assign_op_log: OP_ANDEQ OP_OREQ OP_XOREQ OP_SHLEFTEQ OP_SHRIGHTEQ\n"+
           "assign_op:     assign_op_log assign_op_add assign_op_mul\n" +
           "dot:           OP_DOT\n" +
           "in:            OP_IN\n" +
@@ -51,16 +51,17 @@ public class Grammar {
           "return:        OP_RETURN\n" +
           "bkpt:          OP_BKPT\n" +
           
-          "cond:          if else\n" +
+          "cond_op:       if else\n" +
           "expr:          expr_op_bin expr_op_una\n" +
           "num:           numi numd numih numib\n" +
           "val:           num sym call expr dot array\n" +
           "arg:           val str code range nil\n" +
           "op:            expr assign_op\n" +
-          "jmp:           goto for while break label\n" +
-          "stat:          assign global op call cond\n" + 
-          "oper:          stat jmp\n" + 
-          "code:          blok oper sym break continue module funcdef return bkpt\n" + 
+          "jmp:           goto for while break continue goto label\n" +
+          "stat:          assign global op call\n" + 
+          "oper:          stat jmp cond_op\n" + 
+          "condition:     rel_op val expr assign_op assign\n" +
+          "code:          blok oper sym jmp module funcdef return bkpt\n" + 
   "";
   static final String GRAMMAR_RULES = 
           "OP_LABEL:      sym\n" +
@@ -81,11 +82,11 @@ public class Grammar {
           "goto:          sym\n" +
           "call:          arg*\n" +
           "blok:          code*\n" +
-          "for:           stat | sym , rel_op | val , stat , code\n" +
+          "for:           stat | sym , condition , stat , code\n" +
           "for:           sym , in , code\n" +
-          "while:         rel_op | val  , code\n" +
-          "if:            rel_op | val , code\n" + 
-          "if:            rel_op | val , code , else\n" + 
+          "while:         condition , code\n" +
+          "if:            condition , code\n" + 
+          "if:            condition , code , else\n" + 
           "else:          code\n" + 
           "funcdef:       blok\n" + 
   "";
@@ -251,7 +252,7 @@ public class Grammar {
           return;
         }
       }
-      throw new CompilerError("Missing operands for " + e);
+      throw new CompilerError("Missing operands for " + e, e);
     }
     
     // run thru all rules and see if everything matches
@@ -292,7 +293,7 @@ public class Grammar {
         if (dbg) System.out.println("  FAIL ops:" + nodeOpIx + " opLen:" + nodeOpLen + " ruleOps:" + ruleOpIx + " ruleLen:" + ruleOpLen);
     } // per rule
     if (!ruleMatch) {
-      throw new CompilerError("Bad operands for " + e);
+      throw new CompilerError("Bad operands for " + e, e);
     } else {
       if (dbg) System.out.println("  PASS");
     }

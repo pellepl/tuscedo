@@ -82,7 +82,9 @@ public class Lexer {
   Emitter emitter;
   
   boolean dbg = false;
-
+  
+  public int offset;
+  
   byte[] flagmap = new byte[256];
 
   /**
@@ -97,6 +99,7 @@ public class Lexer {
     path = new int[maxSymLen];
     buffer = new byte[maxSymLen];
     rbuffer = new byte[maxSymLen+1];
+    offset = 0;
     for (int i = 0; i < flagmap.length; i++) {
       boolean isNum = i >= '0' && i <= '9';
       boolean isSpc = i == ' ' || i == '\t' || i == '\r' || i == '\n';
@@ -382,6 +385,7 @@ public class Lexer {
    * @param b
    */
   public void feed(int b) {
+    offset++;
     boolean reparse;
     if (b >= 0) rbufAdd((byte)b);
     if (rbufLen() > 1) { 
@@ -397,10 +401,10 @@ public class Lexer {
         // finalizer byte, emit what we have buffered
         if (pathIx > 0 && (curNodes.flags[branchIx] & FLAG_DANGLING) != 0) {
           // finalized on a maybe compound dangling symbol, emit symbol
-          emitter.symbol(buffer, bufIx, curNodes.symids[branchIx]);
+          emitter.symbol(buffer, bufIx, curNodes.symids[branchIx], offset - bufIx - 1);
         } else if (bufIx > 0) {
           // just plain data, emit data
-          emitter.data(buffer, bufIx);
+          emitter.data(buffer, bufIx, offset - bufIx);
         }
         curNodes = null;
         reset();
@@ -410,7 +414,7 @@ public class Lexer {
       if (compoundDangling) {
         compoundDangling = false;
         if (!isComp(b)) {
-          emitter.symbol(buffer, bufIx, curNodes.symids[branchIx]);
+          emitter.symbol(buffer, bufIx, curNodes.symids[branchIx], offset - bufIx - 1);
           curNodes = null;
           internalReset();
           reparse = true;
@@ -473,7 +477,7 @@ public class Lexer {
         // matched out to a non-compound leaf, emit symbol
         if (!compound) {
           curNodes = null;
-          emitter.symbol(buffer, bufIx, branches.symids[matchIx]);
+          emitter.symbol(buffer, bufIx, branches.symids[matchIx], offset - bufIx);
           internalReset();
         } else {
           compoundDangling = true;
@@ -486,7 +490,7 @@ public class Lexer {
           if (curNodes != null
               && (curNodes.flags[branchIx] & FLAG_DANGLING) != 0 && bufIx > 0) {
             // intermittent leaf node, emit symbol
-            emitter.symbol(buffer, bufIx - 1, curNodes.symids[branchIx]);
+            emitter.symbol(buffer, bufIx - 1, curNodes.symids[branchIx], offset - bufIx);
             internalReset();
             reparse = true;
             curNodes = null;
@@ -494,7 +498,7 @@ public class Lexer {
             if (bufIx == 1) {
               // no match on this byte, emit data
               curNodes = null;
-              emitter.data(buffer, 1);
+              emitter.data(buffer, 1, offset - 1);
               internalReset();
             } else if (bufIx > 1) {
               // branch broken, reparse buffered data
@@ -511,6 +515,7 @@ public class Lexer {
               int len = bufIx;
               internalReset();
               curNodes = null;
+              int ooffset = offset;
               closedEntryNodes.closed[closedIx] = true;
               if (dbg) {
                 System.out.print("refeed "+ len + " [" + new String(buffer, 0, len)  + "], close "); printTreeNode(closedEntryNodes, closedIx);
@@ -518,9 +523,11 @@ public class Lexer {
               }
               compoundPrev = rbufLen() < len+1 ? false : isComp(rbufPeek(len+1));
               if (dbg) System.out.println("  rewind " + len + " to char " + (char)rbufPeek(len+1) + ", comp " + compoundPrev);
+              offset -= len;
               rbufRewind(len);
               feed(buffer, 0, len);
               closedEntryNodes.closed[closedIx] = false;
+              offset = ooffset;
               if (dbg) {
                 System.out.print("refed  " + len + ",reopen "); printTreeNode(closedEntryNodes, closedIx);
                 System.out.println();
@@ -805,20 +812,20 @@ public class Lexer {
   } // class NullNodes
 
   public interface Emitter {
-    void data(byte data[], int len);
+    void data(byte data[], int len, int offset);
 
-    void symbol(byte symdata[], int len, int sym);
+    void symbol(byte symdata[], int len, int sym, int offset);
   } // interface Emitter
 
   public static void main(String[] args) {
     Lexer.Emitter emitter = new Lexer.Emitter() {
       @Override
-      public void data(byte data[], int len) {
+      public void data(byte data[], int len, int offset) {
         System.out.print(new String(data, 0, len));
       }
 
       @Override
-      public void symbol(byte data[], int len, int sym) {
+      public void symbol(byte data[], int len, int sym, int offset) {
         System.out.print("[" + new String(data, 0, len) + ":" + sym + "]");
       }
     };
