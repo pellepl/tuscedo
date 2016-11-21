@@ -89,11 +89,11 @@ public class CodeGenBack implements ByteCode {
       List<TAC> tacBlock = frag.tacs.get(i);
       for (TAC tac : tacBlock) {
         compileTAC(tac, frag);
+        //peepholeOptimise(frag);
+        // TODO
+        // update comments and links and what now -- phew!!
       }
     }
-//    if (frag.type == ASTNode.ASTNodeBlok.TYPE_MAIN) {
-//      addCode(frag, IRET);
-//    }
     // resolve fragment branches and labels
     for (Link l : frag.links) {
       if (l instanceof LinkGoto) {
@@ -112,20 +112,34 @@ public class CodeGenBack implements ByteCode {
 
     if (tac instanceof TACAlloc) {
       TACAlloc all = (TACAlloc)tac;
+      // TODO check arg count - do we want this?
+//      if (all.funcEntry) {
+//        sp++;
+//        addCode(frag, stackInfo() + "given argc", ICPY, 2);
+//        sp++;
+//        addCode(frag, stackInfo() + "expected argc", IPUI, all.args.size());
+//        sp -= 2;
+//        addCode(frag, stackInfo(), ICMP);
+//        addCode(frag, IBRAEQ, 0,0,5);
+//        addCode(frag, IBKPT); // TODO not bkpt, but raise exception or something
+//      }
+      
       // point out argument variables
-      int argc = all.vars.size();
-      for (String sym : all.vars) {
-        frag.locals.put(new TACVar(tac.getNode(), sym, all.module, all.scope), -argc-2); // -2 for pushed frame (pc, fp)
-        argc--;
+      if (!all.args.isEmpty()) {
+        int argix = 0;
+        for (String sym : all.args) {
+          frag.locals.put(new TACVar(tac.getNode(), sym, all.module, all.scope), -argix-4); // -4 for pushed frame (args, pc, fp)
+          argix++;
+        }
       }
       // allocate stack variables
-      if (argc > 0) {
+      if (!all.vars.isEmpty()) {
         int fpoffset = sp - fp;
         for (String sym : all.vars) {
           frag.locals.put(new TACVar(tac.getNode(), sym, all.module, all.scope), fpoffset++);
         }
-        sp += argc;
-        addCode(frag, stackInfo() + all.toString(), ISPI, argc-1);
+        sp += all.vars.size();
+        addCode(frag, stackInfo() + all.toString(), ISPI, all.vars.size()-1);
       }
     }
     else if (tac instanceof TACFree) {
@@ -163,16 +177,17 @@ public class CodeGenBack implements ByteCode {
       addCode(frag, stackInfo() + "->" + ((TACGoto)tac).label.toString(), IBRA, 0xff,0xff,0xff);
     }
     else if (tac instanceof TACGotoCond) {
+      int cmpInstr = ICMP;
       TACGotoCond c = (TACGotoCond)tac;
       pushValue(c.cond, frag);
       boolean inverseCond = !c.positive; 
-      int instr = IBRA;
-      if (c.condOp == OP_EQ2) instr = inverseCond ? IBRANE : IBRAEQ;
-      else if (c.condOp == OP_NEQ) instr = inverseCond ? IBRAEQ : IBRANE;
-      else if (c.condOp == OP_GE) instr = inverseCond ? IBRALT : IBRAGE;
-      else if (c.condOp == OP_LT) instr = inverseCond ? IBRAGE : IBRALT;
-      else if (c.condOp == OP_GT) instr = inverseCond ? IBRALE : IBRAGT;
-      else if (c.condOp == OP_LE) instr = inverseCond ? IBRAGT : IBRALE;
+      int braInstr = IBRA;
+      if (c.condOp == OP_EQ2) braInstr = inverseCond ? IBRANE : IBRAEQ;
+      else if (c.condOp == OP_NEQ) braInstr = inverseCond ? IBRAEQ : IBRANE;
+      else if (c.condOp == OP_GE) braInstr = inverseCond ? IBRALT : IBRAGE;
+      else if (c.condOp == OP_LT) braInstr = inverseCond ? IBRAGE : IBRALT;
+      else if (c.condOp == OP_GT) braInstr = inverseCond ? IBRALE : IBRAGT;
+      else if (c.condOp == OP_LE) braInstr = inverseCond ? IBRAGT : IBRALE;
       else if (c.condOp == OP_CALL || 
                c.condOp == OP_SYMBOL || 
                c.condOp == OP_EQ || AST.isAssignOperator(c.condOp) ||
@@ -180,47 +195,47 @@ public class CodeGenBack implements ByteCode {
                AST.isString(c.condOp) ||
                AST.isUnaryOperator(c.condOp)
                ) {
-        pushValue(new TACInt(c.cond.getNode(), 0), frag);
-        instr = IBRAEQ;
+        //pushValue(new TACInt(c.cond.getNode(), 0), frag);
+        cmpInstr = ICMP0;
+        braInstr = IBRAEQ;
       }
       else {
         throw new CompilerError("bad condition '" + c.cond + "' for '" + c +  "', is '" + AST.opString(c.condOp)+"'", c.getNode());
       }
-      sp -= 2;
-      addCode(frag, stackInfo() + tac.toString(), ICMP);
+      sp -= cmpInstr == ICMP0 ? 1 : 2;
+      addCode(frag, stackInfo() + tac.toString(), cmpInstr);
       frag.links.add(new ModuleFragment.LinkGoto(frag.getPC(), c.label));
-      addCode(frag, stackInfo() + "->" + c.label.toString(), instr, 0xff,0xff,0xff);
+      addCode(frag, stackInfo() + "->" + c.label.toString(), braInstr, 0xff,0xff,0xff);
     }
     else if (tac instanceof TACCall) {
       TACCall call = (TACCall)tac;
+      // push nbr of args
+      pushNumber(frag, call.args, "argc, replaced by retval");
       if (!call.link) {
         // func is a local variable
         pushValue(call.var, frag);
-        sp = sp - 1 + 1;
+        sp = sp - 1          // read call address
+             - 1 - call.args // return, pop args and argc
+             + 1;            // retval
         addCode(frag, stackInfo() + "<" + call.func + ", " + call.args + " args>", ICAL);
       } else {
         // func is a function name
         frag.links.add(new ModuleFragment.LinkCall(frag.getPC(), call));
-        sp++;
+        sp = sp 
+            - 1 - call.args // return, pop args and argc
+            + 1;            // retval
         addCode(frag, stackInfo() + "<" + call.func + ", " + call.args + " args>", ICALI, 0x03,0x00,0x00);
       }
-      if (call.referenced && call.args == 0) {
-        // no args, using return value - do naught
-      } else {
-        sp -= call.args + 1;
-        addCode(frag, stackInfo() + "pop args and retval", ISPD, call.args-1 + 1); // +1 for the return value, is now at sp[-call.args]
-        if (call.referenced) {
-          // keep returnvalue if referenced
-          sp++;
-          addCode(frag, stackInfo() + "move retval to top", ICPY, -(call.args+1));
-        }
+      if (!call.referenced) {
+        sp--;
+        addCode(frag, stackInfo() + "unused retval", IPOP);
       }
     }
     else if (tac instanceof TACReturn) {
       TACReturn ret = (TACReturn)tac;
       if (ret.emptyReturn) {
         sp++;
-        addCode(frag, stackInfo() + "return nil", IPU0);
+        addCode(frag, stackInfo() + "return nil", IPUNIL);
       } else {
         pushValue(ret.ret, frag);
       }
@@ -435,14 +450,28 @@ public class CodeGenBack implements ByteCode {
     }
   }
   
+  void pushNumber(ModuleFragment frag, int num, String comment) {
+    sp++;
+    if (num >= 0 && num < 4) {
+      addCode(frag, comment != null ? (stackInfo() + comment) : null, IPU0 + num);
+    } else if (num >= -128 && num <= 127) {
+      addCode(frag, comment != null ? (stackInfo() + comment) : null, IPUI, num);
+    } else {
+      throw new CompilerError("not implemented");
+    }
+
+  }
+  
   boolean pushValue(TAC a, ModuleFragment frag) {
     if (a instanceof TACNil) {
       sp++;
-      addCode(frag, stackInfo() + a.toString(), IPU0);
+      addCode(frag, stackInfo() + a.toString(), IPUNIL);
     } 
     else if (a instanceof TACInt) {
-      if (((TACInt)a).x >= -128 && ((TACInt)a).x <= 127) {
-        // push immediate
+      if (((TACInt)a).x >= 0 && ((TACInt)a).x < 4) {
+        sp++;
+        addCode(frag, stackInfo() + a.toString(), IPU0 + ((TACInt)a).x);
+      } else if (((TACInt)a).x >= -128 && ((TACInt)a).x <= 127) {
         sp++;
         addCode(frag, stackInfo() + a.toString() + " (constimm)", IPUI, ((TACInt)a).x);
       } else {
@@ -473,7 +502,7 @@ public class CodeGenBack implements ByteCode {
     else if (a instanceof TACUnresolved) {
       frag.links.add(new ModuleFragment.LinkUnresolved(frag.getPC(), (TACUnresolved)a));
       sp++;
-      addCode(frag, stackInfo() + a.toString() + " (link)", IPU0, INOP,INOP,INOP);
+      addCode(frag, stackInfo() + a.toString() + " (link)", IPUNIL, INOP,INOP,INOP);
     }
 //    else if (a instanceof TACOp) {
 //      // supposed to be on stack TODO

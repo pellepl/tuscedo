@@ -1,6 +1,6 @@
 package com.pelleplutt.plang;
 
-import static com.pelleplutt.plang.AST.OP_ARRAY;
+import static com.pelleplutt.plang.AST.OP_ADEREF;
 import static com.pelleplutt.plang.AST.OP_BLOK;
 import static com.pelleplutt.plang.AST.OP_BREAK;
 import static com.pelleplutt.plang.AST.OP_CALL;
@@ -237,7 +237,7 @@ public class StructAnalysis {
   ASTNodeSymbol getVariableName(ASTNode e) {
     if (e.op == OP_SYMBOL) {
       return ((ASTNodeSymbol)e);
-    } else if (e.op == OP_ARRAY) {
+    } else if (e.op == OP_ADEREF) {
       return getVariableName(e.operands.get(0));
     }
     return null;

@@ -1,16 +1,27 @@
 package com.pelleplutt.plang;
 
+import static com.pelleplutt.plang.AST.OP_AND;
+import static com.pelleplutt.plang.AST.OP_ANDEQ;
+import static com.pelleplutt.plang.AST.OP_ADEREF;
 import static com.pelleplutt.plang.AST.OP_BKPT;
 import static com.pelleplutt.plang.AST.OP_BLOK;
 import static com.pelleplutt.plang.AST.OP_BREAK;
 import static com.pelleplutt.plang.AST.OP_CALL;
 import static com.pelleplutt.plang.AST.OP_CONTINUE;
+import static com.pelleplutt.plang.AST.OP_DIV;
+import static com.pelleplutt.plang.AST.OP_DIVEQ;
 import static com.pelleplutt.plang.AST.OP_DOT;
 import static com.pelleplutt.plang.AST.OP_EQ;
 import static com.pelleplutt.plang.AST.OP_FOR;
 import static com.pelleplutt.plang.AST.OP_FUNCDEF;
 import static com.pelleplutt.plang.AST.OP_GOTO;
 import static com.pelleplutt.plang.AST.OP_IF;
+import static com.pelleplutt.plang.AST.OP_MINUS;
+import static com.pelleplutt.plang.AST.OP_MINUSEQ;
+import static com.pelleplutt.plang.AST.OP_MOD;
+import static com.pelleplutt.plang.AST.OP_MODEQ;
+import static com.pelleplutt.plang.AST.OP_MUL;
+import static com.pelleplutt.plang.AST.OP_MULEQ;
 import static com.pelleplutt.plang.AST.OP_NIL;
 import static com.pelleplutt.plang.AST.OP_NUMERICB1;
 import static com.pelleplutt.plang.AST.OP_NUMERICB2;
@@ -18,11 +29,21 @@ import static com.pelleplutt.plang.AST.OP_NUMERICD;
 import static com.pelleplutt.plang.AST.OP_NUMERICH1;
 import static com.pelleplutt.plang.AST.OP_NUMERICH2;
 import static com.pelleplutt.plang.AST.OP_NUMERICI;
+import static com.pelleplutt.plang.AST.OP_OR;
+import static com.pelleplutt.plang.AST.OP_OREQ;
+import static com.pelleplutt.plang.AST.OP_PLUS;
+import static com.pelleplutt.plang.AST.OP_PLUSEQ;
 import static com.pelleplutt.plang.AST.OP_QUOTE1;
 import static com.pelleplutt.plang.AST.OP_QUOTE2;
 import static com.pelleplutt.plang.AST.OP_RETURN;
+import static com.pelleplutt.plang.AST.OP_SHLEFT;
+import static com.pelleplutt.plang.AST.OP_SHLEFTEQ;
+import static com.pelleplutt.plang.AST.OP_SHRIGHT;
+import static com.pelleplutt.plang.AST.OP_SHRIGHTEQ;
 import static com.pelleplutt.plang.AST.OP_SYMBOL;
 import static com.pelleplutt.plang.AST.OP_WHILE;
+import static com.pelleplutt.plang.AST.OP_XOR;
+import static com.pelleplutt.plang.AST.OP_XOREQ;
 
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -232,7 +253,7 @@ public class CodeGenFront {
           }
         }
       }
-      boolean doStackAllocation = (eblk.type != ASTNodeBlok.TYPE_MAIN && eblk.gotUnhandledVariables()) || // TODO REMOVE THIS?
+      boolean doStackAllocation = 
                                   (eblk.gotUnhandledVariables() && 
                                    eblk.getScopeLevel() > 0); // no variable stack allocation for top scopes, these are global vars
       if (doStackAllocation) {
@@ -300,21 +321,45 @@ public class CodeGenFront {
       return op;
     } 
     
-    else if (AST.isOperator(e.op) && !AST.isAssignOperator(e.op)) {
-      if (AST.isUnaryOperator(e.op)) {
-        TAC operand = genIR(e.operands.get(0), parentEblk);  
-        setReferenced(operand);
-        TAC op = new TACUnaryOp(e, e.op, operand);
-        add(op);
-        return op;
+    else if (AST.isOperator(e.op)) {
+      if (!AST.isAssignOperator(e.op)) {
+        if (AST.isUnaryOperator(e.op)) {
+          TAC operand = genIR(e.operands.get(0), parentEblk);  
+          setReferenced(operand);
+          TAC op = new TACUnaryOp(e, e.op, operand);
+          add(op);
+          return op;
+        } else {
+          TAC left = genIR(e.operands.get(0), parentEblk);  
+          TAC right = genIR(e.operands.get(1), parentEblk);  
+          setReferenced(left);
+          setReferenced(right);
+          TAC op = new TACOp(e, e.op, left, right);
+          add(op);
+          return op;
+        }
       } else {
-        TAC left = genIR(e.operands.get(0), parentEblk);  
+        TAC assignee = genIR(e.operands.get(0), parentEblk);
+        setReferenced(assignee);
         TAC right = genIR(e.operands.get(1), parentEblk);  
-        setReferenced(left);
         setReferenced(right);
-        TAC op = new TACOp(e, e.op, left, right);
-        add(op);
-        return op;
+        int opCode;
+        if      (e.op == OP_ANDEQ) opCode = OP_AND; 
+        else if (e.op == OP_DIVEQ) opCode = OP_DIV; 
+        else if (e.op == OP_MINUSEQ) opCode = OP_MINUS; 
+        else if (e.op == OP_MODEQ) opCode = OP_MOD; 
+        else if (e.op == OP_MULEQ) opCode = OP_MUL; 
+        else if (e.op == OP_OREQ) opCode = OP_OR; 
+        else if (e.op == OP_PLUSEQ) opCode = OP_PLUS; 
+        else if (e.op == OP_SHLEFTEQ) opCode = OP_SHLEFT; 
+        else if (e.op == OP_SHRIGHTEQ) opCode = OP_SHRIGHT; 
+        else if (e.op == OP_XOREQ) opCode = OP_XOR; 
+        else throw new CompilerError("unknown assign operator " + AST.opString(e.op), e);
+        TAC assignment = new TACOp(e, opCode, assignee, right);
+        add(assignment);
+        TAC assOp = new TACAssign(e, OP_EQ, assignee, assignment); 
+        add(assOp);
+        return assOp;
       }
     }
     
@@ -397,6 +442,14 @@ public class CodeGenFront {
       } else {
         //for (x in y) {w}
         // TODO
+//        boolean doStackAllocation = eblk != null && eblk.gotUnhandledVariables();
+//        if (doStackAllocation) {
+//          add(new TACAlloc(eblk, iteratorVariable, eblk.getModule(), eblk.getScopeId()));
+//          eblk.setVariablesHandled();
+//        }
+//        if (doStackAllocation) {
+//          add(new TACFree(eblk, eblk.getModule(), eblk.getScopeId()));
+//        }
       }
     }
     
@@ -457,7 +510,7 @@ public class CodeGenFront {
     
     else if (e.op == OP_CALL) {
       String args[] = new String[e.operands.size()];
-      for (int i = 0; i < args.length; i++) {
+      for (int i = args.length-1; i >= 0; i--) {
         TAC argVal = genIR(e.operands.get(i), parentEblk);
         TAC arg = new TACArg(e, argVal);
         setReferenced(argVal);
@@ -522,6 +575,9 @@ public class CodeGenFront {
       add(new TACBkpt(e));
     }
     
+    else if (e.op == OP_ADEREF) {
+      throw new CompilerError("not implemented" , e);
+    }
     // TODO more
     
     return null;

@@ -1,6 +1,7 @@
 package com.pelleplutt.plang;
 
 import static com.pelleplutt.plang.AST.OP_AND;
+import static com.pelleplutt.plang.AST.OP_BNOT;
 import static com.pelleplutt.plang.AST.OP_DIV;
 import static com.pelleplutt.plang.AST.OP_DOT;
 import static com.pelleplutt.plang.AST.OP_EQ;
@@ -12,7 +13,6 @@ import static com.pelleplutt.plang.AST.OP_LT;
 import static com.pelleplutt.plang.AST.OP_MINUS;
 import static com.pelleplutt.plang.AST.OP_MUL;
 import static com.pelleplutt.plang.AST.OP_NEQ;
-import static com.pelleplutt.plang.AST.OP_BNOT;
 import static com.pelleplutt.plang.AST.OP_OR;
 import static com.pelleplutt.plang.AST.OP_PLUS;
 import static com.pelleplutt.plang.AST.OP_RANGE;
@@ -150,6 +150,14 @@ public abstract class ASTNode {
         sb.append(operands.get(i).toString());
         if (i < operands.size() - 1)
           sb.append(',');
+      }
+      if (argList != null && !argList.isEmpty()) {
+        sb.append(" ARGS:");
+        for (int i = 0; i < argList.size(); i++) {
+          sb.append(argList.get(i).toString());
+          if (i < argList.size() - 1)
+            sb.append(',');
+        }
       }
       sb.append('}');
       return sb.toString();
@@ -309,6 +317,19 @@ public abstract class ASTNode {
 
     public String toString() {
       return "\"" + string + "\"";
+    }
+  }
+  
+  public static class ASTNodeArrDecl extends ASTNode {
+    int arrid;
+    public ASTNodeArrDecl(int id) {
+      super(AST.OP_ADECL);
+      this.operands = new ArrayList<ASTNode>();
+      this.arrid = id;
+    }
+
+    public String toString() {
+      return "arrdeclr" + operands;
     }
   }
   

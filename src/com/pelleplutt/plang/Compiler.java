@@ -18,7 +18,7 @@ public class Compiler {
     for (String src : sources) {
       Compiler.src = src;
       //System.out.println("* build tree");
-      //AST.dbg = true;
+      AST.dbg = true;
       ASTNodeBlok e = AST.buildTree(src);
       //System.out.println(e);
       
@@ -35,7 +35,7 @@ public class Compiler {
       StructAnalysis.analyse(e);
       
       System.out.println("* intermediate codegen");
-      CodeGenFront.dbg = true;
+      //CodeGenFront.dbg = true;
       List<Module> mods = CodeGenFront.genIR(e);
   
       System.out.println("* backend codegen");
@@ -58,25 +58,33 @@ public class Compiler {
   public static void main(String[] args) {
     Map<String, ExtCall> extDefs = new HashMap<String, ExtCall>();
     extDefs.put("outln", new ExtCall() {
-      public Processor.M exe(Processor.M[] memory, int sp, int fp) {
-        System.out.println(memory[fp+3].asString());
+      public Processor.M exe(Processor.M[] memory, Processor.M[] args) {
+        System.out.println(args[0].asString());
         return null;
       }
     });
     extDefs.put("out", new ExtCall() {
-      public Processor.M exe(Processor.M[] memory, int sp, int fp) {
-        System.out.print(memory[fp+3].asString());
+      public Processor.M exe(Processor.M[] memory, Processor.M[] args) {
+        System.out.print(args[0].asString());
         return null;
       }
     });
     extDefs.put("cos", new ExtCall() {
-      public Processor.M exe(Processor.M[] memory, int sp, int fp) {
-        return new Processor.M((float)Math.cos(memory[fp+3].f));
+      public Processor.M exe(Processor.M[] memory, Processor.M[] args) {
+        return new Processor.M((float)Math.cos(args[0].f));
       }
     });
     extDefs.put("halt", new ExtCall() {
-      public Processor.M exe(Processor.M[] memory, int sp, int fp) {
+      public Processor.M exe(Processor.M[] memory, Processor.M[] args) {
         throw new ProcessorError("halt");
+      }
+    });
+    extDefs.put("argcheckext", new ExtCall() {
+      public Processor.M exe(Processor.M[] memory, Processor.M[] args) {
+        System.out.println("1:" + args[0].asString());
+        System.out.println("2:" + args[1].asString());
+        System.out.println("3:" + args[2].asString());
+        return null;
       }
     });
     
@@ -107,16 +115,15 @@ public class Compiler {
 
         "output = '';\n" + 
 //TODO        "for (y in -1.0 # step # 1.0) {" +
-//TODO        "for (y = -1.0; y < 1.0; y += step) {" +
-        "for (y = -1.0; y < 1.0; y = y + step) {" +
-        "  for (x = -1.6; x < 0.4; x = x + step/2) {\n" +
+        "for (y = -1.0; y < 1.0; y += step) {" +
+        "  for (x = -1.6; x < 0.4; x += step/2) {\n" +
         "    iters = calcIterations(x,y);\n" +
         "    if (iters & 1 == 0) output = output + '0';\n" +
         "    else                output = output + '1';\n" +
         "  }\n" +
         "  output = output + '\n';\n" + 
         "}\n" +
-        "outln('cos(2):' + cos(0.1));\n" +
+        "outln('cos(0.1):' + cos(0.1));\n" +
         "out('mandel\n' + output);\n" +
         "anon = {outln('calling anon');return 'hello anon ';};\n" +
         "mojja = fib;\n" +
@@ -133,6 +140,8 @@ public class Compiler {
         "outln('false:' + false);\n" +
         "if (true) walnut.friendfunc();\n" +
         "if (!true) halt();\n" +
+        "list = [1,2,3,4];\n" +
+        "outln(list[3]);\n" +
 //TODO        "hashmap.somekey(); // == hashmap["somekey"]()
 //TODO        "othermodule.hashmap.somekey();  // == othermodule.hashmap["somekey"]()
 //TODO        "othermodule.hashmap.somekey.somesubkey();  // == othermodule.hashmap["somekey"]["somesubkey"]()
@@ -143,20 +152,34 @@ public class Compiler {
     // DONE:   ambiguity: modulename / variablename when x.key() for x - always prefer variable name in frontend
     // FIXME:  add 'return' to functions and anon if not explicitly set by programmer
     // FIXME:  add number of call arguments to stack frame, ie push pc+fp and also argc
+    // DONE:   in frontend, reverse argument list in order to be able to handle varargs. Fix backend for this also
     
     String siblingsrc = 
         "module mandel;"+
         "otherglobal = 'variable sister';\n" + 
         "func sisterfunc() {" +
         "  return {outln('sisterfunc anon func called');return 'it worked';};\n" +
+        "}" +
+        "func argfunc(a,b,c) {" +
+        "  outln('1st:' + a);\n" +
+        "  outln('2nd:' + b);\n" +
+        "  outln('3rd:' + c);\n" +
+        "  return;\n" +
         "}";
     String othersrc = 
-        "module walnut; otherglobal = 'variable friend';\n" + 
+         "module walnut; otherglobal = 'variable friend';\n" + 
+         "l = [1,2,3];\n" +
+         "l2 = [1, [a], b];\n" +
+         "outln(l[0]);\n" +
          "func friendfunc() {" +
          "  outln('friendfunc called ' + mandel.anon);\n" +
          "  return;\n" +
          "}";
 
+//    src = "a = 0; for (a; a < 10; a += 1) { outln(a); }";
+//    othersrc = "";
+//    siblingsrc = "";
+    
     Executable e = null;
     try {
       e = Compiler.compile(extDefs, othersrc, siblingsrc, src);

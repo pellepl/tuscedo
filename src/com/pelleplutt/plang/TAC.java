@@ -195,14 +195,15 @@ public abstract class TAC {
   
   public static class TACAlloc extends TAC {
     List<String> vars = new ArrayList<String>();
+    List<String> args = new ArrayList<String>();
     String module, scope;
     boolean funcEntry;
     public TACAlloc(ASTNodeBlok e, String module, String scope) {
       super(e);
       this.module = module;
       this.scope = scope;
-      if (e.getArguments() != null) {
-        for (ASTNodeSymbol sym : e.getArguments()) {
+      if (e.getVariables() != null) {
+        for (ASTNodeSymbol sym : e.getVariables()) {
           vars.add(sym.symbol);
         }
       }
@@ -212,13 +213,18 @@ public abstract class TAC {
       this.module = module;
       this.scope = scope;
       this.funcEntry = funcEntry;
-      if (e.getArguments() != null) {
-        for (ASTNodeSymbol sym : e.getArguments()) {
+      if (e.getVariables() != null) {
+        for (ASTNodeSymbol sym : e.getVariables()) {
           vars.add(sym.symbol);
         }
       }
+      if (e.getArguments() != null) {
+        for (ASTNodeSymbol sym : e.getArguments()) {
+          args.add(sym.symbol);
+        }
+      }
     }
-    public String toString() {return "ALLO " + vars + (funcEntry ? " FUNC" : "");}
+    public String toString() {return "ALLO " + vars + (funcEntry ? " FUNC" + args : "");}
   }
   
   public static class TACFree extends TAC {
@@ -228,8 +234,8 @@ public abstract class TAC {
       super(e);
       this.module = module;
       this.scope = scope;
-      if (e.getArguments() != null) {
-        for (ASTNodeSymbol sym : e.getArguments()) {
+      if (e.getVariables() != null) {
+        for (ASTNodeSymbol sym : e.getVariables()) {
           vars.add(sym.symbol);
         }
       }

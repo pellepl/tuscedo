@@ -20,7 +20,7 @@ public class Processor implements ByteCode {
   public static boolean dbgMem = false;
   public static boolean dbgRun = false;
   
-  static final String TSTRING[] = {
+  public static final String TSTRING[] = {
     "nil", "int", "float", "string", "range", "code", "list", "map", "reference"
   };
   
@@ -34,6 +34,7 @@ public class Processor implements ByteCode {
   Map<Integer, ExtCall> extLinks;
   Executable exe;
   M nilM = new M();
+  M zeroM = new M(0);
   
   public Processor(int memorySize, Executable exe) {
     this.exe = exe;
@@ -116,6 +117,12 @@ public class Processor implements ByteCode {
       sb.append("lnot    ");
       break;
     
+    case ICMP0:
+      sb.append("cmp_0   ");
+      break;
+    case ICMN0:
+      sb.append("cmpn_0  ");
+      break;
     case IADI:
       sb.append("add_im  ");
       sb.append(String.format("0x%02x", codetoi(code, pc, 1) + 1));
@@ -128,8 +135,23 @@ public class Processor implements ByteCode {
       sb.append("push_im ");
       sb.append(String.format("0x%02x", codetoi(code, pc, 1)));
       break;
-    case IPU0:
+    case IPUNIL:
       sb.append("push_nil");
+      break;
+    case IPU0:
+      sb.append("push_0  ");
+      break;
+    case IPU1:
+      sb.append("push_1  ");
+      break;
+    case IPU2:
+      sb.append("push_2  ");
+      break;
+    case IPU3:
+      sb.append("push_3  ");
+      break;
+    case IPU4:
+      sb.append("push_4  ");
       break;
     case IPUC:
       sb.append("push_c  ");
@@ -588,6 +610,16 @@ public class Processor implements ByteCode {
     sub(false, false);
   }
   
+  void cmp0() {
+    push(zeroM);
+    sub(false);
+  }
+  
+  void cmn0() {
+    push(zeroM);
+    sub(false, false);
+  }
+  
   void not() {
     M e1 = pop();
     if (e1.type == TINT) {
@@ -631,7 +663,11 @@ public class Processor implements ByteCode {
     push(codetoi(code, pc++, 1));
   }
 
-  void pu0() {
+  void puint(int i) {
+    push(i);
+  }
+
+  void punil() {
     push(nilM);
   }
 
@@ -660,6 +696,7 @@ public class Processor implements ByteCode {
       case TFLOAT: m.i = (int)m.f; break;
       case TNIL: m.i = 0; break;
       case TSTR: m.i = Integer.parseInt(m.str); break;
+      case TRANGE: break;
       case TLIST: break;
       case TMAP: break;
       case TREF: break;
@@ -672,6 +709,7 @@ public class Processor implements ByteCode {
       case TINT: m.f = m.i; break;
       case TNIL: m.f = 0; break;
       case TSTR: m.f = Float.parseFloat(m.str); break;
+      case TRANGE: break;
       case TLIST: break;
       case TMAP: break;
       case TREF: break;
@@ -843,6 +881,7 @@ public class Processor implements ByteCode {
     if (addr.type != TINT && addr.type != TCODE) {
       throw new ProcessorError("calling bad type " + TSTRING[addr.type]);
     }
+    int args = peek(sp+1).i;
     push(pc);
     push(fp);
     fp = sp;
@@ -850,13 +889,14 @@ public class Processor implements ByteCode {
     if ((pc & 0xff0000) == 0xff0000) {
       ExtCall ec = extLinks.get(pc);
       if (ec == null) throw new ProcessorError(String.format("bad external call 0x%06x", pc));
-      M ret = ec.exe(memory, sp, fp); 
+      M ret = ec.exe(memory, getArgs(fp, args)); 
       push(ret == null ? nilM : ret);
       retv();
     }
   }
   
   void cali() {
+    int args = peek(sp+1).i;
     push(pc+3);
     push(fp);
     fp = sp;
@@ -864,25 +904,31 @@ public class Processor implements ByteCode {
     if ((pc & 0xff0000) == 0xff0000) {
       ExtCall ec = extLinks.get(pc);
       if (ec == null) throw new ProcessorError(String.format("bad external call 0x%06x", pc));
-      M ret = ec.exe(memory, sp, fp); 
+      M ret = ec.exe(memory, getArgs(fp, args)); 
       push(ret == null ? nilM : ret);
       retv();
     }
   }
   
   void ret() {
-    if (fp >= memory.length-1) throw new ProcessorError.ProcessorFinishedError();
     sp = fp;
+    if (fp >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("abnormal exit");
     fp = pop().i;
     pc = pop().i;
+    if (pc >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("normal exit");
+    int argc = pop().i;
+    sp += argc;
   }
   
   void retv() {
-    if (fp >= memory.length-1) throw new ProcessorError.ProcessorFinishedError();
     M t = pop();
     sp = fp;
+    if (fp >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("abnormal exit");
     fp = pop().i;
     pc = pop().i;
+    if (pc >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("normal exit");
+    int argc = pop().i;
+    sp += argc;
     push(t);
   }
   
@@ -978,12 +1024,6 @@ public class Processor implements ByteCode {
     case IXOR:
       xor();
       break;
-    case ICMP:
-      cmp();
-      break;
-    case ICMN:
-      cmn();
-      break;
     case INOT:
       not();
       break;
@@ -993,7 +1033,19 @@ public class Processor implements ByteCode {
     case ILNOT:
       lnot();
       break;
+    case ICMP:
+      cmp();
+      break;
+    case ICMN:
+      cmn();
+      break;
       
+    case ICMP0:
+      cmp0();
+      break;
+    case ICMN0:
+      cmn0();
+      break;
     case IADI:
       adi();
       break;
@@ -1004,7 +1056,22 @@ public class Processor implements ByteCode {
       pui();
       break;
     case IPU0:
-      pu0();
+      puint(0);
+      break;
+    case IPU1:
+      puint(1);
+      break;
+    case IPU2:
+      puint(2);
+      break;
+    case IPU3:
+      puint(3);
+      break;
+    case IPU4:
+      puint(4);
+      break;
+    case IPUNIL:
+      punil();
       break;
     case IPUC:
       puc();
@@ -1181,6 +1248,14 @@ public class Processor implements ByteCode {
     }
   }
   
+  M[] getArgs(int fp, int args) {
+    M argv[] = new M[args];
+    for (int i = 0; i < args; i++) {
+      argv[args - i - 1] = memory[fp+3+(args - i)];
+    }
+    return argv;
+  }
+  
   public static class M {
     public byte type;
     public M ref;
@@ -1208,13 +1283,12 @@ public class Processor implements ByteCode {
         return ""+ i;
       case TFLOAT:
         return ""+ f;
-      case TRANGE:
-        return "";
       case TSTR:
         return str;
       case TCODE:
         return String.format("->0x%08x", i);
       case TLIST:
+      case TRANGE:
       case TMAP:
         return "TODO"; // TODO
       case TREF:
@@ -1223,6 +1297,29 @@ public class Processor implements ByteCode {
         return "?";
       }
     }
+
+    public float asFloat() {
+      switch(type) {
+      case TINT:
+        return (float)i;
+      case TFLOAT:
+        return f;
+      default:
+        return Float.NaN;
+      }
+    }
+
+    public int asInt() {
+      switch(type) {
+      case TINT:
+        return i;
+      case TFLOAT:
+        return (int)f;
+      default:
+        return 0;
+      }
+    }
+
     public String toString() {
       switch(type) {
       case TNIL:

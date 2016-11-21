@@ -34,7 +34,7 @@ public class Grammar {
           "dot:           OP_DOT\n" +
           "in:            OP_IN\n" +
           "range:         OP_HASH\n" +
-          "array:         OP_ARRAY\n" +
+          "array:         OP_ADECL\n" +
           "call:          OP_CALL\n" +
           "blok:          OP_BLOK\n" + 
           "if:            OP_IF\n" +

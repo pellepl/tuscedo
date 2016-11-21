@@ -28,6 +28,9 @@ public class ProcessorError extends Error {
   }
 
   public static class ProcessorFinishedError extends ProcessorError {
+    public ProcessorFinishedError(String message) {
+      super(message);
+    }
   }
   public static class ProcessorBreakpointError extends ProcessorError {
   }

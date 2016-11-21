@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
 
+import com.pelleplutt.plang.ASTNode.ASTNodeArrDecl;
 import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
 import com.pelleplutt.plang.ASTNode.ASTNodeCompoundSymbol;
 import com.pelleplutt.plang.ASTNode.ASTNodeFuncCall;
@@ -93,7 +94,8 @@ public class AST implements Lexer.Emitter {
   
   // non lexeme tokens
   final static int _OP_FINAL       = __id++;
-  final static int OP_ARRAY        = __id++;
+  final static int OP_ADECL      = __id++;
+  final static int OP_ADEREF        = __id++;
   final static int OP_MINUS_UNARY  = __id++;
   final static int OP_PLUS_UNARY   = __id++;
   final static int OP_POSTINC      = __id++;
@@ -182,7 +184,8 @@ public class AST implements Lexer.Emitter {
       
       new Op("<@>", _OP_FINAL),
       
-      new Op("arr", OP_ARRAY, 2),
+      new Op("arrdeclr", OP_ADECL, 2),
+      new Op("arrderef", OP_ADEREF, 2),
       new Op("U-", OP_MINUS_UNARY, 1),
       new Op("U+", OP_PLUS_UNARY, 1),
       new Op("++U", OP_POSTINC, 1),
@@ -195,6 +198,7 @@ public class AST implements Lexer.Emitter {
   Stack<Op> opers = new Stack<Op>();
   Stack<Integer> blcks = new Stack<Integer>();
   int callid;
+  int arrdeclid;
   int prevTokix = -1;
   int prevPrevTokix = -1;
   int stroffset, strlen;
@@ -219,6 +223,7 @@ public class AST implements Lexer.Emitter {
   static public ASTNodeBlok buildTree(String s) {
     AST ast = new AST();
     ast.callid = 0;
+    ast.arrdeclid = 0;
     byte tst[] = s.getBytes();
     for (byte b : tst) {
       ast.lexer.feed(b);
@@ -471,17 +476,29 @@ public class AST implements Lexer.Emitter {
   
   void onBracketOpen(int tokix) {
     if (dbg) System.out.println("      opush bracketo " + opString(tokix));
-    opers.push(OPS[tokix]);
+    if (prevTokix != OP_COMMA && (
+        prevTokix == OP_SYMBOL || (!exprs.isEmpty() && (exprs.peek().op == OP_CALL || exprs.peek().op == OP_ADECL))
+        )) {
+      // deref
+      opers.push(OPS[OP_ADEREF]);
+    } else {
+      // declare
+      opers.push(new OpArrDecl(arrdeclid++));
+    }
   }
   
   void onBracketClose(int tokix) {
-    int endedAtTokix = collapseStack(OP_FINALIZER, OP_BRACKETO);
-    if (endedAtTokix == OP_BRACKETO) {
+    int endedAtTokix = collapseStack(OP_FINALIZER, OP_ADEREF, OP_ADECL);
+    if (endedAtTokix == OP_ADEREF) {
       if (dbg) System.out.println("      opop  " + opers.peek());
-      opers.pop(); // pop off the [
+      opers.pop(); // pop off the [ aderef
       ASTNode e2 = exprs.pop();
       ASTNode e1 = exprs.pop();
-      exprs.push(new ASTNodeOp(OP_ARRAY, e1, e2));
+      exprs.push(new ASTNodeOp(OP_ADEREF, e1, e2));
+    } else if (endedAtTokix == OP_ADECL) {
+      if (dbg) System.out.println("      opop  " + opers.peek());
+      handleArrayDeclaration();
+      opers.pop(); // pop off the [ adecl
     } else {
       throw new CompilerError("missing left bracket");
     }
@@ -523,9 +540,24 @@ public class AST implements Lexer.Emitter {
   }
   
   void onComma(int tokix) {
-    int etokix = collapseStack(OP_FINALIZER, OP_PARENO, OP_CALL, OP_FUNCDEF, OP_BRACEO);
-    if (etokix != OP_CALL && etokix != OP_BRACEO && etokix != OP_PARENO && etokix != OP_FUNCDEF) {
-      throw new CompilerError("missing delimiter (parenthesis or brace)");
+    int etokix = collapseStack(OP_FINALIZER, OP_PARENO, OP_CALL, OP_FUNCDEF, OP_BRACEO, OP_ADECL, OP_ADEREF);
+    if (etokix != OP_CALL && etokix != OP_BRACEO && etokix != OP_PARENO && 
+        etokix != OP_FUNCDEF && etokix != OP_ADECL && etokix != OP_ADEREF) {
+      throw new CompilerError("missing delimiter (parenthesis, brace, or bracket)");
+    } else if (etokix == OP_ADECL) {
+      handleArrayDeclaration();
+    }
+  }
+  
+  void handleArrayDeclaration() {
+    ASTNode e = exprs.get(exprs.size()-2);
+    if (e.op == OP_ADECL && ((ASTNodeArrDecl)e).arrid == ((OpArrDecl)opers.peek()).arrid) {
+      ASTNodeArrDecl adecle = (ASTNodeArrDecl)exprs.get(exprs.size()-2);
+      adecle.operands.add(exprs.pop());
+    } else {
+      ASTNodeArrDecl adecle = new ASTNodeArrDecl(((OpArrDecl)opers.peek()).arrid);
+      adecle.operands.add(exprs.pop());
+      exprs.push(adecle);
     }
   }
   
@@ -774,7 +806,16 @@ public class AST implements Lexer.Emitter {
       return "<" + super.toString() + ">";
     }
   }
-
+  static class OpArrDecl extends Op{
+    int arrid;
+    public OpArrDecl(int id) {
+      super("arrdecl"+id, OP_ADECL);
+      this.arrid = id;
+    }
+    public String toString() {
+      return "<" + super.toString() + ">";
+    }
+  }
   
 }
 
