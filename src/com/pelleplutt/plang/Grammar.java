@@ -34,7 +34,6 @@ public class Grammar {
           "dot:           OP_DOT\n" +
           "in:            OP_IN\n" +
           "range:         OP_HASH\n" +
-          "array:         OP_ADECL\n" +
           "call:          OP_CALL\n" +
           "blok:          OP_BLOK\n" + 
           "if:            OP_IF\n" +
@@ -50,11 +49,13 @@ public class Grammar {
           "funcdef:       OP_FUNCDEF\n" +
           "return:        OP_RETURN\n" +
           "bkpt:          OP_BKPT\n" +
+          "arrdecl:       OP_ADECL\n" +
+          "arrderef:      OP_ADEREF\n" +
           
           "cond_op:       if else\n" +
           "expr:          expr_op_bin expr_op_una\n" +
           "num:           numi numd numih numib\n" +
-          "val:           num sym call expr dot array\n" +
+          "val:           num sym call expr dot arrdecl arrderef\n" +
           "arg:           val str code range nil\n" +
           "op:            expr assign_op\n" +
           "jmp:           goto for while break continue goto label\n" +
@@ -66,8 +67,10 @@ public class Grammar {
   static final String GRAMMAR_RULES = 
           "OP_LABEL:      sym\n" +
           "dot:           sym | dot , sym\n" +
-          "assign:        sym | array , op | val | str | range | nil | assign | blok | rel_op | array\n" +
-          "return:        op | val | str | range | nil | assign | blok | rel_op | array\n" +
+          "assign:        sym | arrderef , op | val | str | range | nil | assign | blok | rel_op\n" +
+          "arrdecl:       arg*\n" +
+          "arrderef:      arrderef | arrdecl | sym | dot | str | range , val\n" +
+          "return:        op | val | str | range | nil | assign | blok | rel_op\n" +
           "assign_op:     sym , op | call | val | str\n" +
           "assign_op_add: sym , str\n" +
           "range:         val | range , val\n" +
@@ -77,8 +80,7 @@ public class Grammar {
           "expr_op_add:   str | val , str | val\n" +
           "expr_op_bin:   val , val\n" +
           "expr_op_una:   val\n" +
-          "in:            range | sym | call | dot | array\n" +
-          "array:         array | sym , val\n" +
+          "in:            range | sym | call | dot | arrdecl | arrderef\n" +
           "goto:          sym\n" +
           "call:          arg*\n" +
           "blok:          code*\n" +

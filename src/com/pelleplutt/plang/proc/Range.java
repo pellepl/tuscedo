@@ -35,18 +35,18 @@ public class Range {
     if (start.type == Processor.TFLOAT) {
       f = true;
     } else if (start.type != Processor.TINT) {
-      throw new CompilerError("ranges cannot contain type " + Processor.TSTRING[start.type]);
+      throw new CompilerError("ranges cannot contain type " + Processor.TNAME[start.type]);
     }
     if (end.type == Processor.TFLOAT) {
       f = true;
     } else if (end.type != Processor.TINT) {
-      throw new CompilerError("ranges cannot contain type " + Processor.TSTRING[end.type]);
+      throw new CompilerError("ranges cannot contain type " + Processor.TNAME[end.type]);
     }
     if (step != null) {
       if (step.type == Processor.TFLOAT) {
         f = true;
       } else if (step.type != Processor.TINT) {
-        throw new CompilerError("ranges cannot contain type " + Processor.TSTRING[step.type]);
+        throw new CompilerError("ranges cannot contain type " + Processor.TNAME[step.type]);
       }
     }
     return (byte)(f ? Processor.TFLOAT : Processor.TINT);

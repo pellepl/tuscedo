@@ -1,8 +1,9 @@
 package com.pelleplutt.plang;
 
+import static com.pelleplutt.plang.AST.OP_ADECL;
+import static com.pelleplutt.plang.AST.OP_ADEREF;
 import static com.pelleplutt.plang.AST.OP_AND;
 import static com.pelleplutt.plang.AST.OP_ANDEQ;
-import static com.pelleplutt.plang.AST.OP_ADEREF;
 import static com.pelleplutt.plang.AST.OP_BKPT;
 import static com.pelleplutt.plang.AST.OP_BLOK;
 import static com.pelleplutt.plang.AST.OP_BREAK;
@@ -60,6 +61,7 @@ import com.pelleplutt.plang.ASTNode.ASTNodeString;
 import com.pelleplutt.plang.ASTNode.ASTNodeSymbol;
 import com.pelleplutt.plang.TAC.TACAlloc;
 import com.pelleplutt.plang.TAC.TACArg;
+import com.pelleplutt.plang.TAC.TACArrayDeref;
 import com.pelleplutt.plang.TAC.TACAssign;
 import com.pelleplutt.plang.TAC.TACBkpt;
 import com.pelleplutt.plang.TAC.TACCall;
@@ -220,10 +222,38 @@ public class CodeGenFront {
     }
   }
   
+  class SymbolHolder {
+    TAC arrSymbol;
+  }
+  
+  TAC genIRAssignment(ASTNode e, ASTNodeBlok parentEblk, int level, SymbolHolder sh) {
+    if (e.op == OP_SYMBOL) {
+      TAC ret = genIR(e, parentEblk);
+      sh.arrSymbol = ret;
+      return ret;
+    }
+    else if (e.op == OP_ADEREF) {
+      TAC arr = genIRAssignment(e.operands.get(0), parentEblk, level + 1, sh);
+      setReferenced(arr);
+      TAC derefval = genIR(e.operands.get(1), parentEblk);
+      setReferenced(derefval);
+      TAC deref = new TACArrayDeref(e, arr, derefval); 
+      if (level > 0) {
+        add(deref);
+      } else if (level == 0 && e.operands.get(0).op == OP_SYMBOL){
+        // do not add the last dereference (first in recursive tree), as it is this index we want to assign to
+        // instead, push the array itself
+        add(sh.arrSymbol);
+      }
+      return deref;
+    } else {
+      throw new CompilerError("fatal, unknown assignee", e);
+    }
+  }
+  
   //
   // construct three address code intermediate representation
   //
-  
   TAC genIR(ASTNode e, ASTNodeBlok parentEblk) {
     if (e.op == OP_BLOK) {
       ASTNodeBlok eblk = (ASTNodeBlok)e;
@@ -266,7 +296,14 @@ public class CodeGenFront {
       if (doStackAllocation && eblk.type == ASTNodeBlok.TYPE_MAIN) {
         add(new TACFree(eblk, eblk.getModule(), eblk.getScopeId()));
       }
-      // TODO add 'return' if not set by programer for TYPE_ANON and TYPE_FUNC
+      
+      if (eblk.type == ASTNodeBlok.TYPE_ANON || eblk.type == ASTNodeBlok.TYPE_FUNC) {
+        // add 'return' if not set by programmer for TYPE_ANON and TYPE_FUNC
+        if (!(ffrag.ir.get(ffrag.ir.size()-1) instanceof TACReturn)) {
+          add(new TACReturn(e, new TACNil(e))); 
+        }
+        
+      }
       ffrag = oldFrag;
       if (eblk.type == ASTNodeBlok.TYPE_ANON) {
         return new TACCode(e, newFrag);
@@ -312,7 +349,7 @@ public class CodeGenFront {
     }
     
     else if (e.op == OP_EQ) {
-      TAC assignee = genIR(e.operands.get(0), parentEblk);
+      TAC assignee = genIRAssignment(e.operands.get(0), parentEblk, 0, new SymbolHolder());
       TAC assignment = genIR(e.operands.get(1), parentEblk);
       setReferenced(assignment);
       TAC op = new TACAssign(e, e.op, assignee, assignment); 
@@ -339,7 +376,7 @@ public class CodeGenFront {
           return op;
         }
       } else {
-        TAC assignee = genIR(e.operands.get(0), parentEblk);
+        TAC assignee = genIRAssignment(e.operands.get(0), parentEblk, 0, new SymbolHolder());
         setReferenced(assignee);
         TAC right = genIR(e.operands.get(1), parentEblk);  
         setReferenced(right);
@@ -509,6 +546,7 @@ public class CodeGenFront {
     }
     
     else if (e.op == OP_CALL) {
+      ASTNodeFuncCall callNode = (ASTNodeFuncCall)e;
       String args[] = new String[e.operands.size()];
       for (int i = args.length-1; i >= 0; i--) {
         TAC argVal = genIR(e.operands.get(i), parentEblk);
@@ -516,39 +554,49 @@ public class CodeGenFront {
         setReferenced(argVal);
         add(arg);
       }
-      ASTNodeSymbol callSym = ((ASTNodeFuncCall)e).name;
+      
       TACCall call = null;
-      if (callSym instanceof ASTNodeCompoundSymbol) {
-        ASTNodeCompoundSymbol ce = (ASTNodeCompoundSymbol)callSym;
-        // first, try if initial symbol is a reachable variable. If so, prefer local
-        ASTNodeBlok declBlok = getScopeIfDef(parentEblk, (ASTNodeSymbol)ce.dots.get(0));
-        if (declBlok != null) {
-          // it was, so consider this calling a hash map function <mapvar>.<key>.<key>...()
-          // TODO hashmap func call unwind
-          throw new Error();
-        } else {
-          // this needs to be linked
-          if (ce.dots.size() == 2) {
-            // only a.b, so presume this is <module>.<function>
-            call = new TACCall((ASTNodeFuncCall)e, args.length, ce.dots.get(0).symbol, null);
-            add(call);
-            call.link = true;
-          } else {
-            // a.b.c..., so presume this is a hashmap call <module>.<mapvar>.<key>.<key>...()
+      if (callNode.callByName) {
+        ASTNodeSymbol callSym = callNode.name;
+        if (callSym instanceof ASTNodeCompoundSymbol) {
+          // call by dotted symbol
+          ASTNodeCompoundSymbol ce = (ASTNodeCompoundSymbol)callSym;
+          // first, try if initial symbol is a reachable variable. If so, prefer local
+          ASTNodeBlok declBlok = getScopeIfDef(parentEblk, (ASTNodeSymbol)ce.dots.get(0));
+          if (declBlok != null) {
+            // it was, so consider this calling a hash map function <mapvar>.<key>.<key>...()
             // TODO hashmap func call unwind
-            throw new Error();
+            throw new CompilerError("not implemented", e);
+          } else {
+            // this needs to be linked
+            if (ce.dots.size() == 2) {
+              // only a.b, so presume this is <module>.<function>
+              call = new TACCall((ASTNodeFuncCall)e, args.length, ce.dots.get(0).symbol, null);
+              add(call);
+              call.link = true;
+            } else {
+              // a.b.c..., so presume this is a hashmap call <module>.<mapvar>.<key>.<key>...()
+              // TODO hashmap func call unwind
+              throw new CompilerError("not implemented", e);
+            }
           }
+        } else {
+          // call by symbol
+          ASTNodeBlok scopeBlock = getScopeIfDef(parentEblk, callSym);
+          TACVar var = null;
+          if (scopeBlock != null) {
+            // found a variable with the call name, so presume we're calling a function variable
+            var = new TACVar(e, ((ASTNodeFuncCall)e).name.symbol, scopeBlock.getModule(), scopeBlock.getScopeId());
+          }
+          call = new TACCall((ASTNodeFuncCall)e, args.length, parentEblk.module, var);
+          if (var == null) call.link = true;
+          add(call);
         }
       } else {
-        ASTNodeBlok scopeBlock = getScopeIfDef(parentEblk, callSym);
-        TACVar var = null;
-        if (scopeBlock != null) {
-          // found a variable with the call name, so presume we're calling a function variable
-          var = new TACVar(e, ((ASTNodeFuncCall)e).name.symbol, scopeBlock.getModule(), scopeBlock.getScopeId());
-        }
-        call = new TACCall((ASTNodeFuncCall)e, args.length, parentEblk.module, var);
-        if (var == null) call.link = true;
-
+        // call by op
+        TAC addrGen = genIR(callNode.callAddrOp, parentEblk);
+        setReferenced(addrGen);
+        call = new TACCall((ASTNodeFuncCall)e, args.length, parentEblk.module, null);
         add(call);
       }
       return call;
@@ -576,9 +624,30 @@ public class CodeGenFront {
     }
     
     else if (e.op == OP_ADEREF) {
-      throw new CompilerError("not implemented" , e);
+      TAC arr = genIR(e.operands.get(0), parentEblk);
+      setReferenced(arr);
+      TAC derefval = genIR(e.operands.get(1), parentEblk);
+      setReferenced(derefval);
+      TAC deref = new TACArrayDeref(e, arr, derefval); 
+      add(deref);
+      return deref;
     }
-    // TODO more
+    
+    else if (e.op == OP_ADECL) {
+      ASTNode.ASTNodeArrDecl adecle = (ASTNode.ASTNodeArrDecl)e;
+      for (ASTNode e2 : adecle.operands) {
+        TAC entry = genIR(e2, parentEblk);
+        TAC entryT = new TAC.TACArrayEntry(e, entry);
+        setReferenced(entry);
+        add(entryT);
+      }
+
+      TAC arr = new TAC.TACArray(e, adecle.operands.size()); 
+      add(arr);
+      return arr;
+    }
+    
+    // TODO moar
     
     return null;
   }

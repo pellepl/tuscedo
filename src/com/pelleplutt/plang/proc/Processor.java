@@ -1,6 +1,8 @@
 package com.pelleplutt.plang.proc;
 
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import com.pelleplutt.plang.Executable;
@@ -17,10 +19,12 @@ public class Processor implements ByteCode {
   public static final int TMAP = 7;
   public static final int TREF = 8;
   
+  static final int TO_CHAR = -1;
+  
   public static boolean dbgMem = false;
   public static boolean dbgRun = false;
   
-  public static final String TSTRING[] = {
+  public static final String TNAME[] = {
     "nil", "int", "float", "string", "range", "code", "list", "map", "reference"
   };
   
@@ -133,7 +137,7 @@ public class Processor implements ByteCode {
       break;
     case IPUI:
       sb.append("push_im ");
-      sb.append(String.format("0x%02x", codetoi(code, pc, 1)));
+      sb.append(String.format("%d", codetos(code, pc, 1)));
       break;
     case IPUNIL:
       sb.append("push_nil");
@@ -216,6 +220,9 @@ public class Processor implements ByteCode {
     case ITOS:
       sb.append("cast_S  ");
       break;
+    case ITOC:
+      sb.append("cast_ch ");
+      break;
       
     case IPOP:
       sb.append("pop     ");
@@ -262,22 +269,25 @@ public class Processor implements ByteCode {
       sb.append(String.format("%d", codetoi(code, pc, 1) + 1));
       break;
 
-    case IIXRD:
+    case ILCRE:
+      sb.append("arr_crea");
+      break;
+    case ILRD:
       sb.append("arr_rd  ");
       break;
-    case IIXWR :
+    case ILWR :
       sb.append("arr_wr  ");
       break;
-    case IIXADD:
+    case ILADD:
       sb.append("arr_add ");
       break;
-    case IIXDEL:
+    case ILDEL:
       sb.append("arr_del ");
       break;
-    case IIXINS:
+    case ILINS:
       sb.append("arr_ins ");
       break;
-    case IIXSZ:
+    case ILSZ:
       sb.append("arr_sz  ");
       break;
 
@@ -419,6 +429,12 @@ public class Processor implements ByteCode {
     memory[sp--].str = x;
   }
     
+  void push(List<M> list) {
+    memory[sp].type = TLIST;
+    memory[sp].ref = list;
+    memory[sp--].str = null;
+  }
+    
   void pushRef(M x) {
     memory[sp].type = TREF;
     memory[sp].str = null;
@@ -489,12 +505,72 @@ public class Processor implements ByteCode {
   
   void spi() {
     int m = codetoi(code, pc++, 1) + 1;
+    for (int i = 0; i < m; i++) {
+      poke(sp - i, nilM);
+    }
     sp -= m;
   }
   
   void spd() {
     int m = codetoi(code, pc++, 1) + 1;
     sp += m;
+  }
+  
+  void lcre() {
+    int elements = pop().asInt();
+    List<M> list = new ArrayList<M>();
+    for (int i = 0; i < elements; i++) {
+      M m = new M();
+      m.copy(peek(sp + elements - i));
+      list.add(m);
+    }
+    sp += elements;
+    push(list);
+  }
+  
+  @SuppressWarnings("unchecked")
+  void lrd() {
+    int ix = pop().asInt();
+    M mlist = pop();
+    if (mlist.type == TLIST) {
+      push(((List<M>)mlist.ref).get(ix));
+    } else if (mlist.type == TSTR) {
+      push((int)mlist.str.charAt(ix));
+    } else {
+      throw new ProcessorError("cannot dereference type " + TNAME[mlist.type]);
+    }
+  }
+  
+  @SuppressWarnings("unchecked")
+  void lwr() {
+    int ix = pop().asInt();
+    M mval = pop();
+    M mlist = pop();
+    if (mlist.type == TLIST) {
+      M m = new M();
+      m.copy(mval);
+      ((List<M>)mlist.ref).set(ix, m);
+    } else if (mlist.type == TSTR) {
+      int len = mlist.str.length();
+      mlist.str = 
+          (ix > 0 ? mlist.str.substring(0, ix-1) : "") +  
+          mval.asString() + 
+          (ix+1 < mlist.str.length() ? mlist.str.substring(ix+1) : "");
+    } else {
+      throw new ProcessorError("cannot dereference type " + TNAME[mlist.type]);
+    }
+  }
+  
+  @SuppressWarnings("unchecked")
+  void lsz() {
+    M e = pop();
+    if (e.type == TLIST) {
+      push(((List<M>)e.ref).size());
+    } else if (e.type == TSTR) {
+      push(e.str.length());
+    } else {
+      throw new ProcessorError("cannot get length of type " + TNAME[e.type]);
+    }
   }
   
   void status(int x) {
@@ -510,6 +586,7 @@ public class Processor implements ByteCode {
     minus = false;
   }
     
+  @SuppressWarnings("unchecked")
   void add() {
     M e2 = pop();
     M e1 = pop();
@@ -529,7 +606,7 @@ public class Processor implements ByteCode {
         status(r);
         push(r);
       } else {
-        throw new ProcessorError("cannot add type " + TSTRING[e1.type]);
+        throw new ProcessorError("cannot add type " + TNAME[e1.type]);
       }
     }
     else if (e1.type == TFLOAT && e2.type == TINT) {
@@ -542,12 +619,44 @@ public class Processor implements ByteCode {
       status(r);
       push(r);
     }
+    else if (e1.type == TSTR && e1.str.length() == 1 && e2.type == TINT) {
+      int r = e1.str.charAt(0) + e2.i;
+      status(r);
+      push(r);
+    }
+    else if (e2.type == TSTR && e2.str.length() == 1 && e1.type == TINT) {
+      int r = e1.i + e2.str.charAt(0);
+      status(r);
+      push(r);
+    }
+    else if (e1.type == TSTR && e1.str.length() == 1 && e2.type == TFLOAT) {
+      float r = e1.str.charAt(0) + e2.f;
+      status(r);
+      push(r);
+    }
+    else if (e2.type == TSTR && e2.str.length() == 1 && e1.type == TFLOAT) {
+      float r = e1.f + e2.str.charAt(0);
+      status(r);
+      push(r);
+    }
+    else if (e1.type == TLIST) {
+      M m = new M();
+      m.copy(e2);
+      ((List<M>)e1.ref).add(m);
+      push(e1);
+    }
+    else if (e2.type == TLIST) {
+      M m = new M();
+      m.copy(e1);
+      ((List<M>)e2.ref).add(0, m);
+      push(e2);
+    }
     else if (e1.type == TSTR || e2.type == TSTR) {
       String r = e1.asString() + e2.asString();
       status(r);
       push(r);
     } else {
-      throw new ProcessorError("cannot add types " + TSTRING[e1.type] + " and " + TSTRING[e2.type]);
+      throw new ProcessorError("cannot add types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
     }
   }
 
@@ -580,12 +689,12 @@ public class Processor implements ByteCode {
         String r = e1.str;
         int pos = r.lastIndexOf(e2.str);
         if (pos >= 0) {
-          r = r.substring(0, pos);
+          r = r.substring(0, pos) + r.substring(pos + e2.str.length());
         }
         status(r);
         if (push) push(r);
       } else {
-        throw new ProcessorError("cannot subtract type " + TSTRING[e1.type]);
+        throw new ProcessorError("cannot subtract type " + TNAME[e1.type]);
       }
     }
     else if (e1.type == TFLOAT && e2.type == TINT) {
@@ -597,8 +706,29 @@ public class Processor implements ByteCode {
       float r = e1.i - e2.f;
       status(r);
       if (push) push(r);
-    } else {
-      throw new ProcessorError("cannot subtract types " + TSTRING[e1.type] + " and " + TSTRING[e2.type]);
+    }
+    else if (e1.type == TSTR && e1.str.length() == 1 && e2.type == TINT) {
+      int r = e1.str.charAt(0) - e2.i;
+      status(r);
+      push(r);
+    }
+    else if (e2.type == TSTR && e2.str.length() == 1 && e1.type == TINT) {
+      int r = e1.i - e2.str.charAt(0);
+      status(r);
+      push(r);
+    }
+    else if (e1.type == TSTR && e1.str.length() == 1 && e2.type == TFLOAT) {
+      float r = e1.str.charAt(0) - e2.f;
+      status(r);
+      push(r);
+    }
+    else if (e2.type == TSTR && e2.str.length() == 1 && e1.type == TFLOAT) {
+      float r = e1.f - e2.str.charAt(0);
+      status(r);
+      push(r);
+    }
+    else {
+      throw new ProcessorError("cannot subtract types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
     }
   }
   
@@ -625,7 +755,7 @@ public class Processor implements ByteCode {
     if (e1.type == TINT) {
       push(~e1.i);
     } else {
-      throw new ProcessorError("cannot NOT type " + TSTRING[e1.type]);
+      throw new ProcessorError("cannot invert type " + TNAME[e1.type]);
     }
   }
   
@@ -636,7 +766,7 @@ public class Processor implements ByteCode {
     } else if (e1.type == TFLOAT) {
       push(-e1.f);
     } else {
-      throw new ProcessorError("cannot negate type " + TSTRING[e1.type]);
+      throw new ProcessorError("cannot negate type " + TNAME[e1.type]);
     }
   }
   
@@ -645,7 +775,7 @@ public class Processor implements ByteCode {
     if (e1.type == TINT) {
       push(e1.i == 0 ? 1 : 0);
     } else {
-      throw new ProcessorError("cannot logical not type " + TSTRING[e1.type]);
+      throw new ProcessorError("cannot logical not type " + TNAME[e1.type]);
     }
   }
   
@@ -660,7 +790,7 @@ public class Processor implements ByteCode {
   }
   
   void pui() {
-    push(codetoi(code, pc++, 1));
+    push(codetos(code, pc++, 1));
   }
 
   void puint(int i) {
@@ -715,11 +845,24 @@ public class Processor implements ByteCode {
       case TREF: break;
       }
       break;
+    case TO_CHAR:
+      switch (m.type) {
+      case TFLOAT: m.str = "" + (char)((int)m.f); break;
+      case TCODE: break;
+      case TINT: m.str = "" + (char)(m.i); break;
+      case TNIL: break;
+      case TSTR: break;
+      case TRANGE: break;
+      case TLIST: break;
+      case TMAP: break;
+      case TREF: break;
+      }
+      break;
     case TSTR:
       m.str = m.asString();
       break;
     }
-    m.type = (byte)type;
+    m.type = (byte)(type == TO_CHAR ? TSTR : type);
   }
   
   void mul() {
@@ -736,7 +879,7 @@ public class Processor implements ByteCode {
         status(r);
         push(r);
       } else {
-        throw new ProcessorError("cannot multiply type " + TSTRING[e1.type]);
+        throw new ProcessorError("cannot multiply type " + TNAME[e1.type]);
       }
     }
     else if (e1.type == TFLOAT && e2.type == TINT) {
@@ -749,7 +892,7 @@ public class Processor implements ByteCode {
       status(r);
       push(r);
     } else {
-      throw new ProcessorError("cannot multiply types " + TSTRING[e1.type] + " and " + TSTRING[e2.type]);
+      throw new ProcessorError("cannot multiply types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
     }
   }
 
@@ -767,7 +910,7 @@ public class Processor implements ByteCode {
         status(r);
         push(r);
       } else {
-        throw new ProcessorError("cannot divide type " + TSTRING[e1.type]);
+        throw new ProcessorError("cannot divide type " + TNAME[e1.type]);
       }
     }
     else if (e1.type == TFLOAT && e2.type == TINT) {
@@ -780,7 +923,7 @@ public class Processor implements ByteCode {
       status(r);
       push(r);
     } else {
-      throw new ProcessorError("cannot divide types " + TSTRING[e1.type] + " and " + TSTRING[e2.type]);
+      throw new ProcessorError("cannot divide types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
     }
   }
   
@@ -798,7 +941,7 @@ public class Processor implements ByteCode {
         status(r);
         push(r);
       } else {
-        throw new ProcessorError("cannot modulo type " + TSTRING[e1.type]);
+        throw new ProcessorError("cannot modulo type " + TNAME[e1.type]);
       }
     }
     else if (e1.type == TFLOAT && e2.type == TINT) {
@@ -811,7 +954,7 @@ public class Processor implements ByteCode {
       status(r);
       push(r);
     } else {
-      throw new ProcessorError("cannot modulo types " + TSTRING[e1.type] + " and " + TSTRING[e2.type]);
+      throw new ProcessorError("cannot modulo types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
     }
   }
   
@@ -822,8 +965,16 @@ public class Processor implements ByteCode {
       int r = e1.i << e2.i;
       status(r);
       push(r);
+    } else if (e1.type == TINT && e2.type == TSTR && e2.str.length() == 1) {
+      int r = e1.i << e2.str.charAt(0);
+      status(r);
+      push(r);
+    } else if (e2.type == TINT && e1.type == TSTR && e1.str.length() == 1) {
+      int r = e1.str.charAt(0) << e2.i;
+      status(r);
+      push(r);
     } else {
-      throw new ProcessorError("cannot shift types " + TSTRING[e1.type] + " and " + TSTRING[e2.type]);
+      throw new ProcessorError("cannot shift types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
     }
   }
   
@@ -834,8 +985,16 @@ public class Processor implements ByteCode {
       int r = e1.i >> e2.i;
       status(r);
       push(r);
+    } else if (e1.type == TINT && e2.type == TSTR && e2.str.length() == 1) {
+      int r = e1.i >> e2.str.charAt(0);
+      status(r);
+      push(r);
+    } else if (e2.type == TINT && e1.type == TSTR && e1.str.length() == 1) {
+      int r = e1.str.charAt(0) >> e2.i;
+      status(r);
+      push(r);
     } else {
-      throw new ProcessorError("cannot shift types " + TSTRING[e1.type] + " and " + TSTRING[e2.type]);
+      throw new ProcessorError("cannot shift types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
     }
   }
   
@@ -846,8 +1005,16 @@ public class Processor implements ByteCode {
       int r = e1.i & e2.i;
       status(r);
       push(r);
+    } else if (e1.type == TINT && e2.type == TSTR && e2.str.length() == 1) {
+      int r = e1.i & e2.str.charAt(0);
+      status(r);
+      push(r);
+    } else if (e2.type == TINT && e1.type == TSTR && e1.str.length() == 1) {
+      int r = e1.str.charAt(0) & e2.i;
+      status(r);
+      push(r);
     } else {
-      throw new ProcessorError("cannot and types " + TSTRING[e1.type] + " and " + TSTRING[e2.type]);
+      throw new ProcessorError("cannot and types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
     }
   }
   
@@ -855,11 +1022,19 @@ public class Processor implements ByteCode {
     M e2 = pop();
     M e1 = pop();
     if (e1.type == e2.type && e1.type == TINT) {
-      int r = e1.i & e2.i;
+      int r = e1.i | e2.i;
+      status(r);
+      push(r);
+    } else if (e1.type == TINT && e2.type == TSTR && e2.str.length() == 1) {
+      int r = e1.i | e2.str.charAt(0);
+      status(r);
+      push(r);
+    } else if (e2.type == TINT && e1.type == TSTR && e1.str.length() == 1) {
+      int r = e1.str.charAt(0) | e2.i;
       status(r);
       push(r);
     } else {
-      throw new ProcessorError("cannot or types " + TSTRING[e1.type] + " and " + TSTRING[e2.type]);
+      throw new ProcessorError("cannot or types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
     }
   }
   
@@ -867,11 +1042,19 @@ public class Processor implements ByteCode {
     M e2 = pop();
     M e1 = pop();
     if (e1.type == e2.type && e1.type == TINT) {
-      int r = e1.i & e2.i;
+      int r = e1.i ^ e2.i;
+      status(r);
+      push(r);
+    } else if (e1.type == TINT && e2.type == TSTR && e2.str.length() == 1) {
+      int r = e1.i ^ e2.str.charAt(0);
+      status(r);
+      push(r);
+    } else if (e2.type == TINT && e1.type == TSTR && e1.str.length() == 1) {
+      int r = e1.str.charAt(0) ^ e2.i;
       status(r);
       push(r);
     } else {
-      throw new ProcessorError("cannot xor types " + TSTRING[e1.type] + " and " + TSTRING[e2.type]);
+      throw new ProcessorError("cannot xor types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
     }
   }
   
@@ -879,7 +1062,7 @@ public class Processor implements ByteCode {
     M addr = pop();
     int a = addr.i;
     if (addr.type != TINT && addr.type != TCODE) {
-      throw new ProcessorError("calling bad type " + TSTRING[addr.type]);
+      throw new ProcessorError("calling bad type " + TNAME[addr.type]);
     }
     int args = peek(sp+1).i;
     push(pc);
@@ -1135,6 +1318,9 @@ public class Processor implements ByteCode {
     case ITOS:
       to(TSTR);
       break;
+    case ITOC:
+      to(TO_CHAR);
+      break;
 
     case IPOP:
       pop();
@@ -1174,17 +1360,23 @@ public class Processor implements ByteCode {
       spd();
       break;
 
-    case IIXRD:
+    case ILCRE:
+      lcre();
       break;
-    case IIXWR:
+    case ILRD:
+      lrd();
       break;
-    case IIXADD:
+    case ILWR:
+      lwr();
       break;
-    case IIXDEL:
+    case ILADD:
       break;
-    case IIXINS:
+    case ILDEL:
       break;
-    case IIXSZ:
+    case ILINS:
+      break;
+    case ILSZ:
+      lsz();
       break;
 
     case ICAL: 
@@ -1258,7 +1450,7 @@ public class Processor implements ByteCode {
   
   public static class M {
     public byte type;
-    public M ref;
+    public Object ref;
     public String str;
     public int i;
     public float f;
@@ -1288,11 +1480,30 @@ public class Processor implements ByteCode {
       case TCODE:
         return String.format("->0x%08x", i);
       case TLIST:
+      {
+        StringBuilder sb = new StringBuilder("[");
+        @SuppressWarnings("unchecked")
+        List<M> l = (List<M>)ref;
+        final int sz = l.size();
+        if (sz > 6) {
+          for (int i = 0; i < 3; i++) {
+            sb.append(l.get(i).asString() + ", ");
+          }
+          sb.append("(" + (sz - 3) + " more entries)");
+        } else {
+          for (int i = 0; i < sz; i++) {
+            sb.append(l.get(i).asString());
+            if (i < sz-1) sb.append(", ");
+          }
+        }
+        sb.append("]");
+        return sb.toString();
+      }
       case TRANGE:
       case TMAP:
         return "TODO"; // TODO
       case TREF:
-        return ref.asString();
+        return ref instanceof M ? ((M)ref).asString() : ref.toString();
       default:
         return "?";
       }

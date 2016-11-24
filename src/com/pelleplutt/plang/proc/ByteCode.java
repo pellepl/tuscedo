@@ -74,13 +74,15 @@ public interface ByteCode {
   static final int ITOI  = 0x40; // cast to int
   static final int ITOF  = 0x41; // cast to float
   static final int ITOS  = 0x42; // cast to string
+  static final int ITOC  = 0x43; // cast to char
   
-  static final int IIXRD = 0x50; // list read index               push(pop(list).list_get(pop(ix)))
-  static final int IIXWR = 0x51; // list write index              pop(list).set(pop(ix)) = pop()
-  static final int IIXADD= 0x52; // list add                      pop(list).add(pop(ix))
-  static final int IIXDEL= 0x53; // list remove                   pop(list).del(pop(ix))
-  static final int IIXINS= 0x54; // list insert                   pop(list).ins(pop(ix)) = pop()
-  static final int IIXSZ = 0x55; // read list size                push(pop(list).size)
+  static final int ILCRE = 0x50; // create list                   sz=pop(); while(sz--){l.add($sp[-sz]);};push(l);
+  static final int ILRD  = 0x51; // list read index               ix=pop(); l=pop(); push(l[ix]=v);
+  static final int ILWR  = 0x52; // list write index              v=pop(); ix=pop(); l=pop(); l[ix]=v;
+  static final int ILADD = 0x53; // list add                      v=pop(); l=pop(); l.add(v);
+  static final int ILDEL = 0x54; // list remove                   ix=pop(); l=pop(); l.del(ix);
+  static final int ILINS = 0x55; // list insert                   v=pop(); ix=pop(); l=pop(); l.ins(ix,v);
+  static final int ILSZ  = 0x56; // read list size                l=pop();push(l.size)
 
   static final int ICAL  = 0xe0; // call function                 a=pop(); push($pc+3); push($fp); $fp=sp; $pc=a
   static final int ICALI = 0xe1; // call function immediate       push($pc+3); push($fp); $fp=sp; $pc=xxxxxx
@@ -111,7 +113,7 @@ public interface ByteCode {
        UD,UD, 2, 2, 2, 1, 1, 1, 1, 1, 1, 4,UD,UD,UD,UD, //10
         1, 1, 1, 2, 1, 4, 1, 4, 2, 2,UD,UD, 2, 2,UD,UD, //20
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, //30
-        1, 1, 1,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //40
+        1, 1, 1, 1,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //40
         1, 1, 1, 1, 1, 1,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //50
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //60
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //70

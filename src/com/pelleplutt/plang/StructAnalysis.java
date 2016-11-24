@@ -1,5 +1,6 @@
 package com.pelleplutt.plang;
 
+import static com.pelleplutt.plang.AST.OP_ADECL;
 import static com.pelleplutt.plang.AST.OP_ADEREF;
 import static com.pelleplutt.plang.AST.OP_BLOK;
 import static com.pelleplutt.plang.AST.OP_BREAK;
@@ -126,9 +127,7 @@ public class StructAnalysis {
       
       if (tnode instanceof ASTNodeBlok) {
         // anonymous scope
-        // System.out.println("ENTER anon " + e);
         newAnonymousScope((ASTNodeBlok)tnode, e);
-        // System.out.println("LEAVE anon " + be + " got symbols " + anonScope.symList + " and args " + anonScope.symArgs);
       } else {
         if (e.operands != null) {
           for (ASTNode e2 : e.operands) {
@@ -200,6 +199,15 @@ public class StructAnalysis {
     else if (e.op == OP_ELSE) {
       analyseRecurse(e.operands.get(0), scopeStack, e, true, loop);
     }
+    else if (e.op == OP_ADECL) {
+      for (ASTNode e2 : e.operands) {
+        if (e2 instanceof ASTNodeBlok) {
+          newAnonymousScope((ASTNodeBlok)e2, e);
+        } else {
+          analyseRecurse(e2, scopeStack, e, operator, loop);
+        }
+      }
+    }
     else {
       if (e.operands != null) {
         for (ASTNode e2 : e.operands) {
@@ -251,6 +259,10 @@ public class StructAnalysis {
         // is defined already
         return;
       };
+      if (s.symArgs.contains(esym)) {
+        // is defined already
+        return;
+      };
     }
     scopeStack.peek().symList.add(esym);
     if (dbg) System.out.println("  + '" + esym.symbol + "' " + (scopeStack.size() == 1 ? "GLOBAL" : "LOCAL"));
@@ -268,6 +280,7 @@ public class StructAnalysis {
     for (int i = scopeStack.size()-1; i >= 0; i--) {
       Scope s = scopeStack.get(i);
       if (s.symList.contains(esym)) return true;
+      if (s.symArgs.contains(esym)) return true;
     }
     return false;
   }
@@ -277,6 +290,7 @@ public class StructAnalysis {
     for (int i = scopeStack.size()-2; i >= 0; i--) {
       Scope s = scopeStack.get(i);
       if (s.symList.contains(sym)) return true;
+      if (s.symArgs.contains(sym)) return true;
     }
     return false;
   }
