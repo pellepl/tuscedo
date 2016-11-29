@@ -7,10 +7,12 @@ import java.util.List;
 import java.util.Map;
 
 import com.pelleplutt.plang.ModuleFragment.Link;
+import com.pelleplutt.plang.ModuleFragment.LinkArrayInitializer;
 import com.pelleplutt.plang.ModuleFragment.LinkCall;
 import com.pelleplutt.plang.ModuleFragment.LinkConst;
-import com.pelleplutt.plang.ModuleFragment.LinkUnresolved;
 import com.pelleplutt.plang.ModuleFragment.LinkGlobal;
+import com.pelleplutt.plang.ModuleFragment.LinkUnresolved;
+import com.pelleplutt.plang.TAC.TACArrInit;
 import com.pelleplutt.plang.TAC.TACCode;
 import com.pelleplutt.plang.TAC.TACFloat;
 import com.pelleplutt.plang.TAC.TACInt;
@@ -120,6 +122,11 @@ public class Linker implements ByteCode {
             }
           } 
         }
+        else if (l instanceof LinkArrayInitializer) {
+          LinkArrayInitializer lai = (LinkArrayInitializer)l;
+          globalLUT.put(lai.arr, symbolOffset);
+          symbolOffset += lai.arr.entries.size();
+        }
       }
     }
     
@@ -160,6 +167,7 @@ public class Linker implements ByteCode {
     for (ModuleFragment frag : fragments) {
       if (dbg) System.out.println("    .. " + frag.modname + frag.fragname);
       linkFragConst(frag);
+      linkFragArrayInitializers(frag);
       linkFragGlobals(frag);
       linkFragFunc(frag);
       linkFragUnresolved(frag);
@@ -221,7 +229,6 @@ public class Linker implements ByteCode {
         if (dbg) System.out.print(", as variable " + refVar);
         if (globalLUT.containsKey(refVar)){
           // this is a global variable reference
-          frag.write(srcvar, ILDI, 1);
           frag.write(srcvar + 1, globalLUT.get(refVar), 3);
           if (dbg) System.out.println(": found");
           continue;
@@ -231,7 +238,6 @@ public class Linker implements ByteCode {
         if (fragLUT.containsKey(callName)) {
           // this is a function reference
           TACCode funcRef = new TACCode(tu.getNode(), fragLUT.get(callName));
-          frag.write(srcvar, ILDI, 1);
           frag.write(srcvar + 1, globalLUT.get(funcRef), 3);
           if (dbg) System.out.println(": found");
           continue;
@@ -241,6 +247,18 @@ public class Linker implements ByteCode {
       } // all LinkUnresolveds 
     }
   }
+  
+  public void linkFragArrayInitializers(ModuleFragment frag) {
+    for (Link l : frag.links) {
+      if (l instanceof LinkArrayInitializer) {
+        LinkArrayInitializer lai = (LinkArrayInitializer)l;
+        int srcvar = lai.pc;
+        frag.write(srcvar + 1, globalLUT.get(lai.arr), 3);
+      } 
+    }
+  }
+  
+
   
   public void collectCode() {
     for (ModuleFragment frag : fragments) {
@@ -257,6 +275,30 @@ public class Linker implements ByteCode {
     return mc;
   }
 
+  M makeConstPrimitive(TAC t) {
+    M m = null;
+
+    if (t instanceof TACInt) {
+      m = new M(((TACInt)t).x);
+    }
+    else if (t instanceof TACFloat) {
+      m = new M(((TACFloat)t).x);
+    }
+    else if (t instanceof TACString) {
+      m = new M(((TACString)t).x);
+    }
+    else if (t instanceof TACCode) {
+      if (((TACCode)t).ffrag != null) {
+        m = new M(fragLUT.get(((TACCode)t).ffrag.module + ((TACCode)t).ffrag.name));
+      } else {
+        m = new M(((TACCode)t).addr);
+      }
+      m.type = Processor.TCODE;
+    }
+    else throw new CompilerError("constant type not primitive " + t.getClass().getSimpleName());
+
+    return m;
+  }
   
   Map<Integer, M> getConstants() {
     Map<Integer, M> constants = new HashMap<Integer, M>();
@@ -264,25 +306,15 @@ public class Linker implements ByteCode {
       if (!(t instanceof TACVar)) {
         int addr = globalLUT.get(t);
         M m = null;
-        if (t instanceof TACInt) {
-          m = new M(((TACInt)t).x);
-        }
-        else if (t instanceof TACFloat) {
-          m = new M(((TACFloat)t).x);
-        }
-        else if (t instanceof TACString) {
-          m = new M(((TACString)t).x);
-        }
-        else if (t instanceof TACCode) {
-          if (((TACCode)t).ffrag != null) {
-            m = new M(fragLUT.get(((TACCode)t).ffrag.module + ((TACCode)t).ffrag.name));
-          } else {
-            m = new M(((TACCode)t).addr);
+        if (t instanceof TACArrInit) {
+          List<TAC> arr = ((TACArrInit)t).entries;
+          for (TAC taentry : arr) {
+            constants.put(addr++, makeConstPrimitive(taentry));
           }
-          m.type = Processor.TCODE;
+        } else {
+          m = makeConstPrimitive(t);
+          constants.put(addr, m);
         }
-        else throw new CompilerError("unhandled constant type " + t.getClass().getSimpleName());
-        constants.put(addr, m);
       }
     }
     return constants;

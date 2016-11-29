@@ -3,6 +3,7 @@ package com.pelleplutt.plang;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.pelleplutt.plang.ASTNode.ASTNodeArrDecl;
 import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
 import com.pelleplutt.plang.ASTNode.ASTNodeCompoundSymbol;
 import com.pelleplutt.plang.ASTNode.ASTNodeFuncCall;
@@ -28,7 +29,7 @@ public abstract class TAC {
     if (t instanceof TACVar || t instanceof TACString || 
         t instanceof TACInt || t instanceof TACFloat ||
         t instanceof TACCode || t instanceof TACUnresolved ||
-        t instanceof TACArrayDeref) {
+        t instanceof TACSetDeref || t instanceof TACMapTuple) {
       return t.toString();
     } else {
       if (dbgResolveRefs) return "(" + t.toString() + ")";
@@ -167,26 +168,55 @@ public abstract class TAC {
     public String toString() {return Float.toString(x);}
   }
   
-  public static class TACArrayEntry extends TAC {
+  public static class TACSet extends TAC {
+    int entries;
+    public TACSet(ASTNode e, int entryCount) {
+      super(e); this.entries = entryCount;
+    }
+    public String toString() {return "ARR " + entries + " entries";}
+  }
+  public static class TACArrInit extends TAC {
+    List<TAC> entries = new ArrayList<TAC>();
+    public TACArrInit(ASTNodeArrDecl e) {
+      super((ASTNode)e);
+    }
+    public String toString() {return "ARRINIT " + entries;}
+  }
+  public static class TACMap extends TAC {
+    int tuples;
+    public TACMap(ASTNode e, int tuples) {
+      super(e); this.tuples = tuples;
+    }
+    public String toString() {return "MAP " + tuples + " tuples";}
+  }
+  public static class TACArrEntry extends TAC {
     TAC entry;
-    public TACArrayEntry(ASTNode e, TAC arg) {
+    public TACArrEntry(ASTNode e, TAC arg) {
       super(e); this.entry = arg;
     }
     public String toString() {return "ENTRY " + ref(entry);}
   }
-  public static class TACArray extends TAC {
-    int entries;
-    public TACArray(ASTNode e, int entries) {
-      super(e); this.entries = entries;
+  public static class TACMapTuple extends TAC {
+    TAC key; TAC val;
+    public boolean isLast;
+    public TACMapTuple(ASTNode e, TAC key, TAC val) {
+      super(e); this.key = key; this.val = val; 
     }
-    public String toString() {return "ARR " + entries + " entries";}
+    public String toString() {return "TUPLE " + ref(key) + ":" + ref(val) + (isLast ? " last" : "");}
   }
-  public static class TACArrayDeref extends TAC {
-    TAC arr, derefVal;
-    public TACArrayDeref(ASTNode e, TAC arr, TAC derefVal) {
-      super(e); this.arr = arr; this.derefVal = derefVal;
+  public static class TACSetDeref extends TAC {
+    TAC set, derefVal;
+    public TACSetDeref(ASTNode e, TAC set, TAC derefVal) {
+      super(e); this.set = set; this.derefVal = derefVal;
     }
-    public String toString() {return "DEREF " + ref(arr) + "<" + ref(derefVal) + ">";}
+    public String toString() {return "DEREF (" + ref(set) + "<" + ref(derefVal) + ">)";}
+  }
+  public static class TACSetRead extends TAC {
+    TAC set, derefIx;
+    public TACSetRead(ASTNode e, TAC set, TAC derefIx) {
+      super(e); this.set = set; this.derefIx = derefIx;
+    }
+    public String toString() {return "READDIX (" + ref(set) + "<" + ref(derefIx) + ">)";}
   }
   
   public static class TACGoto extends TAC {
@@ -217,10 +247,13 @@ public abstract class TAC {
   }
   
   public static class TACAlloc extends TAC {
+    public static final String varIterator = ".iter";
+    public static final String varSet = ".set";
     List<String> vars = new ArrayList<String>();
     List<String> args = new ArrayList<String>();
     String module, scope;
     boolean funcEntry;
+    
     public TACAlloc(ASTNodeBlok e, String module, String scope) {
       super(e);
       this.module = module;
@@ -231,6 +264,7 @@ public abstract class TAC {
         }
       }
     }
+    
     public TACAlloc(ASTNodeBlok e, String module, String scope, boolean funcEntry) {
       super(e);
       this.module = module;
@@ -247,9 +281,27 @@ public abstract class TAC {
         }
       }
     }
+
+    // for each constructor (for x in y)
+    public TACAlloc(ASTNode e, ASTNodeBlok eblk) {
+      super(e instanceof ASTNodeBlok ? e : eblk);
+      if (e instanceof ASTNodeBlok) {
+        eblk = (ASTNodeBlok)e;
+        if (eblk.getVariables() != null) {
+          for (ASTNodeSymbol sym : eblk.getVariables()) {
+            vars.add(sym.symbol);
+          }
+        }
+      }
+      this.module = eblk.getModule();
+      this.scope = eblk.getScopeId();
+      vars.add(varIterator);
+      vars.add(varSet);
+    }
+    
     public String toString() {return "ALLO " + vars + (funcEntry ? " FUNC" + args : "");}
   }
-  
+
   public static class TACFree extends TAC {
     List<String> vars = new ArrayList<String>();
     String module, scope;
@@ -262,6 +314,12 @@ public abstract class TAC {
           vars.add(sym.symbol);
         }
       }
+    }
+    public TACFree(TACAlloc x) {
+      super(x.getNode());
+      this.module = x.module;
+      this.scope = x.scope;
+      this.vars = x.vars;
     }
     public String toString() {return "FREE " + vars;}
   }
@@ -293,10 +351,11 @@ public abstract class TAC {
     int args;
     TACVar var;
     boolean link;
+    // if true, call by name or variable, else func addr is presumed to be on stack
     boolean callByName;
     public TACCall(ASTNodeFuncCall e, int args, String module, TACVar var) {
       super(e); 
-      this.args = args; this.var = var; this.module = module; this.callByName = e.callByName;
+      this.args = args; this.var = var; this.module = module; callByName = e.callByName;
       if (e.name instanceof ASTNodeCompoundSymbol) {
         ASTNodeCompoundSymbol ce = (ASTNodeCompoundSymbol)e.name;
         this.func = ce.dots.get(1).symbol;  
@@ -307,17 +366,22 @@ public abstract class TAC {
           this.func = e.name.symbol;
         }
       }
-      
+    }
+    public TACCall(ASTNode e, String funcName, int args, String module) {
+      super(e); 
+      this.args = args; this.var = null; this.module = module; callByName = true; link = true;
+      this.func = funcName;
     }
     public String toString() {
       String id;
-      ASTNodeFuncCall e = (ASTNodeFuncCall)getNode(); 
-      if (e.callByName) {
+      ASTNodeFuncCall efc = null;
+      if (getNode() instanceof ASTNodeFuncCall) efc = (ASTNodeFuncCall)getNode(); 
+      if (efc == null || efc.callByName) {
         String funcName = func;
         String moduleName = ((module != null ? (":" + module + ".func") : " (resolve)"));
         id = funcName+moduleName;
       } else {
-        id = e.callAddrOp.toString();
+        id = efc.callAddrOp.toString();
       }
         
       return "CALL <" + id +"> " + args +" args";}

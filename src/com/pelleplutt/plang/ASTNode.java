@@ -1,5 +1,6 @@
 package com.pelleplutt.plang;
 
+import static com.pelleplutt.plang.AST.OP_ADEREF;
 import static com.pelleplutt.plang.AST.OP_AND;
 import static com.pelleplutt.plang.AST.OP_BNOT;
 import static com.pelleplutt.plang.AST.OP_DIV;
@@ -23,6 +24,7 @@ import static com.pelleplutt.plang.AST.OP_XOR;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public abstract class ASTNode {
   int op;
@@ -41,6 +43,12 @@ public abstract class ASTNode {
       this.operands.add(n);
     }
   }
+  
+  public void copyDebugInfo(ASTNode e) {
+    this.stroffset = e.stroffset;
+    this.strlen = e.strlen;
+  }
+
   
   public String toString() {
     StringBuilder sb = new StringBuilder();
@@ -87,7 +95,7 @@ public abstract class ASTNode {
   }
   
   public static class ASTNodeBlok extends ASTNode {
-    List<ASTNodeSymbol> symList;
+    Map<ASTNodeSymbol, Integer> symList;
     List<ASTNodeSymbol> argList;
     int scopeLevel;
     String id;
@@ -95,20 +103,21 @@ public abstract class ASTNode {
     ASTNodeBlok parentBlock;
     int type;
     boolean variablesHandled;
+    public int symNbr;
     public static final int TYPE_MAIN = 0;
     public static final int TYPE_FUNC = 1;
     public static final int TYPE_ANON = 2;
     public ASTNodeBlok(ASTNode... operands) {
       super(AST.OP_BLOK, operands);
     }
-    public void setAnnotation(List<ASTNodeSymbol> symList, int scopeLevel, String id, String module, int type) {
+    public void setAnnotation(Map<ASTNodeSymbol, Integer> symList, int scopeLevel, String id, String module, int type) {
       this.symList = symList;
       this.scopeLevel = scopeLevel;
       this.id = id;
       this.module = module;
       this.type = type;
     }
-    public void setAnnotation(List<ASTNodeSymbol> symList, List<ASTNodeSymbol> argList, int scopeLevel, String id, String module, int type) {
+    public void setAnnotation(Map<ASTNodeSymbol, Integer> symList, List<ASTNodeSymbol> argList, int scopeLevel, String id, String module, int type) {
       this.symList = symList;
       this.argList = argList;
       this.scopeLevel = scopeLevel;
@@ -116,8 +125,20 @@ public abstract class ASTNode {
       this.module = module;
       this.type = type;
     }
+    public boolean declaresVariableInThisScope(ASTNodeSymbol sym) {
+      return symList.containsKey(sym);
+    }
+    public boolean isSymbolDeclared(ASTNodeSymbol sym, int whenceSymNbr) {
+      Integer symNbr = symList.get(sym);
+      if (symNbr == null) return false;
+      return symNbr.intValue() <= sym.symNbr; 
+
+    }
     public List<ASTNodeSymbol> getVariables() {
-      return this.symList;
+      if (symList == null) return null;
+      List<ASTNodeSymbol> vl = new ArrayList<ASTNodeSymbol>();
+      vl.addAll(symList.keySet());
+      return vl;
     }
     public List<ASTNodeSymbol> getArguments() {
       return this.argList;
@@ -191,6 +212,8 @@ public abstract class ASTNode {
 
   public static class ASTNodeSymbol extends ASTNode {
     String symbol;
+    public boolean declare;
+    public int symNbr;
 
     public ASTNodeSymbol(String s) {
       super(AST.OP_SYMBOL);
@@ -198,7 +221,7 @@ public abstract class ASTNode {
     }
 
     public String toString() {
-      return symbol;
+      return symbol + (declare ? "*" : "");
     }
     
     public boolean equals(Object o) {
@@ -232,6 +255,43 @@ public abstract class ASTNode {
         } else {
           dots.add(0, ((ASTNodeSymbol)de.operands.get(0)));
           sb.insert(0, ((ASTNodeSymbol)de.operands.get(0)).symbol);
+          de = null;
+        }
+      }
+      
+      symbol = sb.toString();
+    }
+
+    public String toString() {
+      return symbol;
+    }
+    
+    public boolean equals(Object o) {
+      throw new Error();
+    }
+    
+    public int hashCode() {
+      throw new Error();
+    }
+  }
+
+  public static class ASTNodeArrSymbol extends ASTNodeSymbol {
+    ASTNode e;
+    List<ASTNode> path = new ArrayList<ASTNode>();
+
+    public ASTNodeArrSymbol(ASTNode e) {
+      super(null);
+      op = OP_SYMBOL; // TODO
+      StringBuilder sb = new StringBuilder();
+      ASTNode de = e;
+      while (de != null) {
+        path.add(0, de.operands.get(1));
+        sb.insert(0, "." + (de.operands.get(1)).toString());
+        if (de.operands.get(0).op == OP_ADEREF) {
+          de = de.operands.get(0);
+        } else {
+          path.add(0, de.operands.get(0));
+          sb.insert(0, de.operands.get(0).toString());
           de = null;
         }
       }
@@ -332,10 +392,31 @@ public abstract class ASTNode {
   
   public static class ASTNodeArrDecl extends ASTNode {
     int arrid;
+    public boolean onlyPrimitives;
     public ASTNodeArrDecl(int id) {
       super(AST.OP_ADECL);
       this.operands = new ArrayList<ASTNode>();
       this.arrid = id;
+    }
+
+    public boolean isEmpty() {
+      return operands == null || operands.isEmpty();
+    }
+    
+    public boolean containsTuples() {
+      boolean gotTuple = false;
+      boolean gotEntry = false;
+      for (ASTNode e : operands) {
+        if (e.op == AST.OP_TUPLE) {
+          gotTuple = true;
+          if (gotEntry) throw new CompilerError("cannot mix tuples and entries", e);
+        }
+        else {
+          gotEntry = true;
+          if (gotTuple) throw new CompilerError("cannot mix tuples and entries", e);
+        }
+      }
+      return gotTuple;
     }
 
     public String toString() {

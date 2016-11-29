@@ -51,12 +51,15 @@ public class Grammar {
           "bkpt:          OP_BKPT\n" +
           "arrdecl:       OP_ADECL\n" +
           "arrderef:      OP_ADEREF\n" +
+          "label:         OP_LABEL\n" + 
+          "tuple:         OP_TUPLE\n" +
           
           "cond_op:       if else\n" +
           "expr:          expr_op_bin expr_op_una\n" +
           "num:           numi numd numih numib\n" +
           "val:           num sym call expr dot arrdecl arrderef\n" +
           "arg:           val str code range nil\n" +
+          "maparg:        arg tuple\n" +
           "op:            expr assign_op\n" +
           "jmp:           goto for while break continue goto label\n" +
           "stat:          assign global op call\n" + 
@@ -65,14 +68,16 @@ public class Grammar {
           "code:          blok oper sym jmp module funcdef return bkpt\n" + 
   "";
   static final String GRAMMAR_RULES = 
-          "OP_LABEL:      sym\n" +
+          "label:         sym\n" +
+          "tuple:         op | call | val | str | range | nil | assign | blok | rel_op , op | call | val | str | range | nil | assign | blok | rel_op\n" +
           "dot:           sym | dot , sym\n" +
-          "assign:        sym | arrderef , op | val | str | range | nil | assign | blok | rel_op\n" +
-          "arrdecl:       arg*\n" +
-          "arrderef:      arrderef | arrdecl | sym | dot | str | range , val\n" +
+          "assign:        sym | arrderef | dot , op | call | val | str | range | nil | assign | blok | rel_op\n" +
+          "arrdecl:       maparg*\n" +
+          "arrderef:      arrderef | arrdecl | sym | dot | str | range | call , val | str\n" +
           "return:        op | val | str | range | nil | assign | blok | rel_op\n" +
-          "assign_op:     sym , op | call | val | str\n" +
-          "assign_op_add: sym , str\n" +
+          "assign_op:     sym | arrderef | dot , op | call | val | assign | rel_op\n" +
+          "assign_op_add: sym | arrderef | dot , str\n" +
+          "OP_PLUSEQ:     sym | arrderef | dot , blok\n" +
           "range:         val | range , val\n" +
           "global:        sym\n" +
           "module:        sym\n" +
@@ -86,6 +91,7 @@ public class Grammar {
           "blok:          code*\n" +
           "for:           stat | sym , condition , stat , code\n" +
           "for:           sym , in , code\n" +
+          "in:            sym | call | dot | arrdecl | arrderef | str | range\n" +
           "while:         condition , code\n" +
           "if:            condition , code\n" + 
           "if:            condition , code , else\n" + 

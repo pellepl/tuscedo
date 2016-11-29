@@ -36,12 +36,14 @@ import static com.pelleplutt.plang.AST.OP_PLUS;
 import static com.pelleplutt.plang.AST.OP_PLUSEQ;
 import static com.pelleplutt.plang.AST.OP_QUOTE1;
 import static com.pelleplutt.plang.AST.OP_QUOTE2;
+import static com.pelleplutt.plang.AST.OP_RANGE;
 import static com.pelleplutt.plang.AST.OP_RETURN;
 import static com.pelleplutt.plang.AST.OP_SHLEFT;
 import static com.pelleplutt.plang.AST.OP_SHLEFTEQ;
 import static com.pelleplutt.plang.AST.OP_SHRIGHT;
 import static com.pelleplutt.plang.AST.OP_SHRIGHTEQ;
 import static com.pelleplutt.plang.AST.OP_SYMBOL;
+import static com.pelleplutt.plang.AST.OP_TUPLE;
 import static com.pelleplutt.plang.AST.OP_WHILE;
 import static com.pelleplutt.plang.AST.OP_XOR;
 import static com.pelleplutt.plang.AST.OP_XOREQ;
@@ -53,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
+import com.pelleplutt.plang.ASTNode.ASTNodeArrSymbol;
 import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
 import com.pelleplutt.plang.ASTNode.ASTNodeCompoundSymbol;
 import com.pelleplutt.plang.ASTNode.ASTNodeFuncCall;
@@ -61,7 +64,6 @@ import com.pelleplutt.plang.ASTNode.ASTNodeString;
 import com.pelleplutt.plang.ASTNode.ASTNodeSymbol;
 import com.pelleplutt.plang.TAC.TACAlloc;
 import com.pelleplutt.plang.TAC.TACArg;
-import com.pelleplutt.plang.TAC.TACArrayDeref;
 import com.pelleplutt.plang.TAC.TACAssign;
 import com.pelleplutt.plang.TAC.TACBkpt;
 import com.pelleplutt.plang.TAC.TACCall;
@@ -75,6 +77,8 @@ import com.pelleplutt.plang.TAC.TACLabel;
 import com.pelleplutt.plang.TAC.TACNil;
 import com.pelleplutt.plang.TAC.TACOp;
 import com.pelleplutt.plang.TAC.TACReturn;
+import com.pelleplutt.plang.TAC.TACSetDeref;
+import com.pelleplutt.plang.TAC.TACSetRead;
 import com.pelleplutt.plang.TAC.TACString;
 import com.pelleplutt.plang.TAC.TACUnaryOp;
 import com.pelleplutt.plang.TAC.TACUnresolved;
@@ -222,6 +226,98 @@ public class CodeGenFront {
     }
   }
   
+  static int __innerScope = 0;
+  String getInnerScope() {
+    return ".$" + (__innerScope++);
+  }
+  
+  TAC genIRUnwindArrOp(ASTNode e, ASTNodeBlok parentEblk, boolean assignOp) {
+    ASTNodeArrSymbol ce = new ASTNodeArrSymbol(e);
+    int len = ce.path.size();
+    TAC tarr = genIR(ce.path.get(0), parentEblk);
+    add(tarr);
+    setReferenced(tarr);
+    for (int i = 1; i < len; i++) {
+      TAC derefVal = genIR(ce.path.get(i), parentEblk);
+      setReferenced(derefVal);
+      TAC deref = new TACSetDeref(e, tarr, derefVal);
+      setReferenced(deref);
+      if (assignOp) {
+        if (i < len-1) {
+          add(deref);
+        }
+        // do not add last dot path, as this is returned as the assignee and will be emitted thare
+      } else {
+        add(deref);
+      }
+      tarr = deref;
+    }
+    return tarr;
+  }
+  
+  TAC genIRUnwindDotOp(ASTNode e, ASTNodeBlok parentEblk, boolean assignOp) {
+    // cases:
+    // <map>.<key> or
+    // <module>.<var> or
+    // <module>.<map>.<key>
+    // x.y      - if x unknown => x module, y var
+    //            if x known   => x map,    y key
+    // x.y.z... - if x unknown => x module, y map, z... keys
+    //            if x known   => x map,    y,z... keys
+    
+    // a.b.c...
+    ASTNodeCompoundSymbol ce = new ASTNodeCompoundSymbol(e);
+    int len = ce.dots.size();
+    // first, try if initial symbol is a reachable variable. If so, prefer local
+    ASTNodeBlok declBlok = getScopeIfDef(parentEblk, (ASTNodeSymbol)ce.dots.get(0));
+    if (declBlok != null) {
+      // it was, so consider this a hash map - start unwinding it
+      // get first symbol...
+      TAC tmap = genIR(ce.dots.get(0), parentEblk);
+      add(tmap);
+      setReferenced(tmap);
+      // ...then unwind the dereferences...
+      for (int i = 1; i < len; i++) {
+        TACString derefval = new TACString(ce.dots.get(i), ((ASTNodeSymbol)ce.dots.get(i)).symbol);
+        TAC deref = new TACSetDeref(e, tmap, derefval);
+        if (assignOp) {
+          if (i < len-1) {
+            add(deref);
+          }
+          // do not add last dot path, as this is returned as the assignee and will be emitted thare
+        } else {
+          add(deref);
+        }
+        tmap = deref;
+      }
+      return tmap;
+    } else {
+      // <module>.<map>
+      // add unresolved for first two path entries <module>.<variable>
+      TAC tmap = new TACUnresolved(e, ce.dots.get(0).symbol, ce.dots.get(1).symbol); 
+      if (len <= 2) {
+        return tmap;
+      }
+      // <module>.<map>.<key>....
+      add(tmap);
+      setReferenced(tmap);
+      for (int i = 2; i < len; i++) {
+        TACString derefval = new TACString(ce.dots.get(i), ((ASTNodeSymbol)ce.dots.get(i)).symbol);
+        TAC deref = new TACSetDeref(e, tmap, derefval);
+        if (assignOp) {
+          if (i < len-1) {
+            add(deref);
+          }
+          // do not add last dot path, as this is returned as the assignee and will be emitted thare
+        } else {
+          add(deref);
+        }
+        tmap = deref;
+      }
+      return tmap;
+    }
+  }
+  
   class SymbolHolder {
     TAC arrSymbol;
   }
@@ -233,19 +329,9 @@ public class CodeGenFront {
       return ret;
     }
     else if (e.op == OP_ADEREF) {
-      TAC arr = genIRAssignment(e.operands.get(0), parentEblk, level + 1, sh);
-      setReferenced(arr);
-      TAC derefval = genIR(e.operands.get(1), parentEblk);
-      setReferenced(derefval);
-      TAC deref = new TACArrayDeref(e, arr, derefval); 
-      if (level > 0) {
-        add(deref);
-      } else if (level == 0 && e.operands.get(0).op == OP_SYMBOL){
-        // do not add the last dereference (first in recursive tree), as it is this index we want to assign to
-        // instead, push the array itself
-        add(sh.arrSymbol);
-      }
-      return deref;
+      return genIRUnwindArrOp(e, parentEblk, true);
+    } else if (e.op == OP_DOT) {
+      return genIRUnwindDotOp(e, parentEblk, true);
     } else {
       throw new CompilerError("fatal, unknown assignee", e);
     }
@@ -275,13 +361,13 @@ public class CodeGenFront {
         ffrag = new FrontFragment(eblk.module == null ? ".MAIN" : eblk.module, ".main");
         ffrag.type = ASTNode.ASTNodeBlok.TYPE_MAIN;
         ffrags.add(ffrag);
-        if (eblk.symList != null) {
-          // collect the global variables
-          for (ASTNode esym : eblk.symList) {
-            ASTNodeSymbol sym = (ASTNodeSymbol)esym;
-            ffrag.gvars.add(new TACVar(sym, sym.symbol, eblk.getModule(), eblk.getScopeId()));
-          }
-        }
+//        if (eblk.symList != null) {
+//          // collect the global variables
+//          for (ASTNode esym : eblk.symList) {
+//            ASTNodeSymbol sym = (ASTNodeSymbol)esym;
+//            ffrag.gvars.add(new TACVar(sym, sym.symbol, eblk.getModule(), eblk.getScopeId()));
+//          }
+//        }
       }
       boolean doStackAllocation = 
                                   (eblk.gotUnhandledVariables() && 
@@ -329,19 +415,7 @@ public class CodeGenFront {
     }
     
     else if (e.op == OP_DOT) {
-      // a.b.c...
-      ASTNodeCompoundSymbol ce = new ASTNodeCompoundSymbol(e);
-      // first, try if initial symbol is a reachable variable. If so, prefer local
-      ASTNodeBlok declBlok = getScopeIfDef(parentEblk, (ASTNodeSymbol)ce.dots.get(0));
-      if (declBlok != null) {
-        // it was, so consider this a hash map - start unwinding it
-        // TODO hashmap
-        throw new Error();
-      } else {
-        // add unresolved for first two path entries <module>.<variable>
-        return new TACUnresolved(e, ce.dots.get(0).symbol, ce.dots.get(1).symbol);
-       // TODO unwind the rest as a hashmap
-      }
+      return genIRUnwindDotOp(e, parentEblk, false);
     }
     
     else if (e.op == OP_NIL) {
@@ -353,7 +427,6 @@ public class CodeGenFront {
       TAC assignment = genIR(e.operands.get(1), parentEblk);
       setReferenced(assignment);
       TAC op = new TACAssign(e, e.op, assignee, assignment); 
-
       add(op);
       return op;
     } 
@@ -379,7 +452,7 @@ public class CodeGenFront {
         TAC assignee = genIRAssignment(e.operands.get(0), parentEblk, 0, new SymbolHolder());
         setReferenced(assignee);
         TAC right = genIR(e.operands.get(1), parentEblk);  
-        setReferenced(right);
+        if (right != null) setReferenced(right);
         int opCode;
         if      (e.op == OP_ANDEQ) opCode = OP_AND; 
         else if (e.op == OP_DIVEQ) opCode = OP_DIV; 
@@ -450,15 +523,18 @@ public class CodeGenFront {
           eblk.setVariablesHandled();
         }
         
+        // initial : x
         genIR(e.operands.get(0), parentEblk);
         newBlock();
         add(lLoop);
+        // conditional : y
         TAC cond = genIR(e.operands.get(1), parentEblk);
         setReferenced(cond);
         TAC iffalsegoto = new TACGotoCond(e, cond, lExit, false);
         add(iffalsegoto);
         newBlock();
         pushLoop(lCont, lExit);
+        // loop : w
         genIR(e.operands.get(3), parentEblk);
         boolean contCalled = loopWasContinued();
         popLoop();
@@ -466,6 +542,7 @@ public class CodeGenFront {
           newBlock();
           add(lCont);
         }
+        // evaluate : z
         genIR(e.operands.get(2), parentEblk);
         TAC gotoLoop = new TACGoto(e, lLoop);
         add(gotoLoop);
@@ -478,15 +555,84 @@ public class CodeGenFront {
         
       } else {
         //for (x in y) {w}
-        // TODO
-//        boolean doStackAllocation = eblk != null && eblk.gotUnhandledVariables();
-//        if (doStackAllocation) {
-//          add(new TACAlloc(eblk, iteratorVariable, eblk.getModule(), eblk.getScopeId()));
-//          eblk.setVariablesHandled();
-//        }
-//        if (doStackAllocation) {
-//          add(new TACFree(eblk, eblk.getModule(), eblk.getScopeId()));
-//        }
+        TACAlloc talloc = new TACAlloc(e.operands.get(2), parentEblk); 
+        add(talloc);
+        String label = genLabel();
+
+        TACLabel lLoop = new TACLabel(e, label+"_floop");
+        TACLabel lExit = new TACLabel(e, label+"_fexit");
+        TACLabel lCont = new TACLabel(e, label+"_fcont");
+
+        String innerScope = getInnerScope();
+        TACVar _set = new TACVar(parentEblk, TACAlloc.varSet, talloc.module, talloc.scope + innerScope); 
+        TACVar _iter = new TACVar(parentEblk, TACAlloc.varIterator, talloc.module, talloc.scope + innerScope); 
+        TACVar assignee = new TACVar(e.operands.get(0), ((ASTNodeSymbol)e.operands.get(0)).symbol, 
+            parentEblk.getModule(), parentEblk.getScopeId());
+        
+        // inital .set = y, .iter = 0
+        // .set = y 
+        add(new TACAssign(
+            e.operands.get(1),                                            // ASTNode
+            OP_EQ,                                                        // op
+            _set,                                                         // inner set variable
+            genIR(e.operands.get(1).operands.get(0), parentEblk)));       // the set itself
+        // .iter = 0 
+        add(new TACAssign(
+            e.operands.get(1),                                            // ASTNode
+            OP_EQ,                                                        // op
+            _iter,                                                        // inner iterator variable
+            new TACInt(e.operands.get(1).operands.get(0), 0)));           // zero
+        
+        newBlock();
+        add(lLoop);
+
+        // conditional : y (.iter < len(.set))
+        TACArg _set_arg = new TACArg(e, _set);
+        add(_set_arg);
+        setReferenced(_set_arg);
+        TAC _len_set = new TACCall(e, "len", 1, talloc.module);
+        add(_len_set);
+        setReferenced(_len_set);
+        TAC cond = new TACOp(e, AST.OP_LT, _iter, _len_set);
+        add(cond);
+        setReferenced(cond);
+        TACGotoCond iffalsegoto = new TACGotoCond(e, cond, lExit, false);
+        iffalsegoto.condOp = AST.OP_LT;
+        add(iffalsegoto);
+        newBlock();
+        pushLoop(lCont, lExit);
+
+        // loop : x = .set[.iter]
+        add(_set);
+        setReferenced(_set);
+        TAC _set_iter = new TACSetRead(e.operands.get(2), _set, _iter);
+        add(_set_iter);
+        setReferenced(_set_iter);
+        add(new TACAssign(
+            e.operands.get(0),                                            // ASTNode
+            OP_EQ,                                                        // op
+            assignee,                                                     // x
+            _set_iter));                                                  // .set[.iter]
+
+        // loop : w
+        genIR(e.operands.get(2), parentEblk);
+        boolean contCalled = loopWasContinued();
+        popLoop();
+        if (contCalled) {
+          newBlock();
+          add(lCont);
+        }
+
+        // continue
+        TAC _iter_add = new TACUnaryOp(e, AST.OP_POSTINC, _iter);
+        add(_iter_add);
+
+        TAC gotoLoop = new TACGoto(e, lLoop);
+        add(gotoLoop);
+        newBlock();
+        add(lExit);
+        
+        add(new TACFree(talloc));
       }
     }
     
@@ -565,19 +711,46 @@ public class CodeGenFront {
           ASTNodeBlok declBlok = getScopeIfDef(parentEblk, (ASTNodeSymbol)ce.dots.get(0));
           if (declBlok != null) {
             // it was, so consider this calling a hash map function <mapvar>.<key>.<key>...()
-            // TODO hashmap func call unwind
-            throw new CompilerError("not implemented", e);
+            // hashmap func call unwind
+            // get first symbol <mapvar>...
+            TAC tmap = genIR(ce.dots.get(0), parentEblk);
+            add(tmap);
+            setReferenced(tmap);
+            // ...then unwind the dereferences...
+            for (int i = 1; i < ce.dots.size(); i++) {
+              TACString derefval = new TACString(ce.dots.get(i), ((ASTNodeSymbol)ce.dots.get(i)).symbol);
+              TAC deref = new TACSetDeref(e, tmap, derefval);
+              add(deref);
+              tmap = deref;
+            }
+            // ...then do the call
+            call = new TACCall((ASTNodeFuncCall)e, args.length, parentEblk.module, null);
+            call.callByName = false;
+            add(call);
           } else {
-            // this needs to be linked
+            // no reachable variable for first entry in dot path, this needs to be linked
             if (ce.dots.size() == 2) {
               // only a.b, so presume this is <module>.<function>
               call = new TACCall((ASTNodeFuncCall)e, args.length, ce.dots.get(0).symbol, null);
               add(call);
               call.link = true;
             } else {
-              // a.b.c..., so presume this is a hashmap call <module>.<mapvar>.<key>.<key>...()
-              // TODO hashmap func call unwind
-              throw new CompilerError("not implemented", e);
+              // a.b.c..., so presume this is a hashmap call <module>.<mapvar>.<key>....()
+              TAC tmap = new TACUnresolved(e, ce.dots.get(0).symbol, ce.dots.get(1).symbol); 
+              add(tmap);
+              setReferenced(tmap);
+              for (int i = 2; i < ce.dots.size(); i++) {
+                TACString derefval = new TACString(ce.dots.get(i), ((ASTNodeSymbol)ce.dots.get(i)).symbol);
+                TAC deref = new TACSetDeref(e, tmap, derefval);
+                add(deref);
+                tmap = deref;
+              }
+              call = new TACCall((ASTNodeFuncCall)e, args.length, ce.dots.get(0).symbol, null);
+              add(call);
+              call.link = true;
+              // do not call by name but by stack top address as we've dereferenced
+              // external map
+              call.callByName = false; 
             }
           }
         } else {
@@ -624,27 +797,59 @@ public class CodeGenFront {
     }
     
     else if (e.op == OP_ADEREF) {
-      TAC arr = genIR(e.operands.get(0), parentEblk);
-      setReferenced(arr);
-      TAC derefval = genIR(e.operands.get(1), parentEblk);
-      setReferenced(derefval);
-      TAC deref = new TACArrayDeref(e, arr, derefval); 
-      add(deref);
-      return deref;
+      return genIRUnwindArrOp(e, parentEblk, false);
     }
     
     else if (e.op == OP_ADECL) {
+      TAC set;
       ASTNode.ASTNodeArrDecl adecle = (ASTNode.ASTNodeArrDecl)e;
-      for (ASTNode e2 : adecle.operands) {
-        TAC entry = genIR(e2, parentEblk);
-        TAC entryT = new TAC.TACArrayEntry(e, entry);
-        setReferenced(entry);
-        add(entryT);
+      boolean isMap = adecle.isEmpty() || adecle.containsTuples();
+      if (isMap) {
+        set = new TAC.TACMap(e, adecle.operands.size()); 
+        add(set);
+        int len = adecle.operands.size();
+        for (int i = 0; i < len; i++) {
+          ASTNode e2 = adecle.operands.get(i);
+          TAC.TACMapTuple tuple = (TAC.TACMapTuple)genIR(e2, parentEblk);
+          tuple.isLast = i == len-1;
+          add(tuple);
+        }
+      } else {
+        if (adecle.onlyPrimitives) {
+          TAC.TACArrInit tarr = new TAC.TACArrInit(adecle); 
+          for (ASTNode e2 : adecle.operands) {
+            TAC arrentry = genIR(e2, parentEblk);
+            tarr.entries.add(arrentry);
+          }
+          set = tarr;
+          add(set);
+        } else {
+          for (ASTNode e2 : adecle.operands) {
+            TAC entry = genIR(e2, parentEblk);
+            TAC entryT = new TAC.TACArrEntry(e, entry);
+            setReferenced(entry);
+            add(entryT);
+          }
+          set = new TAC.TACSet(e, adecle.operands.size()); 
+          add(set);
+        }
       }
 
-      TAC arr = new TAC.TACArray(e, adecle.operands.size()); 
-      add(arr);
-      return arr;
+      return set;
+    }
+    
+    else if (e.op == OP_TUPLE) {
+      TAC key = genIR(e.operands.get(0), parentEblk);
+      TAC val = genIR(e.operands.get(1), parentEblk);
+      setReferenced(key);
+      setReferenced(val);
+      TAC tuple = new TAC.TACMapTuple(e, key, val);
+      return tuple;
+    }
+    
+    else if (e.op == OP_RANGE) {
+      // TODO range
+      throw new CompilerError("not implemented", e);
     }
     
     // TODO moar
@@ -717,27 +922,25 @@ public class CodeGenFront {
   }
   
   void setReferenced(TAC tac) {
-    tac.referenced = true;
+    if (tac != null) tac.referenced = true;
   }
   
   ASTNodeBlok getScopeIfDef(ASTNodeBlok eblk, ASTNodeSymbol sym) {
+    int whenceSymNbr = sym.symNbr;
     while (eblk != null) {
-      if (eblk.getVariables().contains(sym) ||
-          (eblk.getArguments() != null && eblk.getArguments().contains(sym))) {
+//      System.out.println("looking for " + sym + " in " + eblk.getVariables());
+//      System.out.println("  declared here  " + eblk.declaresVariableInThisScope(sym));
+//      System.out.println("  is declared b4 " +  eblk.isSymbolDeclared(sym, whenceSymNbr));
+      if ((eblk.getArguments() != null && eblk.getArguments().contains(sym)) ||
+          (eblk.declaresVariableInThisScope(sym) && eblk.isSymbolDeclared(sym, whenceSymNbr))) {
         return eblk;
       }
+      whenceSymNbr = eblk.symNbr;
       eblk = eblk.parentBlock;
     }
     return null;
   }
 
-  ASTNodeBlok getScope(ASTNodeBlok eblk, ASTNodeSymbol sym) {
-    ASTNodeBlok scopeBlock = getScopeIfDef(eblk, sym);
-    if (scopeBlock == null) {
-      throw new CompilerError("variable '" + sym + "' not found", sym);
-    }
-    return scopeBlock;
-  }
 
   //
   // IR context (e.g. main, func def, anonymous)
@@ -749,7 +952,7 @@ public class CodeGenFront {
     List<Block> blocks = new ArrayList<Block>();
     List<TAC> ir = new ArrayList<TAC>();
     Stack<Loop> loopStack = new Stack<Loop>();
-    List<TACVar> gvars = new ArrayList<TACVar>();
+    //List<TACVar> gvars = new ArrayList<TACVar>();
     int type; // ASTNode.ASTNodeBlok.TYPE_*
     
     public FrontFragment(String module, String name) {

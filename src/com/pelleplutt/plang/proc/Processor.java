@@ -2,6 +2,7 @@ package com.pelleplutt.plang.proc;
 
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,13 +26,14 @@ public class Processor implements ByteCode {
   public static boolean dbgRun = false;
   
   public static final String TNAME[] = {
-    "nil", "int", "float", "string", "range", "code", "list", "map", "reference"
+    "nil", "int", "float", "string", "range", "code", "list", "map", "ref"
   };
   
   M[] memory;
   byte[] code;
   int sp;
   int pc;
+  int oldpc;
   int fp;
   boolean zero;
   boolean minus;
@@ -57,8 +59,16 @@ public class Processor implements ByteCode {
     }
   }
   
+  public void disasm(PrintStream out, String pre, int pc, int len) {
+    disasm(out, pre, code, pc, len); 
+  }
+
   public static void disasm(PrintStream out, byte[] code, int pc, int len) {
+    disasm(out, null, code, pc, len);
+  }
+  public static void disasm(PrintStream out, String pre, byte[] code, int pc, int len) {
     while (len > 0) {
+      if (pre != null) out.print(pre);
       out.println(String.format("0x%06x %s", pc, disasm(code, pc)));
       int instr = (int)(code[pc] & 0xff);
       int step = ISIZE[instr];
@@ -90,10 +100,10 @@ public class Processor implements ByteCode {
     case IREM:
       sb.append("rem     ");
       break;
-    case ISHL:
+    case ISHIFTL:
       sb.append("shiftl  ");
       break;
-    case ISHR:
+    case ISHIFTR:
       sb.append("shiftr  ");
       break;
     case IAND:
@@ -108,7 +118,7 @@ public class Processor implements ByteCode {
     case ICMP:
       sb.append("cmp     ");
       break;
-    case ICMN:
+    case ICMPN:
       sb.append("cmpn    ");
       break;
     case INOT:
@@ -121,51 +131,51 @@ public class Processor implements ByteCode {
       sb.append("lnot    ");
       break;
     
-    case ICMP0:
+    case ICMP_0:
       sb.append("cmp_0   ");
       break;
-    case ICMN0:
+    case ICMN_0:
       sb.append("cmpn_0  ");
       break;
-    case IADI:
+    case IADD_IM:
       sb.append("add_im  ");
       sb.append(String.format("0x%02x", codetoi(code, pc, 1) + 1));
       break;
-    case ISUI:
+    case ISUB_IM:
       sb.append("sub_im  ");
       sb.append(String.format("0x%02x", codetoi(code, pc, 1) + 1));
       break;
-    case IPUI:
+    case IPUSH_IM:
       sb.append("push_im ");
       sb.append(String.format("%d", codetos(code, pc, 1)));
       break;
-    case IPUNIL:
+    case IPUSH_NIL:
       sb.append("push_nil");
       break;
-    case IPU0:
+    case IPUSH_0:
       sb.append("push_0  ");
       break;
-    case IPU1:
+    case IPUSH_1:
       sb.append("push_1  ");
       break;
-    case IPU2:
+    case IPUSH_2:
       sb.append("push_2  ");
       break;
-    case IPU3:
+    case IPUSH_3:
       sb.append("push_3  ");
       break;
-    case IPU4:
+    case IPUSH_4:
       sb.append("push_4  ");
       break;
-    case IPUC:
+    case IPUSH_C:
       sb.append("push_c  ");
       sb.append(String.format("0x%06x", codetoi(code, pc, 3)));
       break;
 
-    case IADQ1:
+    case IADD_Q1:
       sb.append("add_q1  ");
       break;
-    case IADQ2:
+    case IADD_Q2:
       sb.append("add_q2  ");
       break;
     case IADQ3:
@@ -174,53 +184,53 @@ public class Processor implements ByteCode {
     case IADQ4:
       sb.append("add_q4  ");
       break;
-    case IADQ5:
+    case IADD_Q5:
       sb.append("add_q5  ");
       break;
-    case IADQ6:
+    case IADD_Q6:
       sb.append("add_q6  ");
       break;
-    case IADQ7:
+    case IADD_Q7:
       sb.append("add_q7  ");
       break;
-    case IADQ8:
+    case IADD_Q8:
       sb.append("add_q8  ");
       break;
-    case ISUQ1:
+    case ISUB_Q1:
       sb.append("sub_q1  ");
       break;
-    case ISUQ2:
+    case ISUB_Q2:
       sb.append("sub_q2  ");
       break;
-    case ISUQ3:
+    case ISUB_Q3:
       sb.append("sub_q3  ");
       break;
-    case ISUQ4:
+    case ISUB_Q4:
       sb.append("sub_q4  ");
       break;
-    case ISUQ5:
+    case ISUB_Q5:
       sb.append("sub_q5  ");
       break;
-    case ISUQ6:
+    case ISUB_Q6:
       sb.append("sub_q6  ");
       break;
-    case ISUQ7:
+    case ISUB_Q7:
       sb.append("sub_q7  ");
       break;
-    case ISUQ8:
+    case ISUB_Q8:
       sb.append("sub_q8  ");
       break;
       
-    case ITOI:
+    case ICAST_I:
       sb.append("cast_I  ");
       break;
-    case ITOF:
+    case ICAST_F:
       sb.append("cast_F  ");
       break;
-    case ITOS:
+    case ICAST_S:
       sb.append("cast_S  ");
       break;
-    case ITOC:
+    case ICAST_CH:
       sb.append("cast_ch ");
       break;
       
@@ -230,105 +240,115 @@ public class Processor implements ByteCode {
     case IDUP:
       sb.append("dup     ");
       break;
-    case ISWP:
+    case ISWAP:
       sb.append("swap    ");
       break;
     case ICPY:
       sb.append("cpy     ");
       sb.append(String.format("$sp[%4d]", codetos(code, pc, 1)));
       break;
-    case ISTR:
+    case ISTOR:
       sb.append("stor    ");
       break;
-    case ISTI:
+    case ISTOR_IM:
       sb.append("stor_im ");
       sb.append(String.format("mem[0x%06x]", codetoi(code, pc, 3)));
       break;
-    case ILD :
+    case ILOAD :
       sb.append("load    ");
       break;
-    case ILDI:
+    case ILOAD_IM:
       sb.append("load_im ");
       sb.append(String.format("mem[0x%06x]", codetoi(code, pc, 3)));
       break;
-    case ISTF:
+    case ISTOR_FP:
       sb.append("stor_fp ");
       sb.append(String.format("$fp[%4d]", codetos(code, pc, 1)));
       break;
-    case ILDF:
+    case ILOAD_FP:
       sb.append("load_fp ");
       sb.append(String.format("$fp[%4d]", codetos(code, pc, 1)));
       break;
 
-    case ISPI:
+    case ISP_INCR:
       sb.append("sp_incr ");
       sb.append(String.format("%d", codetoi(code, pc, 1) + 1));
       break;
-    case ISPD:
+    case ISP_DECR:
       sb.append("sp_decr ");
       sb.append(String.format("%d", codetoi(code, pc, 1) + 1));
       break;
 
-    case ILCRE:
-      sb.append("arr_crea");
+    case ISET_CRE:
+      sb.append("set_cre ");
       break;
-    case ILRD:
-      sb.append("arr_rd  ");
+    case IARR_CRE:
+      sb.append("arr_cre ");
+      sb.append(String.format("mem[0x%06x]", codetoi(code, pc, 3)));
       break;
-    case ILWR :
-      sb.append("arr_wr  ");
+    case ISET_DRF:
+      sb.append("set_drf ");
       break;
-    case ILADD:
+    case ISET_WR :
+      sb.append("set_wr  ");
+      break;
+    case IARR_ADD:
       sb.append("arr_add ");
       break;
-    case ILDEL:
-      sb.append("arr_del ");
+    case IMAP_ADD:
+      sb.append("map_add ");
       break;
-    case ILINS:
+    case ISET_DEL:
+      sb.append("set_del ");
+      break;
+    case IARR_INS:
       sb.append("arr_ins ");
       break;
-    case ILSZ:
-      sb.append("arr_sz  ");
+    case ISET_SZ:
+      sb.append("set_sz  ");
+      break;
+    case ISET_RD:
+      sb.append("set_rd  ");
       break;
 
-    case ICAL: 
+    case ICALL: 
       sb.append("call    ");
       break;
-    case ICALI: 
+    case ICALL_IM: 
       sb.append("call_im ");
       sb.append(String.format("0x%06x", codetoi(code, pc, 3)));
       break;
     case IRET: 
-      sb.append("return  ");
+      sb.append("ret     ");
       break;
     case IRETV: 
-      sb.append("returnv ");
+      sb.append("retv    ");
       break;
-    case IJMP: 
+    case IJUMP: 
       sb.append("jump    ");
       sb.append(String.format("%d", codetoi(code, pc, 3)));
       break;
-    case IJMPEQ: 
+    case IJUMP_EQ: 
       sb.append("jump_eq ");
       sb.append(String.format("%d", codetoi(code, pc, 3)));
       break;
-    case IJMPNE: 
+    case IJUMP_NE: 
       sb.append("jump_ne ");
       sb.append(String.format("%d", codetoi(code, pc, 3)));
       break;
-    case IJMPGT: 
+    case IJUMP_GT: 
       sb.append("jump_gt ");
       sb.append(String.format("%d", codetoi(code, pc, 3)));
       break;
-    case IJMPGE: 
+    case IJUMP_GE: 
       sb.append("jump_ge ");
       sb.append(String.format("%d", codetoi(code, pc, 3)));
       break;
-    case IJMPLT: 
+    case IJUMP_LT: 
       sb.append("jump_lt ");
       sb.append(String.format("%d", codetoi(code, pc, 3)));
       break;
-    case IJMPLE: 
+    case IJUMP_LE: 
       sb.append("jump_le ");
       sb.append(String.format("%d", codetoi(code, pc, 3)));
       break;
@@ -336,27 +356,27 @@ public class Processor implements ByteCode {
       sb.append("bra     ");
       sb.append(String.format("%d (0x%06x)", codetos(code, pc, 3), pc + codetos(code, pc, 3)-1));
       break;
-    case IBRAEQ: 
+    case IBRA_EQ: 
       sb.append("bra_eq  ");
       sb.append(String.format("%d (0x%06x)", codetos(code, pc, 3), pc + codetos(code, pc, 3)-1));
       break;
-    case IBRANE: 
+    case IBRA_NE: 
       sb.append("bra_ne  ");
       sb.append(String.format("%d (0x%06x)", codetos(code, pc, 3), pc + codetos(code, pc, 3)-1));
       break;
-    case IBRAGT: 
+    case IBRA_GT: 
       sb.append("bra_gt  ");
       sb.append(String.format("%d (0x%06x)", codetos(code, pc, 3), pc + codetos(code, pc, 3)-1));
       break;
-    case IBRAGE: 
+    case IBRA_GE: 
       sb.append("bra_ge  ");
       sb.append(String.format("%d (0x%06x)", codetos(code, pc, 3), pc + codetos(code, pc, 3)-1));
       break;
-    case IBRALT: 
+    case IBRA_LT: 
       sb.append("bra_lt  ");
       sb.append(String.format("%d (0x%06x)", codetos(code, pc, 3), pc + codetos(code, pc, 3)-1));
       break;
-    case IBRALE: 
+    case IBRA_LE: 
       sb.append("bra_le  ");
       sb.append(String.format("%d (0x%06x)", codetos(code, pc, 3), pc + codetos(code, pc, 3)-1));
       break;
@@ -406,6 +426,7 @@ public class Processor implements ByteCode {
   }
   
   void push(M m) {
+    if (m == null) m = nilM;
     poke(sp--, m);
   }
     
@@ -450,7 +471,7 @@ public class Processor implements ByteCode {
   }
   
   M tmpM = new M();
-  void swp() {
+  void swap() {
     M m1 = pop();
     M m2 = tmpM.copy(pop());
     push(m1);
@@ -461,7 +482,7 @@ public class Processor implements ByteCode {
     push(peekStack(codetos(code, pc++, 1)));
   }
   
-  void str() {
+  void stor() {
     M m = pop();
     M addr = pop();
     if (addr.type == TINT) {
@@ -471,14 +492,14 @@ public class Processor implements ByteCode {
     }
   }
   
-  void sti() {
+  void stor_im() {
     M m = pop();
     int addr = codetoi(code, pc, 3);
     pc += 3;
     poke(addr, m);
   }
   
-  void ld() {
+  void load() {
     M addr = pop();
     if (addr.type == TINT) {
       push(peek(addr.i));
@@ -487,23 +508,23 @@ public class Processor implements ByteCode {
     }
   }
   
-  void ldi() {
+  void load_im() {
     int addr = codetoi(code, pc, 3);
     pc += 3;
     push(peek(addr));
   }
   
-  void stf() {
+  void stor_fp() {
     int rel = codetos(code, pc++, 1);
     poke(fp - rel, pop());
   }
   
-  void ldf() {
+  void load_fp() {
     int rel = codetos(code, pc++, 1);
     push(peek(fp - rel));
   }
   
-  void spi() {
+  void sp_incr() {
     int m = codetoi(code, pc++, 1) + 1;
     for (int i = 0; i < m; i++) {
       poke(sp - i, nilM);
@@ -511,12 +532,12 @@ public class Processor implements ByteCode {
     sp -= m;
   }
   
-  void spd() {
+  void sp_decr() {
     int m = codetoi(code, pc++, 1) + 1;
     sp += m;
   }
   
-  void lcre() {
+  void set_cre() {
     int elements = pop().asInt();
     List<M> list = new ArrayList<M>();
     for (int i = 0; i < elements; i++) {
@@ -528,48 +549,125 @@ public class Processor implements ByteCode {
     push(list);
   }
   
+  void arr_cre() {
+    int addr = codetoi(code, pc, 3);
+    pc += 3;
+    int elements = pop().asInt();
+    List<M> list = new ArrayList<M>();
+    for (int i = 0; i < elements; i++) {
+      M m = new M();
+      m.copy(peek(addr++));
+      list.add(m);
+    }
+    push(list);
+  }
+  
   @SuppressWarnings("unchecked")
-  void lrd() {
-    int ix = pop().asInt();
-    M mlist = pop();
-    if (mlist.type == TLIST) {
-      push(((List<M>)mlist.ref).get(ix));
-    } else if (mlist.type == TSTR) {
-      push((int)mlist.str.charAt(ix));
+  void set_drf() {
+    M mix = pop();
+    M mset = pop();
+    if (mset.type == TLIST) {
+      push(((List<M>)mset.ref).get(mix.asInt()));
+    } else if (mset.type == TSTR) {
+      push((int)mset.str.charAt(mix.asInt()));
+    } else if (mset.type == TMAP) {
+      push(((Map<Object,M>)mset.ref).get(mix.getRaw()));
+    } else if (mset.type == TRANGE) {
+      throw new ProcessorError("not implemented"); // TODO
     } else {
-      throw new ProcessorError("cannot dereference type " + TNAME[mlist.type]);
+      throw new ProcessorError("cannot dereference type " + TNAME[mset.type]);
     }
   }
   
   @SuppressWarnings("unchecked")
-  void lwr() {
-    int ix = pop().asInt();
+  void set_wr() {
+    M mix = pop();
     M mval = pop();
-    M mlist = pop();
-    if (mlist.type == TLIST) {
+    M mset = pop();
+    if (mset.type == TLIST) {
       M m = new M();
       m.copy(mval);
-      ((List<M>)mlist.ref).set(ix, m);
-    } else if (mlist.type == TSTR) {
-      int len = mlist.str.length();
-      mlist.str = 
-          (ix > 0 ? mlist.str.substring(0, ix-1) : "") +  
+      ((List<M>)mset.ref).set(mix.asInt(), m);
+    } else if (mset.type == TMAP) {
+      M m = new M();
+      m.copy(mval);
+      ((Map<Object, M>)mset.ref).put(mix.getRaw(), m);
+    } else if (mset.type == TSTR) {
+      int ix = mix.asInt();
+      int len = mset.str.length();
+      mset.str = 
+          (ix > 0 ? mset.str.substring(0, ix-1) : "") +  
           mval.asString() + 
-          (ix+1 < mlist.str.length() ? mlist.str.substring(ix+1) : "");
+          (ix+1 < len ? mset.str.substring(ix+1) : "");
     } else {
-      throw new ProcessorError("cannot dereference type " + TNAME[mlist.type]);
+      throw new ProcessorError("cannot dereference type " + TNAME[mset.type]);
     }
   }
   
   @SuppressWarnings("unchecked")
-  void lsz() {
+  void map_add() {
+    M mkey = pop();
+    M mval = pop();
+    M mmap = peek(sp+1);
+    if (mmap.type == TLIST) {
+      if (!((List<M>)mmap.ref).isEmpty()) {
+        throw new ProcessorError("cannot add tuples to a list");
+      }
+      mmap.ref = new HashMap<Object, M>();
+      mmap.type = TMAP;
+    }
+    if (mmap.type == TMAP) {
+      M mk = new M();
+      mk.copy(mkey);
+      M mv = new M();
+      mv.copy(mval);
+      ((HashMap<Object,M>)mmap.ref).put(mk.getRaw(), mv);
+    } else {
+      throw new ProcessorError("cannot add tuples to type " + TNAME[mmap.type]);
+    }
+  }
+  
+  @SuppressWarnings("unchecked")
+  void set_sz() {
     M e = pop();
     if (e.type == TLIST) {
       push(((List<M>)e.ref).size());
+    } else if (e.type == TMAP) {
+      push(((Map<Object,M>)e.ref).size());
     } else if (e.type == TSTR) {
       push(e.str.length());
+    } else if (e.type == TRANGE) {
+      throw new ProcessorError("not implemented"); // TODO
     } else {
       throw new ProcessorError("cannot get length of type " + TNAME[e.type]);
+    }
+  }
+  
+  @SuppressWarnings("unchecked")
+  void set_rd() {
+    int ix = pop().asInt();
+    M mset = pop();
+    if (mset.type == TLIST) {
+      push(((List<M>)mset.ref).get(ix));
+    } else if (mset.type == TMAP) {
+      Map<Object,M> map = (Map<Object,M>)mset.ref;
+      Object key = map.keySet().toArray()[ix];
+      M mval = map.get(key);
+      if (mval == null) mval = nilM;
+      M mkey = new M(key);
+      Map<Object,M> res = new HashMap<Object,M>();
+      res.put("key", mkey);
+      res.put("val", mval);
+      M mres = new M();
+      mres.type = TMAP;
+      mres.ref = res;
+      push(mres);
+    } else if (mset.type == TSTR) {
+      push((int)mset.str.charAt(ix));
+    } else if (mset.type == TRANGE) {
+      throw new ProcessorError("not implemented"); // TODO
+    } else {
+      throw new ProcessorError("cannot get sub element of type " + TNAME[mset.type]);
     }
   }
   
@@ -736,16 +834,16 @@ public class Processor implements ByteCode {
     sub(false);
   }
   
-  void cmn() {
+  void cmpn() {
     sub(false, false);
   }
   
-  void cmp0() {
+  void cmp_0() {
     push(zeroM);
     sub(false);
   }
   
-  void cmn0() {
+  void cmn_0() {
     push(zeroM);
     sub(false, false);
   }
@@ -779,44 +877,44 @@ public class Processor implements ByteCode {
     }
   }
   
-  void adi() {
+  void add_im() {
     push(codetoi(code, pc++, 1) + 1);
     add();
   }
 
-  void sui() {
+  void sub_im() {
     push(codetoi(code, pc++, 1) + 1);
     sub();
   }
   
-  void pui() {
+  void push_im() {
     push(codetos(code, pc++, 1));
   }
 
-  void puint(int i) {
+  void push_im_int(int i) {
     push(i);
   }
 
-  void punil() {
+  void push_nil() {
     push(nilM);
   }
 
-  void puc() {
+  void push_c() {
     push(codetoi(code, pc, 3));
     pc += 3;
   }
 
-  void adq(int x) {
+  void add_q(int x) {
     push(x);
     add();
   }
 
-  void suq(int x) {
+  void sub_q(int x) {
     push(x);
     sub();
   }
   
-  void to(int type) {
+  void cast(int type) {
     M m = peekStack(0);
     switch (type) {
     case TINT:
@@ -958,7 +1056,7 @@ public class Processor implements ByteCode {
     }
   }
   
-  void shl() {
+  void shiftl() {
     M e2 = pop();
     M e1 = pop();
     if (e1.type == e2.type && e1.type == TINT) {
@@ -978,7 +1076,7 @@ public class Processor implements ByteCode {
     }
   }
   
-  void shr() {
+  void shiftr() {
     M e2 = pop();
     M e1 = pop();
     if (e1.type == e2.type && e1.type == TINT) {
@@ -1058,7 +1156,7 @@ public class Processor implements ByteCode {
     }
   }
   
-  void cal() {
+  void call() {
     M addr = pop();
     int a = addr.i;
     if (addr.type != TINT && addr.type != TCODE) {
@@ -1078,7 +1176,7 @@ public class Processor implements ByteCode {
     }
   }
   
-  void cali() {
+  void call_im() {
     int args = peek(sp+1).i;
     push(pc+3);
     push(fp);
@@ -1115,7 +1213,7 @@ public class Processor implements ByteCode {
     push(t);
   }
   
-  void jmp(int icond) {
+  void jump(int icond) {
     int dst = codetoi(code, pc, 3);
     pc += 3;
     switch (icond) {
@@ -1173,6 +1271,7 @@ public class Processor implements ByteCode {
   }
 
   void stepProc() {
+    oldpc = pc;
     int instr = (int)(code[pc++] & 0xff);
     switch (instr) {
     case INOP:
@@ -1192,11 +1291,11 @@ public class Processor implements ByteCode {
     case IREM:
       rem();
       break;
-    case ISHL:
-      shl();
+    case ISHIFTL:
+      shiftl();
       break;
-    case ISHR:
-      shr();
+    case ISHIFTR:
+      shiftr();
       break;
     case IAND:
       and();
@@ -1219,107 +1318,107 @@ public class Processor implements ByteCode {
     case ICMP:
       cmp();
       break;
-    case ICMN:
-      cmn();
+    case ICMPN:
+      cmpn();
       break;
       
-    case ICMP0:
-      cmp0();
+    case ICMP_0:
+      cmp_0();
       break;
-    case ICMN0:
-      cmn0();
+    case ICMN_0:
+      cmn_0();
       break;
-    case IADI:
-      adi();
+    case IADD_IM:
+      add_im();
       break;
-    case ISUI:
-      sui();
+    case ISUB_IM:
+      sub_im();
       break;
-    case IPUI:
-      pui();
+    case IPUSH_IM:
+      push_im();
       break;
-    case IPU0:
-      puint(0);
+    case IPUSH_0:
+      push_im_int(0);
       break;
-    case IPU1:
-      puint(1);
+    case IPUSH_1:
+      push_im_int(1);
       break;
-    case IPU2:
-      puint(2);
+    case IPUSH_2:
+      push_im_int(2);
       break;
-    case IPU3:
-      puint(3);
+    case IPUSH_3:
+      push_im_int(3);
       break;
-    case IPU4:
-      puint(4);
+    case IPUSH_4:
+      push_im_int(4);
       break;
-    case IPUNIL:
-      punil();
+    case IPUSH_NIL:
+      push_nil();
       break;
-    case IPUC:
-      puc();
+    case IPUSH_C:
+      push_c();
       break;
     
-    case IADQ1:
-      adq(1);
+    case IADD_Q1:
+      add_q(1);
       break;
-    case IADQ2:
-      adq(2);
+    case IADD_Q2:
+      add_q(2);
       break;
     case IADQ3:
-      adq(3);
+      add_q(3);
       break;
     case IADQ4:
-      adq(4);
+      add_q(4);
       break;
-    case IADQ5:
-      adq(5);
+    case IADD_Q5:
+      add_q(5);
       break;
-    case IADQ6:
-      adq(6);
+    case IADD_Q6:
+      add_q(6);
       break;
-    case IADQ7:
-      adq(7);
+    case IADD_Q7:
+      add_q(7);
       break;
-    case IADQ8:
-      adq(8);
+    case IADD_Q8:
+      add_q(8);
       break;
-    case ISUQ1:
-      suq(1);
+    case ISUB_Q1:
+      sub_q(1);
       break;
-    case ISUQ2:
-      suq(2);
+    case ISUB_Q2:
+      sub_q(2);
       break;
-    case ISUQ3:
-      suq(3);
+    case ISUB_Q3:
+      sub_q(3);
       break;
-    case ISUQ4:
-      suq(4);
+    case ISUB_Q4:
+      sub_q(4);
       break;
-    case ISUQ5:
-      suq(5);
+    case ISUB_Q5:
+      sub_q(5);
       break;
-    case ISUQ6:
-      suq(6);
+    case ISUB_Q6:
+      sub_q(6);
       break;
-    case ISUQ7:
-      suq(7);
+    case ISUB_Q7:
+      sub_q(7);
       break;
-    case ISUQ8:
-      suq(8);
+    case ISUB_Q8:
+      sub_q(8);
       break;
 
-    case ITOI:
-      to(TINT);
+    case ICAST_I:
+      cast(TINT);
       break;
-    case ITOF:
-      to(TFLOAT);
+    case ICAST_F:
+      cast(TFLOAT);
       break;
-    case ITOS:
-      to(TSTR);
+    case ICAST_S:
+      cast(TSTR);
       break;
-    case ITOC:
-      to(TO_CHAR);
+    case ICAST_CH:
+      cast(TO_CHAR);
       break;
 
     case IPOP:
@@ -1328,62 +1427,71 @@ public class Processor implements ByteCode {
     case IDUP:
       dup();
       break;
-    case ISWP:
-      swp();
+    case ISWAP:
+      swap();
       break;
     case ICPY:
       cpy();
       break;
-    case ISTR:
-      str();
+    case ISTOR:
+      stor();
       break;
-    case ISTI:
-      sti();
+    case ISTOR_IM:
+      stor_im();
       break;
-    case ILD :
-      ld();
+    case ILOAD :
+      load();
       break;
-    case ILDI:
-      ldi();
+    case ILOAD_IM:
+      load_im();
       break;
-    case ISTF:
-      stf();
+    case ISTOR_FP:
+      stor_fp();
       break;
-    case ILDF:
-      ldf();
+    case ILOAD_FP:
+      load_fp();
       break;
       
-    case ISPI:
-      spi();
+    case ISP_INCR:
+      sp_incr();
       break;
-    case ISPD:
-      spd();
-      break;
-
-    case ILCRE:
-      lcre();
-      break;
-    case ILRD:
-      lrd();
-      break;
-    case ILWR:
-      lwr();
-      break;
-    case ILADD:
-      break;
-    case ILDEL:
-      break;
-    case ILINS:
-      break;
-    case ILSZ:
-      lsz();
+    case ISP_DECR:
+      sp_decr();
       break;
 
-    case ICAL: 
-      cal();
+    case ISET_CRE:
+      set_cre();
       break;
-    case ICALI: 
-      cali();
+    case IARR_CRE:
+      arr_cre();
+      break;
+    case ISET_DRF:
+      set_drf();
+      break;
+    case ISET_WR:
+      set_wr();
+      break;
+    case IARR_ADD:
+      break;
+    case IMAP_ADD:
+      map_add();
+      break;
+    case ISET_DEL:
+      break;
+    case IARR_INS:
+      break;
+    case ISET_SZ:
+      set_sz();
+      break;
+    case ISET_RD:
+      set_rd();
+      break;
+
+    case ICALL: 
+      call();
+      break;
+    case ICALL_IM: 
+      call_im();
       break;
     case IRET: 
       ret();
@@ -1391,46 +1499,46 @@ public class Processor implements ByteCode {
     case IRETV: 
       retv();
       break;
-    case IJMP: 
-      jmp(ICOND_AL);
+    case IJUMP: 
+      jump(ICOND_AL);
       break;
-    case IJMPEQ: 
-      jmp(ICOND_EQ);
+    case IJUMP_EQ: 
+      jump(ICOND_EQ);
       break;
-    case IJMPNE: 
-      jmp(ICOND_NE);
+    case IJUMP_NE: 
+      jump(ICOND_NE);
       break;
-    case IJMPGE: 
-      jmp(ICOND_GE);
+    case IJUMP_GE: 
+      jump(ICOND_GE);
       break;
-    case IJMPGT: 
-      jmp(ICOND_GT);
+    case IJUMP_GT: 
+      jump(ICOND_GT);
       break;
-    case IJMPLE: 
-      jmp(ICOND_LE);
+    case IJUMP_LE: 
+      jump(ICOND_LE);
       break;
-    case IJMPLT: 
-      jmp(ICOND_LT);
+    case IJUMP_LT: 
+      jump(ICOND_LT);
       break;
     case IBRA: 
       bra(ICOND_AL);
       break;
-    case IBRAEQ: 
+    case IBRA_EQ: 
       bra(ICOND_EQ);
       break;
-    case IBRANE: 
+    case IBRA_NE: 
       bra(ICOND_NE);
       break;
-    case IBRAGE: 
+    case IBRA_GE: 
       bra(ICOND_GE);
       break;
-    case IBRAGT: 
+    case IBRA_GT: 
       bra(ICOND_GT);
       break;
-    case IBRALE: 
+    case IBRA_LE: 
       bra(ICOND_LE);
       break;
-    case IBRALT: 
+    case IBRA_LT: 
       bra(ICOND_LT);
       break;
     case IBKPT: 
@@ -1467,6 +1575,27 @@ public class Processor implements ByteCode {
     public M(float x) { type = TFLOAT; f = x; }
     public M(String x) { type = TSTR; str = x; }
     public M(M x) { type = TREF; ref = x; }
+    public M(Object o) {
+      if (o instanceof Integer) {
+        i = ((Integer) o).intValue();
+        type = TINT;
+      }
+      else if (o instanceof Float) {
+        f = ((Float) o).floatValue();
+        type = TFLOAT;
+      }
+      else if (o instanceof String) {
+        str = ((String) o);
+        type = TSTR;
+      } 
+      else if (o instanceof Range) {
+        // TODO 
+        throw new ProcessorError("not implemented");
+      } 
+      else {
+        throw new ProcessorError("bad memory class " + o.getClass().getSimpleName());
+      }
+    }
     public String asString() {
       switch(type) {
       case TNIL:
@@ -1499,8 +1628,26 @@ public class Processor implements ByteCode {
         sb.append("]");
         return sb.toString();
       }
-      case TRANGE:
       case TMAP:
+        StringBuilder sb = new StringBuilder("[");
+        @SuppressWarnings("unchecked")
+        Map<Object, M> m = (Map<Object, M>)ref;
+        final int sz = m.size();
+        Object keys[] = m.keySet().toArray();
+        if (sz > 6) {
+          for (int i = 0; i < 3; i++) {
+            sb.append(keys[i] + ":" + m.get(keys[i]).asString() + ", ");
+          }
+          sb.append("(" + (sz - 3) + " more entries)");
+        } else {
+          for (int i = 0; i < sz; i++) {
+            sb.append(keys[i] + ":" + m.get(keys[i]).asString());
+            if (i < sz-1) sb.append(", ");
+          }
+        }
+        sb.append("]");
+        return sb.toString();
+      case TRANGE:
         return "TODO"; // TODO
       case TREF:
         return ref instanceof M ? ((M)ref).asString() : ref.toString();
@@ -1555,6 +1702,31 @@ public class Processor implements ByteCode {
         return "?";
       }
     }
+    
+    public Object getRaw() {
+      switch(type) {
+      case TNIL:
+        return null;
+      case TINT:
+        return i;
+      case TFLOAT:
+        return f;
+      case TRANGE:
+        return ref;
+      case TSTR:
+        return str;
+      case TCODE:
+        return this;
+      case TLIST:
+        return ref;
+      case TMAP:
+        return ref;
+      case TREF:
+        return ref;
+      default:
+        return null;
+      }
+    }
   }
   
   String getStack() {
@@ -1566,8 +1738,27 @@ public class Processor implements ByteCode {
     return sb.toString();
   }
   
-  String getProcInfo() {
-    return String.format("pc:0x%08x  sp:0x%06x  fp:%06x  sr:", pc, sp, fp) + 
+  public void printStack(PrintStream out, String pre, int maxEntries) {
+    for (int i = sp; i < sp+maxEntries; i++) {
+      if (i >= memory.length) break;
+      if (pre != null) out.print(pre);
+      out.println(String.format("0x%06x %-8s %s", i, TNAME[memory[i].type], memory[i].asString()));
+    }
+  }
+  
+  public String getProcInfo() {
+    return String.format("pc:0x%08x  sp:0x%06x  fp:0x%06x  sr:", pc, sp, fp) + 
         (zero ? "Z" : "z") + (minus ? "M" : "m");
   }
+
+  public int getPC() {
+    return oldpc;
+  }
+  public int getSP() {
+    return sp;
+  }
+  public int getFP() {
+    return fp;
+  }
+
 }

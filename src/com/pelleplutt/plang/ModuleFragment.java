@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.pelleplutt.plang.TAC.TACArrInit;
 import com.pelleplutt.plang.TAC.TACCall;
 import com.pelleplutt.plang.TAC.TACLabel;
 import com.pelleplutt.plang.TAC.TACUnresolved;
@@ -126,5 +127,13 @@ public class ModuleFragment {
       this.call = c;
     }
     public String toString() {return String.format("link func %s @ 0x%06x", call.toString(), pc);}
+  }
+  public static class LinkArrayInitializer extends Link {
+    TACArrInit arr;
+    public LinkArrayInitializer(int pc, TACArrInit arr) {
+      super(pc);
+      this.arr = arr;
+    }
+    public String toString() {return String.format("link const array %d entries @ 0x%06x", arr.entries.size(), pc);}
   }
 }

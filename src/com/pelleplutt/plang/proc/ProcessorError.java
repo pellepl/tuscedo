@@ -29,9 +29,10 @@ public class ProcessorError extends Error {
 
   public static class ProcessorFinishedError extends ProcessorError {
     public ProcessorFinishedError(String message) {
-      super(message);
+      super("execution stopped");
     }
   }
   public static class ProcessorBreakpointError extends ProcessorError {
+    public ProcessorBreakpointError() { super("breakpoint hit"); }
   }
 }

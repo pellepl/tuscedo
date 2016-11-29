@@ -188,16 +188,56 @@ public class Compiler {
         "  rev += char(word[i]);\n" +
         "}\n" +
         "outln(word + ' | ' + rev);\n" +
-        "matrix = [[1,2,3],[4,5,6],[7,8,9]];\n" +
+        "rev = '';\n" +
+        "for (c in word) {\n" +
+        "  rev = char(c) + rev;\n" +
+        "}\n" +
+        "outln(word + ' | ' + rev);\n" +
+
+        "ident = 1;\n" +
+        "multi = 5;\n" +
+        "matrix = [[ident,ident+multi,ident*multi],[2*(ident),fib(12),2*(ident*multi)],[3*ident,3*(ident+multi),3*(ident*multi)]];\n" +
         "outln(matrix);\n" +
         "matrix[1][1] = 5000;\n" +
         "outln(matrix);\n" +
+        "func getarr(l) { l2 = l; l2[2] = 9; return l2; };\n" +
+        "modarr = getarr([5,4,3,2,1]);\n" +
+        "outln(modarr);\n" +
+        "iniarr = [5,4,3,2,1];\n" +
+        "outln(getarr(iniarr)[0]);\n" +
+        "outln(getarr(iniarr)[2]);\n" +
+        "outln(getarr(iniarr)[4]);\n" +
+        "ix = 0;\n" +
+        "outln('iniarr[' + ix + ']:' + iniarr[ix]);\n" +
+        "ix = 'a';\n" +
+        "outln('iniarr[' + ix + ']:' + iniarr[ix]);\n" +
+        "map = ['call':{outln('mapfunc called');}, 'data':123];\n" +
+        "map.call();\n" +
+        "outln(walnut.ident);\n" +
+        "walnut.ident = 5;\n" +
+        "outln('in mandel : walnut.ident:' + walnut.ident);\n" +
+        "outln('in mandel : walnut.otherfunc()');\n" +
+        "walnut.otherfunc();\n" +
+        "outln('in mandel : walnut.walnutmap.call()');\n" +
+        "walnut.walnutmap.call();\n" +
+        "outln('in mandel : walnut.walnutmap[\"call\"]()');\n" +
+        "walnut.walnutmap['call']();\n" +
+        "outln('in mandel : walnut.walnutmap.call = mandel.fib');\n" +
+        "walnut.walnutmap.call = fib;\n" +
+        "outln('in mandel : walnut.walnutmap.call(12)');\n" +
+        "outln(walnut.walnutmap.call(12));\n" +
+        "func add(x, y) { outln('add' + x + '+' + y); return x+y; }\n" +
+        "walnut.fmap.call();\n" +
+        "walnut.fmap.call = mandel.add;\n" +
+        "outln(walnut.fmap.call(2,3));\n" +
+        "walnut.fmap.sub.call();\n" +
+        "walnut.fmap.sub.call = mandel.add;\n" +
+        "outln(walnut.fmap.sub.call(4,5));\n" +
+        "map.call = fib;\n" +
+        "outln(map.call(12));\n" +
+        "map.call = walnut.fmap.sub.call;\n" + // TODO looks bad
+        "outln(map.call(6,7));\n" +
         "__BKPT;\n" +
-//TODO?        "arr[1,2,3] = [3,4,5];\n"+
-//TODO        "hashmap.somekey(); // == hashmap["somekey"]()
-//TODO        "othermodule.hashmap.somekey();  // == othermodule.hashmap["somekey"]()
-//TODO        "othermodule.hashmap.somekey.somesubkey();  // == othermodule.hashmap["somekey"]["somesubkey"]()
-//TODO        "othermodule.hashmap.somekey.somesubkey = 123;  // == othermodule.hashmap["somekey"]["somesubkey"] = 123
         ""
         ;
     
@@ -205,7 +245,11 @@ public class Compiler {
     // DONE:   add 'return' to functions and anon if not explicitly set by programmer
     // DONE:   add number of call arguments to stack frame, ie push pc+fp and also argc
     // DONE:   in frontend, reverse argument list in order to be able to handle varargs. Fix backend for this also
-    
+    // FIXME:  handle 'global' keyword
+    // FIXME:  use of variables before declaration within scope should not work, confusing 
+    // FIXME:  argument list for anonymous scopes 
+    // FIXME:  arr[1,2,3] = [3,4,5]
+
     String siblingsrc = 
         "module mandel;"+
         "otherglobal = 'variable sister';\n" + 
@@ -218,14 +262,18 @@ public class Compiler {
         "  outln('3rd:' + c);\n" +
         "}";
     String othersrc = 
-         "module walnut; otherglobal = 'variable friend';\n" + 
+         "module walnut;\n" +
+         "otherglobal = 'variable friend';\n" + 
          "l = [1,2,3];\n" +
          "l2 = [1, ['a'], 'b', ['c', ['dekla']]];\n" +
          "l3 = [];\n" +
          "l4[];\n" + 
+         "func otherfunc() {outln('walnut.otherfunc called');}\n" +
          "lfunc = [ \n"+
          "          {return 760;}, {return 401;}, {return 293;}\n"+
          "        ];\n"+
+         "walnutmap = ['call':{outln('walnut mapfunc called');}, 'data':123];\n" +
+         "walnutmap.call();\n" +
          "val=lfunc[0]();" +
          "outln('val='+val);\n" + 
          "val=lfunc[1]();" +
@@ -233,12 +281,14 @@ public class Compiler {
          "val=lfunc[2]();" +
          "outln('val='+val);\n" + 
          "outln('l[0]=1?' + l[0]);\n" +
-         "outln('l2[3][1][0][3]=' + l2[3][1][0][3]);\n" +
+         "outln('l2[3][1][0][3]=' + l2[3][1][0][3] + '(' + char(l2[3][1][0][3]) + ')');\n" +
          "outln('l:' + str(l));\n" +
          "outln('l2:' + str(l2));\n" +
          "outln('l3:' + str(l3));\n" +
          "outln('l4:' + str(l4));\n" +
          "outln('lfunc:' + str(lfunc));\n" +
+         "ident = 4;\n" +
+         "fmap = ['call' : {outln('invoked walnut.fmap.call');}, 'sub':['call' : {outln('invoked walnut.fmap.sub.call');}]];\n" +
          "func friendfunc() {" +
          "  outln('friendfunc called ' + mandel.anon);\n" +
          "}";
@@ -298,21 +348,33 @@ public class Compiler {
   " return crc ^ ~0;\n" +
   "}";
         
-//    src = 
-//        "matrix = [[1,2,3],[4,5,6],[7,8,9]];\n" +
-//        "outln(matrix);\n" +
-//        "matrix[1][1] = 5000;\n" +
-//        "outln(matrix);\n" +
-//        "matrix[0] = [10,20,30];\n" +
-//        "outln(matrix);\n" +
-//        "";
-//    othersrc = "";
-//    siblingsrc = "";
-//    crcsrc = "";
+    src = 
+        "module mod;\n" +
+        //"a;b;\n" +
+        "a=b=10;\n" +
+        "outln('a ' + a);\n" +
+        "outln('b ' + b);\n" +
+        "{\n" +
+        "  d=10;\n" +
+        "  outln('a1 ' + a);\n" +
+        "  outln('b1 ' + b);\n" +
+        "  a;\n" +
+        "  c=a=b=20;\n" +
+        "  outln('a2 ' + a);\n" +
+        "  outln('b1 ' + b);\n" +
+        "}\n" +
+        "outln('a ' + a);\n" +
+        "outln('b ' + b);\n" +
+        "";
     
+    othersrc = 
+        "";
+    siblingsrc = "";
+    crcsrc = "";
+
     Executable e = null;
     try {
-      e = Compiler.compile(extDefs, 0, 0x1000, crcsrc, othersrc, siblingsrc, src);
+      e = Compiler.compile(extDefs, 0x0000, 0x4000, crcsrc, othersrc, siblingsrc, src);
     } catch (CompilerError ce) {
       String s = Compiler.getSource();
       int strstart = ce.getStringStart();
@@ -336,6 +398,18 @@ public class Compiler {
         p.step();
       }
     } catch (ProcessorFinishedError pfe) {}
+    catch (ProcessorError pe) {
+      System.out.println("**********************************************");
+      System.out.println(String.format("Exception at pc 0x%06x", p.getPC()));
+      System.out.println(p.getProcInfo());
+      System.out.println(pe.getMessage());
+      System.out.println("**********************************************");
+      System.out.println("DISASM");
+      p.disasm(System.out, "   ", p.getPC(), 8);
+      System.out.println("STACK");
+      p.printStack(System.out, "   ", 16);
+      pe.printStackTrace(System.err);
+    }
     System.out.println(i + " instructions executed");
   }
 

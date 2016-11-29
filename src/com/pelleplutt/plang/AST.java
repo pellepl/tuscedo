@@ -96,6 +96,7 @@ public class AST implements Lexer.Emitter {
   final static int _OP_FINAL       = __id++;
   final static int OP_ADECL        = __id++;
   final static int OP_ADEREF       = __id++;
+  final static int OP_TUPLE        = __id++;
   final static int OP_MINUS_UNARY  = __id++;
   final static int OP_PLUS_UNARY   = __id++;
   final static int OP_POSTINC      = __id++;
@@ -186,6 +187,7 @@ public class AST implements Lexer.Emitter {
       
       new Op("arrdeclr", OP_ADECL, 2, OP_BRACKETO),
       new Op("arrderef", OP_ADEREF, 2, OP_BRACKETO),
+      new Op("tuple", OP_TUPLE, 2, OP_LABEL),
       new Op("U-", OP_MINUS_UNARY, 1, OP_MINUS),
       new Op("U+", OP_PLUS_UNARY, 1, OP_PLUS),
       new Op("++U", OP_POSTINC, 1, OP_PLUS),
@@ -197,8 +199,10 @@ public class AST implements Lexer.Emitter {
   Stack<ASTNode> exprs = new Stack<ASTNode>();
   Stack<Op> opers = new Stack<Op>();
   Stack<Integer> blcks = new Stack<Integer>();
+  Stack<Integer> blkSymNbrs = new Stack<Integer>();
   int callid;
   int arrdeclid;
+  int blkSymNbr;
   int prevTokix = -1;
   int prevPrevTokix = -1;
   int stroffset, strlen;
@@ -224,6 +228,7 @@ public class AST implements Lexer.Emitter {
     AST ast = new AST();
     ast.callid = 0;
     ast.arrdeclid = 0;
+    ast.blkSymNbr = 0;
     byte tst[] = s.getBytes();
     for (byte b : tst) {
       ast.lexer.feed(b);
@@ -292,7 +297,7 @@ public class AST implements Lexer.Emitter {
     }
     
     else if (tokix == OP_LABEL) {
-      onLabel(tokix);
+      onLabelOrTuple(tokix);
     }
     
     else if (tokix == OP_PARENO) {
@@ -381,17 +386,25 @@ public class AST implements Lexer.Emitter {
   
   void onSymbol(String symbol) {
     if (dbg) System.out.println("   epush sym " + symbol);
-    exprs.push(new ASTNodeSymbol(symbol));
+    ASTNodeSymbol esym = new ASTNodeSymbol(symbol);
+    esym.symNbr = blkSymNbr++;
+    exprs.push(esym);
   }
   
-  void onLabel(int tokix) {
-    // collapse all before label
-    ASTNode a = exprs.pop();
-    collapseStack(OP_FINALIZER, OP_BRACEO);
-    // collapse label
-    exprs.push(a);
-    onOperator(tokix);
-    collapseStack(OP_FINALIZER, OP_BRACEO);
+  void onLabelOrTuple(int tokix) {
+    if (prevTokix == OP_SYMBOL && (
+        prevTokix == prevPrevTokix || prevTokix == prevPrevTokix || prevTokix == prevPrevTokix || prevPrevTokix == -1)) {
+      // label
+      // collapse all before label
+      ASTNode a = exprs.pop();
+      collapseStack(OP_FINALIZER, OP_BRACEO);
+      // collapse label
+      exprs.push(a);
+      onOperator(tokix);
+      collapseStack(OP_FINALIZER, OP_BRACEO);
+    } else {
+      onOperator(OP_TUPLE);
+    }
   }
   
   void onParenthesisOpen(int tokix) {
@@ -488,7 +501,11 @@ public class AST implements Lexer.Emitter {
         prevTokix == OP_BRACKETC || 
         prevTokix == OP_SYMBOL || 
         isString(prevTokix) || 
-        (!exprs.isEmpty() && (exprs.peek().op == OP_CALL || exprs.peek().op == OP_ADECL))
+        (!exprs.isEmpty() && ( 
+            (exprs.peek().op == OP_CALL && prevTokix != OP_PARENO) ||
+            (exprs.peek().op == OP_ADECL)
+            )
+          )
         )) {
       // deref
       collapseStack(OP_DOT); // TODO - is this ok???
@@ -536,19 +553,24 @@ public class AST implements Lexer.Emitter {
     if (dbg) System.out.println("      epush " + opString(tokix));
     opers.push(OPS[tokix]);
     blcks.push(exprs.size());
+    blkSymNbr++;
+    blkSymNbrs.push(blkSymNbr);
+    blkSymNbr = 0;
   }
   
   void onBraceClose(int tokix) {
     // wrap all expressions within starting brace and this brace
     if (blcks.isEmpty()) {
-      throw new Error("'" + OPS[OP_BRACEC] + "' missing '" + OPS[OP_BRACEO] + "'");
+      throw new CompilerError("'" + OPS[OP_BRACEC] + "' missing '" + OPS[OP_BRACEO] + "'", stroffset, strlen);
     }
+    blkSymNbr = blkSymNbrs.pop();
     int blckSize = blcks.pop();
     List<ASTNode> arguments = new ArrayList<ASTNode>();
     while (exprs.size() > blckSize) {
       arguments.add(0, exprs.pop());
     }
-    ASTNode result = new ASTNodeBlok(arguments.toArray(new ASTNode[arguments.size()]));
+    ASTNodeBlok result = new ASTNodeBlok(arguments.toArray(new ASTNode[arguments.size()]));
+    result.symNbr = blkSymNbr;
     if (dbg) System.out.println("      epush " + result);
     exprs.push(result);
     if (collapseStack(OP_FINALIZER, OP_BRACEO) != OP_BRACEO) {
@@ -718,7 +740,7 @@ public class AST implements Lexer.Emitter {
       return OPS[tokix].toString();
     else if (tokix == OP_CALL) {
       return "call";
-    } else if (tokix == OP_CALL) {
+    } else if (tokix == OP_FUNCDEF) {
       return "def";
     } else if (tokix == OP_BLOK) {
       return "blok";
