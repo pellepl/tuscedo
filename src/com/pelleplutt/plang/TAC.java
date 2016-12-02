@@ -7,12 +7,16 @@ import com.pelleplutt.plang.ASTNode.ASTNodeArrDecl;
 import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
 import com.pelleplutt.plang.ASTNode.ASTNodeCompoundSymbol;
 import com.pelleplutt.plang.ASTNode.ASTNodeFuncCall;
+import com.pelleplutt.plang.ASTNode.ASTNodeNumeric;
+import com.pelleplutt.plang.ASTNode.ASTNodeRange;
 import com.pelleplutt.plang.ASTNode.ASTNodeSymbol;
 import com.pelleplutt.plang.CodeGenFront.FrontFragment;
+import com.pelleplutt.plang.proc.Range;
 
 public abstract class TAC {
   private ASTNode e;
   boolean referenced;
+  boolean added;
   FrontFragment ffrag; // only needed for debug when listing the IR
 
   static boolean dbgResolveRefs = false;
@@ -250,8 +254,9 @@ public abstract class TAC {
     public static final String varIterator = ".iter";
     public static final String varSet = ".set";
     List<String> vars = new ArrayList<String>();
+    List<String> tvars = new ArrayList<String>();
     List<String> args = new ArrayList<String>();
-    String module, scope;
+    String module, scope, tScope;
     boolean funcEntry;
     
     public TACAlloc(ASTNodeBlok e, String module, String scope) {
@@ -283,7 +288,7 @@ public abstract class TAC {
     }
 
     // for each constructor (for x in y)
-    public TACAlloc(ASTNode e, ASTNodeBlok eblk) {
+    public TACAlloc(ASTNode e, String tScope, ASTNodeBlok eblk) {
       super(e instanceof ASTNodeBlok ? e : eblk);
       if (e instanceof ASTNodeBlok) {
         eblk = (ASTNodeBlok)e;
@@ -295,16 +300,23 @@ public abstract class TAC {
       }
       this.module = eblk.getModule();
       this.scope = eblk.getScopeId();
-      vars.add(varIterator);
-      vars.add(varSet);
+      this.tScope = tScope;
+      tvars.add(varIterator);
+      tvars.add(varSet);
+    }
+
+    public int variablesOnStack() {
+      return vars.size() + tvars.size();
     }
     
-    public String toString() {return "ALLO " + vars + (funcEntry ? " FUNC" + args : "");}
+    public String toString() {return "ALLO " + vars + (!tvars.isEmpty() ? " " + tvars : "") + 
+        (funcEntry ? " FUNC" + args : "");}
   }
 
   public static class TACFree extends TAC {
     List<String> vars = new ArrayList<String>();
-    String module, scope;
+    List<String> tvars = new ArrayList<String>();
+    String module, scope, tScope;
     public TACFree(ASTNodeBlok e, String module, String scope) {
       super(e);
       this.module = module;
@@ -319,17 +331,22 @@ public abstract class TAC {
       super(x.getNode());
       this.module = x.module;
       this.scope = x.scope;
+      this.tScope = x.tScope;
       this.vars = x.vars;
+      this.tvars = x.tvars;
     }
-    public String toString() {return "FREE " + vars;}
+    public int variablesOnStack() {
+      return vars.size() + tvars.size();
+    }
+    public String toString() {return "FREE " + vars + (!tvars.isEmpty() ? " " + tvars : "");}
   }
   
-  public static class TACArg extends TAC {
+  public static class TACFuncArg extends TAC {
     TAC arg;
-    public TACArg(ASTNode e, TAC arg) {
+    public TACFuncArg(ASTNode e, TAC arg) {
       super(e); this.arg = arg;
     }
-    public String toString() {return "ARG " + ref(arg);}
+    public String toString() {return "FARG " + ref(arg);}
   }
   public static class TACReturn extends TAC {
     TAC ret;
@@ -387,9 +404,50 @@ public abstract class TAC {
       return "CALL <" + id +"> " + args +" args";}
   }
   
+  public static class TACRange extends TAC {
+    boolean stepDefined;
+    TAC from, step, to;
+    private TACRange(ASTNodeRange e, boolean stepDefined) {
+      super(e);
+      this.stepDefined = stepDefined; 
+    }
+    public TACRange(ASTNodeRange e, TAC from, TAC to) {
+      this(e, false);
+      this.from = from;
+      this.to = to;
+    }
+    public TACRange(ASTNodeRange e, TAC from, TAC step, TAC to) {
+      this(e, true);
+      this.from = from;
+      this.step = step;
+      this.to = to;
+    }
+    public String toString() {return "RANGE";}
+  }
+  
   public static class TACBkpt extends TAC {
     public TACBkpt(ASTNode e) {
       super(e);
     }
+  }
+  public static class TACArgc extends TAC {
+    public TACArgc(ASTNode e) {
+      super(e);
+    }
+    public String toString() {return "ARGC";}
+  }
+  public static class TACArgv extends TAC {
+    public TACArgv(ASTNode e) {
+      super(e);
+    }
+    public String toString() {return "ARGV";}
+  }
+  public static class TACArgNbr extends TAC {
+    int arg;
+    public TACArgNbr(ASTNode e, int arg) {
+      super(e);
+      this.arg = arg;
+    }
+    public String toString() {return "ARG#"+arg;}
   }
 }

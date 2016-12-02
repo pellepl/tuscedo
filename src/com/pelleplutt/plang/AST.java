@@ -91,6 +91,9 @@ public class AST implements Lexer.Emitter {
   final static int OP_NIL          = __id++;
   final static int OP_BKPT         = __id++;
   final static int OP_SYMBOL       = __id++;
+  final static int OP_ARGC         = __id++;
+  final static int OP_ARGV         = __id++;
+  final static int OP_ARG          = __id++;
   
   // non lexeme tokens
   final static int _OP_FINAL       = __id++;
@@ -182,6 +185,9 @@ public class AST implements Lexer.Emitter {
       new Op("nil", OP_NIL),
       new Op("\\_\\_BKPT", OP_BKPT),
       new Op("*^0", OP_SYMBOL),
+      new Op("$argc", OP_ARGC),
+      new Op("$argv", OP_ARGV),
+      new Op("$*%", OP_ARG),
       
       new Op("<@>", _OP_FINAL),
       
@@ -288,7 +294,7 @@ public class AST implements Lexer.Emitter {
       } catch (Throwable t) {t.printStackTrace();}
     } 
     
-    else if (tokix == OP_SYMBOL) {
+    else if (tokix == OP_SYMBOL || tokix == OP_ARGC || tokix == OP_ARGV || tokix == OP_ARG) {
       onSymbol(new String(symdata, 0, len));
     }
     
@@ -497,9 +503,11 @@ public class AST implements Lexer.Emitter {
   
   void onBracketOpen(int tokix) {
     if (dbg) System.out.println("      opush bracketo " + opString(tokix));
-    if (prevTokix != OP_COMMA && (
+    if (prevTokix != OP_COMMA && ( 
+        prevTokix == OP_PARENC || 
         prevTokix == OP_BRACKETC || 
         prevTokix == OP_SYMBOL || 
+        prevTokix == OP_ARGV || 
         isString(prevTokix) || 
         (!exprs.isEmpty() && ( 
             (exprs.peek().op == OP_CALL && prevTokix != OP_PARENO) ||
@@ -510,9 +518,20 @@ public class AST implements Lexer.Emitter {
       // deref
       collapseStack(OP_DOT); // TODO - is this ok???
       opers.push(OPS[OP_ADEREF]);
-    } else {
+    } else if (
+        isOperator(prevTokix) ||
+        prevTokix == OP_EQ ||
+        prevTokix == OP_PARENO || 
+        prevTokix == OP_BRACEO || 
+        prevTokix == OP_BRACEC || 
+        prevTokix == OP_BRACKETO || 
+        prevTokix == OP_COMMA || 
+        prevTokix == OP_SEMI || 
+        prevTokix == OP_LABEL) {
       // declare
       opers.push(new OpArrDecl(arrdeclid++));
+    } else {
+      throw new CompilerError("unhandled " + opString(prevTokix), exprs.peek());
     }
   }
   
@@ -779,7 +798,6 @@ public class AST implements Lexer.Emitter {
   
   public static boolean isUnaryOperator(int op) {
     return op == OP_BNOT || op == OP_LNOT || op == OP_MINUS_UNARY || op == OP_PLUS_UNARY ||
-        /*op == OP_PLUS2 || op == OP_MINUS2 ||*/
         op == OP_POSTINC || op == OP_PREINC || op == OP_POSTDEC || op == OP_PREDEC;
   }
   

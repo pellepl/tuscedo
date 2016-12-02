@@ -35,15 +35,18 @@ import java.util.List;
 import com.pelleplutt.plang.ModuleFragment.Link;
 import com.pelleplutt.plang.ModuleFragment.LinkGoto;
 import com.pelleplutt.plang.TAC.TACAlloc;
-import com.pelleplutt.plang.TAC.TACArg;
-import com.pelleplutt.plang.TAC.TACArrInit;
+import com.pelleplutt.plang.TAC.TACArgNbr;
+import com.pelleplutt.plang.TAC.TACArgc;
+import com.pelleplutt.plang.TAC.TACArgv;
 import com.pelleplutt.plang.TAC.TACArrEntry;
+import com.pelleplutt.plang.TAC.TACArrInit;
 import com.pelleplutt.plang.TAC.TACAssign;
 import com.pelleplutt.plang.TAC.TACBkpt;
 import com.pelleplutt.plang.TAC.TACCall;
 import com.pelleplutt.plang.TAC.TACCode;
 import com.pelleplutt.plang.TAC.TACFloat;
 import com.pelleplutt.plang.TAC.TACFree;
+import com.pelleplutt.plang.TAC.TACFuncArg;
 import com.pelleplutt.plang.TAC.TACGoto;
 import com.pelleplutt.plang.TAC.TACGotoCond;
 import com.pelleplutt.plang.TAC.TACInt;
@@ -52,6 +55,7 @@ import com.pelleplutt.plang.TAC.TACMap;
 import com.pelleplutt.plang.TAC.TACMapTuple;
 import com.pelleplutt.plang.TAC.TACNil;
 import com.pelleplutt.plang.TAC.TACOp;
+import com.pelleplutt.plang.TAC.TACRange;
 import com.pelleplutt.plang.TAC.TACReturn;
 import com.pelleplutt.plang.TAC.TACSet;
 import com.pelleplutt.plang.TAC.TACSetDeref;
@@ -192,24 +196,30 @@ public class CodeGenBack implements ByteCode {
         }
       }
       // allocate stack variables
-      if (!all.vars.isEmpty()) {
+      if (all.variablesOnStack() > 0) {
         int fpoffset = sp - fp;
         for (String sym : all.vars) {
           frag.locals.put(new TACVar(tac.getNode(), sym, all.module, all.scope), fpoffset++);
         }
-        sp += all.vars.size();
-        addCode(frag, stackInfo() + all.toString(), ISP_INCR, all.vars.size()-1);
+        for (String sym : all.tvars) {
+          frag.locals.put(new TACVar(tac.getNode(), sym, all.module, all.scope + all.tScope), fpoffset++);
+        }
+        sp += all.variablesOnStack();
+        addCode(frag, stackInfo() + all.toString(), ISP_INCR, all.variablesOnStack()-1);
       }
     }
     else if (tac instanceof TACFree) {
       // free stack variables
       TACFree fre = (TACFree)tac;
-      if (!fre.vars.isEmpty()) {
+      if (fre.variablesOnStack() > 0) {
         for (String esym : fre.vars) {
           frag.locals.remove(new TACVar(tac.getNode(), esym, fre.module, fre.scope));
         }
-        sp -= fre.vars.size();
-        addCode(frag, stackInfo() + tac.toString(), ISP_DECR, fre.vars.size()-1);
+        for (String esym : fre.tvars) {
+          frag.locals.remove(new TACVar(tac.getNode(), esym, fre.module, fre.scope + fre.tScope));
+        }
+        sp -= fre.variablesOnStack();
+        addCode(frag, stackInfo() + tac.toString(), ISP_DECR, fre.variablesOnStack()-1);
       }
     }
     else if (tac instanceof TACVar || tac instanceof TACFloat || 
@@ -315,8 +325,8 @@ public class CodeGenBack implements ByteCode {
       sp--;
       addCode(frag, stackInfo(), IRETV);
     }
-    else if (tac instanceof TACArg) {
-      TACArg a = (TACArg)tac;
+    else if (tac instanceof TACFuncArg) {
+      TACFuncArg a = (TACFuncArg)tac;
       pushValue(a.arg, frag);
     }
     else if (tac instanceof TACBkpt) {
@@ -363,9 +373,49 @@ public class CodeGenBack implements ByteCode {
       sp = sp - 2 + 1;
       addCode(frag, stackInfo() + a, ISET_RD);
     }
+    else if (tac instanceof TACRange) {
+      TACRange a = (TACRange)tac;
+      if (a.stepDefined) {
+//        boolean fromOnStack = pushValue(a.from, frag);
+//        boolean stepOnStack = pushValue(a.step, frag);
+//        if (!fromOnStack && stepOnStack) {
+//          addCode(frag, ISWAP);
+//        }
+//        boolean toOnStack = pushValue(a.to, frag);
+//        if (!stepOnStack && toOnStack) {
+//          addCode(frag, ISWAP);
+//        }
+//        if (!fromOnStack && toOnStack) {
+//          throw new CompilerError("not implemented " + tac, tac.getNode());
+//          // TODO addCode(frag, IROT);
+//        }
+        sp = sp - 3 + 1;
+        addCode(frag, stackInfo() + a, IRNG3);
+      } else {
+//        boolean fromOnStack = pushValue(a.from, frag);
+//        boolean toOnStack = pushValue(a.to, frag);
+//        if (!fromOnStack && toOnStack) {
+//          addCode(frag, ISWAP);
+//        }
+        sp = sp - 2 + 1;
+        addCode(frag, stackInfo() + a, IRNG2);
+      }
+    }
+    else if (tac instanceof TACInt) {
+      pushValue(tac, frag);
+    }
+    else if (tac instanceof TACArgv) {
+      pushValue(tac, frag);
+    }
+    else if (tac instanceof TACArgc) {
+      pushValue(tac, frag);
+    }
+    else if (tac instanceof TACArgNbr) {
+      pushValue(tac, frag);
+    }
 
     else {
-      throw new Error("not implemented " + tac);
+      throw new Error("not implemented " + tac + " " + tac.getClass().getSimpleName() + " "+ AST.opString(tac.getNode().op));
     }
   }
   
@@ -374,17 +424,13 @@ public class CodeGenBack implements ByteCode {
       pushValue(tac.operand, frag);
       sp = sp - 1 + 1;
       addCode(frag, stackInfo() + tac.toString(), IADD_Q1);
-      if (tac.operand instanceof TACVar) {
-        emitAssignment(tac, tac.operand, null, tac.referenced, frag);
-      }
+      emitAssignment(tac, tac.operand, null, tac.referenced, frag);
     } 
     else if (tac.op == OP_PREDEC) {
       pushValue(tac.operand, frag);
       sp = sp - 1 + 1;
       addCode(frag, stackInfo() + tac.toString(), ISUB_Q1);
-      if (tac.operand instanceof TACVar) {
-        emitAssignment(tac, tac.operand, null, tac.referenced, frag);
-      }
+      emitAssignment(tac, tac.operand, null, tac.referenced, frag);
     } 
     else if (tac.op == OP_POSTINC) {
       pushValue(tac.operand, frag);
@@ -394,9 +440,8 @@ public class CodeGenBack implements ByteCode {
       }
       sp = sp - 1 + 1;
       addCode(frag, stackInfo() + tac.toString(), IADD_Q1);
-      if (tac.operand instanceof TACVar) {
-        emitAssignment(tac, tac.operand, null, false, frag);
-      }
+      // false instead of tac.referenced, DUP already emitted
+      emitAssignment(tac, tac.operand, null, false, frag);
     } 
     else if (tac.op == OP_POSTDEC) {
       pushValue(tac.operand, frag);
@@ -406,9 +451,8 @@ public class CodeGenBack implements ByteCode {
       }
       sp = sp - 1 + 1;
       addCode(frag, stackInfo() + tac.toString(), ISUB_Q1);
-      if (tac.operand instanceof TACVar) {
-        emitAssignment(tac, tac.operand, null, false, frag);
-      }
+      // false instead of tac.referenced, DUP already emitted
+      emitAssignment(tac, tac.operand, null, false, frag);
     } 
     else if (tac.op == OP_LNOT) {
       pushValue(tac.operand, frag);
@@ -589,7 +633,11 @@ public class CodeGenBack implements ByteCode {
     if (num >= 0 && num <= 4) {
       addCode(frag, comment != null ? (stackInfo() + comment) : null, IPUSH_0 + num);
     } else if (num >= -128 && num <= 127) {
-      addCode(frag, comment != null ? (stackInfo() + comment) : null, IPUSH_IM, num);
+      addCode(frag, comment != null ? (stackInfo() + comment) : null, IPUSH_S, num);
+    } else if (num >= 128 && num <= 255+128) {
+      addCode(frag, comment != null ? (stackInfo() + comment) : null, IPUSH_U, num-128);
+    } else if (num <= -128 && num >= -(255+128)) {
+      addCode(frag, comment != null ? (stackInfo() + comment) : null, IPUSH_U, (-num)-128, INEG);
     } else {
       throw new CompilerError("not implemented");
     }
@@ -602,12 +650,8 @@ public class CodeGenBack implements ByteCode {
       addCode(frag, stackInfo() + a.toString(), IPUSH_NIL);
     } 
     else if (a instanceof TACInt) {
-      if (((TACInt)a).x >= 0 && ((TACInt)a).x <= 4) {
-        sp++;
-        addCode(frag, stackInfo() + a.toString(), IPUSH_0 + ((TACInt)a).x);
-      } else if (((TACInt)a).x >= -128 && ((TACInt)a).x <= 127) {
-        sp++;
-        addCode(frag, stackInfo() + a.toString() + " (constimm)", IPUSH_IM, ((TACInt)a).x);
+      if (((TACInt)a).x >= -(255+128) && ((TACInt)a).x <= 255+128) {
+        pushNumber(frag, ((TACInt)a).x, a.toString());
       } else {
         frag.links.add(new ModuleFragment.LinkConst(frag.getPC(), a));
         sp++;
@@ -628,15 +672,37 @@ public class CodeGenBack implements ByteCode {
       }
     }
     else if (a instanceof TACFloat || a instanceof TACString || a instanceof TACCode) {
-      // TODO RANGE?
       frag.links.add(new ModuleFragment.LinkConst(frag.getPC(), a));
       sp++;
       addCode(frag, stackInfo() + a.toString() + " (const)", ILOAD_IM, 2,0,0);
     } 
+    else if (a instanceof TACRange) {
+      // TODO RANGE?
+      //throw new CompilerError("not implemented" , a.getNode());
+    }
     else if (a instanceof TACUnresolved) {
       frag.links.add(new ModuleFragment.LinkUnresolved(frag.getPC(), (TACUnresolved)a));
       sp++;
       addCode(frag, stackInfo() + a.toString() + " (link)", ILOAD_IM, INOP,INOP,INOP);
+    }
+    else if (a instanceof TACArgc) {
+      sp++;
+      addCode(frag, stackInfo() + a, ILOAD_FP, -3);
+    }
+    else if (a instanceof TACArgNbr) {
+      int argnbr = ((TACArgNbr)a).arg;
+      pushNumber(frag, argnbr, "argnbr " + argnbr);
+      sp++;
+      addCode(frag, stackInfo() + "argc", ILOAD_FP, -3);
+      sp -= 2;
+      addCode(frag, stackInfo() + argnbr + " >= argc", ICMP);
+      addCode(frag, stackInfo() + "ok", IBRA_LT, 0,0,4+1+4);
+      sp++;
+      addCode(frag, stackInfo() + "beyond argc", IPUSH_NIL);
+      sp--;
+      addCode(frag, stackInfo(), IBRA, 0,0,4+2);
+      sp++;
+      addCode(frag, stackInfo() + "get arg " + argnbr, ILOAD_FP, -4 -argnbr);
     }
 //    else if (a instanceof TACOp) {
 //      // supposed to be on stack TODO

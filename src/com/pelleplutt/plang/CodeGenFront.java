@@ -21,6 +21,7 @@ import static com.pelleplutt.plang.AST.OP_MINUS;
 import static com.pelleplutt.plang.AST.OP_MINUSEQ;
 import static com.pelleplutt.plang.AST.OP_MOD;
 import static com.pelleplutt.plang.AST.OP_MODEQ;
+import static com.pelleplutt.plang.AST.OP_MODULE;
 import static com.pelleplutt.plang.AST.OP_MUL;
 import static com.pelleplutt.plang.AST.OP_MULEQ;
 import static com.pelleplutt.plang.AST.OP_NIL;
@@ -60,16 +61,20 @@ import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
 import com.pelleplutt.plang.ASTNode.ASTNodeCompoundSymbol;
 import com.pelleplutt.plang.ASTNode.ASTNodeFuncCall;
 import com.pelleplutt.plang.ASTNode.ASTNodeNumeric;
+import com.pelleplutt.plang.ASTNode.ASTNodeRange;
 import com.pelleplutt.plang.ASTNode.ASTNodeString;
 import com.pelleplutt.plang.ASTNode.ASTNodeSymbol;
 import com.pelleplutt.plang.TAC.TACAlloc;
-import com.pelleplutt.plang.TAC.TACArg;
+import com.pelleplutt.plang.TAC.TACArgNbr;
+import com.pelleplutt.plang.TAC.TACArgc;
+import com.pelleplutt.plang.TAC.TACArgv;
 import com.pelleplutt.plang.TAC.TACAssign;
 import com.pelleplutt.plang.TAC.TACBkpt;
 import com.pelleplutt.plang.TAC.TACCall;
 import com.pelleplutt.plang.TAC.TACCode;
 import com.pelleplutt.plang.TAC.TACFloat;
 import com.pelleplutt.plang.TAC.TACFree;
+import com.pelleplutt.plang.TAC.TACFuncArg;
 import com.pelleplutt.plang.TAC.TACGoto;
 import com.pelleplutt.plang.TAC.TACGotoCond;
 import com.pelleplutt.plang.TAC.TACInt;
@@ -318,22 +323,19 @@ public class CodeGenFront {
     }
   }
   
-  class SymbolHolder {
-    TAC arrSymbol;
-  }
-  
-  TAC genIRAssignment(ASTNode e, ASTNodeBlok parentEblk, int level, SymbolHolder sh) {
+  TAC genIRAssignment(ASTNode e, ASTNodeBlok parentEblk) {
     if (e.op == OP_SYMBOL) {
       TAC ret = genIR(e, parentEblk);
-      sh.arrSymbol = ret;
       return ret;
     }
     else if (e.op == OP_ADEREF) {
       return genIRUnwindArrOp(e, parentEblk, true);
     } else if (e.op == OP_DOT) {
       return genIRUnwindDotOp(e, parentEblk, true);
+    } else if (AST.isNumber(e.op) || AST.isString(e.op)) {
+      return null; // do nufin
     } else {
-      throw new CompilerError("fatal, unknown assignee", e);
+      throw new CompilerError("fatal, unknown assignee " + e.getClass().getSimpleName(), e);
     }
   }
   
@@ -394,6 +396,7 @@ public class CodeGenFront {
       if (eblk.type == ASTNodeBlok.TYPE_ANON) {
         return new TACCode(e, newFrag);
       }
+      return null;
     } 
     
     else if (isNum(e.op)) {
@@ -406,6 +409,9 @@ public class CodeGenFront {
     }
     
     else if (e.op == OP_SYMBOL) {
+      if (((ASTNodeSymbol)e).symbol.charAt(0) == '$') {
+        return createInbuiltSymbol(e, ((ASTNodeSymbol)e).symbol.substring(1));
+      }
       ASTNodeBlok declBlok = getScopeIfDef(parentEblk, (ASTNodeSymbol)e);
       if (declBlok != null) {
         return new TACVar(e, ((ASTNodeSymbol)e).symbol, declBlok.getModule(), declBlok.getScopeId());
@@ -423,7 +429,7 @@ public class CodeGenFront {
     }
     
     else if (e.op == OP_EQ) {
-      TAC assignee = genIRAssignment(e.operands.get(0), parentEblk, 0, new SymbolHolder());
+      TAC assignee = genIRAssignment(e.operands.get(0), parentEblk);
       TAC assignment = genIR(e.operands.get(1), parentEblk);
       setReferenced(assignment);
       TAC op = new TACAssign(e, e.op, assignee, assignment); 
@@ -434,6 +440,7 @@ public class CodeGenFront {
     else if (AST.isOperator(e.op)) {
       if (!AST.isAssignOperator(e.op)) {
         if (AST.isUnaryOperator(e.op)) {
+          genIRAssignment(e.operands.get(0), parentEblk);
           TAC operand = genIR(e.operands.get(0), parentEblk);  
           setReferenced(operand);
           TAC op = new TACUnaryOp(e, e.op, operand);
@@ -449,10 +456,12 @@ public class CodeGenFront {
           return op;
         }
       } else {
-        TAC assignee = genIRAssignment(e.operands.get(0), parentEblk, 0, new SymbolHolder());
+        TAC assignee = genIRAssignment(e.operands.get(0), parentEblk);
         setReferenced(assignee);
-        TAC right = genIR(e.operands.get(1), parentEblk);  
-        if (right != null) setReferenced(right);
+        TAC assignOperandLeft = genIR(e.operands.get(0), parentEblk);
+        setReferenced(assignOperandLeft);
+        TAC assignOperandRight = genIR(e.operands.get(1), parentEblk);  
+        setReferenced(assignOperandRight);
         int opCode;
         if      (e.op == OP_ANDEQ) opCode = OP_AND; 
         else if (e.op == OP_DIVEQ) opCode = OP_DIV; 
@@ -465,11 +474,11 @@ public class CodeGenFront {
         else if (e.op == OP_SHRIGHTEQ) opCode = OP_SHRIGHT; 
         else if (e.op == OP_XOREQ) opCode = OP_XOR; 
         else throw new CompilerError("unknown assign operator " + AST.opString(e.op), e);
-        TAC assignment = new TACOp(e, opCode, assignee, right);
+        TAC operation = new TACOp(e, opCode, assignOperandLeft, assignOperandRight);
+        add(operation);
+        TAC assignment = new TACAssign(e, OP_EQ, assignee, operation); 
         add(assignment);
-        TAC assOp = new TACAssign(e, OP_EQ, assignee, assignment); 
-        add(assOp);
-        return assOp;
+        return assignment;
       }
     }
     
@@ -502,6 +511,7 @@ public class CodeGenFront {
         newBlock();
         add(lExit);
       }
+      return null;
     }
     
     else if (e.op == OP_FOR) {
@@ -555,7 +565,13 @@ public class CodeGenFront {
         
       } else {
         //for (x in y) {w}
-        TACAlloc talloc = new TACAlloc(e.operands.get(2), parentEblk); 
+        String innerScope = getInnerScope();
+        ASTNode eloopCode = e.operands.get(2);
+        if (eloopCode.op == OP_BLOK) {
+          ((ASTNodeBlok)eloopCode).setVariablesHandled();
+        }
+        TACAlloc talloc = new TACAlloc(eloopCode, innerScope, parentEblk);
+        
         add(talloc);
         String label = genLabel();
 
@@ -563,9 +579,9 @@ public class CodeGenFront {
         TACLabel lExit = new TACLabel(e, label+"_fexit");
         TACLabel lCont = new TACLabel(e, label+"_fcont");
 
-        String innerScope = getInnerScope();
         TACVar _set = new TACVar(parentEblk, TACAlloc.varSet, talloc.module, talloc.scope + innerScope); 
         TACVar _iter = new TACVar(parentEblk, TACAlloc.varIterator, talloc.module, talloc.scope + innerScope); 
+        
         TACVar assignee = new TACVar(e.operands.get(0), ((ASTNodeSymbol)e.operands.get(0)).symbol, 
             parentEblk.getModule(), parentEblk.getScopeId());
         
@@ -587,7 +603,7 @@ public class CodeGenFront {
         add(lLoop);
 
         // conditional : y (.iter < len(.set))
-        TACArg _set_arg = new TACArg(e, _set);
+        TACFuncArg _set_arg = new TACFuncArg(e, _set);
         add(_set_arg);
         setReferenced(_set_arg);
         TAC _len_set = new TACCall(e, "len", 1, talloc.module);
@@ -634,6 +650,7 @@ public class CodeGenFront {
         
         add(new TACFree(talloc));
       }
+      return null;
     }
     
     else if (e.op == OP_WHILE) {
@@ -670,18 +687,21 @@ public class CodeGenFront {
       if (doStackAllocation) {
         add(new TACFree(eblk, eblk.getModule(), eblk.getScopeId()));
       }
+      return null;
     }
     
     else if (e.op == OP_BREAK) {
       TACLabel lExit = getLoopBreakLabel();
       add(new TACGoto(e, lExit));
       newBlock();
+      return null;
     }
     
     else if (e.op == OP_CONTINUE) {
       TACLabel lCont = getLoopContinueLabel();
       add(new TACGoto(e, lCont));
       newBlock();
+      return null;
     }
     
     else if (e.op == OP_GOTO) {
@@ -689,6 +709,7 @@ public class CodeGenFront {
       TAC gotoDest = new TACGoto(e, dest);
       add(gotoDest);
       newBlock();
+      return null;
     }
     
     else if (e.op == OP_CALL) {
@@ -696,7 +717,7 @@ public class CodeGenFront {
       String args[] = new String[e.operands.size()];
       for (int i = args.length-1; i >= 0; i--) {
         TAC argVal = genIR(e.operands.get(i), parentEblk);
-        TAC arg = new TACArg(e, argVal);
+        TAC arg = new TACFuncArg(e, argVal);
         setReferenced(argVal);
         add(arg);
       }
@@ -777,6 +798,7 @@ public class CodeGenFront {
 
     else if (e.op == OP_FUNCDEF) {
       genIR(e.operands.get(0), parentEblk);
+      return null;
     }
     
     else if (e.op == OP_RETURN) {
@@ -790,10 +812,12 @@ public class CodeGenFront {
       }
       add(ret);
       newBlock();
+      return null;
     }
     
     else if (e.op == OP_BKPT) {
       add(new TACBkpt(e));
+      return null;
     }
     
     else if (e.op == OP_ADEREF) {
@@ -848,16 +872,41 @@ public class CodeGenFront {
     }
     
     else if (e.op == OP_RANGE) {
-      // TODO range
-      throw new CompilerError("not implemented", e);
+      TAC r;
+      if (e.operands.size() == 2) {
+        TAC efrom = genIR(e.operands.get(0), parentEblk); 
+        add(efrom);
+        setReferenced(efrom);
+        TAC eto = genIR(e.operands.get(1), parentEblk);
+        add(eto);
+        setReferenced(eto);
+        r = new TAC.TACRange((ASTNodeRange)e, efrom, eto); 
+      } else {
+        TAC efrom = genIR(e.operands.get(0), parentEblk); 
+        add(efrom);
+        setReferenced(efrom);
+        TAC estep = genIR(e.operands.get(1), parentEblk); 
+        add(estep);
+        setReferenced(estep);
+        TAC eto = genIR(e.operands.get(2), parentEblk);
+        add(eto);
+        setReferenced(eto);
+        r = new TAC.TACRange((ASTNodeRange)e, efrom, estep, eto); 
+      }
+      add(r);
+      return r;
     }
-    
+    else if (e.op == OP_MODULE) {
+      return null;
+    }
+    else {
+      throw new CompilerError("not implemented " + AST.opString(e.op), e);
+    }
     // TODO moar
-    
-    return null;
   }
   
   void add(TAC t) {
+    if (t.added) return;
     if (ffrag.block == null) {
       ffrag.block = new Block();
       ffrag.blocks.add(ffrag.block);
@@ -865,6 +914,7 @@ public class CodeGenFront {
     ffrag.block.add(t);
     ffrag.ir.add(t);
     t.ffrag = ffrag;
+    t.added = true;
   }
   
   void newBlock() {
@@ -923,6 +973,16 @@ public class CodeGenFront {
   
   void setReferenced(TAC tac) {
     if (tac != null) tac.referenced = true;
+  }
+  
+  TAC createInbuiltSymbol(ASTNode e, String isym) {
+    boolean isNumeric = true;
+    int num = -1;
+    try {num = Integer.parseInt(isym); } catch(Throwable t) {isNumeric=false;}
+         if (isym.equals("argc")) return new TACArgc(e);
+    else if (isym.equals("argv")) return new TACArgv(e);
+    else if (isNumeric)           return new TACArgNbr(e, num);
+    else throw new CompilerError("not implemented $" + isym);
   }
   
   ASTNodeBlok getScopeIfDef(ASTNodeBlok eblk, ASTNodeSymbol sym) {

@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.pelleplutt.plang.CompilerError;
 import com.pelleplutt.plang.Executable;
 import com.pelleplutt.plang.proc.ProcessorError.ProcessorBreakpointError;
 
@@ -16,7 +17,7 @@ public class Processor implements ByteCode {
   public static final int TSTR = 3;
   public static final int TRANGE = 4;
   public static final int TCODE = 5;
-  public static final int TLIST = 6;
+  public static final int TARR = 6;
   public static final int TMAP = 7;
   public static final int TREF = 8;
   
@@ -26,7 +27,7 @@ public class Processor implements ByteCode {
   public static boolean dbgRun = false;
   
   public static final String TNAME[] = {
-    "nil", "int", "float", "string", "range", "code", "list", "map", "ref"
+    "nil", "int", "float", "string", "range", "code", "arr", "map", "ref"
   };
   
   M[] memory;
@@ -145,9 +146,13 @@ public class Processor implements ByteCode {
       sb.append("sub_im  ");
       sb.append(String.format("0x%02x", codetoi(code, pc, 1) + 1));
       break;
-    case IPUSH_IM:
-      sb.append("push_im ");
+    case IPUSH_S:
+      sb.append("push_s  ");
       sb.append(String.format("%d", codetos(code, pc, 1)));
+      break;
+    case IPUSH_U:
+      sb.append("push_u  ");
+      sb.append(String.format("%d", codetoi(code, pc, 1)+128));
       break;
     case IPUSH_NIL:
       sb.append("push_nil");
@@ -310,6 +315,12 @@ public class Processor implements ByteCode {
     case ISET_RD:
       sb.append("set_rd  ");
       break;
+    case IRNG2:
+      sb.append("rng2    ");
+      break;
+    case IRNG3:
+      sb.append("rng3    ");
+      break;
 
     case ICALL: 
       sb.append("call    ");
@@ -444,6 +455,9 @@ public class Processor implements ByteCode {
     memory[sp--].f = x;
   }
     
+  void push(char x) {
+    push(Character.toString(x));
+  }
   void push(String x) {
     memory[sp].type = TSTR;
     memory[sp].ref = null;
@@ -451,7 +465,7 @@ public class Processor implements ByteCode {
   }
     
   void push(List<M> list) {
-    memory[sp].type = TLIST;
+    memory[sp].type = TARR;
     memory[sp].ref = list;
     memory[sp--].str = null;
   }
@@ -566,41 +580,198 @@ public class Processor implements ByteCode {
   void set_drf() {
     M mix = pop();
     M mset = pop();
-    if (mset.type == TLIST) {
-      push(((List<M>)mset.ref).get(mix.asInt()));
+    if (mset.type == TARR) {
+      if (mix.type == TARR) {
+        derefListArgList((List<M>)mset.ref, (List<M>)mix.ref);
+      } else if (mix.type == TRANGE) {
+        derefListArgRange((List<M>)mset.ref, (Range)mix.ref);
+      } else {
+        push(((List<M>)mset.ref).get(mix.asInt()));
+      }
     } else if (mset.type == TSTR) {
-      push((int)mset.str.charAt(mix.asInt()));
+      if (mix.type == TARR) {
+        derefStringArgList(mset.str, (List<M>)mix.ref);
+      } else if (mix.type == TRANGE) {
+        derefStringArgRange(mset.str, (Range)mix.ref);
+      } else {
+        push(mset.str.charAt(mix.asInt()));
+      }
     } else if (mset.type == TMAP) {
-      push(((Map<Object,M>)mset.ref).get(mix.getRaw()));
+      if (mix.type == TARR) {
+        derefMapArgList((Map<Object,M>)mset.ref, (List<M>)mix.ref);
+      } else if (mix.type == TRANGE) {
+        derefMapArgRange((Map<Object,M>)mset.ref, (Range)mix.ref);
+      } else {
+        push(((Map<Object,M>)mset.ref).get(mix.getRaw()));
+      }
     } else if (mset.type == TRANGE) {
-      throw new ProcessorError("not implemented"); // TODO
+      if (mix.type == TARR) {
+        derefRangeArgList((Range)mset.ref, (List<M>)mix.ref);
+      } else if (mix.type == TRANGE) {
+        derefRangeArgRange((Range)mset.ref, (Range)mix.ref);
+      }else {
+        if (((Range)mset.ref).type == TINT) {
+          push((int)((Range)mset.ref).get(mix.asInt()));
+        }
+        else if (((Range)mset.ref).type == TFLOAT) {
+          push((float)((Range)mset.ref).get(mix.asInt()));
+        }
+      }
     } else {
       throw new ProcessorError("cannot dereference type " + TNAME[mset.type]);
     }
   }
   
+  void derefListArgList(List<M> set, List<M> drf) {
+    List<M> list = new ArrayList<M>();
+    for (M mdrf : drf) {
+      if (mdrf.type == TFLOAT || mdrf.type == TINT) {
+        M m = new M();
+        m.copy(set.get(mdrf.asInt()));
+        list.add(m);
+      }
+    }
+    push(list);
+  }
+  void derefListArgRange(List<M> set, Range drf) {
+    List<M> list = new ArrayList<M>();
+    int len = drf.size();
+    for (int i = 0; i < len; i++) {
+      float d = drf.get(i);
+      M m = new M();
+      m.copy(set.get((int)d));
+      list.add(m);
+    }
+    push(list);
+  }
+  
+  void derefStringArgList(String str, List<M> drf) {
+    StringBuilder sb = new StringBuilder();
+    for (M mdrf : drf) {
+      if (mdrf.type == TFLOAT || mdrf.type == TINT) {
+        sb.append(str.charAt(mdrf.asInt()));
+      }
+    }
+    push(sb.toString());
+  }
+  void derefStringArgRange(String str, Range drf) {
+    StringBuilder sb = new StringBuilder();
+    int len = drf.size();
+    for (int i = 0; i < len; i++) {
+      float d = drf.get(i);
+      sb.append(str.charAt((int)d));
+    }
+    push(sb.toString());
+  }
+  
+  void derefMapArgList(Map<Object,M> set, List<M> drf) {
+    List<M> list = new ArrayList<M>();
+    for (M mdrf : drf) {
+      if (mdrf.type == TFLOAT || mdrf.type == TINT) {
+        M m = new M();
+        m.copy(set.get(mdrf.getRaw()));
+        list.add(m);
+      }
+    }
+    push(list);
+  }
+  void derefMapArgRange(Map<Object,M> set, Range drf) {
+    List<M> list = new ArrayList<M>();
+    Object keys[] = set.keySet().toArray();
+    int len = drf.size();
+    for (int i = 0; i < len; i++) {
+      float d = drf.get(i);
+      Object key = keys[(int)d];
+      M mval = set.get(key);
+      if (mval == null) continue;
+      M mkey = new M(key);
+      Map<Object,M> res = new HashMap<Object,M>();
+      res.put("key", mkey);
+      res.put("val", mval);
+      M mres = new M();
+      mres.type = TMAP;
+      mres.ref = res;
+      list.add(mres);
+    }
+    push(list);
+  }  
+  
+  void derefRangeArgList(Range set, List<M> drf) {
+    List<M> list = new ArrayList<M>();
+    if (set.type == TINT) {
+      for (M mdrf : drf) {
+        if (mdrf.type == TFLOAT || mdrf.type == TINT) {
+          list.add(new M((int)set.get(mdrf.asInt())));
+        }
+      }
+    }
+    else if (set.type == TFLOAT) {
+      for (M mdrf : drf) {
+        if (mdrf.type == TFLOAT || mdrf.type == TINT) {
+          list.add(new M((float)set.get(mdrf.asInt())));
+        }
+      }
+    }
+    push(list);
+  }
+  void derefRangeArgRange(Range set, Range drf) {
+    List<M> list = new ArrayList<M>();
+    int len = drf.size();
+    if (set.type == TINT) {
+      for (int i = 0; i < len; i++) {
+        float d = drf.get(i);
+        list.add(new M((int)set.get((int)d)));
+      }
+    }
+    else if (set.type == TFLOAT) {
+      for (int i = 0; i < len; i++) {
+        float d = drf.get(i);
+        list.add(new M((float)set.get((int)d)));
+      }
+    }
+    push(list);
+  }
+  
   @SuppressWarnings("unchecked")
   void set_wr() {
+    // TODO handle set list ie arr[[1,2,3]] = 3
+    // TODO handle set range ie arr[0#2] = 3
     M mix = pop();
     M mval = pop();
     M mset = pop();
-    if (mset.type == TLIST) {
-      M m = new M();
-      m.copy(mval);
-      ((List<M>)mset.ref).set(mix.asInt(), m);
+    if (mset.type == TARR) {
+      if (mval.type == TNIL) {
+        ((List<M>)mset.ref).remove(mix.asInt());
+      } else {
+        M m = new M();
+        m.copy(mval);
+        ((List<M>)mset.ref).set(mix.asInt(), m);
+      }
     } else if (mset.type == TMAP) {
-      M m = new M();
-      m.copy(mval);
-      ((Map<Object, M>)mset.ref).put(mix.getRaw(), m);
+      if (mval.type == TNIL) {
+        ((Map<Object, M>)mset.ref).remove(mix.getRaw());
+      } else {
+        M m = new M();
+        m.copy(mval);
+        ((Map<Object, M>)mset.ref).put(mix.getRaw(), m);
+      }
     } else if (mset.type == TSTR) {
-      int ix = mix.asInt();
-      int len = mset.str.length();
-      mset.str = 
-          (ix > 0 ? mset.str.substring(0, ix-1) : "") +  
-          mval.asString() + 
-          (ix+1 < len ? mset.str.substring(ix+1) : "");
+      if (mval.type == TNIL) {
+        int ix = mix.asInt();
+        int len = mset.str.length();
+        mset.str = 
+            (ix > 0 ? mset.str.substring(0, ix-1) : "") +  
+            (ix+1 < len ? mset.str.substring(ix+1) : "");
+      } else {
+        int ix = mix.asInt();
+        int len = mset.str.length();
+        mset.str = 
+            (ix > 0 ? mset.str.substring(0, ix-1) : "") +  
+            mval.asString() + 
+            (ix+1 < len ? mset.str.substring(ix+1) : "");
+      }
     } else {
-      throw new ProcessorError("cannot dereference type " + TNAME[mset.type]);
+      throw new ProcessorError("cannot write entries in type " + TNAME[mset.type]);
     }
   }
   
@@ -609,7 +780,7 @@ public class Processor implements ByteCode {
     M mkey = pop();
     M mval = pop();
     M mmap = peek(sp+1);
-    if (mmap.type == TLIST) {
+    if (mmap.type == TARR) {
       if (!((List<M>)mmap.ref).isEmpty()) {
         throw new ProcessorError("cannot add tuples to a list");
       }
@@ -630,14 +801,14 @@ public class Processor implements ByteCode {
   @SuppressWarnings("unchecked")
   void set_sz() {
     M e = pop();
-    if (e.type == TLIST) {
+    if (e.type == TARR) {
       push(((List<M>)e.ref).size());
     } else if (e.type == TMAP) {
       push(((Map<Object,M>)e.ref).size());
     } else if (e.type == TSTR) {
       push(e.str.length());
     } else if (e.type == TRANGE) {
-      throw new ProcessorError("not implemented"); // TODO
+      push(((Range)e.ref).size());
     } else {
       throw new ProcessorError("cannot get length of type " + TNAME[e.type]);
     }
@@ -647,7 +818,7 @@ public class Processor implements ByteCode {
   void set_rd() {
     int ix = pop().asInt();
     M mset = pop();
-    if (mset.type == TLIST) {
+    if (mset.type == TARR) {
       push(((List<M>)mset.ref).get(ix));
     } else if (mset.type == TMAP) {
       Map<Object,M> map = (Map<Object,M>)mset.ref;
@@ -663,12 +834,37 @@ public class Processor implements ByteCode {
       mres.ref = res;
       push(mres);
     } else if (mset.type == TSTR) {
-      push((int)mset.str.charAt(ix));
+      push(mset.str.charAt(ix));
     } else if (mset.type == TRANGE) {
-      throw new ProcessorError("not implemented"); // TODO
-    } else {
+      if (((Range)mset.ref).type == TINT) {
+        push((int)((Range)mset.ref).get(ix));
+      }
+      else if (((Range)mset.ref).type == TFLOAT) {
+        push((float)((Range)mset.ref).get(ix));
+      } else {
+        throw new ProcessorError("fatal: range of bad type " + TNAME[((Range)mset.ref).type]);
+      }
+     } else {
       throw new ProcessorError("cannot get sub element of type " + TNAME[mset.type]);
     }
+  }
+  
+  void rng(int def) {
+    Range range;
+    if (def == 2) {
+      M mto = pop();
+      M mfrom = pop();
+      range = new Range(mfrom, mto);
+    } else {
+      M mto = pop();
+      M mstep = pop();
+      M mfrom = pop();
+      range = new Range(mfrom, mstep, mto);
+    }
+    M mr = new M();
+    mr.ref = range;
+    mr.type = TRANGE;
+    push(mr);
   }
   
   void status(int x) {
@@ -717,33 +913,13 @@ public class Processor implements ByteCode {
       status(r);
       push(r);
     }
-    else if (e1.type == TSTR && e1.str.length() == 1 && e2.type == TINT) {
-      int r = e1.str.charAt(0) + e2.i;
-      status(r);
-      push(r);
-    }
-    else if (e2.type == TSTR && e2.str.length() == 1 && e1.type == TINT) {
-      int r = e1.i + e2.str.charAt(0);
-      status(r);
-      push(r);
-    }
-    else if (e1.type == TSTR && e1.str.length() == 1 && e2.type == TFLOAT) {
-      float r = e1.str.charAt(0) + e2.f;
-      status(r);
-      push(r);
-    }
-    else if (e2.type == TSTR && e2.str.length() == 1 && e1.type == TFLOAT) {
-      float r = e1.f + e2.str.charAt(0);
-      status(r);
-      push(r);
-    }
-    else if (e1.type == TLIST) {
+    else if (e1.type == TARR) {
       M m = new M();
       m.copy(e2);
       ((List<M>)e1.ref).add(m);
       push(e1);
     }
-    else if (e2.type == TLIST) {
+    else if (e2.type == TARR) {
       M m = new M();
       m.copy(e1);
       ((List<M>)e2.ref).add(0, m);
@@ -804,26 +980,6 @@ public class Processor implements ByteCode {
       float r = e1.i - e2.f;
       status(r);
       if (push) push(r);
-    }
-    else if (e1.type == TSTR && e1.str.length() == 1 && e2.type == TINT) {
-      int r = e1.str.charAt(0) - e2.i;
-      status(r);
-      push(r);
-    }
-    else if (e2.type == TSTR && e2.str.length() == 1 && e1.type == TINT) {
-      int r = e1.i - e2.str.charAt(0);
-      status(r);
-      push(r);
-    }
-    else if (e1.type == TSTR && e1.str.length() == 1 && e2.type == TFLOAT) {
-      float r = e1.str.charAt(0) - e2.f;
-      status(r);
-      push(r);
-    }
-    else if (e2.type == TSTR && e2.str.length() == 1 && e1.type == TFLOAT) {
-      float r = e1.f - e2.str.charAt(0);
-      status(r);
-      push(r);
     }
     else {
       throw new ProcessorError("cannot subtract types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
@@ -887,8 +1043,12 @@ public class Processor implements ByteCode {
     sub();
   }
   
-  void push_im() {
+  void push_s() {
     push(codetos(code, pc++, 1));
+  }
+
+  void push_u() {
+    push(codetoi(code, pc++, 1)+128);
   }
 
   void push_im_int(int i) {
@@ -923,9 +1083,9 @@ public class Processor implements ByteCode {
       case TINT: break;
       case TFLOAT: m.i = (int)m.f; break;
       case TNIL: m.i = 0; break;
-      case TSTR: m.i = Integer.parseInt(m.str); break;
+      case TSTR: m.i = m.str.length() == 1 ? m.str.charAt(0) : Integer.parseInt(m.str); break;
       case TRANGE: break;
-      case TLIST: break;
+      case TARR: break;
       case TMAP: break;
       case TREF: break;
       }
@@ -938,7 +1098,7 @@ public class Processor implements ByteCode {
       case TNIL: m.f = 0; break;
       case TSTR: m.f = Float.parseFloat(m.str); break;
       case TRANGE: break;
-      case TLIST: break;
+      case TARR: break;
       case TMAP: break;
       case TREF: break;
       }
@@ -951,7 +1111,7 @@ public class Processor implements ByteCode {
       case TNIL: break;
       case TSTR: break;
       case TRANGE: break;
-      case TLIST: break;
+      case TARR: break;
       case TMAP: break;
       case TREF: break;
       }
@@ -1063,14 +1223,6 @@ public class Processor implements ByteCode {
       int r = e1.i << e2.i;
       status(r);
       push(r);
-    } else if (e1.type == TINT && e2.type == TSTR && e2.str.length() == 1) {
-      int r = e1.i << e2.str.charAt(0);
-      status(r);
-      push(r);
-    } else if (e2.type == TINT && e1.type == TSTR && e1.str.length() == 1) {
-      int r = e1.str.charAt(0) << e2.i;
-      status(r);
-      push(r);
     } else {
       throw new ProcessorError("cannot shift types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
     }
@@ -1081,14 +1233,6 @@ public class Processor implements ByteCode {
     M e1 = pop();
     if (e1.type == e2.type && e1.type == TINT) {
       int r = e1.i >> e2.i;
-      status(r);
-      push(r);
-    } else if (e1.type == TINT && e2.type == TSTR && e2.str.length() == 1) {
-      int r = e1.i >> e2.str.charAt(0);
-      status(r);
-      push(r);
-    } else if (e2.type == TINT && e1.type == TSTR && e1.str.length() == 1) {
-      int r = e1.str.charAt(0) >> e2.i;
       status(r);
       push(r);
     } else {
@@ -1103,14 +1247,6 @@ public class Processor implements ByteCode {
       int r = e1.i & e2.i;
       status(r);
       push(r);
-    } else if (e1.type == TINT && e2.type == TSTR && e2.str.length() == 1) {
-      int r = e1.i & e2.str.charAt(0);
-      status(r);
-      push(r);
-    } else if (e2.type == TINT && e1.type == TSTR && e1.str.length() == 1) {
-      int r = e1.str.charAt(0) & e2.i;
-      status(r);
-      push(r);
     } else {
       throw new ProcessorError("cannot and types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
     }
@@ -1123,14 +1259,6 @@ public class Processor implements ByteCode {
       int r = e1.i | e2.i;
       status(r);
       push(r);
-    } else if (e1.type == TINT && e2.type == TSTR && e2.str.length() == 1) {
-      int r = e1.i | e2.str.charAt(0);
-      status(r);
-      push(r);
-    } else if (e2.type == TINT && e1.type == TSTR && e1.str.length() == 1) {
-      int r = e1.str.charAt(0) | e2.i;
-      status(r);
-      push(r);
     } else {
       throw new ProcessorError("cannot or types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
     }
@@ -1141,14 +1269,6 @@ public class Processor implements ByteCode {
     M e1 = pop();
     if (e1.type == e2.type && e1.type == TINT) {
       int r = e1.i ^ e2.i;
-      status(r);
-      push(r);
-    } else if (e1.type == TINT && e2.type == TSTR && e2.str.length() == 1) {
-      int r = e1.i ^ e2.str.charAt(0);
-      status(r);
-      push(r);
-    } else if (e2.type == TINT && e1.type == TSTR && e1.str.length() == 1) {
-      int r = e1.str.charAt(0) ^ e2.i;
       status(r);
       push(r);
     } else {
@@ -1256,8 +1376,16 @@ public class Processor implements ByteCode {
   }
   
   public void step() {
-    if (dbgRun) stepDebug(System.out);
-    else        stepProc();
+    try {
+      if (dbgRun) stepDebug(System.out);
+      else        stepProc();
+    } catch (Throwable t) {
+      if (t instanceof ProcessorError) throw t;
+      else {
+        t.printStackTrace();
+        throw new ProcessorError(t.getMessage());
+      }
+    }
   }
   
   void stepDebug(PrintStream out) {
@@ -1334,8 +1462,11 @@ public class Processor implements ByteCode {
     case ISUB_IM:
       sub_im();
       break;
-    case IPUSH_IM:
-      push_im();
+    case IPUSH_S:
+      push_s();
+      break;
+    case IPUSH_U:
+      push_u();
       break;
     case IPUSH_0:
       push_im_int(0);
@@ -1486,6 +1617,12 @@ public class Processor implements ByteCode {
     case ISET_RD:
       set_rd();
       break;
+    case IRNG2:
+      rng(2);
+      break;
+    case IRNG3:
+      rng(3);
+      break;
 
     case ICALL: 
       call();
@@ -1589,8 +1726,8 @@ public class Processor implements ByteCode {
         type = TSTR;
       } 
       else if (o instanceof Range) {
-        // TODO 
-        throw new ProcessorError("not implemented");
+        ref = o;
+        type = TRANGE;
       } 
       else {
         throw new ProcessorError("bad memory class " + o.getClass().getSimpleName());
@@ -1608,7 +1745,7 @@ public class Processor implements ByteCode {
         return str;
       case TCODE:
         return String.format("->0x%08x", i);
-      case TLIST:
+      case TARR:
       {
         StringBuilder sb = new StringBuilder("[");
         @SuppressWarnings("unchecked")
@@ -1648,7 +1785,7 @@ public class Processor implements ByteCode {
         sb.append("]");
         return sb.toString();
       case TRANGE:
-        return "TODO"; // TODO
+        return ((Range)ref).toString();
       case TREF:
         return ref instanceof M ? ((M)ref).asString() : ref.toString();
       default:
@@ -1692,7 +1829,7 @@ public class Processor implements ByteCode {
         return "s\'" + asString() + "'";
       case TCODE:
         return "c" + asString();
-      case TLIST:
+      case TARR:
         return "l" + asString();
       case TMAP:
         return "m" + asString();
@@ -1717,7 +1854,7 @@ public class Processor implements ByteCode {
         return str;
       case TCODE:
         return this;
-      case TLIST:
+      case TARR:
         return ref;
       case TMAP:
         return ref;
@@ -1739,7 +1876,7 @@ public class Processor implements ByteCode {
   }
   
   public void printStack(PrintStream out, String pre, int maxEntries) {
-    for (int i = sp; i < sp+maxEntries; i++) {
+    for (int i = sp-1; i < sp+maxEntries; i++) {
       if (i >= memory.length) break;
       if (pre != null) out.print(pre);
       out.println(String.format("0x%06x %-8s %s", i, TNAME[memory[i].type], memory[i].asString()));

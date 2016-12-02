@@ -94,7 +94,7 @@ public class Compiler {
         "outln('program start');\n" + 
         "outln('crc32:' + crc.crc32(0, 'abcd', 4));\n" + 
         "mul = 1000;\n" +
-        "step = 0.4;\n" +
+        "step = 0.2;\n" +
 
         "func calcIterations(x, y) {\n" +
         "  zr = x; zi = y; i = 0;\n" +
@@ -115,9 +115,8 @@ public class Compiler {
         "}\n" +
 
         "output = '';\n" + 
-//TODO        "for (y in -1.0 # step # 1.0) {" +
-        "for (y = -1.0; y < 1.0; y += step) {" +
-        "  for (x = -1.6; x < 0.4; x += step/2) {\n" +
+        "for (y in -1.0 # step # 1.0) {\n" +
+        "  for (x in -1.6 # step/2 # 0.4) {\n" +
         "    iters = calcIterations(x,y);\n" +
         "    if (iters == mul) output = output + '0';\n" +
         "    else                output = output + '1';\n" +
@@ -185,15 +184,17 @@ public class Compiler {
         "word = 'Are we not drawn onward, we few, drawn onward to new era?';\n" +
         "rev = '';\n" +
         "for (i = len(word) - 1; i >= 0; i--) {\n" +
-        "  rev += char(word[i]);\n" +
+        "  rev += word[i];\n" +
         "}\n" +
-        "outln(word + ' | ' + rev);\n" +
+        "outln(word + ' |fornext| ' + rev);\n" +
         "rev = '';\n" +
         "for (c in word) {\n" +
-        "  rev = char(c) + rev;\n" +
+        "  rev = c + rev;\n" +
         "}\n" +
-        "outln(word + ' | ' + rev);\n" +
+        "outln(word + ' |foreach| ' + rev);\n" +
+        "outln(word + ' | range | ' + word[len(word)-1 # 0);\n" +
 
+        
         "ident = 1;\n" +
         "multi = 5;\n" +
         "matrix = [[ident,ident+multi,ident*multi],[2*(ident),fib(12),2*(ident*multi)],[3*ident,3*(ident+multi),3*(ident*multi)]];\n" +
@@ -235,8 +236,13 @@ public class Compiler {
         "outln(walnut.fmap.sub.call(4,5));\n" +
         "map.call = fib;\n" +
         "outln(map.call(12));\n" +
-        "map.call = walnut.fmap.sub.call;\n" + // TODO looks bad
+        "map.call = walnut.fmap.sub.call;\n" +
         "outln(map.call(6,7));\n" +
+        "outln(-270);\n" +
+        "outln(('abcdef'[0#3])[2#0]);\n" +
+        "string = 'peter';\n" +
+        "string[2] = nil;\n" +
+        "outln(string);\n" +
         "__BKPT;\n" +
         ""
         ;
@@ -245,10 +251,20 @@ public class Compiler {
     // DONE:   add 'return' to functions and anon if not explicitly set by programmer
     // DONE:   add number of call arguments to stack frame, ie push pc+fp and also argc
     // DONE:   in frontend, reverse argument list in order to be able to handle varargs. Fix backend for this also
+    // DONE:   use of variables before declaration within scope should not work, confusing 
+    // DONE:   ranges 
+    // DONE:   partialarr = oldarr[[3,4,5]]
+    // FIXME?: argument list for anonymous scopes 
+    // FIXME:  arr[[1,2,3]] = 4
+    // FIXME:  arr[[1,2,3]] = arrb[[3,4,5]]
+    // FIXME:  arr = arrb[$0 > 5]
+    // FIXME:  arr = arrb[{x = $0 * 2; return a < 3;}]
+    // FIXME:  goto
     // FIXME:  handle 'global' keyword
-    // FIXME:  use of variables before declaration within scope should not work, confusing 
-    // FIXME:  argument list for anonymous scopes 
-    // FIXME:  arr[1,2,3] = [3,4,5]
+//    "r = ['a':1,'b':2,'c':3];\n" +
+//    "r.b = r;\n" +
+//    "outln(r.b.b.b.b.b.b.b.b.b.b.b['b'].c);\n" + // TODO
+
 
     String siblingsrc = 
         "module mandel;"+
@@ -281,6 +297,7 @@ public class Compiler {
          "val=lfunc[2]();" +
          "outln('val='+val);\n" + 
          "outln('l[0]=1?' + l[0]);\n" +
+         "outln(l2);\n" +
          "outln('l2[3][1][0][3]=' + l2[3][1][0][3] + '(' + char(l2[3][1][0][3]) + ')');\n" +
          "outln('l:' + str(l));\n" +
          "outln('l2:' + str(l2));\n" +
@@ -343,28 +360,26 @@ public class Compiler {
   "  i = 0;\n" +
   "  crc = crc ^ ~0;\n" +
   "  while (size--) {\n" +
-  "   crc = crc32_tab[(crc ^ buf[i++]) & 0xff] ^ (crc >> 8);\n"+
+  "   crc = crc32_tab[(crc ^ int(buf[i++])) & 0xff] ^ (crc >> 8);\n"+
   "  }\n" +
   " return crc ^ ~0;\n" +
   "}";
         
     src = 
         "module mod;\n" +
-        //"a;b;\n" +
-        "a=b=10;\n" +
-        "outln('a ' + a);\n" +
-        "outln('b ' + b);\n" +
-        "{\n" +
-        "  d=10;\n" +
-        "  outln('a1 ' + a);\n" +
-        "  outln('b1 ' + b);\n" +
-        "  a;\n" +
-        "  c=a=b=20;\n" +
-        "  outln('a2 ' + a);\n" +
-        "  outln('b1 ' + b);\n" +
-        "}\n" +
-        "outln('a ' + a);\n" +
-        "outln('b ' + b);\n" +
+        "f = { \n" +
+        "  outln('argc   :' + $argc);\n" +
+//        "  outln('argv   :' + $argv);\n" +
+//        "  outln('argv[0]:' + $argv[0]);\n" +
+//        "  outln('argv[1]:' + $argv[1]);\n" +
+//        "  outln('argv[2]:' + $argv[2]);\n" +
+        "  outln('arg0   :' + $0);\n" +
+        "  outln('arg1   :' + $1);\n" +
+        "  outln('arg2   :' + str($2));\n" +
+        "  outln('arg3   :' + $3);\n" +
+        "};\n" +
+        "f('mo','bo', ['ko','ko']);\n" +
+        "f();\n" +
         "";
     
     othersrc = 
@@ -394,7 +409,7 @@ public class Compiler {
     //Processor.dbgMem = true;
     int i = 0;
     try {
-      for (; i < 10000000*0+800000; i++) {
+      for (; i < 10000000*1+800000; i++) {
         p.step();
       }
     } catch (ProcessorFinishedError pfe) {}

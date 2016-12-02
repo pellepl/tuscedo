@@ -82,10 +82,12 @@ public class StructAnalysis {
       //if (dbg) System.out.println("LEAVE eblk " + eblok + " got symbols " + scope.symList);
     }
     else if (e.op == OP_SYMBOL && !operator) {
-      defVar(scopeStack, (ASTNodeSymbol)e);
+      if (((ASTNodeSymbol)e).symbol.charAt(0) != '$') {
+        defVar(scopeStack, (ASTNodeSymbol)e, parentNode);
+      }
     } 
     else if (e.op == OP_SYMBOL && operator) {
-      // nothung
+      // nothing
     }
     else if (e.op == OP_RETURN) {
       if (e.operands!=null && e.operands.size()>0) {
@@ -125,11 +127,19 @@ public class StructAnalysis {
       // System.out.println("LEAVE func " + fe + " got symbols " + funcScope.symList + " and args " + funcScope.symArgs);
     } 
     else if (e.op == OP_EQ) {
-      ASTNode asignee = e.operands.get(0);
+      ASTNode assignee = e.operands.get(0);
       ASTNode tnode = e.operands.get(1);
-      if (asignee.op != OP_DOT) {
-        ASTNodeSymbol var = getVariableName(asignee);
-        defVarIfUndef(scopeStack, (ASTNodeSymbol)var);
+      
+      if (assignee.op == OP_SYMBOL && ((ASTNodeSymbol)assignee).symbol.charAt(0) == '$') {
+        throw new CompilerError("cannot assign argument variables", e);
+      }
+      
+      if (assignee.op != OP_DOT) {
+        ASTNodeSymbol var = getVariableName(assignee);
+        if (var.symbol.charAt(0) == '$') {
+          throw new CompilerError("cannot assign argument variables", e);
+        }
+        defVarIfUndef(scopeStack, (ASTNodeSymbol)var, e);
       }
         
       if (tnode instanceof ASTNodeBlok) {
@@ -288,7 +298,7 @@ public class StructAnalysis {
   }
 
   // define variable for scope if not already reachable
-  void defVarIfUndef(ScopeStack scopeStack, ASTNodeSymbol esym) {
+  void defVarIfUndef(ScopeStack scopeStack, ASTNodeSymbol esym, ASTNode definer) {
     if (esym == null) throw new CompilerError("fatal");
     for (int i = scopeStack.size()-1; i >= 0; i--) {
       Scope s = scopeStack.get(i);
@@ -302,16 +312,18 @@ public class StructAnalysis {
       };
     }
     scopeStack.peek().symVars.put(esym, esym.symNbr);
+    if (dbg) System.out.println("  + '" + esym.symbol + "' " + (scopeStack.size() == 1 ? "GLOBAL" : "LOCAL") +
+        " in " + definer);
     esym.declare = true;
-    if (dbg) System.out.println("  + '" + esym.symbol + "' " + (scopeStack.size() == 1 ? "GLOBAL" : "LOCAL"));
   }
   
   // define variable for scope, if same name already reachable this will shadow ancestor
-  void defVar(ScopeStack scopeStack, ASTNodeSymbol esym) {
+  void defVar(ScopeStack scopeStack, ASTNodeSymbol esym, ASTNode definer) {
     boolean shadow = isVarDefAbove(scopeStack, esym);
     scopeStack.peek().symVars.put(esym, esym.symNbr);
+    if (dbg) System.out.println("  + '" + esym.symbol + "' " + (scopeStack.size() == 1 ? "GLOBAL" : "LOCAL") + (shadow ? " SHADOW" : "")+
+        " in " + definer);
     esym.declare = true;
-    if (dbg) System.out.println("  + '" + esym.symbol + "' " + (scopeStack.size() == 1 ? "GLOBAL" : "LOCAL") + (shadow ? " SHADOW" : ""));
   }
   
   // see if a variable is reachable from this scope and ancestors

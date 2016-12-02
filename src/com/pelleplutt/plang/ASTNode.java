@@ -131,7 +131,7 @@ public abstract class ASTNode {
     public boolean isSymbolDeclared(ASTNodeSymbol sym, int whenceSymNbr) {
       Integer symNbr = symList.get(sym);
       if (symNbr == null) return false;
-      return symNbr.intValue() <= sym.symNbr; 
+      return symNbr.intValue() <= whenceSymNbr; 
 
     }
     public List<ASTNodeSymbol> getVariables() {

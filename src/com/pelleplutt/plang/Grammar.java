@@ -70,10 +70,10 @@ public class Grammar {
   static final String GRAMMAR_RULES = 
           "label:         sym\n" +
           "tuple:         op | call | val | str | range | nil | assign | blok | rel_op , op | call | val | str | range | nil | assign | blok | rel_op\n" +
-          "dot:           sym | dot , sym\n" +
+          "dot:           sym | dot | arrderef , sym\n" +
           "assign:        sym | arrderef | dot , op | call | val | str | range | nil | assign | blok | rel_op\n" +
           "arrdecl:       maparg*\n" +
-          "arrderef:      arrderef | arrdecl | sym | dot | str | range | call , val | str\n" +
+          "arrderef:      arrderef | arrdecl | sym | dot | str | range | call , val | str | range\n" +
           "return:        op | val | str | range | nil | assign | blok | rel_op\n" +
           "assign_op:     sym | arrderef | dot , op | call | val | assign | rel_op\n" +
           "assign_op_add: sym | arrderef | dot , str\n" +

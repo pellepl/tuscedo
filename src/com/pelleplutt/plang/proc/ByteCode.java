@@ -31,14 +31,15 @@ public interface ByteCode {
   static final int ICMN_0   = 0x11; // compare neg 0                 0 - pop())
   static final int IADD_IM  = 0x12; // add immediate                 push(pop() + xx+1)
   static final int ISUB_IM  = 0x13; // sub immediate                 push(pop() - (xx+1))
-  static final int IPUSH_IM = 0x14; // push signed immediate         push(xx)
-  static final int IPUSH_NIL= 0x15; // push nil                      push(nil)
-  static final int IPUSH_0  = 0x16; // push 0                        push(0)
-  static final int IPUSH_1  = 0x17; // push 1                        push(1)
-  static final int IPUSH_2  = 0x18; // push 2                        push(2)
-  static final int IPUSH_3  = 0x19; // push 3                        push(3)
-  static final int IPUSH_4  = 0x1a; // push 4                        push(4)
-  static final int IPUSH_C  = 0x1b; // push constant                 push(xxxxxx)
+  static final int IPUSH_S  = 0x14; // push signed immediate         push(ss)
+  static final int IPUSH_U  = 0x15; // push unsigned immediate       push(xx+128)
+  static final int IPUSH_NIL= 0x16; // push nil                      push(nil)
+  static final int IPUSH_0  = 0x17; // push 0                        push(0)
+  static final int IPUSH_1  = 0x18; // push 1                        push(1)
+  static final int IPUSH_2  = 0x19; // push 2                        push(2)
+  static final int IPUSH_3  = 0x1a; // push 3                        push(3)
+  static final int IPUSH_4  = 0x1b; // push 4                        push(4)
+  static final int IPUSH_C  = 0x1c; // push constant                 push(xxxxxx)
   
   static final int IPOP     = 0x20; 
   static final int IDUP     = 0x21; 
@@ -86,6 +87,8 @@ public interface ByteCode {
   static final int IARR_INS = 0x57; // array insert                  v=pop(); ix=pop(); l=pop(); l.ins(ix,v);
   static final int ISET_SZ  = 0x58; // read set size                 l=pop();push(l.size)
   static final int ISET_RD  = 0x59; // read set entry                ix=pop(); s=pop(); push(s[ix]);
+  static final int IRNG2    = 0x5a; // range(from,to)                push(range(pop(to), pop(from));
+  static final int IRNG3    = 0x5b; // range(from,step,to)           push(range(pop(to), pop(step), pop(from));
 
   static final int ICALL    = 0xe0; // call function                 a=pop(); push($pc+3); push($fp); $fp=sp; $pc=a
   static final int ICALL_IM = 0xe1; // call function immediate       push($pc+3); push($fp); $fp=sp; $pc=xxxxxx
@@ -113,11 +116,11 @@ public interface ByteCode {
   static final int ISIZE[] = {
       //0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, //00
-       UD,UD, 2, 2, 2, 1, 1, 1, 1, 1, 1, 4,UD,UD,UD,UD, //10
+        1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 4,UD,UD,UD, //10
         1, 1, 1, 2, 1, 4, 1, 4, 2, 2,UD,UD, 2, 2,UD,UD, //20
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, //30
         1, 1, 1, 1,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //40
-        1, 4, 1, 1, 1, 1, 1, 1, 1, 1,UD,UD,UD,UD,UD,UD, //50
+        1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,UD,UD,UD,UD, //50
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //60
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //70
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //80

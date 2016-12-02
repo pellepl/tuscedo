@@ -18,16 +18,36 @@ public class Range {
     } else {
       this.step = -1.0f;
     }
+    if (this.start == this.end) {
+      throw new CompilerError("zero range");
+    }
   }
 
   public Range(M start, M step, M end) {
+    type = checkType(start, step, end);
     this.start = start.asFloat();
     this.step = step.asFloat();
     this.end = end.asFloat();
+    if (this.start == this.end) {
+      throw new CompilerError("zero range");
+    }
+    if (this.step == 0) {
+      throw new CompilerError("range step cannot be zero");
+    }
     if (this.start < this.end && this.step < 0 ||
         this.start > this.end && this.step > 0) {
       throw new CompilerError("range step sign is invalid");
     }
+  }
+  
+  public int size() {
+    int l = (int)Math.ceil(Math.abs((end-start) / step));
+    if (l * step + start == end) l++;
+    return l;
+  }
+  
+  public float get(int ix) {
+    return start + ((float)ix*step);
   }
   
   public static byte checkType(M start, M step, M end) {
@@ -52,4 +72,8 @@ public class Range {
     return (byte)(f ? Processor.TFLOAT : Processor.TINT);
   }
 
+  public String toString() {
+    return start + "#" + step + "#" + end;
+  }
+  
 }
