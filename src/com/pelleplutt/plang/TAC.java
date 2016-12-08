@@ -7,11 +7,9 @@ import com.pelleplutt.plang.ASTNode.ASTNodeArrDecl;
 import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
 import com.pelleplutt.plang.ASTNode.ASTNodeCompoundSymbol;
 import com.pelleplutt.plang.ASTNode.ASTNodeFuncCall;
-import com.pelleplutt.plang.ASTNode.ASTNodeNumeric;
 import com.pelleplutt.plang.ASTNode.ASTNodeRange;
 import com.pelleplutt.plang.ASTNode.ASTNodeSymbol;
 import com.pelleplutt.plang.CodeGenFront.FrontFragment;
-import com.pelleplutt.plang.proc.Range;
 
 public abstract class TAC {
   private ASTNode e;
@@ -370,15 +368,18 @@ public abstract class TAC {
     String declaredModule;
     String func;
     int args;
-    // if false, func is a variable func pointer, no need for linking
-    boolean link;
+    // if true, call by name or variable, else func addr is presumed to be on stack
+    boolean funcNameDefined;
+    // if true, func address is a variable, denoted in var
+    boolean funcAddrInVar;
     // if link is false, this is the variable func pointer
     TACVar var;
-    // if true, call by name or variable, else func addr is presumed to be on stack
-    boolean callByName;
+    
     public TACCall(ASTNodeFuncCall e, int args, String module, String declaredModule, TACVar var) {
       super(e); 
-      this.args = args; this.var = var; this.module = module; this.declaredModule = declaredModule; callByName = e.callByName;
+      this.args = args; this.var = var; this.module = module; this.declaredModule = declaredModule;
+      funcNameDefined = !e.callByArrayDereference;
+      funcAddrInVar = var != null;
       if (e.name instanceof ASTNodeCompoundSymbol) {
         ASTNodeCompoundSymbol ce = (ASTNodeCompoundSymbol)e.name;
         this.func = ce.dots.get(1).symbol;  
@@ -392,14 +393,16 @@ public abstract class TAC {
     }
     public TACCall(ASTNode e, String funcName, int args, String module, String declaredModule) {
       super(e); 
-      this.args = args; this.var = null; this.module = module; this.declaredModule = declaredModule; callByName = true; link = true;
+      this.args = args; this.var = null; this.module = module; this.declaredModule = declaredModule;
+      funcNameDefined = true;
+      funcAddrInVar = false;
       this.func = funcName;
     }
     public String toString() {
       String id;
       ASTNodeFuncCall efc = null;
       if (getNode() instanceof ASTNodeFuncCall) efc = (ASTNodeFuncCall)getNode(); 
-      if (efc == null || efc.callByName) {
+      if (efc == null || !efc.callByArrayDereference) {
         String funcName = func;
         String moduleName = ((module != null ? (":" + module + ".func") : " (resolve)"));
         id = funcName+moduleName;
@@ -455,5 +458,23 @@ public abstract class TAC {
       this.arg = arg;
     }
     public String toString() {return "ARG#"+arg;}
+  }
+  public static class TACDefineMe extends TAC {
+    public TACDefineMe(ASTNode e) {
+      super(e);
+    }
+    public String toString() {return "ME_SET";}
+  }
+  public static class TACUndefineMe extends TAC {
+    public TACUndefineMe(ASTNode e) {
+      super(e);
+    }
+    public String toString() {return "ME_CLEAR";}
+  }
+  public static class TACGetMe extends TAC {
+    public TACGetMe(ASTNode e) {
+      super(e);
+    }
+    public String toString() {return "ME_GET";}
   }
 }

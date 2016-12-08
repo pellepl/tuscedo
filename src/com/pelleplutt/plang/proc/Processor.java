@@ -33,6 +33,8 @@ public class Processor implements ByteCode {
   byte[] code;
   int sp;
   int pc;
+  int me;
+  int me_banked;
   int oldpc;
   int fp;
   boolean zero;
@@ -41,12 +43,12 @@ public class Processor implements ByteCode {
   Executable exe;
   M nilM = new M();
   M zeroM = new M(0);
+  String[] args;
   
   public Processor(int memorySize) {
     nilM.type = TNIL;
     memory = new M[memorySize];
     for (int i = 0; i < memorySize; i++) memory[i] = new M();
-    reset();
   }
   
   public Processor(int memorySize, Executable exe) {
@@ -54,17 +56,35 @@ public class Processor implements ByteCode {
     setExe(exe);
   }
   
+  public Executable getExecutable() {
+    return exe;
+  }
+  
+  public M[] getMemory() {
+    return memory;
+  }
+  
   public void reset() {
     sp = memory.length - 1;
+    if (args == null) args = new String[0];
+    for (int i = args.length-1; i >= 0; i--) {
+      push(args[i]);
+    }
+    push(args.length);
+    push(nilM); // me
+    push(-1); // pc
+    push(-1); // fp
     fp = sp;
+    me = -1;
     zero = false;
     minus = false;
     pc = exe == null ? 0 : exe.getPCStart();
   }
 
   
-  public void setExe(Executable exe) {
+  public void setExe(Executable exe, String ...args) {
     this.exe = exe;
+    this.args = args;
     pc = exe.getPCStart();
     this.code = exe.getMachineCode();
     this.extLinks = exe.getExternalLinkMap();
@@ -73,6 +93,7 @@ public class Processor implements ByteCode {
       M m = consts.get(addr);
       poke(addr, m);
     }
+    reset();
   }
   
   public void disasm(PrintStream out, String pre, int pc, int len) {
@@ -95,6 +116,9 @@ public class Processor implements ByteCode {
   }
 
   public static String disasm(byte[] code, int pc) {
+    if (pc < 0 || pc >= code.length) {
+      return String.format("BADADDR 0x%06x", pc);
+    }
     int instr = (int)(code[pc++] & 0xff);
     StringBuilder sb = new StringBuilder();
     switch (instr) {
@@ -187,9 +211,14 @@ public class Processor implements ByteCode {
     case IPUSH_4:
       sb.append("push_4  ");
       break;
-    case IPUSH_C:
-      sb.append("push_c  ");
-      sb.append(String.format("0x%06x", codetoi(code, pc, 3)));
+    case IDEF_ME:
+      sb.append("def_me  ");
+      break;
+    case IPUSH_ME:
+      sb.append("push_me ");
+      break;
+    case IUDEF_ME:
+      sb.append("udef_me ");
       break;
 
     case IADD_Q1:
@@ -571,7 +600,7 @@ public class Processor implements ByteCode {
     if (elements == -1) {
       // create arg array
       MemoryList list = new MemoryList(memory, 
-          fp+FRAME_SIZE, fp+FRAME_SIZE+memory[fp+FRAME_2_ARGC].asInt());
+          fp+FRAME_SIZE+1, fp+FRAME_SIZE+1+memory[fp+FRAME_3_ARGC].asInt());
       push(list);
     } else {
       List<M> list = new ArrayList<M>();
@@ -1081,9 +1110,20 @@ public class Processor implements ByteCode {
     push(nilM);
   }
 
-  void push_c() {
-    push(codetoi(code, pc, 3));
-    pc += 3;
+  void def_me() {
+    me_banked = peekStack(0).i;
+  }
+
+  void push_me() {
+    if (me == -1) {
+      push(nilM);
+    } else {
+      push(memory[me]);
+    }
+  }
+
+  void udef_me() {
+    me_banked = -1;
   }
 
   void add_q(int x) {
@@ -1304,30 +1344,34 @@ public class Processor implements ByteCode {
     if (addr.type != TINT && addr.type != TCODE) {
       throw new ProcessorError("calling bad type " + TNAME[addr.type]);
     }
+    push(me);
     push(pc);
     push(fp);
-    int args = peek(sp+FRAME_2_ARGC).i;
+    int args = peek(sp+FRAME_3_ARGC).i;
     fp = sp;
     pc = a;
+    me = me_banked;
     if ((pc & 0xff0000) == 0xff0000) {
       ExtCall ec = extLinks.get(pc);
       if (ec == null) throw new ProcessorError(String.format("bad external call 0x%06x", pc));
-      M ret = ec.exe(memory, getArgs(fp, args)); 
+      M ret = ec.exe(this, getArgs(fp, args)); 
       push(ret == null ? nilM : ret);
       retv();
     }
   }
   
   void call_im() {
+    push(me);
     push(pc+3);
     push(fp);
-    int args = peek(sp+FRAME_2_ARGC).i;
+    int args = peek(sp+FRAME_3_ARGC).i;
     fp = sp;
     pc = codetos(code, pc, 3);
+    me = me_banked;
     if ((pc & 0xff0000) == 0xff0000) {
       ExtCall ec = extLinks.get(pc);
       if (ec == null) throw new ProcessorError(String.format("bad external call 0x%06x", pc));
-      M ret = ec.exe(memory, getArgs(fp, args)); 
+      M ret = ec.exe(this, getArgs(fp, args)); 
       push(ret == null ? nilM : ret);
       retv();
     }
@@ -1335,10 +1379,11 @@ public class Processor implements ByteCode {
   
   void ret() {
     sp = fp;
-    if (fp >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("abnormal exit");
+    if (fp < 0 || fp >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("abnormal exit");
     fp = pop().i;
     pc = pop().i;
-    if (pc >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("normal exit");
+    me = pop().i;
+    if (pc < 0 || pc >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("normal exit");
     int argc = pop().i;
     sp += argc;
   }
@@ -1346,10 +1391,11 @@ public class Processor implements ByteCode {
   void retv() {
     M t = pop();
     sp = fp;
-    if (fp >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("abnormal exit");
+    if (fp < 0 || fp >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("abnormal exit");
     fp = pop().i;
     pc = pop().i;
-    if (pc >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("normal exit");
+    me = pop().i;
+    if (pc < 0 || pc >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("normal exit");
     int argc = pop().i;
     sp += argc;
     push(t);
@@ -1508,8 +1554,14 @@ public class Processor implements ByteCode {
     case IPUSH_NIL:
       push_nil();
       break;
-    case IPUSH_C:
-      push_c();
+    case IDEF_ME:
+      def_me();
+      break;
+    case IPUSH_ME:
+      push_me();
+      break;
+    case IUDEF_ME:
+      udef_me();
       break;
     
     case IADD_Q1:
@@ -1710,7 +1762,7 @@ public class Processor implements ByteCode {
   M[] getArgs(int fp, int args) {
     M argv[] = new M[args];
     for (int i = 0; i < args; i++) {
-      argv[args - i - 1] = memory[fp+3+(args - i)];
+      argv[args - i - 1] = memory[fp+FRAME_SIZE+(args - i)];
     }
     return argv;
   }
@@ -1906,7 +1958,7 @@ public class Processor implements ByteCode {
   }
   
   public String getProcInfo() {
-    return String.format("pc:0x%08x  sp:0x%06x  fp:0x%06x  sr:", pc, sp, fp) + 
+    return String.format("pc:0x%08x  sp:0x%06x  fp:0x%06x  me:0x%06x(0x%06x) sr:", pc, sp, fp, me & 0xffffff, me_banked & 0xffffff) + 
         (zero ? "Z" : "z") + (minus ? "M" : "m");
   }
 

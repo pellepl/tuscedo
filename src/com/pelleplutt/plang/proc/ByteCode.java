@@ -39,7 +39,9 @@ public interface ByteCode {
   static final int IPUSH_2  = 0x19; // push 2                        push(2)
   static final int IPUSH_3  = 0x1a; // push 3                        push(3)
   static final int IPUSH_4  = 0x1b; // push 4                        push(4)
-  static final int IPUSH_C  = 0x1c; // push constant                 push(xxxxxx)
+  static final int IDEF_ME  = 0x1c; // set me reg                    $me = peek()
+  static final int IPUSH_ME = 0x1d; // push me reg                   push($me)
+  static final int IUDEF_ME = 0x1e; // undef me reg                  $me = -1
   
   static final int IPOP     = 0x20; 
   static final int IDUP     = 0x21; 
@@ -116,7 +118,7 @@ public interface ByteCode {
   static final int ISIZE[] = {
       //0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, //00
-        1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 4,UD,UD,UD, //10
+        1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1,UD, //10
         1, 1, 1, 2, 1, 4, 1, 4, 2, 2,UD,UD, 2, 2,UD,UD, //20
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, //30
         1, 1, 1, 1,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //40
@@ -158,14 +160,16 @@ public interface ByteCode {
    * ARG1
    * ARG0
    * ARGC
+   * ME
    * PC
    * FP
    */
   
-  static final int FRAME_SIZE = 3+1;
   static final int FRAME_0_FP = 1;
   static final int FRAME_1_PC = 2;
-  static final int FRAME_2_ARGC = 3;
+  static final int FRAME_2_ME = 3;
+  static final int FRAME_3_ARGC = 4;
+  static final int FRAME_SIZE = 4;
   
   /*
   

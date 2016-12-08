@@ -94,6 +94,7 @@ public class AST implements Lexer.Emitter {
   final static int OP_ARGC         = __id++;
   final static int OP_ARGV         = __id++;
   final static int OP_ARG          = __id++;
+  final static int OP_ME           = __id++;
   
   // non lexeme tokens
   final static int _OP_FINAL       = __id++;
@@ -188,6 +189,7 @@ public class AST implements Lexer.Emitter {
       new Op("$argc", OP_ARGC),
       new Op("$argv", OP_ARGV),
       new Op("$*%", OP_ARG),
+      new Op("me", OP_ME),
       
       new Op("<@>", _OP_FINAL),
       
@@ -294,7 +296,7 @@ public class AST implements Lexer.Emitter {
       } catch (Throwable t) {t.printStackTrace();}
     } 
     
-    else if (tokix == OP_SYMBOL || tokix == OP_ARGC || tokix == OP_ARGV || tokix == OP_ARG) {
+    else if (tokix == OP_SYMBOL || tokix == OP_ARGC || tokix == OP_ARGV || tokix == OP_ARG || tokix == OP_ME) {
       onSymbol(new String(symdata, 0, len));
     }
     

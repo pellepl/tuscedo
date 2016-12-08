@@ -33,7 +33,7 @@ public class Compiler {
       StructAnalysis.analyse(e);
       
       System.out.println("* intermediate codegen");
-      //CodeGenFront.dbg = true;
+      CodeGenFront.dbg = true;
       ir = CodeGenFront.genIR(e, ir);
   
       System.out.println("* backend codegen");
@@ -56,29 +56,29 @@ public class Compiler {
   public static void main(String[] args) {
     Map<String, ExtCall> extDefs = new HashMap<String, ExtCall>();
     extDefs.put("println", new ExtCall() {
-      public Processor.M exe(Processor.M[] memory, Processor.M[] args) {
+      public Processor.M exe(Processor p, Processor.M[] args) {
         System.out.println(args[0].asString());
         return null;
       }
     });
     extDefs.put("print", new ExtCall() {
-      public Processor.M exe(Processor.M[] memory, Processor.M[] args) {
+      public Processor.M exe(Processor p, Processor.M[] args) {
         System.out.print(args[0].asString());
         return null;
       }
     });
     extDefs.put("cos", new ExtCall() {
-      public Processor.M exe(Processor.M[] memory, Processor.M[] args) {
+      public Processor.M exe(Processor p, Processor.M[] args) {
         return new Processor.M((float)Math.cos(args[0].f));
       }
     });
     extDefs.put("halt", new ExtCall() {
-      public Processor.M exe(Processor.M[] memory, Processor.M[] args) {
+      public Processor.M exe(Processor p, Processor.M[] args) {
         throw new ProcessorError("halt");
       }
     });
     extDefs.put("argcheckext", new ExtCall() {
-      public Processor.M exe(Processor.M[] memory, Processor.M[] args) {
+      public Processor.M exe(Processor p, Processor.M[] args) {
         System.out.println("1:" + args[0].asString());
         System.out.println("2:" + args[1].asString());
         System.out.println("3:" + args[2].asString());
@@ -394,22 +394,26 @@ public class Compiler {
   " return crc ^ ~0;\n" +
   "}";
         
-//    src = 
-//        "module mod;\n" +
-//        "WTF.exe();\n"+
-//        "WTF.init(100);\n" +        
-//        "";
-//    
-//    othersrc = 
-//        "module mod;\n" +
-//        "println('skit:' + WTF);\n" + // TODO should not work
-//        "hello = {println('hello');};\n" +
-//        "WTF = ['init':{ for(x in 0#10) {println($0+x);} }, 'exe':hello, 'nbr':123];n" +
-//        "";
-//    siblingsrc = 
-//        "";
-//    crcsrc = 
-//        "";
+    src = 
+        "module mod;\n" +
+        "WTF.exe();\n"+
+        "WTF.init(100);\n" +   
+        "b = [[{return 1234;}]];\n" +
+        "println(b['c']['d']());\n" +
+        "println(b.c.d());\n" +
+        "a = ['age':12, 'older':{me.age++; println('Im now ',me.age,'years');}];" +
+        "";
+    
+    othersrc = 
+        "module mod;\n" +
+        "println('skit:' + WTF);\n" + // TODO should not work
+        "hello = {println('hello');};\n" +
+        "WTF = ['init':{ for(x in 0#10) {println($0+x);} }, 'exe':hello, 'nbr':123];n" +
+        "";
+    siblingsrc = 
+        "";
+    crcsrc = 
+        "";
 
     Executable e = null;
     try {

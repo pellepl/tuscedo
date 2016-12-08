@@ -5,6 +5,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import com.pelleplutt.plang.proc.ExtCall;
 import com.pelleplutt.plang.proc.Processor;
@@ -17,7 +20,7 @@ public class CLI {
   
   void run() throws IOException {
     extDefs.put("println", new ExtCall() {
-      public Processor.M exe(Processor.M[] memory, Processor.M[] args) {
+      public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           System.out.println();
         } else {
@@ -30,7 +33,7 @@ public class CLI {
       }
     });
     extDefs.put("print", new ExtCall() {
-      public Processor.M exe(Processor.M[] memory, Processor.M[] args) {
+      public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
         } else {
           for (int i = 0; i < args.length; i++) {
@@ -41,8 +44,18 @@ public class CLI {
       }
     });
     extDefs.put("halt", new ExtCall() {
-      public Processor.M exe(Processor.M[] memory, Processor.M[] args) {
+      public Processor.M exe(Processor p, Processor.M[] args) {
         throw new ProcessorError("halt");
+      }
+    });
+    extDefs.put("__const", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        SortedSet<Integer> asort = new TreeSet<Integer>();
+        asort.addAll(p.getExecutable().getConstants().keySet());
+        for (int addr : asort) {
+          System.out.println(String.format("  0x%06x  %s", addr, p.getExecutable().getConstants().get(addr).toString()));
+        }
+        return null;
       }
     });
 
@@ -52,11 +65,20 @@ public class CLI {
     BufferedReader c = new BufferedReader(new InputStreamReader(System.in));
     String line;
     Executable e;
+    StringBuilder input = new StringBuilder();
     while ((line = c.readLine()) != null) {
+      if (line.endsWith("\\")) {
+        input.append(line.substring(0, line.length()-1) + "\n");
+        continue;
+      } else {
+        input.append(line + "\n");
+      }
+      String src = input.toString();
+      input = new StringBuilder();
       try {
-        e = compiler.compileIncrementally(line);
+        e = compiler.compileIncrementally(src);
       } catch (CompilerError ce) {
-        String s = line;
+        String s = src;
         int strstart = ce.getStringStart();
         int strend = ce.getStringEnd();
         if (strstart > 0) {

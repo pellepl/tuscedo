@@ -44,9 +44,11 @@ import com.pelleplutt.plang.TAC.TACAssign;
 import com.pelleplutt.plang.TAC.TACBkpt;
 import com.pelleplutt.plang.TAC.TACCall;
 import com.pelleplutt.plang.TAC.TACCode;
+import com.pelleplutt.plang.TAC.TACDefineMe;
 import com.pelleplutt.plang.TAC.TACFloat;
 import com.pelleplutt.plang.TAC.TACFree;
 import com.pelleplutt.plang.TAC.TACFuncArg;
+import com.pelleplutt.plang.TAC.TACGetMe;
 import com.pelleplutt.plang.TAC.TACGoto;
 import com.pelleplutt.plang.TAC.TACGotoCond;
 import com.pelleplutt.plang.TAC.TACInt;
@@ -62,6 +64,7 @@ import com.pelleplutt.plang.TAC.TACSetDeref;
 import com.pelleplutt.plang.TAC.TACSetRead;
 import com.pelleplutt.plang.TAC.TACString;
 import com.pelleplutt.plang.TAC.TACUnaryOp;
+import com.pelleplutt.plang.TAC.TACUndefineMe;
 import com.pelleplutt.plang.TAC.TACUnresolved;
 import com.pelleplutt.plang.TAC.TACVar;
 import com.pelleplutt.plang.proc.ByteCode;
@@ -194,7 +197,7 @@ public class CodeGenBack implements ByteCode {
       if (!all.args.isEmpty()) {
         int argix = 0;
         for (String sym : all.args) {
-          frag.locals.put(new TACVar(tac.getNode(), sym, all.module, null, all.scope), -argix-FRAME_SIZE); // -4 for pushed frame (args, pc, fp)
+          frag.locals.put(new TACVar(tac.getNode(), sym, all.module, null, all.scope), -argix-FRAME_SIZE-1);
           argix++;
         }
       }
@@ -281,7 +284,7 @@ public class CodeGenBack implements ByteCode {
     }
     else if (tac instanceof TACCall) {
       TACCall call = (TACCall)tac;
-      if (!call.callByName) {
+      if (!call.funcNameDefined) {
         // func address is pushed by previous operation
         // push nbr of args
         pushNumber(frag, call.args, "argc, replaced by retval");
@@ -291,7 +294,7 @@ public class CodeGenBack implements ByteCode {
             - 1 - call.args  // return, pop args and argc
             + 1;             // retval
         addCode(frag, stackInfo() + "<_stack_addr_, " + call.args + " args>", ICALL);
-      } else if (!call.link) {
+      } else if (call.funcAddrInVar) {
         // func is a variable func pointer, no need for linking
         // push nbr of args
         pushNumber(frag, call.args, "argc, replaced by retval");
@@ -415,6 +418,16 @@ public class CodeGenBack implements ByteCode {
     }
     else if (tac instanceof TACArgNbr) {
       pushValue(tac, frag);
+    }
+    else if (tac instanceof TACDefineMe) {
+      addCode(frag, stackInfo() + "define me (banked)", IDEF_ME);
+    }
+    else if (tac instanceof TACUndefineMe) {
+      addCode(frag, stackInfo() + "undefine me (banked)", IUDEF_ME);
+    }
+    else if (tac instanceof TACGetMe) {
+      sp++;
+      addCode(frag, stackInfo() + "get me", IPUSH_ME);
     }
 
     else {
@@ -690,13 +703,13 @@ public class CodeGenBack implements ByteCode {
     }
     else if (a instanceof TACArgc) {
       sp++;
-      addCode(frag, stackInfo() + a, ILOAD_FP, -FRAME_2_ARGC);
+      addCode(frag, stackInfo() + a, ILOAD_FP, -FRAME_3_ARGC);
     }
     else if (a instanceof TACArgNbr) {
       int argnbr = ((TACArgNbr)a).arg;
       pushNumber(frag, argnbr, "argnbr " + argnbr);
       sp++;
-      addCode(frag, stackInfo() + "argc", ILOAD_FP, -FRAME_2_ARGC);
+      addCode(frag, stackInfo() + "argc", ILOAD_FP, -FRAME_3_ARGC);
       sp -= 2;
       addCode(frag, stackInfo() + argnbr + " >= argc", ICMP);
       addCode(frag, stackInfo() + "ok", IBRA_LT, 0,0,4+1+4);
@@ -705,7 +718,7 @@ public class CodeGenBack implements ByteCode {
       sp--;
       addCode(frag, stackInfo(), IBRA, 0,0,4+2);
       sp++;
-      addCode(frag, stackInfo() + "get arg " + argnbr, ILOAD_FP, -FRAME_SIZE -argnbr);
+      addCode(frag, stackInfo() + "get arg " + argnbr, ILOAD_FP, -FRAME_SIZE - 1 - argnbr);
     }
     else if (a instanceof TACArgv) {
       pushNumber(frag, -1, "create argv array");
