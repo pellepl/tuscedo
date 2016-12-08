@@ -64,13 +64,14 @@ public class StructAnalysis {
     } 
     else if (e.op == OP_BLOK) {
       ASTNodeBlok eblok = (ASTNodeBlok)e;
-      //if (dbg) System.out.println("ENTER eblk " + e);
       Scope newScope = new Scope(eblok);
       String blockId = getBlockId();
       if (!scopeStack.isEmpty()) {
         eblok.parentBlock = scopeStack.peek().block;
         // System.out.println("     PRENT " + scopeStack.peek() + " block:" + scopeStack.peek().block);
       }
+      if (dbg) System.out.println("ENTER eblk " + e);
+      if (dbg) System.out.println("      prnt " + eblok.parentBlock);
       scopeStack.push(newScope);
       if (eblok.operands != null) {
         for (ASTNode e2 : eblok.operands) {
@@ -79,7 +80,7 @@ public class StructAnalysis {
       }
       Scope scope = scopeStack.pop();
       eblok.setAnnotation(scope.symVars, scopeStack.size(), blockId, module, ASTNodeBlok.TYPE_MAIN);
-      //if (dbg) System.out.println("LEAVE eblk " + eblok + " got symbols " + scope.symList);
+      if (dbg) System.out.println("LEAVE eblk " + eblok + " got symbols " + scope.symVars);
     }
     else if (e.op == OP_SYMBOL && !operator) {
       if (((ASTNodeSymbol)e).symbol.charAt(0) != '$') {
@@ -270,21 +271,22 @@ public class StructAnalysis {
     String blockId = getBlockId() + "A";
     ScopeStack anonScopeStack = new ScopeStack();
     anonScopeStack.push(globalScope);
-    Scope anonScope = new Scope(globalScope.block);
+    Scope anonScope = new Scope(be);
     anonScopeStack.push(anonScope);
-    if (dbg) System.out.println(">>> branch off anon");
+    if (dbg) System.out.println("ENTER anon eblk " + be);
+    if (dbg) System.out.println("           prnt " + parent);
     if (be.operands != null) {
       for (ASTNode e2 : be.operands) {
         analyseRecurse(e2, anonScopeStack, parent, false, false);
       }
     }
     be.setAnnotation(anonScope.symVars, anonScopeStack.size(), blockId, module, ASTNodeBlok.TYPE_ANON);
-    if (dbg) System.out.println("<<< branch back anon");
+    if (dbg) System.out.println("LEAVE anon eblk " + be + " got symbols " + anonScope.symVars);
   }
   
   public static void analyse(ASTNodeBlok e) {
     StructAnalysis cg = new StructAnalysis();
-    System.out.println("  * analyse variables");
+    if (dbg) System.out.println("  * analyse variables");
     cg.structAnalyse(e);
   }
   
@@ -320,10 +322,12 @@ public class StructAnalysis {
   // define variable for scope, if same name already reachable this will shadow ancestor
   void defVar(ScopeStack scopeStack, ASTNodeSymbol esym, ASTNode definer) {
     boolean shadow = isVarDefAbove(scopeStack, esym);
-    scopeStack.peek().symVars.put(esym, esym.symNbr);
-    if (dbg) System.out.println("  + '" + esym.symbol + "' " + (scopeStack.size() == 1 ? "GLOBAL" : "LOCAL") + (shadow ? " SHADOW" : "")+
-        " in " + definer);
-    esym.declare = true;
+    if (!isVarDef(scopeStack, esym)) {
+      scopeStack.peek().symVars.put(esym, esym.symNbr);
+      if (dbg) System.out.println("  + '" + esym.symbol + "' " + (scopeStack.size() == 1 ? "GLOBAL" : "LOCAL") + (shadow ? " SHADOW" : "")+
+          " in " + definer);
+      esym.declare = true;
+    }
   }
   
   // see if a variable is reachable from this scope and ancestors

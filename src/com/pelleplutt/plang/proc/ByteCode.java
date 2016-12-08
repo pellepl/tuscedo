@@ -90,8 +90,8 @@ public interface ByteCode {
   static final int IRNG2    = 0x5a; // range(from,to)                push(range(pop(to), pop(from));
   static final int IRNG3    = 0x5b; // range(from,step,to)           push(range(pop(to), pop(step), pop(from));
 
-  static final int ICALL    = 0xe0; // call function                 a=pop(); push($pc+3); push($fp); $fp=sp; $pc=a
-  static final int ICALL_IM = 0xe1; // call function immediate       push($pc+3); push($fp); $fp=sp; $pc=xxxxxx
+  static final int ICALL    = 0xe0; // call function                 (argc on stack) a=pop(); push($pc+3); push($fp); $fp=sp; $pc=a
+  static final int ICALL_IM = 0xe1; // call function immediate       (argc on stack) push($pc+3); push($fp); $fp=sp; $pc=xxxxxx
   static final int IRET     = 0xe8; // return                        $sp=$fp; $fp=pop(); $pc=pop(); argc=pop(); $sp-=argc;
   static final int IRETV    = 0xe9; // return val                    t=pop(); $sp=$fp; $fp=pop(); $pc=pop(); argc=pop(); $sp-=argc; push(t);
   
@@ -131,8 +131,41 @@ public interface ByteCode {
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //d0
         1, 4,UD,UD,UD,UD,UD,UD, 1,UD,UD,UD,UD,UD,UD,UD, //e0
         4, 4, 4, 4, 4, 4, 4,UD, 4, 4, 4, 4, 4, 4, 4, 0, //f0
- };
+  };
   
+
+  
+  /**
+   * Stack when call by address
+   * ARG..
+   * ARG1
+   * ARG0
+   * ARGC
+   * ---> call
+   */
+  /**
+   * Stack when call by stack address
+   * ARG..
+   * ARG1
+   * ARG0
+   * ARGC
+   * FUNCADDR
+   * ---> call
+   */
+  /**
+   * Stack in call
+   * ARG...
+   * ARG1
+   * ARG0
+   * ARGC
+   * PC
+   * FP
+   */
+  
+  static final int FRAME_SIZE = 3+1;
+  static final int FRAME_0_FP = 1;
+  static final int FRAME_1_PC = 2;
+  static final int FRAME_2_ARGC = 3;
   
   /*
   

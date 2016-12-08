@@ -72,11 +72,14 @@ public class CodeGenBack implements ByteCode {
   int sp;
   int fp;
   
-  public static void compile(List<Module> modules) {
+  public static void compile(IntermediateRepresentation ir) {
+    List<Module> modules = ir.getModules();
     CodeGenBack cg = new CodeGenBack();
     for (Module m : modules) {
-      System.out.println("  * compile module " + m.id);
+      if (m.compiled) continue;
+      if (dbg) System.out.println("  * compile module " + m.id);
       cg.compileMod(m);
+      m.compiled = true;
     }
   }
   
@@ -84,7 +87,7 @@ public class CodeGenBack implements ByteCode {
     for (ModuleFragment frag : m.frags) {
       sp = 0;
       fp = 0;
-      System.out.println("  * compile frgmnt " + m.id + frag.fragname);
+      if (dbg) System.out.println("  * compile frgmnt " + m.id + frag.fragname);
       compileFrag(frag);
       byte mc[] = frag.getMachineCode();
       
@@ -191,7 +194,7 @@ public class CodeGenBack implements ByteCode {
       if (!all.args.isEmpty()) {
         int argix = 0;
         for (String sym : all.args) {
-          frag.locals.put(new TACVar(tac.getNode(), sym, all.module, all.scope), -argix-4); // -4 for pushed frame (args, pc, fp)
+          frag.locals.put(new TACVar(tac.getNode(), sym, all.module, null, all.scope), -argix-FRAME_SIZE); // -4 for pushed frame (args, pc, fp)
           argix++;
         }
       }
@@ -199,10 +202,10 @@ public class CodeGenBack implements ByteCode {
       if (all.variablesOnStack() > 0) {
         int fpoffset = sp - fp;
         for (String sym : all.vars) {
-          frag.locals.put(new TACVar(tac.getNode(), sym, all.module, all.scope), fpoffset++);
+          frag.locals.put(new TACVar(tac.getNode(), sym, all.module, null, all.scope), fpoffset++);
         }
         for (String sym : all.tvars) {
-          frag.locals.put(new TACVar(tac.getNode(), sym, all.module, all.scope + all.tScope), fpoffset++);
+          frag.locals.put(new TACVar(tac.getNode(), sym, all.module, null, all.scope + all.tScope), fpoffset++);
         }
         sp += all.variablesOnStack();
         addCode(frag, stackInfo() + all.toString(), ISP_INCR, all.variablesOnStack()-1);
@@ -213,10 +216,10 @@ public class CodeGenBack implements ByteCode {
       TACFree fre = (TACFree)tac;
       if (fre.variablesOnStack() > 0) {
         for (String esym : fre.vars) {
-          frag.locals.remove(new TACVar(tac.getNode(), esym, fre.module, fre.scope));
+          frag.locals.remove(new TACVar(tac.getNode(), esym, fre.module, null, fre.scope));
         }
         for (String esym : fre.tvars) {
-          frag.locals.remove(new TACVar(tac.getNode(), esym, fre.module, fre.scope + fre.tScope));
+          frag.locals.remove(new TACVar(tac.getNode(), esym, fre.module, null, fre.scope + fre.tScope));
         }
         sp -= fre.variablesOnStack();
         addCode(frag, stackInfo() + tac.toString(), ISP_DECR, fre.variablesOnStack()-1);
@@ -687,13 +690,13 @@ public class CodeGenBack implements ByteCode {
     }
     else if (a instanceof TACArgc) {
       sp++;
-      addCode(frag, stackInfo() + a, ILOAD_FP, -3);
+      addCode(frag, stackInfo() + a, ILOAD_FP, -FRAME_2_ARGC);
     }
     else if (a instanceof TACArgNbr) {
       int argnbr = ((TACArgNbr)a).arg;
       pushNumber(frag, argnbr, "argnbr " + argnbr);
       sp++;
-      addCode(frag, stackInfo() + "argc", ILOAD_FP, -3);
+      addCode(frag, stackInfo() + "argc", ILOAD_FP, -FRAME_2_ARGC);
       sp -= 2;
       addCode(frag, stackInfo() + argnbr + " >= argc", ICMP);
       addCode(frag, stackInfo() + "ok", IBRA_LT, 0,0,4+1+4);
@@ -702,7 +705,11 @@ public class CodeGenBack implements ByteCode {
       sp--;
       addCode(frag, stackInfo(), IBRA, 0,0,4+2);
       sp++;
-      addCode(frag, stackInfo() + "get arg " + argnbr, ILOAD_FP, -4 -argnbr);
+      addCode(frag, stackInfo() + "get arg " + argnbr, ILOAD_FP, -FRAME_SIZE -argnbr);
+    }
+    else if (a instanceof TACArgv) {
+      pushNumber(frag, -1, "create argv array");
+      addCode(frag, stackInfo(), ISET_CRE);
     }
 //    else if (a instanceof TACOp) {
 //      // supposed to be on stack TODO

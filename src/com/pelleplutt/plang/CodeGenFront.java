@@ -95,10 +95,17 @@ public class CodeGenFront {
   static int anonIx = 0;
   List<FrontFragment> ffrags = new ArrayList<FrontFragment>();
   FrontFragment ffrag;
+  IntermediateRepresentation irep;
   
-  public static List<Module> genIR(ASTNodeBlok e) {
+  public static IntermediateRepresentation genIR(ASTNodeBlok e, IntermediateRepresentation ir) {
+    if (ir == null) {
+      ir = new IntermediateRepresentation();
+    }
     CodeGenFront cg = new CodeGenFront();
-    return cg.doIntermediateCode(e);
+    cg.irep = ir;
+    List<Module> mods = cg.doIntermediateCode(e);
+    ir.getModules().addAll(mods);
+    return ir;
   }
   
   public CodeGenFront() {
@@ -163,6 +170,7 @@ public class CodeGenFront {
     }
   }
   
+  // dot -Tps gtest.gv -o gtest.ps && okular gtest.ps 
   void printDot(PrintStream out) {
     out.println("digraph G {");
     int ffragIx = 0;
@@ -363,26 +371,26 @@ public class CodeGenFront {
         ffrag = new FrontFragment(eblk.module == null ? ".MAIN" : eblk.module, ".main");
         ffrag.type = ASTNode.ASTNodeBlok.TYPE_MAIN;
         ffrags.add(ffrag);
-//        if (eblk.symList != null) {
-//          // collect the global variables
-//          for (ASTNode esym : eblk.symList) {
-//            ASTNodeSymbol sym = (ASTNodeSymbol)esym;
-//            ffrag.gvars.add(new TACVar(sym, sym.symbol, eblk.getModule(), eblk.getScopeId()));
-//          }
-//        }
       }
-      boolean doStackAllocation = 
-                                  (eblk.gotUnhandledVariables() && 
-                                   eblk.getScopeLevel() > 0); // no variable stack allocation for top scopes, these are global vars
+      
+      if (eblk.getScopeLevel() == 0) {
+        irep.addGlobalVariables(eblk.module, eblk.symList.keySet());
+      }
+      
+      boolean doStackAllocation = (eblk.gotUnhandledVariables() &&
+                                   // no variable stack allocation for top scopes, these are global vars
+                                   eblk.getScopeLevel() > 0);
       if (doStackAllocation) {
         eblk.setVariablesHandled();
-        add(new TACAlloc(eblk, eblk.getModule(), eblk.getScopeId(), eblk.type == ASTNodeBlok.TYPE_FUNC));
+        TACAlloc talloc = new TACAlloc(eblk, eblk.getModule(), eblk.getScopeId(), eblk.type == ASTNodeBlok.TYPE_FUNC);
+        add(talloc);
       }
       for (ASTNode e2 : e.operands) {
         genIR(e2, (ASTNodeBlok)e);
       }
-      if (doStackAllocation && eblk.type == ASTNodeBlok.TYPE_MAIN) {
-        add(new TACFree(eblk, eblk.getModule(), eblk.getScopeId()));
+      if (doStackAllocation/* && eblk.type == ASTNodeBlok.TYPE_MAIN*/) { // TODO : why this check on MAIN?
+        TACFree tfree = new TACFree(eblk, eblk.getModule(), eblk.getScopeId());
+        add(tfree);
       }
       
       if (eblk.type == ASTNodeBlok.TYPE_ANON || eblk.type == ASTNodeBlok.TYPE_FUNC) {
@@ -414,7 +422,7 @@ public class CodeGenFront {
       }
       ASTNodeBlok declBlok = getScopeIfDef(parentEblk, (ASTNodeSymbol)e);
       if (declBlok != null) {
-        return new TACVar(e, ((ASTNodeSymbol)e).symbol, declBlok.getModule(), declBlok.getScopeId());
+        return new TACVar(e, ((ASTNodeSymbol)e).symbol, declBlok.getModule(), null, declBlok.getScopeId());
       } else {
         return new TACUnresolved((ASTNodeSymbol)e, parentEblk);
       }
@@ -571,7 +579,6 @@ public class CodeGenFront {
           ((ASTNodeBlok)eloopCode).setVariablesHandled();
         }
         TACAlloc talloc = new TACAlloc(eloopCode, innerScope, parentEblk);
-        
         add(talloc);
         String label = genLabel();
 
@@ -579,11 +586,12 @@ public class CodeGenFront {
         TACLabel lExit = new TACLabel(e, label+"_fexit");
         TACLabel lCont = new TACLabel(e, label+"_fcont");
 
-        TACVar _set = new TACVar(parentEblk, TACAlloc.varSet, talloc.module, talloc.scope + innerScope); 
-        TACVar _iter = new TACVar(parentEblk, TACAlloc.varIterator, talloc.module, talloc.scope + innerScope); 
+        TACVar _set = new TACVar(parentEblk, TACAlloc.varSet, talloc.module, null, talloc.scope + innerScope); 
+        TACVar _iter = new TACVar(parentEblk, TACAlloc.varIterator, talloc.module, null, talloc.scope + innerScope); 
         
-        TACVar assignee = new TACVar(e.operands.get(0), ((ASTNodeSymbol)e.operands.get(0)).symbol, 
-            parentEblk.getModule(), parentEblk.getScopeId());
+        TAC assignee = genIRAssignment(e.operands.get(0), parentEblk);
+            //new TACVar(e.operands.get(0), ((ASTNodeSymbol)e.operands.get(0)).symbol, 
+            //parentEblk.getModule(), parentEblk.getScopeId());
         
         // inital .set = y, .iter = 0
         // .set = y 
@@ -606,7 +614,7 @@ public class CodeGenFront {
         TACFuncArg _set_arg = new TACFuncArg(e, _set);
         add(_set_arg);
         setReferenced(_set_arg);
-        TAC _len_set = new TACCall(e, "len", 1, talloc.module);
+        TAC _len_set = new TACCall(e, "len", 1, talloc.module, null);
         add(_len_set);
         setReferenced(_len_set);
         TAC cond = new TACOp(e, AST.OP_LT, _iter, _len_set);
@@ -648,7 +656,9 @@ public class CodeGenFront {
         newBlock();
         add(lExit);
         
-        add(new TACFree(talloc));
+        TACFree tfree = new TACFree(talloc);
+        add(tfree);
+
       }
       return null;
     }
@@ -745,14 +755,14 @@ public class CodeGenFront {
               tmap = deref;
             }
             // ...then do the call
-            call = new TACCall((ASTNodeFuncCall)e, args.length, parentEblk.module, null);
+            call = new TACCall((ASTNodeFuncCall)e, args.length, parentEblk.module, null, null);
             call.callByName = false;
             add(call);
           } else {
             // no reachable variable for first entry in dot path, this needs to be linked
             if (ce.dots.size() == 2) {
               // only a.b, so presume this is <module>.<function>
-              call = new TACCall((ASTNodeFuncCall)e, args.length, ce.dots.get(0).symbol, null);
+              call = new TACCall((ASTNodeFuncCall)e, args.length, ce.dots.get(0).symbol, ce.dots.get(0).symbol, null);
               add(call);
               call.link = true;
             } else {
@@ -766,7 +776,7 @@ public class CodeGenFront {
                 add(deref);
                 tmap = deref;
               }
-              call = new TACCall((ASTNodeFuncCall)e, args.length, ce.dots.get(0).symbol, null);
+              call = new TACCall((ASTNodeFuncCall)e, args.length, ce.dots.get(0).symbol, ce.dots.get(0).symbol, null);
               add(call);
               call.link = true;
               // do not call by name but by stack top address as we've dereferenced
@@ -776,13 +786,13 @@ public class CodeGenFront {
           }
         } else {
           // call by symbol
-          ASTNodeBlok scopeBlock = getScopeIfDef(parentEblk, callSym);
+          ASTNodeBlok declBlok = getScopeIfDef(parentEblk, callSym);
           TACVar var = null;
-          if (scopeBlock != null) {
+          if (declBlok != null) {
             // found a variable with the call name, so presume we're calling a function variable
-            var = new TACVar(e, ((ASTNodeFuncCall)e).name.symbol, scopeBlock.getModule(), scopeBlock.getScopeId());
+            var = new TACVar(e, ((ASTNodeFuncCall)e).name.symbol, declBlok.getModule(), null, declBlok.getScopeId());
           }
-          call = new TACCall((ASTNodeFuncCall)e, args.length, parentEblk.module, var);
+          call = new TACCall((ASTNodeFuncCall)e, args.length, parentEblk.module, null, var);
           if (var == null) call.link = true;
           add(call);
         }
@@ -790,7 +800,7 @@ public class CodeGenFront {
         // call by op
         TAC addrGen = genIR(callNode.callAddrOp, parentEblk);
         setReferenced(addrGen);
-        call = new TACCall((ASTNodeFuncCall)e, args.length, parentEblk.module, null);
+        call = new TACCall((ASTNodeFuncCall)e, args.length, parentEblk.module, null, null);
         add(call);
       }
       return call;
@@ -986,18 +996,32 @@ public class CodeGenFront {
   }
   
   ASTNodeBlok getScopeIfDef(ASTNodeBlok eblk, ASTNodeSymbol sym) {
+    int ix = 0;
     int whenceSymNbr = sym.symNbr;
-    while (eblk != null) {
-//      System.out.println("looking for " + sym + " in " + eblk.getVariables());
-//      System.out.println("  declared here  " + eblk.declaresVariableInThisScope(sym));
-//      System.out.println("  is declared b4 " +  eblk.isSymbolDeclared(sym, whenceSymNbr));
-      if ((eblk.getArguments() != null && eblk.getArguments().contains(sym)) ||
-          (eblk.declaresVariableInThisScope(sym) && eblk.isSymbolDeclared(sym, whenceSymNbr))) {
-        return eblk;
+    ASTNodeBlok veblk = eblk;
+    while (veblk != null) {
+      if (dbg) System.out.println((ix++) + "looking for " + sym + " in " + veblk.getVariables() + ": " + veblk);
+      if (dbg) System.out.println("  declared here  " + veblk.declaresVariableInThisScope(sym));
+      if (dbg) System.out.println("  is declared b4 " +  veblk.isSymbolDeclared(sym, whenceSymNbr));
+      if ((veblk.getArguments() != null && veblk.getArguments().contains(sym)) ||
+          (veblk.declaresVariableInThisScope(sym) && veblk.isSymbolDeclared(sym, whenceSymNbr))) {
+        if (dbg) System.out.println("  found");
+        return veblk;
       }
-      whenceSymNbr = eblk.symNbr;
-      eblk = eblk.parentBlock;
+      whenceSymNbr = veblk.symNbr;
+      veblk = veblk.parentBlock;
     }
+    List<ASTNodeSymbol> modGlobs;
+    if (irep != null && (modGlobs = irep.getGlobalVariables(eblk.getModule())) != null) {
+      if (modGlobs.contains(sym)) {
+        if (dbg) System.out.println("  is declared in previous source");
+        ASTNodeBlok declBlok = new ASTNodeBlok(); 
+        declBlok.module = eblk.getModule();
+        declBlok.id = ".0"; // global scope
+        return declBlok;
+      }
+    }
+    if (dbg) System.out.println("  NOT FOUND");
     return null;
   }
 

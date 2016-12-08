@@ -35,11 +35,11 @@ public class AST implements Lexer.Emitter {
   final static int OP_MODULE       = __id++;
   final static int OP_LABEL        = __id++;
   final static int OP_FUNCDEF      = __id++;
+  final static int OP_ELSE         = __id++;
+  final static int OP_IF           = __id++;
   final static int OP_WHILE        = __id++;
   final static int OP_IN           = __id++;
   final static int OP_FOR          = __id++;
-  final static int OP_ELSE         = __id++;
-  final static int OP_IF           = __id++;
   final static int OP_BREAK        = __id++;
   final static int OP_CONTINUE     = __id++;
   final static int OP_RETURN       = __id++;
@@ -129,11 +129,11 @@ public class AST implements Lexer.Emitter {
       new Op("module", OP_MODULE, 1),
       new Op(":", OP_LABEL, 1),
       new Op("func", OP_FUNCDEF, 1),
+      new Op("else", OP_ELSE, 1),
+      new Op("if", OP_IF, 2),
       new Op("while", OP_WHILE, 2),
       new Op("in", OP_IN, 1),
       new Op("for", OP_FOR, 4),
-      new Op("else", OP_ELSE, 1),
-      new Op("if", OP_IF, 2),
       new Op("break", OP_BREAK),
       new Op("continue", OP_CONTINUE),
       new Op("return", OP_RETURN, 1),
@@ -399,7 +399,11 @@ public class AST implements Lexer.Emitter {
   
   void onLabelOrTuple(int tokix) {
     if (prevTokix == OP_SYMBOL && (
-        prevTokix == prevPrevTokix || prevTokix == prevPrevTokix || prevTokix == prevPrevTokix || prevPrevTokix == -1)) {
+        prevTokix == OP_FINALIZER || 
+        prevPrevTokix == OP_FINALIZER || 
+        prevPrevTokix == OP_SEMI ||
+        prevPrevTokix == OP_BRACEO ||
+        prevPrevTokix == OP_BRACEC)) {
       // label
       // collapse all before label
       ASTNode a = exprs.pop();
@@ -718,7 +722,7 @@ public class AST implements Lexer.Emitter {
       }
       ASTNode result = new ASTNodeOp(operator.id, arguments.toArray(new ASTNode[arguments.size()]));
       if (result.op == OP_ELSE) {
-        // handle else speically, look for preceding if and enter the 
+        // handle else specially, look for preceding if and enter the 
         // else op as the if's third operand
         if (dbg) System.out.println("      epush " + result + " collapse, else");
         if (exprs.isEmpty() || exprs.peek().op != OP_IF) {
@@ -769,7 +773,8 @@ public class AST implements Lexer.Emitter {
   }
   
   public static boolean isArithmeticOperand(int op) {
-    return op == OP_SYMBOL || op == OP_DOT || isString(op) || isNumber(op) ||
+    return op == OP_SYMBOL || op == OP_ARG || op == OP_ARGC || op == OP_ARGV || op == OP_DOT || 
+        isString(op) || isNumber(op) ||
         op == OP_PARENC || op == OP_BRACKETC || op == OP_PLUS2 || op == OP_MINUS2;
   }
   

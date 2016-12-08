@@ -1,8 +1,6 @@
 package com.pelleplutt.plang;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
@@ -14,7 +12,7 @@ import com.pelleplutt.plang.proc.ProcessorError.ProcessorFinishedError;
 public class Compiler {
   static String src;
   public static Executable compile(Map<String, ExtCall> extDefs, int ramOffs, int constOffs, String ...sources) {
-    List<Module> allMods = new ArrayList<Module>();
+    IntermediateRepresentation ir = null;
     for (String src : sources) {
       Compiler.src = src;
       //System.out.println("* build tree");
@@ -35,35 +33,35 @@ public class Compiler {
       StructAnalysis.analyse(e);
       
       System.out.println("* intermediate codegen");
-      CodeGenFront.dbg = true;
-      List<Module> mods = CodeGenFront.genIR(e);
+      //CodeGenFront.dbg = true;
+      ir = CodeGenFront.genIR(e, ir);
   
       System.out.println("* backend codegen");
       //CodeGenBack.dbg = true;
-      CodeGenBack.compile(mods);
+      CodeGenBack.compile(ir);
       
-      allMods.addAll(mods);
+      ir.accumulateGlobals();
     }
     TAC.dbgResolveRefs = true;
 
     System.out.println("* link");
     Linker.dbg = true;
-    Executable exe = Linker.link(allMods, ramOffs, constOffs, extDefs, true);
+    Executable exe = Linker.link(ir, ramOffs, constOffs, extDefs, true);
     
-    System.out.println(".. all ok, " + exe.machineCode.length + " bytes of code");
+    System.out.println(".. all ok, " + exe.machineCode.length + " bytes of code, pc start @ 0x" + Integer.toHexString(exe.getPCStart()));
     
     return exe;
   }
   
   public static void main(String[] args) {
     Map<String, ExtCall> extDefs = new HashMap<String, ExtCall>();
-    extDefs.put("outln", new ExtCall() {
+    extDefs.put("println", new ExtCall() {
       public Processor.M exe(Processor.M[] memory, Processor.M[] args) {
         System.out.println(args[0].asString());
         return null;
       }
     });
-    extDefs.put("out", new ExtCall() {
+    extDefs.put("print", new ExtCall() {
       public Processor.M exe(Processor.M[] memory, Processor.M[] args) {
         System.out.print(args[0].asString());
         return null;
@@ -90,9 +88,9 @@ public class Compiler {
     
     String src = 
         "module mandel;\n" +
-        "outln('*************');\n" + 
-        "outln('program start');\n" + 
-        "outln('crc32:' + crc.crc32(0, 'abcd', 4));\n" + 
+        "println('*************');\n" + 
+        "println('program start');\n" + 
+        "println('crc32:' + crc.crc32(0, 'abcd', 4));\n" + 
         "mul = 1000;\n" +
         "step = 0.2;\n" +
 
@@ -123,126 +121,156 @@ public class Compiler {
         "  }\n" +
         "  output = output + '\n';\n" + 
         "}\n" +
-        "outln('cos(0.1):' + cos(0.1));\n" +
-        "out('mandel\n' + output);\n" +
-        "anon = {outln('calling anon');return 'hello anon ';};\n" +
+        "println('cos(0.1):' + cos(0.1));\n" +
+        "print('mandel\n' + output);\n" +
+        "anon = {println('calling anon');return 'hello anon ';};\n" +
         "mojja = fib;\n" +
-        "outln('fibo='+mojja(12));\n" +
-        "outln(mandel.anon + ':' + anon());\n" +
-        "outln('sisterglobal:' + otherglobal);\n" +
-        "outln('friendglobal:' + walnut.otherglobal);\n" +
+        "println('fibo='+mojja(12));\n" +
+        "println(mandel.anon + ':' + anon());\n" +
+        "println('sisterglobal:' + otherglobal);\n" +
+        "println('friendglobal:' + walnut.otherglobal);\n" +
         "sisfun = sisterfunc();\n" +
-        "outln('sisterfunc return value:'  + sisfun);\n" + 
-        "outln('calling it:' + sisfun());\n" +
+        "println('sisterfunc return value:'  + sisfun);\n" + 
+        "println('calling it:' + sisfun());\n" +
         "false = 0;\n" +
         "true = !false;\n" +
-        "outln('true: ' + true);\n" +
-        "outln('false:' + false);\n" +
+        "println('true: ' + true);\n" +
+        "println('false:' + false);\n" +
         "if (true) walnut.friendfunc();\n" +
         "if (!true) halt();\n" +
         "list = [1,2,3,4];\n" +
-        "outln(list[3]);\n" +
-        "outln('walnut.lfunc[0]():' + walnut.lfunc[0]());\n" + 
-        "outln('walnut.lfunc[1]():' + walnut.lfunc[1]());\n" + 
-        "outln('walnut.lfunc[2]():' + walnut.lfunc[2]());\n" +
+        "println(list[3]);\n" +
+        "println('walnut.lfunc[0]():' + walnut.lfunc[0]());\n" + 
+        "println('walnut.lfunc[1]():' + walnut.lfunc[1]());\n" + 
+        "println('walnut.lfunc[2]():' + walnut.lfunc[2]());\n" +
         "string = 'pelle';\n" +
-        "outln('pelle'[0]);\n" + 
-        "outln(string[1]);\n" + 
-        "outln(string[2]);\n" + 
-        "outln(string[3]);\n" + 
-        "outln(string[4]);\n" + 
-        "outln(string);\n" +
+        "println('pelle'[0]);\n" + 
+        "println(string[1]);\n" + 
+        "println(string[2]);\n" + 
+        "println(string[3]);\n" + 
+        "println(string[4]);\n" + 
+        "println(string);\n" +
         "string += 'rockar';\n" +
-        "outln(string);\n" +
+        "println(string);\n" +
         "string -= 'rockar';\n" +
-        "outln(string);\n" +
+        "println(string);\n" +
         "arr[];\n" +
-        "outln(arr);\n" +
+        "println(arr);\n" +
         "arr = arr + 'some end';\n" +
-        "outln(arr);\n" +
+        "println(arr);\n" +
         "arr = 'begin' + arr;\n" +
-        "outln(arr);\n" +
+        "println(arr);\n" +
         "arr += 'end';\n" +
-        "outln(arr);\n" +
+        "println(arr);\n" +
         "arr++;\n" +
-        "outln(arr);\n" +
+        "println(arr);\n" +
         "++arr;\n" +
-        "outln(arr);\n" +
-        "outln(len(arr));\n" +
+        "println(arr);\n" +
+        "println(len(arr));\n" +
         "arr[1] = 'middle';\n" +
         "arr[4] = arr[2];\n" +
         "arr[3] = 'pre' + str(arr[4]);\n" +
         "arr[2] = 'after middle';\n" +
-        "outln(arr);\n" +
+        "println(arr);\n" +
         "for (i = 0; i < len(arr); i++) {\n" +
-        "  outln(i + ': ' + arr[i]);\n" +
+        "  println(i + ': ' + arr[i]);\n" +
         "  arr[i] = i;\n" +
         "}\n" +
         "for (i = 0; i < len(arr); i++) {\n" +
-        "  outln(i + ': ' + arr[i]);\n" +
+        "  println(i + ': ' + arr[i]);\n" +
         "}\n" +
         "word = 'Are we not drawn onward, we few, drawn onward to new era?';\n" +
         "rev = '';\n" +
         "for (i = len(word) - 1; i >= 0; i--) {\n" +
         "  rev += word[i];\n" +
         "}\n" +
-        "outln(word + ' |fornext| ' + rev);\n" +
+        "println(word + ' |fornext| ' + rev);\n" +
         "rev = '';\n" +
         "for (c in word) {\n" +
         "  rev = c + rev;\n" +
         "}\n" +
-        "outln(word + ' |foreach| ' + rev);\n" +
-        "outln(word + ' | range | ' + word[len(word)-1 # 0);\n" +
+        "println(word + ' |foreach| ' + rev);\n" +
+        "println(word + ' | range | ' + word[len(word)-1 # 0]);\n" +
 
         
         "ident = 1;\n" +
         "multi = 5;\n" +
         "matrix = [[ident,ident+multi,ident*multi],[2*(ident),fib(12),2*(ident*multi)],[3*ident,3*(ident+multi),3*(ident*multi)]];\n" +
-        "outln(matrix);\n" +
+        "println(matrix);\n" +
         "matrix[1][1] = 5000;\n" +
-        "outln(matrix);\n" +
+        "println(matrix);\n" +
         "func getarr(l) { l2 = l; l2[2] = 9; return l2; };\n" +
         "modarr = getarr([5,4,3,2,1]);\n" +
-        "outln(modarr);\n" +
+        "println(modarr);\n" +
         "iniarr = [5,4,3,2,1];\n" +
-        "outln(getarr(iniarr)[0]);\n" +
-        "outln(getarr(iniarr)[2]);\n" +
-        "outln(getarr(iniarr)[4]);\n" +
+        "println(getarr(iniarr)[0]);\n" +
+        "println(getarr(iniarr)[2]);\n" +
+        "println(getarr(iniarr)[4]);\n" +
         "ix = 0;\n" +
-        "outln('iniarr[' + ix + ']:' + iniarr[ix]);\n" +
+        "println('iniarr[' + ix + ']:' + iniarr[ix]);\n" +
         "ix = 'a';\n" +
-        "outln('iniarr[' + ix + ']:' + iniarr[ix]);\n" +
-        "map = ['call':{outln('mapfunc called');}, 'data':123];\n" +
+        "println('iniarr[' + ix + ']:' + iniarr[ix]);\n" +
+        "map = ['call':{println('mapfunc called');}, 'data':123];\n" +
         "map.call();\n" +
-        "outln(walnut.ident);\n" +
+        "println(walnut.ident);\n" +
         "walnut.ident = 5;\n" +
-        "outln('in mandel : walnut.ident:' + walnut.ident);\n" +
-        "outln('in mandel : walnut.otherfunc()');\n" +
+        "println('in mandel : walnut.ident:' + walnut.ident);\n" +
+        "println('in mandel : walnut.otherfunc()');\n" +
         "walnut.otherfunc();\n" +
-        "outln('in mandel : walnut.walnutmap.call()');\n" +
+        "println('in mandel : walnut.walnutmap.call()');\n" +
         "walnut.walnutmap.call();\n" +
-        "outln('in mandel : walnut.walnutmap[\"call\"]()');\n" +
+        "println('in mandel : walnut.walnutmap[\"call\"]()');\n" +
         "walnut.walnutmap['call']();\n" +
-        "outln('in mandel : walnut.walnutmap.call = mandel.fib');\n" +
+        "println('in mandel : walnut.walnutmap.call = mandel.fib');\n" +
         "walnut.walnutmap.call = fib;\n" +
-        "outln('in mandel : walnut.walnutmap.call(12)');\n" +
-        "outln(walnut.walnutmap.call(12));\n" +
-        "func add(x, y) { outln('add' + x + '+' + y); return x+y; }\n" +
+        "println('in mandel : walnut.walnutmap.call(12)');\n" +
+        "println(walnut.walnutmap.call(12));\n" +
+        "func add(x, y) { println('add' + x + '+' + y); return x+y; }\n" +
         "walnut.fmap.call();\n" +
         "walnut.fmap.call = mandel.add;\n" +
-        "outln(walnut.fmap.call(2,3));\n" +
+        "println(walnut.fmap.call(2,3));\n" +
         "walnut.fmap.sub.call();\n" +
         "walnut.fmap.sub.call = mandel.add;\n" +
-        "outln(walnut.fmap.sub.call(4,5));\n" +
+        "println(walnut.fmap.sub.call(4,5));\n" +
         "map.call = fib;\n" +
-        "outln(map.call(12));\n" +
+        "println(map.call(12));\n" +
         "map.call = walnut.fmap.sub.call;\n" +
-        "outln(map.call(6,7));\n" +
-        "outln(-270);\n" +
-        "outln(('abcdef'[0#3])[2#0]);\n" +
+        "println(map.call(6,7));\n" +
+        "println(-270);\n" +
+        "println(('abcdef'[0#3])[2#0]);\n" +
         "string = 'peter';\n" +
         "string[2] = nil;\n" +
-        "outln(string);\n" +
+        "println(string);\n" +
+        "farg = { \n" +
+        "  println('argc   :' + $argc);\n" +
+        "  println('argv   :' + str($argv));\n" +
+        "  println('argv[0]:' + $argv[0]);\n" +
+        "  println('argv[1]:' + $argv[1]);\n" +
+        "  println('argv[2]:' + str($argv[2]));\n" +
+        "  for (a in $argv) { \n" +
+        "    println('argv :' + str(a));\n" +
+        "  }\n" +
+        "  for (a in $argv)\n" +
+        "    println('argv :' + str(a));\n" +
+        "  println('arg0   :' + $0);\n" +
+        "  println('arg1   :' + $1);\n" +
+        "  println('arg2   :' + str($2));\n" +
+        "  println('arg3   :' + $3);\n" +
+        "};\n" +
+        "farg('mo','bo', ['ko','ko2']);\n" +
+        "farg();\n" +
+        "a = ['init':{ for(x in 0#10) {println($0+x);} }, 'exe':{println('hello world');}, 'nbr':123];  a.init(1);\n" +
+        "func rec(o) {\n" +
+        "  if (len(o) == 0) {\n" +
+        "    println(o);\n" +
+        "  } else {" +
+        "    for (x in o) rec(x);\n" +
+        "  }\n" +
+        "}\n" +
+        "majs = [0,1,2,[3,4,[5,6],7],8];\n" +
+        "rec(majs);\n" +
+        "a = true;\n" +
+        "if (a) println('a true'); else for (x in 0#10) println('a false');\n" +
         "__BKPT;\n" +
         ""
         ;
@@ -253,29 +281,30 @@ public class Compiler {
     // DONE:   in frontend, reverse argument list in order to be able to handle varargs. Fix backend for this also
     // DONE:   use of variables before declaration within scope should not work, confusing 
     // DONE:   ranges 
-    // DONE:   partialarr = oldarr[[3,4,5]]
-    // FIXME?: argument list for anonymous scopes 
+    // DONE:   partialarr = oldarr[[3,4,5]], partialarr = oldarr[3#5]
+    // FIXME:  if (a) println('a true'); else println('a false');
+    // FIXME:  arr = arrb[{x = $0 * 2; return x < 3;}]
+    // FIXME?: argument list for rel ops, funcs, e.g arr[$0 > 10], map[$0.val < 44]  
     // FIXME:  arr[[1,2,3]] = 4
     // FIXME:  arr[[1,2,3]] = arrb[[3,4,5]]
     // FIXME:  arr = arrb[$0 > 5]
-    // FIXME:  arr = arrb[{x = $0 * 2; return a < 3;}]
     // FIXME:  goto
     // FIXME:  handle 'global' keyword
-//    "r = ['a':1,'b':2,'c':3];\n" +
-//    "r.b = r;\n" +
-//    "outln(r.b.b.b.b.b.b.b.b.b.b.b['b'].c);\n" + // TODO
+    // FIXME: "r = ['a':1,'b':2,'c':3];\n" +
+    //        "r.b = r;\n" +
+    //        "println(r.b.b['b'].c);\n" +
 
 
     String siblingsrc = 
         "module mandel;"+
         "otherglobal = 'variable sister';\n" + 
         "func sisterfunc() {" +
-        "  return {outln('sisterfunc anon func called');return 'it worked';};\n" +
+        "  return {println('sisterfunc anon func called');return 'it worked';};\n" +
         "}" +
         "func argfunc(a,b,c) {" +
-        "  outln('1st:' + a);\n" +
-        "  outln('2nd:' + b);\n" +
-        "  outln('3rd:' + c);\n" +
+        "  println('1st:' + a);\n" +
+        "  println('2nd:' + b);\n" +
+        "  println('3rd:' + c);\n" +
         "}";
     String othersrc = 
          "module walnut;\n" +
@@ -284,30 +313,30 @@ public class Compiler {
          "l2 = [1, ['a'], 'b', ['c', ['dekla']]];\n" +
          "l3 = [];\n" +
          "l4[];\n" + 
-         "func otherfunc() {outln('walnut.otherfunc called');}\n" +
+         "func otherfunc() {println('walnut.otherfunc called');}\n" +
          "lfunc = [ \n"+
          "          {return 760;}, {return 401;}, {return 293;}\n"+
          "        ];\n"+
-         "walnutmap = ['call':{outln('walnut mapfunc called');}, 'data':123];\n" +
+         "walnutmap = ['call':{println('walnut mapfunc called');}, 'data':123];\n" +
          "walnutmap.call();\n" +
          "val=lfunc[0]();" +
-         "outln('val='+val);\n" + 
+         "println('val='+val);\n" + 
          "val=lfunc[1]();" +
-         "outln('val='+val);\n" + 
+         "println('val='+val);\n" + 
          "val=lfunc[2]();" +
-         "outln('val='+val);\n" + 
-         "outln('l[0]=1?' + l[0]);\n" +
-         "outln(l2);\n" +
-         "outln('l2[3][1][0][3]=' + l2[3][1][0][3] + '(' + char(l2[3][1][0][3]) + ')');\n" +
-         "outln('l:' + str(l));\n" +
-         "outln('l2:' + str(l2));\n" +
-         "outln('l3:' + str(l3));\n" +
-         "outln('l4:' + str(l4));\n" +
-         "outln('lfunc:' + str(lfunc));\n" +
+         "println('val='+val);\n" + 
+         "println('l[0]=1?' + l[0]);\n" +
+         "println(l2);\n" +
+         "println('l2[3][1][0][3]=' + l2[3][1][0][3] + '(' + char(l2[3][1][0][3]) + ')');\n" +
+         "println('l:' + str(l));\n" +
+         "println('l2:' + str(l2));\n" +
+         "println('l3:' + str(l3));\n" +
+         "println('l4:' + str(l4));\n" +
+         "println('lfunc:' + str(lfunc));\n" +
          "ident = 4;\n" +
-         "fmap = ['call' : {outln('invoked walnut.fmap.call');}, 'sub':['call' : {outln('invoked walnut.fmap.sub.call');}]];\n" +
+         "fmap = ['call' : {println('invoked walnut.fmap.call');}, 'sub':['call' : {println('invoked walnut.fmap.sub.call');}]];\n" +
          "func friendfunc() {" +
-         "  outln('friendfunc called ' + mandel.anon);\n" +
+         "  println('friendfunc called ' + mandel.anon);\n" +
          "}";
 
     String crcsrc = "module crc;\n" +
@@ -365,38 +394,33 @@ public class Compiler {
   " return crc ^ ~0;\n" +
   "}";
         
-    src = 
-        "module mod;\n" +
-        "f = { \n" +
-        "  outln('argc   :' + $argc);\n" +
-//        "  outln('argv   :' + $argv);\n" +
-//        "  outln('argv[0]:' + $argv[0]);\n" +
-//        "  outln('argv[1]:' + $argv[1]);\n" +
-//        "  outln('argv[2]:' + $argv[2]);\n" +
-        "  outln('arg0   :' + $0);\n" +
-        "  outln('arg1   :' + $1);\n" +
-        "  outln('arg2   :' + str($2));\n" +
-        "  outln('arg3   :' + $3);\n" +
-        "};\n" +
-        "f('mo','bo', ['ko','ko']);\n" +
-        "f();\n" +
-        "";
-    
-    othersrc = 
-        "";
-    siblingsrc = "";
-    crcsrc = "";
+//    src = 
+//        "module mod;\n" +
+//        "WTF.exe();\n"+
+//        "WTF.init(100);\n" +        
+//        "";
+//    
+//    othersrc = 
+//        "module mod;\n" +
+//        "println('skit:' + WTF);\n" + // TODO should not work
+//        "hello = {println('hello');};\n" +
+//        "WTF = ['init':{ for(x in 0#10) {println($0+x);} }, 'exe':hello, 'nbr':123];n" +
+//        "";
+//    siblingsrc = 
+//        "";
+//    crcsrc = 
+//        "";
 
     Executable e = null;
     try {
       e = Compiler.compile(extDefs, 0x0000, 0x4000, crcsrc, othersrc, siblingsrc, src);
     } catch (CompilerError ce) {
       String s = Compiler.getSource();
-      int strstart = ce.getStringStart();
-      int strend = ce.getStringEnd();
+      int strstart = Math.min(s.length(), Math.max(0, ce.getStringStart()));
+      int strend = Math.min(s.length(), Math.max(0, ce.getStringEnd()));
       if (strstart > 0) {
-        int ps = Math.max(0, strstart - 50);
-        int pe = Math.min(s.length(), strend + 50);
+        int ps = Math.min(s.length(), Math.max(0, strstart - 50));
+        int pe = Math.max(0, Math.min(s.length(), strend + 50));
         System.out.println(ce.getMessage());
         System.out.println("... " + s.substring(ps, strstart) + 
             " -->" + s.substring(strstart, strend) + "<-- " +
@@ -430,5 +454,30 @@ public class Compiler {
 
   private static String getSource() {
     return src;
+  }
+  
+  Map<String, ExtCall> extDefs;
+  Linker linker;
+  public Compiler(Map<String, ExtCall> extDefs, int ramOffs, int constOffs) {
+    this.extDefs = extDefs;
+    linker = new Linker(ramOffs, constOffs);
+  }
+  
+  IntermediateRepresentation ir = null;
+  public Executable compileIncrementally(String src) {
+    Executable exe = null;
+    try {
+      ASTNodeBlok e = AST.buildTree(src);
+      ASTOptimiser.optimise(e);
+      Grammar.check(e);
+      StructAnalysis.analyse(e);
+      ir = CodeGenFront.genIR(e, ir);
+      CodeGenBack.compile(ir);
+      ir.accumulateGlobals();
+      exe = linker.link(ir, extDefs, true);
+    } finally {
+      if (ir != null) ir.clearModules();
+    }
+    return exe;
   }
 }

@@ -7,9 +7,10 @@ import com.pelleplutt.plang.ASTNode.ASTNodeString;
 import com.pelleplutt.plang.ASTNode.ASTNodeSymbol;
 
 public class ASTOptimiser {
+  static boolean dbg = false;
   public static void optimise(ASTNodeBlok a) {
     // optimise constants
-    System.out.println("  * constant folding");
+    if (dbg) System.out.println("  * constant folding");
     constFolding(a, null);
     optimiseDeadCode(a);
   }

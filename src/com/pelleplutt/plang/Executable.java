@@ -11,14 +11,20 @@ public class Executable {
   Map<Integer, M> constants;
   Map<Integer, ExtCall> extLinks;
   List<Module> dbgModules;
+  int pcStart;
   
   
-  public Executable(byte[] machineCode, Map<Integer, M> constants, Map<Integer, ExtCall> extLinks, List<Module> list) {
+  public Executable(int pcStart, byte[] machineCode, Map<Integer, M> constants, Map<Integer, ExtCall> extLinks, List<Module> list) {
+    this.pcStart = pcStart;
     this.machineCode = machineCode;
     this.constants = constants;
     this.extLinks = extLinks;
     this.dbgModules = list;
   }
+  public int getPCStart() {
+    return pcStart;
+  }
+  
   public byte[] getMachineCode() {
     return machineCode;
   }

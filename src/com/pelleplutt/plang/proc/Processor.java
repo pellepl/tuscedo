@@ -6,7 +6,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.pelleplutt.plang.CompilerError;
 import com.pelleplutt.plang.Executable;
 import com.pelleplutt.plang.proc.ProcessorError.ProcessorBreakpointError;
 
@@ -43,14 +42,30 @@ public class Processor implements ByteCode {
   M nilM = new M();
   M zeroM = new M(0);
   
-  public Processor(int memorySize, Executable exe) {
-    this.exe = exe;
-    sp = memorySize - 1;
-    pc = 0;
-    fp = sp;
+  public Processor(int memorySize) {
     nilM.type = TNIL;
     memory = new M[memorySize];
     for (int i = 0; i < memorySize; i++) memory[i] = new M();
+    reset();
+  }
+  
+  public Processor(int memorySize, Executable exe) {
+    this(memorySize);
+    setExe(exe);
+  }
+  
+  public void reset() {
+    sp = memory.length - 1;
+    fp = sp;
+    zero = false;
+    minus = false;
+    pc = exe == null ? 0 : exe.getPCStart();
+  }
+
+  
+  public void setExe(Executable exe) {
+    this.exe = exe;
+    pc = exe.getPCStart();
     this.code = exe.getMachineCode();
     this.extLinks = exe.getExternalLinkMap();
     Map<Integer, M> consts = exe.getConstants();
@@ -68,7 +83,7 @@ public class Processor implements ByteCode {
     disasm(out, null, code, pc, len);
   }
   public static void disasm(PrintStream out, String pre, byte[] code, int pc, int len) {
-    while (len > 0) {
+    while (len > 0 && pc < code.length) {
       if (pre != null) out.print(pre);
       out.println(String.format("0x%06x %s", pc, disasm(code, pc)));
       int instr = (int)(code[pc] & 0xff);
@@ -553,14 +568,21 @@ public class Processor implements ByteCode {
   
   void set_cre() {
     int elements = pop().asInt();
-    List<M> list = new ArrayList<M>();
-    for (int i = 0; i < elements; i++) {
-      M m = new M();
-      m.copy(peek(sp + elements - i));
-      list.add(m);
+    if (elements == -1) {
+      // create arg array
+      MemoryList list = new MemoryList(memory, 
+          fp+FRAME_SIZE, fp+FRAME_SIZE+memory[fp+FRAME_2_ARGC].asInt());
+      push(list);
+    } else {
+      List<M> list = new ArrayList<M>();
+      for (int i = 0; i < elements; i++) {
+        M m = new M();
+        m.copy(peek(sp + elements - i));
+        list.add(m);
+      }
+      sp += elements;
+      push(list);
     }
-    sp += elements;
-    push(list);
   }
   
   void arr_cre() {
@@ -810,7 +832,7 @@ public class Processor implements ByteCode {
     } else if (e.type == TRANGE) {
       push(((Range)e.ref).size());
     } else {
-      throw new ProcessorError("cannot get length of type " + TNAME[e.type]);
+      push(0);
     }
   }
   
@@ -949,7 +971,7 @@ public class Processor implements ByteCode {
       e2 = tmp;
     }
     if (e1.type == e2.type) {
-      if (e1.type == TINT) {
+      if (e1.type == TINT || e1.type == TCODE) {
         int r = e1.i - e2.i;
         status(r);
         if (push) push(r);
@@ -1282,9 +1304,9 @@ public class Processor implements ByteCode {
     if (addr.type != TINT && addr.type != TCODE) {
       throw new ProcessorError("calling bad type " + TNAME[addr.type]);
     }
-    int args = peek(sp+1).i;
     push(pc);
     push(fp);
+    int args = peek(sp+FRAME_2_ARGC).i;
     fp = sp;
     pc = a;
     if ((pc & 0xff0000) == 0xff0000) {
@@ -1297,9 +1319,9 @@ public class Processor implements ByteCode {
   }
   
   void call_im() {
-    int args = peek(sp+1).i;
     push(pc+3);
     push(fp);
+    int args = peek(sp+FRAME_2_ARGC).i;
     fp = sp;
     pc = codetos(code, pc, 3);
     if ((pc & 0xff0000) == 0xff0000) {
