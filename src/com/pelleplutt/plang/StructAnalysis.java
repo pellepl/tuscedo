@@ -53,7 +53,7 @@ public class StructAnalysis {
   
 
   void analyseRecurse(ASTNode e, ScopeStack scopeStack, ASTNode parentNode, boolean operator, boolean loop) {
-    // System.out.println("*** anaylyseRec " + e);
+    //System.out.println("*** anaylyseRec " + e);
     // System.out.println("    scopeStack:" + scopeStack.id + " " + scopeStack);
     if (e.op == OP_MODULE) {
       module = ((ASTNodeSymbol)e.operands.get(0)).symbol;
@@ -96,7 +96,7 @@ public class StructAnalysis {
         if (e.operands.get(0) instanceof ASTNodeBlok) {
           newAnonymousScope((ASTNodeBlok)e.operands.get(0), e);
         }
-      }
+      } 
     }
     else if (e.op == OP_FUNCDEF) {
       // funcdef scope
@@ -135,7 +135,7 @@ public class StructAnalysis {
         throw new CompilerError("cannot assign argument variables", e);
       }
       
-      if (assignee.op != OP_DOT) {
+      if (assignee.op != OP_DOT && assignee.op != OP_ADEREF) {
         ASTNodeSymbol var = getVariableName(assignee);
         if (var.symbol.charAt(0) == '$') {
           throw new CompilerError("cannot assign argument variables", e);
@@ -187,7 +187,11 @@ public class StructAnalysis {
     else if (e.op == OP_CALL) {
       if (e.operands != null) {
         for (ASTNode e2 : e.operands) {
-          analyseRecurse(e2, scopeStack, e, true, false);
+          if (e2 instanceof ASTNodeBlok) {
+            newAnonymousScope((ASTNodeBlok)e2, e);
+          } else {
+            analyseRecurse(e2, scopeStack, e, true, false);
+          }
         }
       }
     }

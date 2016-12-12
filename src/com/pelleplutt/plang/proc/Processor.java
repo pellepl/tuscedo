@@ -1,9 +1,6 @@
 package com.pelleplutt.plang.proc;
 
 import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import com.pelleplutt.plang.Executable;
@@ -16,9 +13,8 @@ public class Processor implements ByteCode {
   public static final int TSTR = 3;
   public static final int TRANGE = 4;
   public static final int TCODE = 5;
-  public static final int TARR = 6;
-  public static final int TMAP = 7;
-  public static final int TREF = 8;
+  public static final int TSET = 6;
+  public static final int TREF = 7;
   
   static final int TO_CHAR = -1;
   
@@ -26,15 +22,15 @@ public class Processor implements ByteCode {
   public static boolean dbgRun = false;
   
   public static final String TNAME[] = {
-    "nil", "int", "float", "string", "range", "code", "arr", "map", "ref"
+    "nil", "int", "float", "string", "range", "code", "set", "ref"
   };
   
   M[] memory;
   byte[] code;
   int sp;
   int pc;
-  int me;
-  int me_banked;
+  M me;
+  M me_banked;
   int oldpc;
   int fp;
   boolean zero;
@@ -75,7 +71,7 @@ public class Processor implements ByteCode {
     push(-1); // pc
     push(-1); // fp
     fp = sp;
-    me = -1;
+    me = null;
     zero = false;
     minus = false;
     pc = exe == null ? 0 : exe.getPCStart();
@@ -508,9 +504,9 @@ public class Processor implements ByteCode {
     memory[sp--].str = x;
   }
     
-  void push(List<M> list) {
-    memory[sp].type = TARR;
-    memory[sp].ref = list;
+  void push(MSet set) {
+    memory[sp].type = TSET;
+    memory[sp].ref = set;
     memory[sp--].str = null;
   }
     
@@ -599,11 +595,11 @@ public class Processor implements ByteCode {
     int elements = pop().asInt();
     if (elements == -1) {
       // create arg array
-      MemoryList list = new MemoryList(memory, 
+      MMemList list = new MMemList(memory, 
           fp+FRAME_SIZE+1, fp+FRAME_SIZE+1+memory[fp+FRAME_3_ARGC].asInt());
       push(list);
     } else {
-      List<M> list = new ArrayList<M>();
+      MListMap list = new MListMap();
       for (int i = 0; i < elements; i++) {
         M m = new M();
         m.copy(peek(sp + elements - i));
@@ -618,54 +614,46 @@ public class Processor implements ByteCode {
     int addr = codetoi(code, pc, 3);
     pc += 3;
     int elements = pop().asInt();
-    List<M> list = new ArrayList<M>();
+    MListMap set = new MListMap();
     for (int i = 0; i < elements; i++) {
       M m = new M();
       m.copy(peek(addr++));
-      list.add(m);
+      set.add(m);
     }
-    push(list);
+    push(set);
   }
   
   @SuppressWarnings("unchecked")
   void set_drf() {
     M mix = pop();
     M mset = pop();
-    if (mset.type == TARR) {
-      if (mix.type == TARR) {
-        derefListArgList((List<M>)mset.ref, (List<M>)mix.ref);
+    if (mset.type == TSET) {
+      if (mix.type == TSET) {
+        derefSetArgSet((MSet)mset.ref, (MSet)mix.ref);
       } else if (mix.type == TRANGE) {
-        derefListArgRange((List<M>)mset.ref, (Range)mix.ref);
+        derefSetArgRange((MSet)mset.ref, (MRange)mix.ref);
       } else {
-        push(((List<M>)mset.ref).get(mix.asInt()));
+        push(((MSet)mset.ref).get(mix));
       }
     } else if (mset.type == TSTR) {
-      if (mix.type == TARR) {
-        derefStringArgList(mset.str, (List<M>)mix.ref);
+      if (mix.type == TSET) {
+        derefStringArgSet(mset.str, (MSet)mix.ref);
       } else if (mix.type == TRANGE) {
-        derefStringArgRange(mset.str, (Range)mix.ref);
+        derefStringArgRange(mset.str, (MRange)mix.ref);
       } else {
         push(mset.str.charAt(mix.asInt()));
       }
-    } else if (mset.type == TMAP) {
-      if (mix.type == TARR) {
-        derefMapArgList((Map<Object,M>)mset.ref, (List<M>)mix.ref);
-      } else if (mix.type == TRANGE) {
-        derefMapArgRange((Map<Object,M>)mset.ref, (Range)mix.ref);
-      } else {
-        push(((Map<Object,M>)mset.ref).get(mix.getRaw()));
-      }
     } else if (mset.type == TRANGE) {
-      if (mix.type == TARR) {
-        derefRangeArgList((Range)mset.ref, (List<M>)mix.ref);
+      if (mix.type == TSET) {
+        derefRangeArgSet((MRange)mset.ref, (MSet)mix.ref);
       } else if (mix.type == TRANGE) {
-        derefRangeArgRange((Range)mset.ref, (Range)mix.ref);
+        derefRangeArgRange((MRange)mset.ref, (MRange)mix.ref);
       }else {
-        if (((Range)mset.ref).type == TINT) {
-          push((int)((Range)mset.ref).get(mix.asInt()));
+        if (((MRange)mset.ref).type == TINT) {
+          push((int)((MRange)mset.ref).get(mix.asInt()));
         }
-        else if (((Range)mset.ref).type == TFLOAT) {
-          push((float)((Range)mset.ref).get(mix.asInt()));
+        else if (((MRange)mset.ref).type == TFLOAT) {
+          push((float)((MRange)mset.ref).get(mix.asInt()));
         }
       }
     } else {
@@ -673,39 +661,45 @@ public class Processor implements ByteCode {
     }
   }
   
-  void derefListArgList(List<M> set, List<M> drf) {
-    List<M> list = new ArrayList<M>();
-    for (M mdrf : drf) {
+  void derefSetArgSet(MSet set, MSet drf) {
+    MListMap res = new MListMap();
+    int len = drf.size();
+    for (int i = 0; i < len; i++) {
+      M mdrf = drf.getElement(i);
+      M m = new M();
       if (mdrf.type == TFLOAT || mdrf.type == TINT) {
-        M m = new M();
-        m.copy(set.get(mdrf.asInt()));
-        list.add(m);
+        m.copy(set.getElement(mdrf.asInt()));
+      } else {
+        m.copy(set.get(mdrf));
       }
+      res.add(m);
     }
-    push(list);
+    push(res);
   }
-  void derefListArgRange(List<M> set, Range drf) {
-    List<M> list = new ArrayList<M>();
+  void derefSetArgRange(MSet set, MRange drf) {
+    MListMap res = new MListMap();
     int len = drf.size();
     for (int i = 0; i < len; i++) {
       float d = drf.get(i);
       M m = new M();
       m.copy(set.get((int)d));
-      list.add(m);
+      res.add(m);
     }
-    push(list);
+    push(res);
   }
   
-  void derefStringArgList(String str, List<M> drf) {
+  void derefStringArgSet(String str, MSet drf) {
     StringBuilder sb = new StringBuilder();
-    for (M mdrf : drf) {
+    int len = drf.size();
+    for (int i = 0; i < len; i++) {
+      M mdrf = drf.getElement(i);
       if (mdrf.type == TFLOAT || mdrf.type == TINT) {
         sb.append(str.charAt(mdrf.asInt()));
       }
     }
     push(sb.toString());
   }
-  void derefStringArgRange(String str, Range drf) {
+  void derefStringArgRange(String str, MRange drf) {
     StringBuilder sb = new StringBuilder();
     int len = drf.size();
     for (int i = 0; i < len; i++) {
@@ -715,96 +709,49 @@ public class Processor implements ByteCode {
     push(sb.toString());
   }
   
-  void derefMapArgList(Map<Object,M> set, List<M> drf) {
-    List<M> list = new ArrayList<M>();
-    for (M mdrf : drf) {
-      if (mdrf.type == TFLOAT || mdrf.type == TINT) {
-        M m = new M();
-        m.copy(set.get(mdrf.getRaw()));
-        list.add(m);
-      }
-    }
-    push(list);
-  }
-  void derefMapArgRange(Map<Object,M> set, Range drf) {
-    List<M> list = new ArrayList<M>();
-    Object keys[] = set.keySet().toArray();
+  
+  void derefRangeArgSet(MRange set, MSet drf) {
+    MListMap res = new MListMap();
     int len = drf.size();
     for (int i = 0; i < len; i++) {
-      float d = drf.get(i);
-      Object key = keys[(int)d];
-      M mval = set.get(key);
-      if (mval == null) continue;
-      M mkey = new M(key);
-      Map<Object,M> res = new HashMap<Object,M>();
-      res.put("key", mkey);
-      res.put("val", mval);
-      M mres = new M();
-      mres.type = TMAP;
-      mres.ref = res;
-      list.add(mres);
-    }
-    push(list);
-  }  
-  
-  void derefRangeArgList(Range set, List<M> drf) {
-    List<M> list = new ArrayList<M>();
-    if (set.type == TINT) {
-      for (M mdrf : drf) {
-        if (mdrf.type == TFLOAT || mdrf.type == TINT) {
-          list.add(new M((int)set.get(mdrf.asInt())));
-        }
+      M mdrf = drf.getElement(i);
+      if (mdrf.type == TFLOAT || mdrf.type == TINT) {
+        res.add(new M(set.get(mdrf.asInt())));
       }
     }
-    else if (set.type == TFLOAT) {
-      for (M mdrf : drf) {
-        if (mdrf.type == TFLOAT || mdrf.type == TINT) {
-          list.add(new M((float)set.get(mdrf.asInt())));
-        }
-      }
-    }
-    push(list);
+    push(res);
   }
-  void derefRangeArgRange(Range set, Range drf) {
-    List<M> list = new ArrayList<M>();
+  void derefRangeArgRange(MRange set, MRange drf) {
+    MListMap res = new MListMap();
     int len = drf.size();
     if (set.type == TINT) {
       for (int i = 0; i < len; i++) {
         float d = drf.get(i);
-        list.add(new M((int)set.get((int)d)));
+        res.add(new M((int)set.get((int)d)));
       }
     }
     else if (set.type == TFLOAT) {
       for (int i = 0; i < len; i++) {
         float d = drf.get(i);
-        list.add(new M((float)set.get((int)d)));
+        res.add(new M((float)set.get((int)d)));
       }
     }
-    push(list);
+    push(res);
   }
-  
-  @SuppressWarnings("unchecked")
+    
   void set_wr() {
     // TODO handle set list ie arr[[1,2,3]] = 3
     // TODO handle set range ie arr[0#2] = 3
-    M mix = pop();
     M mval = pop();
+    M mix = pop();
     M mset = pop();
-    if (mset.type == TARR) {
+    if (mset.type == TSET) {
       if (mval.type == TNIL) {
-        ((List<M>)mset.ref).remove(mix.asInt());
+        ((MSet)mset.ref).remove(mix);
       } else {
         M m = new M();
         m.copy(mval);
-        ((List<M>)mset.ref).set(mix.asInt(), m);
-      }
-    } else if (mset.type == TMAP) {
-      if (mval.type == TNIL) {
-        ((Map<Object, M>)mset.ref).remove(mix.getRaw());
-      } else {
-        M m = new M();
-        m.copy(mval);
-        ((Map<Object, M>)mset.ref).put(mix.getRaw(), m);
+        ((MSet)mset.ref).set(mix, m);
       }
     } else if (mset.type == TSTR) {
       if (mval.type == TNIL) {
@@ -826,24 +773,16 @@ public class Processor implements ByteCode {
     }
   }
   
-  @SuppressWarnings("unchecked")
   void map_add() {
     M mkey = pop();
     M mval = pop();
     M mmap = peek(sp+1);
-    if (mmap.type == TARR) {
-      if (!((List<M>)mmap.ref).isEmpty()) {
-        throw new ProcessorError("cannot add tuples to a list");
-      }
-      mmap.ref = new HashMap<Object, M>();
-      mmap.type = TMAP;
-    }
-    if (mmap.type == TMAP) {
+    if (mmap.type == TSET) {
       M mk = new M();
       mk.copy(mkey);
       M mv = new M();
       mv.copy(mval);
-      ((HashMap<Object,M>)mmap.ref).put(mk.getRaw(), mv);
+      ((MSet)mmap.ref).set(mk.getRaw(), mv);
     } else {
       throw new ProcessorError("cannot add tuples to type " + TNAME[mmap.type]);
     }
@@ -852,14 +791,12 @@ public class Processor implements ByteCode {
   @SuppressWarnings("unchecked")
   void set_sz() {
     M e = pop();
-    if (e.type == TARR) {
-      push(((List<M>)e.ref).size());
-    } else if (e.type == TMAP) {
-      push(((Map<Object,M>)e.ref).size());
+    if (e.type == TSET) {
+      push(((MSet)e.ref).size());
     } else if (e.type == TSTR) {
       push(e.str.length());
     } else if (e.type == TRANGE) {
-      push(((Range)e.ref).size());
+      push(((MRange)e.ref).size());
     } else {
       push(0);
     }
@@ -869,31 +806,18 @@ public class Processor implements ByteCode {
   void set_rd() {
     int ix = pop().asInt();
     M mset = pop();
-    if (mset.type == TARR) {
-      push(((List<M>)mset.ref).get(ix));
-    } else if (mset.type == TMAP) {
-      Map<Object,M> map = (Map<Object,M>)mset.ref;
-      Object key = map.keySet().toArray()[ix];
-      M mval = map.get(key);
-      if (mval == null) mval = nilM;
-      M mkey = new M(key);
-      Map<Object,M> res = new HashMap<Object,M>();
-      res.put("key", mkey);
-      res.put("val", mval);
-      M mres = new M();
-      mres.type = TMAP;
-      mres.ref = res;
-      push(mres);
+    if (mset.type == TSET) {
+      push(((MSet)mset.ref).get(ix));
     } else if (mset.type == TSTR) {
       push(mset.str.charAt(ix));
     } else if (mset.type == TRANGE) {
-      if (((Range)mset.ref).type == TINT) {
-        push((int)((Range)mset.ref).get(ix));
+      if (((MRange)mset.ref).type == TINT) {
+        push((int)((MRange)mset.ref).get(ix));
       }
-      else if (((Range)mset.ref).type == TFLOAT) {
-        push((float)((Range)mset.ref).get(ix));
+      else if (((MRange)mset.ref).type == TFLOAT) {
+        push((float)((MRange)mset.ref).get(ix));
       } else {
-        throw new ProcessorError("fatal: range of bad type " + TNAME[((Range)mset.ref).type]);
+        throw new ProcessorError("fatal: range of bad type " + TNAME[((MRange)mset.ref).type]);
       }
      } else {
       throw new ProcessorError("cannot get sub element of type " + TNAME[mset.type]);
@@ -901,16 +825,16 @@ public class Processor implements ByteCode {
   }
   
   void rng(int def) {
-    Range range;
+    MRange range;
     if (def == 2) {
       M mto = pop();
       M mfrom = pop();
-      range = new Range(mfrom, mto);
+      range = new MRange(mfrom, mto);
     } else {
       M mto = pop();
       M mstep = pop();
       M mfrom = pop();
-      range = new Range(mfrom, mstep, mto);
+      range = new MRange(mfrom, mstep, mto);
     }
     M mr = new M();
     mr.ref = range;
@@ -950,6 +874,13 @@ public class Processor implements ByteCode {
         String r = e1.str + e2.str;
         status(r);
         push(r);
+      } else if (e1.type == TSET) {
+        M me1 = new M();
+        me1.copy(e1);
+        M me2 = new M();
+        me2.copy(e2);
+        ((MSet)me1.ref).add(me2);
+        push(me1);
       } else {
         throw new ProcessorError("cannot add type " + TNAME[e1.type]);
       }
@@ -964,16 +895,16 @@ public class Processor implements ByteCode {
       status(r);
       push(r);
     }
-    else if (e1.type == TARR) {
+    else if (e1.type == TSET) {
       M m = new M();
       m.copy(e2);
-      ((List<M>)e1.ref).add(m);
+      ((MSet)e1.ref).add(m);
       push(e1);
     }
-    else if (e2.type == TARR) {
+    else if (e2.type == TSET) {
       M m = new M();
       m.copy(e1);
-      ((List<M>)e2.ref).add(0, m);
+      ((MSet)e2.ref).insert(0, m);
       push(e2);
     }
     else if (e1.type == TSTR || e2.type == TSTR) {
@@ -1111,19 +1042,21 @@ public class Processor implements ByteCode {
   }
 
   void def_me() {
-    me_banked = peekStack(0).i;
+    M m = new M();
+    m.copy(peekStack(0));
+    me_banked = m;
   }
 
   void push_me() {
-    if (me == -1) {
+    if (me == null) {
       push(nilM);
     } else {
-      push(memory[me]);
+      push(me);
     }
   }
 
   void udef_me() {
-    me_banked = -1;
+    me_banked = null;
   }
 
   void add_q(int x) {
@@ -1135,7 +1068,6 @@ public class Processor implements ByteCode {
     push(x);
     sub();
   }
-  
   void cast(int type) {
     M m = peekStack(0);
     switch (type) {
@@ -1147,8 +1079,7 @@ public class Processor implements ByteCode {
       case TNIL: m.i = 0; break;
       case TSTR: m.i = m.str.length() == 1 ? m.str.charAt(0) : Integer.parseInt(m.str); break;
       case TRANGE: break;
-      case TARR: break;
-      case TMAP: break;
+      case TSET: break;
       case TREF: break;
       }
       break;
@@ -1160,8 +1091,7 @@ public class Processor implements ByteCode {
       case TNIL: m.f = 0; break;
       case TSTR: m.f = Float.parseFloat(m.str); break;
       case TRANGE: break;
-      case TARR: break;
-      case TMAP: break;
+      case TSET: break;
       case TREF: break;
       }
       break;
@@ -1173,8 +1103,7 @@ public class Processor implements ByteCode {
       case TNIL: break;
       case TSTR: break;
       case TRANGE: break;
-      case TARR: break;
-      case TMAP: break;
+      case TSET: break;
       case TREF: break;
       }
       break;
@@ -1382,7 +1311,7 @@ public class Processor implements ByteCode {
     if (fp < 0 || fp >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("abnormal exit");
     fp = pop().i;
     pc = pop().i;
-    me = pop().i;
+    me = pop();
     if (pc < 0 || pc >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("normal exit");
     int argc = pop().i;
     sp += argc;
@@ -1394,7 +1323,7 @@ public class Processor implements ByteCode {
     if (fp < 0 || fp >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("abnormal exit");
     fp = pop().i;
     pc = pop().i;
-    me = pop().i;
+    me = pop();
     if (pc < 0 || pc >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("normal exit");
     int argc = pop().i;
     sp += argc;
@@ -1799,7 +1728,7 @@ public class Processor implements ByteCode {
         str = ((String) o);
         type = TSTR;
       } 
-      else if (o instanceof Range) {
+      else if (o instanceof MRange) {
         ref = o;
         type = TRANGE;
       } 
@@ -1819,51 +1748,14 @@ public class Processor implements ByteCode {
         return str;
       case TCODE:
         return String.format("->0x%08x", i);
-      case TARR:
-      {
-        StringBuilder sb = new StringBuilder("[");
-        @SuppressWarnings("unchecked")
-        List<M> l = (List<M>)ref;
-        final int sz = l.size();
-        if (sz > 6) {
-          for (int i = 0; i < 3; i++) {
-            sb.append(l.get(i).asString() + ", ");
-          }
-          sb.append("(" + (sz - 3) + " more entries)");
-        } else {
-          for (int i = 0; i < sz; i++) {
-            sb.append(l.get(i).asString());
-            if (i < sz-1) sb.append(", ");
-          }
-        }
-        sb.append("]");
-        return sb.toString();
-      }
-      case TMAP:
-        StringBuilder sb = new StringBuilder("[");
-        @SuppressWarnings("unchecked")
-        Map<Object, M> m = (Map<Object, M>)ref;
-        final int sz = m.size();
-        Object keys[] = m.keySet().toArray();
-        if (sz > 6) {
-          for (int i = 0; i < 3; i++) {
-            sb.append(keys[i] + ":" + m.get(keys[i]).asString() + ", ");
-          }
-          sb.append("(" + (sz - 3) + " more entries)");
-        } else {
-          for (int i = 0; i < sz; i++) {
-            sb.append(keys[i] + ":" + m.get(keys[i]).asString());
-            if (i < sz-1) sb.append(", ");
-          }
-        }
-        sb.append("]");
-        return sb.toString();
+      case TSET:
+        return ((MSet)ref).toString();
       case TRANGE:
-        return ((Range)ref).toString();
+        return ((MRange)ref).toString();
       case TREF:
         return ref instanceof M ? ((M)ref).asString() : ref.toString();
       default:
-        return "?";
+        return "?" + type;
       }
     }
 
@@ -1903,14 +1795,12 @@ public class Processor implements ByteCode {
         return "s\'" + asString() + "'";
       case TCODE:
         return "c" + asString();
-      case TARR:
-        return "l" + asString();
-      case TMAP:
-        return "m" + asString();
+      case TSET:
+        return "a" + asString();
       case TREF:
         return "ref" + asString();
       default:
-        return "?";
+        return "?" + type;
       }
     }
     
@@ -1928,9 +1818,7 @@ public class Processor implements ByteCode {
         return str;
       case TCODE:
         return this;
-      case TARR:
-        return ref;
-      case TMAP:
+      case TSET:
         return ref;
       case TREF:
         return ref;
@@ -1958,7 +1846,7 @@ public class Processor implements ByteCode {
   }
   
   public String getProcInfo() {
-    return String.format("pc:0x%08x  sp:0x%06x  fp:0x%06x  me:0x%06x(0x%06x) sr:", pc, sp, fp, me & 0xffffff, me_banked & 0xffffff) + 
+    return String.format("pc:0x%08x  sp:0x%06x  fp:0x%06x  sr:", pc, sp, fp) + 
         (zero ? "Z" : "z") + (minus ? "M" : "m");
   }
 
@@ -1973,3 +1861,32 @@ public class Processor implements ByteCode {
   }
 
 }
+
+/*
+module map; \
+func new() { \
+  m[]; \
+  m.map = []; \
+  m.put = { \
+    entry = ["key":$0, "val":$1]; \
+    me.map += entry; \
+  }; \
+  m.get = { \
+    for (e in me.map) { \
+      if (e.key == $0) { \
+        return e.val; \
+      } \
+    } \
+    return nil; \
+  }; \
+  return m; \
+}
+
+m = map.new();
+m.put("hello", "world");
+m.put("ice", "cream");
+println("hello:", m.get("hello"));
+println("world:", m.get("world"));
+println("ice  :", m.get("ice"));
+
+*/

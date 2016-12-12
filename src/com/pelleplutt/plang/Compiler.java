@@ -213,7 +213,13 @@ public class Compiler {
         "map = ['call':{println('mapfunc called');}, 'data':123];\n" +
         "map.call();\n" +
         "println(walnut.ident);\n" +
+        
+        
+        
         "walnut.ident = 5;\n" +
+        
+        
+        
         "println('in mandel : walnut.ident:' + walnut.ident);\n" +
         "println('in mandel : walnut.otherfunc()');\n" +
         "walnut.otherfunc();\n" +
@@ -282,7 +288,8 @@ public class Compiler {
     // DONE:   use of variables before declaration within scope should not work, confusing 
     // DONE:   ranges 
     // DONE:   partialarr = oldarr[[3,4,5]], partialarr = oldarr[3#5]
-    // FIXME:  if (a) println('a true'); else println('a false');
+    // DONE:   a=[]; for(i in 0#10) {a['x'+i]='y'+i;} // inverts key/val
+    // DONE:   if (a) println('a true'); else println('a false');
     // FIXME:  arr = arrb[{x = $0 * 2; return x < 3;}]
     // FIXME?: argument list for rel ops, funcs, e.g arr[$0 > 10], map[$0.val < 44]  
     // FIXME:  arr[[1,2,3]] = 4
@@ -393,27 +400,27 @@ public class Compiler {
   "  }\n" +
   " return crc ^ ~0;\n" +
   "}";
-        
-    src = 
-        "module mod;\n" +
-        "WTF.exe();\n"+
-        "WTF.init(100);\n" +   
-        "b = [[{return 1234;}]];\n" +
-        "println(b['c']['d']());\n" +
-        "println(b.c.d());\n" +
-        "a = ['age':12, 'older':{me.age++; println('Im now ',me.age,'years');}];" +
-        "";
-    
-    othersrc = 
-        "module mod;\n" +
-        "println('skit:' + WTF);\n" + // TODO should not work
-        "hello = {println('hello');};\n" +
-        "WTF = ['init':{ for(x in 0#10) {println($0+x);} }, 'exe':hello, 'nbr':123];n" +
-        "";
-    siblingsrc = 
-        "";
-    crcsrc = 
-        "";
+//        
+//    src = 
+//        "module mod;\n" +
+//        "WTF.exe();\n"+
+//        "WTF.init(100);\n" +   
+//        "b = [[{return 1234;}]];\n" +
+//        "println(b['c']['d']());\n" +
+//        "println(b.c.d());\n" +
+//        "a = ['age':12, 'older':{me.age++; println('Im now ',me.age,'years');}];" +
+//        "";
+//    
+//    othersrc = 
+//        "module mod;\n" +
+//        "println('skit:' + WTF);\n" + // TODO should not work
+//        "hello = {println('hello');};\n" +
+//        "WTF = ['init':{ for(x in 0#10) {println($0+x);} }, 'exe':hello, 'nbr':123];n" +
+//        "";
+//    siblingsrc = 
+//        "";
+//    crcsrc = 
+//        "";
 
     Executable e = null;
     try {

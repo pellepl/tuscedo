@@ -618,12 +618,11 @@ public class CodeGenBack implements ByteCode {
       }
     } else if (assignee instanceof TACSetDeref) {
       TACSetDeref de = (TACSetDeref)assignee;
-      pushValue(assignment, frag);
+      pushValues(de.derefVal, assignment, frag);
       if (referenced) {
         sp++;
         addCode(frag, stackInfo() + op.toString(), IDUP);
       }
-      pushValue(de.derefVal, frag);
       sp -= 3;
       addCode(frag, stackInfo() + op.toString(), ISET_WR);
     } else if (assignee instanceof TACUnresolved) {
@@ -691,6 +690,10 @@ public class CodeGenBack implements ByteCode {
       frag.links.add(new ModuleFragment.LinkConst(frag.getPC(), a));
       sp++;
       addCode(frag, stackInfo() + a.toString() + " (const)", ILOAD_IM, 2,0,0);
+    } 
+    else if (a instanceof TACGetMe) {
+      sp++;
+      addCode(frag, stackInfo() + "get me", IPUSH_ME);
     } 
     else if (a instanceof TACRange) {
       // TODO RANGE?
