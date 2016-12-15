@@ -12,9 +12,9 @@ public class Processor implements ByteCode {
   public static final int TFLOAT = 2;
   public static final int TSTR = 3;
   public static final int TRANGE = 4;
-  public static final int TCODE = 5;
-  public static final int TSET = 6;
-  public static final int TREF = 7;
+  public static final int TFUNC = 5;
+  public static final int TANON = 6;
+  public static final int TSET = 7;
   
   static final int TO_CHAR = -1;
   
@@ -22,7 +22,7 @@ public class Processor implements ByteCode {
   public static boolean dbgRun = false;
   
   public static final String TNAME[] = {
-    "nil", "int", "float", "string", "range", "code", "set", "ref"
+    "nil", "int", "float", "string", "range", "func", "anon", "set"
   };
   
   M[] memory;
@@ -510,12 +510,6 @@ public class Processor implements ByteCode {
     memory[sp--].str = null;
   }
     
-  void pushRef(M x) {
-    memory[sp].type = TREF;
-    memory[sp].str = null;
-    memory[sp--].ref = x;
-  }
-    
   M peekStack(int r) {
     return memory[sp + r + 1];
   }
@@ -623,7 +617,6 @@ public class Processor implements ByteCode {
     push(set);
   }
   
-  @SuppressWarnings("unchecked")
   void set_drf() {
     M mix = pop();
     M mset = pop();
@@ -788,7 +781,6 @@ public class Processor implements ByteCode {
     }
   }
   
-  @SuppressWarnings("unchecked")
   void set_sz() {
     M e = pop();
     if (e.type == TSET) {
@@ -802,7 +794,6 @@ public class Processor implements ByteCode {
     }
   }
   
-  @SuppressWarnings("unchecked")
   void set_rd() {
     int ix = pop().asInt();
     M mset = pop();
@@ -855,7 +846,6 @@ public class Processor implements ByteCode {
     minus = false;
   }
     
-  @SuppressWarnings("unchecked")
   void add() {
     M e2 = pop();
     M e1 = pop();
@@ -931,7 +921,7 @@ public class Processor implements ByteCode {
       e2 = tmp;
     }
     if (e1.type == e2.type) {
-      if (e1.type == TINT || e1.type == TCODE) {
+      if (e1.type == TINT || e1.type == TFUNC || e1.type == TANON) {
         int r = e1.i - e2.i;
         status(r);
         if (push) push(r);
@@ -1073,38 +1063,38 @@ public class Processor implements ByteCode {
     switch (type) {
     case TINT:
       switch (m.type) {
-      case TCODE:
+      case TFUNC:
+      case TANON:
       case TINT: break;
       case TFLOAT: m.i = (int)m.f; break;
       case TNIL: m.i = 0; break;
       case TSTR: m.i = m.str.length() == 1 ? m.str.charAt(0) : Integer.parseInt(m.str); break;
       case TRANGE: break;
       case TSET: break;
-      case TREF: break;
       }
       break;
     case TFLOAT:
       switch (m.type) {
       case TFLOAT: break;
-      case TCODE:
+      case TFUNC:
+      case TANON:
       case TINT: m.f = m.i; break;
       case TNIL: m.f = 0; break;
       case TSTR: m.f = Float.parseFloat(m.str); break;
       case TRANGE: break;
       case TSET: break;
-      case TREF: break;
       }
       break;
     case TO_CHAR:
       switch (m.type) {
       case TFLOAT: m.str = "" + (char)((int)m.f); break;
-      case TCODE: break;
+      case TANON:
+      case TFUNC: break;
       case TINT: m.str = "" + (char)(m.i); break;
       case TNIL: break;
       case TSTR: break;
       case TRANGE: break;
       case TSET: break;
-      case TREF: break;
       }
       break;
     case TSTR:
@@ -1269,10 +1259,10 @@ public class Processor implements ByteCode {
   
   void call() {
     M addr = pop();
-    int a = addr.i;
-    if (addr.type != TINT && addr.type != TCODE) {
+    if (addr.type != TINT && addr.type != TFUNC && addr.type != TANON) {
       throw new ProcessorError("calling bad type " + TNAME[addr.type]);
     }
+    int a = addr.i;
     push(me);
     push(pc);
     push(fp);
@@ -1280,12 +1270,14 @@ public class Processor implements ByteCode {
     fp = sp;
     pc = a;
     me = me_banked;
-    if ((pc & 0xff0000) == 0xff0000) {
+    if ((pc >>> 24) == PC_MSB_EXT) {
       ExtCall ec = extLinks.get(pc);
       if (ec == null) throw new ProcessorError(String.format("bad external call 0x%06x", pc));
       M ret = ec.exe(this, getArgs(fp, args)); 
       push(ret == null ? nilM : ret);
       retv();
+    } else if ((pc >>> 24) == PC_MSB_RAMCODE) {
+      // TODO
     }
   }
   
@@ -1714,7 +1706,6 @@ public class Processor implements ByteCode {
     public M(int x) { type = TINT; i = x; }
     public M(float x) { type = TFLOAT; f = x; }
     public M(String x) { type = TSTR; str = x; }
-    public M(M x) { type = TREF; ref = x; }
     public M(Object o) {
       if (o instanceof Integer) {
         i = ((Integer) o).intValue();
@@ -1746,14 +1737,14 @@ public class Processor implements ByteCode {
         return ""+ f;
       case TSTR:
         return str;
-      case TCODE:
+      case TFUNC:
         return String.format("->0x%08x", i);
+      case TANON:
+        return String.format(":>0x%08x", i);
       case TSET:
         return ((MSet)ref).toString();
       case TRANGE:
         return ((MRange)ref).toString();
-      case TREF:
-        return ref instanceof M ? ((M)ref).asString() : ref.toString();
       default:
         return "?" + type;
       }
@@ -1793,12 +1784,12 @@ public class Processor implements ByteCode {
         return "r"+ asString();
       case TSTR:
         return "s\'" + asString() + "'";
-      case TCODE:
+      case TFUNC:
         return "c" + asString();
+      case TANON:
+        return "C" + asString();
       case TSET:
         return "a" + asString();
-      case TREF:
-        return "ref" + asString();
       default:
         return "?" + type;
       }
@@ -1816,11 +1807,11 @@ public class Processor implements ByteCode {
         return ref;
       case TSTR:
         return str;
-      case TCODE:
+      case TFUNC:
+        return this;
+      case TANON:
         return this;
       case TSET:
-        return ref;
-      case TREF:
         return ref;
       default:
         return null;
@@ -1846,7 +1837,7 @@ public class Processor implements ByteCode {
   }
   
   public String getProcInfo() {
-    return String.format("pc:0x%08x  sp:0x%06x  fp:0x%06x  sr:", pc, sp, fp) + 
+    return String.format("pc:0x%06x  sp:0x%06x  fp:0x%06x  sr:", pc, sp, fp) + 
         (zero ? "Z" : "z") + (minus ? "M" : "m");
   }
 

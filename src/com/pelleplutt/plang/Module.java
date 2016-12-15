@@ -3,8 +3,6 @@ package com.pelleplutt.plang;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.pelleplutt.plang.TAC.TACVar;
-
 public class Module {
   String id;
   List<ModuleFragment> frags = new ArrayList<ModuleFragment>();

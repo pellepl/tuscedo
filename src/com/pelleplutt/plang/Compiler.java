@@ -290,6 +290,7 @@ public class Compiler {
     // DONE:   partialarr = oldarr[[3,4,5]], partialarr = oldarr[3#5]
     // DONE:   a=[]; for(i in 0#10) {a['x'+i]='y'+i;} // inverts key/val
     // DONE:   if (a) println('a true'); else println('a false');
+    // FIXME:  { globalscope = 1; { localscope = 2; anon = { return localscope * 4; }; println(anon()); } }
     // FIXME:  arr = arrb[{x = $0 * 2; return x < 3;}]
     // FIXME?: argument list for rel ops, funcs, e.g arr[$0 > 10], map[$0.val < 44]  
     // FIXME:  arr[[1,2,3]] = 4

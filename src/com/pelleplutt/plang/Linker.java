@@ -334,7 +334,7 @@ public class Linker implements ByteCode {
       } else {
         m = new M(((TACCode)t).addr);
       }
-      m.type = Processor.TCODE;
+      m.type = Processor.TFUNC;
     }
     else throw new CompilerError("constant type not primitive " + t.getClass().getSimpleName());
 

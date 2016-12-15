@@ -135,6 +135,10 @@ public interface ByteCode {
         4, 4, 4, 4, 4, 4, 4,UD, 4, 4, 4, 4, 4, 4, 4, 0, //f0
   };
   
+  static final int PC_MSB_CODE      = 0x00;
+  static final int PC_MSB_RAM       = 0x01;
+  static final int PC_MSB_RAMCODE   = 0x02;
+  static final int PC_MSB_EXT       = 0xff;
 
   
   /**
