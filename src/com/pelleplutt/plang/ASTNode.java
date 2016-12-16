@@ -97,6 +97,7 @@ public abstract class ASTNode {
   public static class ASTNodeBlok extends ASTNode {
     Map<ASTNodeSymbol, Integer> symList;
     List<ASTNodeSymbol> argList;
+    List<ASTNodeSymbol> anonDefScopeSymList;
     int scopeLevel;
     String id;
     String module;
@@ -117,13 +118,21 @@ public abstract class ASTNode {
       this.module = module;
       this.type = type;
     }
-    public void setAnnotation(Map<ASTNodeSymbol, Integer> symList, List<ASTNodeSymbol> argList, int scopeLevel, String id, String module, int type) {
+    public void setAnnotationFunction(Map<ASTNodeSymbol, Integer> symList, List<ASTNodeSymbol> argList, int scopeLevel, String id, String module) {
       this.symList = symList;
       this.argList = argList;
       this.scopeLevel = scopeLevel;
       this.id = id;
       this.module = module;
-      this.type = type;
+      this.type = ASTNodeBlok.TYPE_FUNC;
+    }
+    public void setAnnotationAnonymous(Map<ASTNodeSymbol, Integer> symList, int scopeLevel, String id, String module, List<ASTNodeSymbol> anonDefScopeSymList) {
+      this.symList = symList;
+      this.scopeLevel = scopeLevel;
+      this.id = id;
+      this.module = module;
+      this.anonDefScopeSymList = new ArrayList<ASTNodeSymbol>(anonDefScopeSymList); 
+      this.type = ASTNodeBlok.TYPE_ANON;
     }
     public boolean declaresVariableInThisScope(ASTNodeSymbol sym) {
       return symList.containsKey(sym);
@@ -143,6 +152,9 @@ public abstract class ASTNode {
     }
     public List<ASTNodeSymbol> getArguments() {
       return this.argList;
+    }
+    public List<ASTNodeSymbol> getAnonymousDefinedScopeVariables() {
+      return this.anonDefScopeSymList;
     }
     public String getModule() {
       return this.module;

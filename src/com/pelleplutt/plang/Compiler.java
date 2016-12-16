@@ -423,6 +423,39 @@ public class Compiler {
 //    crcsrc = 
 //        "";
 
+    
+  src = 
+    "module mod;\n" +
+    "func makeAnon(argVal) {\n" +
+    "  localVal = 'local';\n" +
+    "  localArgVal = argVal + 'nisse';\n" +
+    "  anon = {\n" +
+    "    println('Here goes!');\n" +
+    "    println('localVal:     ' + localVal);\n" +
+    "    println('argVal:       ' + argVal);\n" +
+    "    println('localArgVal:  ' + localArgVal);\n" +
+    "    println('anonArgVal:   ' + $0);\n" +
+    "    all = str(localVal) + str(argVal) + str(localArgVal);\n" +
+    "    println('all:          ' + all);\n" +
+//    "    println('localArgVal:  ' + bajs);\n" +
+    "  };\n" +
+    "  bajs = 2;\n" + 
+    "  return anon;\n" +
+    "}\n" +
+    "cool1 = makeAnon('funcarg1');\n" +
+    "cool2 = makeAnon('funcarg2');\n" +
+    "cool1('anonarg1');\n" +
+    "cool2('anonarg2');\n" +
+    "";
+  
+  othersrc = 
+    "";
+  siblingsrc = 
+    "";
+  crcsrc = 
+    "";
+
+    
     Executable e = null;
     try {
       e = Compiler.compile(extDefs, 0x0000, 0x4000, crcsrc, othersrc, siblingsrc, src);

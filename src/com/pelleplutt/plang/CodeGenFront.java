@@ -394,7 +394,8 @@ public class CodeGenFront {
       for (ASTNode e2 : e.operands) {
         genIR(e2, (ASTNodeBlok)e);
       }
-      if (doStackAllocation/* && eblk.type == ASTNodeBlok.TYPE_MAIN*/) { // TODO : why this check on MAIN?
+      if (doStackAllocation) {
+        // TODO what if programmer has a return statement? then we add free after return, stooooh-pidh!
         TACFree tfree = new TACFree(eblk, eblk.getModule(), eblk.getScopeId());
         add(tfree);
       }
@@ -408,7 +409,14 @@ public class CodeGenFront {
       }
       ffrag = oldFrag;
       if (eblk.type == ASTNodeBlok.TYPE_ANON) {
-        return new TACCode(e, newFrag);
+        // create external variable list that the anonymous scope reaches out to
+        List<TACVar> adsVars = new ArrayList<TACVar>();
+        for (ASTNodeSymbol esym : eblk.anonDefScopeSymList) {
+          ASTNodeBlok declBlok = getScopeIfDef(parentEblk, esym);
+          if (declBlok == null) throw new CompilerError("fatal", e);
+          adsVars.add(new TACVar(esym, esym.symbol, declBlok.getModule(), null, declBlok.getScopeId()));
+        }
+        return new TACCode(e, newFrag, adsVars, ASTNodeBlok.TYPE_ANON);
       }
       return null;
     } 
@@ -1019,11 +1027,12 @@ public class CodeGenFront {
     int whenceSymNbr = sym.symNbr;
     ASTNodeBlok veblk = eblk;
     while (veblk != null) {
-      if (dbg) System.out.println((ix++) + "looking for " + sym + " in " + veblk.getVariables() + ": " + veblk);
+      if (dbg) System.out.println((ix++) + "looking for " + sym + " in " + veblk.getVariables() + veblk.getArguments() + veblk.getAnonymousDefinedScopeVariables() + ": " + veblk);
       if (dbg) System.out.println("  declared here  " + veblk.declaresVariableInThisScope(sym));
       if (dbg) System.out.println("  is declared b4 " +  veblk.isSymbolDeclared(sym, whenceSymNbr));
       if ((veblk.getArguments() != null && veblk.getArguments().contains(sym)) ||
-          (veblk.declaresVariableInThisScope(sym) && veblk.isSymbolDeclared(sym, whenceSymNbr))) {
+          (veblk.declaresVariableInThisScope(sym) && veblk.isSymbolDeclared(sym, whenceSymNbr)) ||
+          (veblk.getAnonymousDefinedScopeVariables() != null && veblk.getAnonymousDefinedScopeVariables().contains(sym))) {
         if (dbg) System.out.println("  found");
         return veblk;
       }

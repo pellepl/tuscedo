@@ -32,6 +32,8 @@ import java.io.PrintStream;
 import java.util.HashMap;
 import java.util.List;
 
+import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
+import com.pelleplutt.plang.ASTNode.ASTNodeSymbol;
 import com.pelleplutt.plang.ModuleFragment.Link;
 import com.pelleplutt.plang.ModuleFragment.LinkGoto;
 import com.pelleplutt.plang.TAC.TACAlloc;
@@ -179,7 +181,10 @@ public class CodeGenBack implements ByteCode {
   void compileTAC(TAC tac, ModuleFragment frag) {
     if (dbg) System.out.println("    " + tac);
 
+    
     if (tac instanceof TACAlloc) {
+      // TODO ANON need to take care of the extra stuff here from anon definition scope locals
+
       TACAlloc all = (TACAlloc)tac;
       // TODO check arg count - do we want this?
 //      if (all.funcEntry) {
@@ -193,6 +198,8 @@ public class CodeGenBack implements ByteCode {
 //        addCode(frag, IBKPT); // TODO not bkpt, but raise exception or something
 //      }
       
+      // TODO ANON point out definition scope locals
+      
       // point out argument variables
       if (!all.args.isEmpty()) {
         int argix = 0;
@@ -202,22 +209,30 @@ public class CodeGenBack implements ByteCode {
         }
       }
       // allocate stack variables
-      if (all.variablesOnStack() > 0) {
+      if (all.variablesOnStack() + all.countADSVars() > 0) {
         int fpoffset = sp - fp;
+        for (String sym : all.adsVars) {
+          frag.locals.put(new TACVar(tac.getNode(), sym, all.module, null, all.scope), fpoffset++);
+        }
         for (String sym : all.vars) {
           frag.locals.put(new TACVar(tac.getNode(), sym, all.module, null, all.scope), fpoffset++);
         }
         for (String sym : all.tvars) {
           frag.locals.put(new TACVar(tac.getNode(), sym, all.module, null, all.scope + all.tScope), fpoffset++);
         }
-        sp += all.variablesOnStack();
-        addCode(frag, stackInfo() + all.toString(), ISP_INCR, all.variablesOnStack()-1);
+        if (all.variablesOnStack() > 0) {
+          sp += all.variablesOnStack();
+          addCode(frag, stackInfo() + all.toString(), ISP_INCR, all.variablesOnStack()-1);
+        }
       }
     }
     else if (tac instanceof TACFree) {
       // free stack variables
       TACFree fre = (TACFree)tac;
       if (fre.variablesOnStack() > 0) {
+        for (String sym : fre.adsVars) {
+          frag.locals.remove(new TACVar(tac.getNode(), sym, fre.module, null, fre.scope));
+        }
         for (String esym : fre.vars) {
           frag.locals.remove(new TACVar(tac.getNode(), esym, fre.module, null, fre.scope));
         }
@@ -686,11 +701,32 @@ public class CodeGenBack implements ByteCode {
         addCode(frag, stackInfo() + a.toString() + " (var)", ILOAD_IM, 0,0,0);
       }
     }
-    else if (a instanceof TACFloat || a instanceof TACString || a instanceof TACCode) {
+    else if (a instanceof TACFloat || a instanceof TACString) {
       frag.links.add(new ModuleFragment.LinkConst(frag.getPC(), a));
       sp++;
       addCode(frag, stackInfo() + a.toString() + " (const)", ILOAD_IM, 2,0,0);
-    } 
+    } else if (a instanceof TACCode) {
+      TACCode tcode = (TACCode)a;
+      if (tcode.type == ASTNodeBlok.TYPE_ANON) {
+        // adsVars into set
+        for (int i = 0; i < tcode.adsVars.size(); i++) {
+          TACVar adsVar = tcode.adsVars.get(i);
+          int fpoffset = frag.locals.get(adsVar);
+          sp++;
+          addCode(frag, stackInfo() + adsVar.toString() + " (local anon)", ILOAD_FP, fpoffset);
+        }
+        pushValue(new TACInt(a.getNode(), tcode.adsVars.size()), frag);
+        sp -= tcode.adsVars.size();
+        addCode(frag, stackInfo(), ISET_CRE);
+      }
+      frag.links.add(new ModuleFragment.LinkConst(frag.getPC(), a));
+      sp++;
+      addCode(frag, stackInfo() + a.toString() + " (const)", ILOAD_IM, 2,0,0);
+      if (tcode.type == ASTNodeBlok.TYPE_ANON) {
+        sp -= 2;
+        addCode(frag, stackInfo() + a.toString() + " (anon call def)", IANO_CRE);
+      }
+    }
     else if (a instanceof TACGetMe) {
       sp++;
       addCode(frag, stackInfo() + "get me", IPUSH_ME);

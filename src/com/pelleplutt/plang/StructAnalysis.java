@@ -36,6 +36,9 @@ import com.pelleplutt.plang.ASTNode.ASTNodeSymbol;
 public class StructAnalysis {
   static boolean dbg = false;
   public ScopeStack mainScopeStack;
+  ScopeStack anonDefiningScopeStack = null;
+  List<ASTNodeSymbol> anonDefLocals = new ArrayList<ASTNodeSymbol>();
+  
   String module = ".main";
   int blockId;
   
@@ -88,13 +91,19 @@ public class StructAnalysis {
       }
     } 
     else if (e.op == OP_SYMBOL && operator) {
-      // nothing
+      if (anonDefiningScopeStack != null && isVarDef(anonDefiningScopeStack, (ASTNodeSymbol)e)) {
+        // within an anonymous block, so gather all references to external locals
+        if (!anonDefLocals.contains((ASTNodeSymbol)e)) {
+          anonDefLocals.add((ASTNodeSymbol)e);
+        }
+      }
     }
     else if (e.op == OP_RETURN) {
       if (e.operands!=null && e.operands.size()>0) {
-        analyseRecurse(e.operands.get(0), scopeStack, parentNode, true, loop);
         if (e.operands.get(0) instanceof ASTNodeBlok) {
-          newAnonymousScope((ASTNodeBlok)e.operands.get(0), e);
+          newAnonymousScope((ASTNodeBlok)e.operands.get(0), scopeStack, e);
+        } else {
+          analyseRecurse(e.operands.get(0), scopeStack, parentNode, true, loop);
         }
       } 
     }
@@ -122,8 +131,7 @@ public class StructAnalysis {
           analyseRecurse(e2, funcScopeStack, e, false, false);
         }
       }
-      be.setAnnotation(funcScope.symVars, funcScope.symArgs, funcScopeStack.size(), blockId, module, 
-          ASTNodeBlok.TYPE_FUNC);
+      be.setAnnotationFunction(funcScope.symVars, funcScope.symArgs, funcScopeStack.size(), blockId, module);
       if (dbg) System.out.println("<<< branch back funcdef " + blockId);
       // System.out.println("LEAVE func " + fe + " got symbols " + funcScope.symList + " and args " + funcScope.symArgs);
     } 
@@ -145,7 +153,7 @@ public class StructAnalysis {
         
       if (tnode instanceof ASTNodeBlok) {
         // anonymous scope
-        newAnonymousScope((ASTNodeBlok)tnode, e);
+        newAnonymousScope((ASTNodeBlok)tnode, scopeStack, e);
       } else {
         if (e.operands != null) {
           for (ASTNode e2 : e.operands) {
@@ -157,7 +165,7 @@ public class StructAnalysis {
       if (AST.isAssignOperator(e.op)) {
         analyseRecurse(e.operands.get(0), scopeStack, e, true, loop);
         if (e.operands.get(1) instanceof ASTNodeBlok) {
-          newAnonymousScope((ASTNodeBlok)e.operands.get(1), e);
+          newAnonymousScope((ASTNodeBlok)e.operands.get(1), scopeStack, e);
         } else {
           analyseRecurse(e.operands.get(1), scopeStack, e, true, loop);
         }
@@ -188,7 +196,7 @@ public class StructAnalysis {
       if (e.operands != null) {
         for (ASTNode e2 : e.operands) {
           if (e2 instanceof ASTNodeBlok) {
-            newAnonymousScope((ASTNodeBlok)e2, e);
+            newAnonymousScope((ASTNodeBlok)e2, scopeStack, e);
           } else {
             analyseRecurse(e2, scopeStack, e, true, false);
           }
@@ -240,7 +248,7 @@ public class StructAnalysis {
             onlyPrimitives = false;
           }
           if (e2 instanceof ASTNodeBlok) {
-            newAnonymousScope((ASTNodeBlok)e2, e);
+            newAnonymousScope((ASTNodeBlok)e2, scopeStack, e);
           } else {
             analyseRecurse(e2, scopeStack, e, operator, loop);
           }
@@ -254,7 +262,7 @@ public class StructAnalysis {
       //val
       ASTNode val = e.operands.get(1);
       if (val instanceof ASTNodeBlok) {
-        newAnonymousScope((ASTNodeBlok)val, e);
+        newAnonymousScope((ASTNodeBlok)val, scopeStack, e);
       } else {
         analyseRecurse(val, scopeStack, e, operator, loop);
       }
@@ -268,7 +276,11 @@ public class StructAnalysis {
     }
   }
   
-  void newAnonymousScope(ASTNodeBlok be, ASTNode parent) {
+  void newAnonymousScope(ASTNodeBlok be, ScopeStack definingScopeStack, ASTNode parent) {
+    if (anonDefiningScopeStack != null) {
+      throw new CompilerError("cannot nest anonymous functions", parent);
+    }
+    anonDefiningScopeStack = definingScopeStack;
     Scope globalScope = mainScopeStack.get(0);
     be.parentBlock = globalScope.block;
     
@@ -284,7 +296,9 @@ public class StructAnalysis {
         analyseRecurse(e2, anonScopeStack, parent, false, false);
       }
     }
-    be.setAnnotation(anonScope.symVars, anonScopeStack.size(), blockId, module, ASTNodeBlok.TYPE_ANON);
+    be.setAnnotationAnonymous(anonScope.symVars, anonScopeStack.size(), blockId, module, anonDefLocals);
+    anonDefLocals.clear();
+    anonDefiningScopeStack = null;
     if (dbg) System.out.println("LEAVE anon eblk " + be + " got symbols " + anonScope.symVars);
   }
   

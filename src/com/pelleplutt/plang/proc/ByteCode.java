@@ -94,6 +94,7 @@ public interface ByteCode {
 
   static final int ICALL    = 0xe0; // call function                 (argc on stack) a=pop(); push($pc+3); push($fp); $fp=sp; $pc=a
   static final int ICALL_IM = 0xe1; // call function immediate       (argc on stack) push($pc+3); push($fp); $fp=sp; $pc=xxxxxx
+  static final int IANO_CRE = 0xe2; // create anonymous function     locals=pop(); addr=pop(); push(anon{addr, locals});
   static final int IRET     = 0xe8; // return                        $sp=$fp; $fp=pop(); $pc=pop(); argc=pop(); $sp-=argc;
   static final int IRETV    = 0xe9; // return val                    t=pop(); $sp=$fp; $fp=pop(); $pc=pop(); argc=pop(); $sp-=argc; push(t);
   
@@ -116,31 +117,26 @@ public interface ByteCode {
   
   static final int UD = -1;  
   static final int ISIZE[] = {
-      //0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, //00
-        1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1,UD, //10
-        1, 1, 1, 2, 1, 4, 1, 4, 2, 2,UD,UD, 2, 2,UD,UD, //20
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, //30
-        1, 1, 1, 1,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //40
-        1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,UD,UD,UD,UD, //50
-       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //60
-       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //70
-       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //80
-       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //90
-       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //a0
-       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //b0
-       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //c0
-       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //d0
-        1, 4,UD,UD,UD,UD,UD,UD, 1,UD,UD,UD,UD,UD,UD,UD, //e0
-        4, 4, 4, 4, 4, 4, 4,UD, 4, 4, 4, 4, 4, 4, 4, 0, //f0
+    // x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 xa xb xc xd xe xf
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, //0x
+        1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1,UD, //1x
+        1, 1, 1, 2, 1, 4, 1, 4, 2, 2,UD,UD, 2, 2,UD,UD, //2x
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, //3x
+        1, 1, 1, 1,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //4x
+        1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,UD,UD,UD,UD, //5x
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //6x
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //7x
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //8x
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //9x
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //ax
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //bx
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //cx
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //dx
+        1, 4, 1,UD,UD,UD,UD,UD, 1,UD,UD,UD,UD,UD,UD,UD, //ex
+        4, 4, 4, 4, 4, 4, 4,UD, 4, 4, 4, 4, 4, 4, 4, 0, //fx
   };
   
-  static final int PC_MSB_CODE      = 0x00;
-  static final int PC_MSB_RAM       = 0x01;
-  static final int PC_MSB_RAMCODE   = 0x02;
-  static final int PC_MSB_EXT       = 0xff;
 
-  
   /**
    * Stack when call by address
    * ARG..
@@ -159,7 +155,16 @@ public interface ByteCode {
    * ---> call
    */
   /**
-   * Stack in call
+   * Stack when calling anonymous
+   * ARG..
+   * ARG1
+   * ARG0
+   * ARGC
+   * ANONADDR
+   * ---> call
+   */
+  /**
+   * Stack in call, regular
    * ARG...
    * ARG1
    * ARG0
@@ -167,6 +172,17 @@ public interface ByteCode {
    * ME
    * PC
    * FP
+   */
+  /**
+   * Stack in call, anonymous
+   * ARG...
+   * ARG1
+   * ARG0
+   * ARGC
+   * ME
+   * PC
+   * FP
+   * (anonymous definition scope list)
    */
   
   static final int FRAME_0_FP = 1;

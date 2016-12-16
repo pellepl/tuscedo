@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
 import com.pelleplutt.plang.ModuleFragment.Link;
 import com.pelleplutt.plang.ModuleFragment.LinkArrayInitializer;
 import com.pelleplutt.plang.ModuleFragment.LinkCall;
@@ -140,7 +141,7 @@ public class Linker implements ByteCode {
           String callName = lu.sym.module + ".func." + lu.sym.name;
           if (fragLUT.containsKey(callName)) {
             // this is a function reference, add address as constant
-            TACCode funcRef = new TACCode(lu.sym.getNode(), fragLUT.get(callName));
+            TACCode funcRef = new TACCode(lu.sym.getNode(), fragLUT.get(callName), ASTNodeBlok.TYPE_FUNC);
             if (!globalLUT.containsKey(funcRef)) {
               globalLUT.put(funcRef, symbolConstOffset++);
             }
@@ -278,7 +279,7 @@ public class Linker implements ByteCode {
         if (dbg) System.out.print(", as function " + callName);
         if (fragLUT.containsKey(callName)) {
           // this is a function reference
-          TACCode funcRef = new TACCode(tu.getNode(), fragLUT.get(callName));
+          TACCode funcRef = new TACCode(tu.getNode(), fragLUT.get(callName), ASTNodeBlok.TYPE_FUNC);
           frag.write(srcvar + 1, globalLUT.get(funcRef), 3);
           if (dbg) System.out.println(": found");
           continue;

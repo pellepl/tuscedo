@@ -54,7 +54,6 @@ public abstract class TAC {
     int op;
     TAC operand;
     public TACUnaryOp(ASTNode e, int op, TAC operand) {
-      // TODO associativity
       super(e); this.op = op; this.operand = operand;
     }
     public String toString() {return AST.opString(op) + ref(operand);}
@@ -146,12 +145,18 @@ public abstract class TAC {
   public static class TACCode extends TAC {
     FrontFragment ffrag;
     int addr;
-    public TACCode(ASTNode e, FrontFragment ffrag) {
-      super(e); this.ffrag = ffrag;
+    int type;
+    List<TACVar> adsVars;
+    public TACCode(ASTNode e, FrontFragment ffrag, int type) {
+      super(e); this.ffrag = ffrag; this.type = type;
     }
-    public TACCode(ASTNode e, int address) {
-      super(e); this.addr = address;
+    public TACCode(ASTNode e, FrontFragment ffrag, List<TACVar> adsVars, int type) {
+      super(e); this.ffrag = ffrag; this.type = type; this.adsVars = adsVars;
     }
+    public TACCode(ASTNode e, int address, int type) {
+      super(e); this.addr = address; this.type = type;
+    }
+    
     public boolean equals(Object o) {
       if (o instanceof TACCode) {
         TACCode t = (TACCode)o;
@@ -162,7 +167,7 @@ public abstract class TAC {
     public int hashCode() {
       return ffrag != null ? ffrag.module.hashCode() ^ ffrag.name.hashCode() : addr;
     }
-    public String toString() {return ffrag != null ? ffrag.module + ffrag.name : String.format("0x%08x", addr);}
+    public String toString() {return ffrag != null ? ffrag.module + ffrag.name : String.format("0x%06x", addr);}
   }
   
   public static class TACFloat extends TAC {
@@ -254,6 +259,7 @@ public abstract class TAC {
   public static class TACAlloc extends TAC {
     public static final String varIterator = ".iter";
     public static final String varSet = ".set";
+    List<String> adsVars = new ArrayList<String>();
     List<String> vars = new ArrayList<String>();
     List<String> tvars = new ArrayList<String>();
     List<String> args = new ArrayList<String>();
@@ -261,14 +267,7 @@ public abstract class TAC {
     boolean funcEntry;
     
     public TACAlloc(ASTNodeBlok e, String module, String scope) {
-      super(e);
-      this.module = module;
-      this.scope = scope;
-      if (e.getVariables() != null) {
-        for (ASTNodeSymbol sym : e.getVariables()) {
-          vars.add(sym.symbol);
-        }
-      }
+      this(e, module, scope, false);
     }
     
     public TACAlloc(ASTNodeBlok e, String module, String scope, boolean funcEntry) {
@@ -284,6 +283,11 @@ public abstract class TAC {
       if (e.getArguments() != null) {
         for (ASTNodeSymbol sym : e.getArguments()) {
           args.add(sym.symbol);
+        }
+      }
+      if (e.getAnonymousDefinedScopeVariables() != null) {
+        for (ASTNodeSymbol sym : e.getAnonymousDefinedScopeVariables()) {
+          adsVars.add(sym.symbol);
         }
       }
     }
@@ -310,11 +314,17 @@ public abstract class TAC {
       return vars.size() + tvars.size();
     }
     
-    public String toString() {return "ALLO " + vars + (!tvars.isEmpty() ? " " + tvars : "") + 
+    public int countADSVars() {
+      return adsVars.size();
+    }
+    
+    public String toString() {return "ALLO " + vars + (!tvars.isEmpty() ? " " + tvars : "") +
+        (!adsVars.isEmpty() ? " ADS:" + adsVars : "") +
         (funcEntry ? " FUNC" + args : "");}
   }
 
   public static class TACFree extends TAC {
+    List<String> adsVars = new ArrayList<String>();
     List<String> vars = new ArrayList<String>();
     List<String> tvars = new ArrayList<String>();
     String module, scope, tScope;
@@ -327,6 +337,11 @@ public abstract class TAC {
           vars.add(sym.symbol);
         }
       }
+      if (e.getAnonymousDefinedScopeVariables() != null) {
+        for (ASTNodeSymbol sym : e.getAnonymousDefinedScopeVariables()) {
+          adsVars.add(sym.symbol);
+        }
+      }
     }
     public TACFree(TACAlloc x) {
       super(x.getNode());
@@ -335,11 +350,12 @@ public abstract class TAC {
       this.tScope = x.tScope;
       this.vars = x.vars;
       this.tvars = x.tvars;
+      this.adsVars = x.adsVars;
     }
     public int variablesOnStack() {
-      return vars.size() + tvars.size();
+      return vars.size() + tvars.size() + adsVars.size();
     }
-    public String toString() {return "FREE " + vars + (!tvars.isEmpty() ? " " + tvars : "");}
+    public String toString() {return "FREE " + vars + (!tvars.isEmpty() ? " " + tvars : "")+ (!adsVars.isEmpty() ? " " + adsVars : "");}
   }
   
   public static class TACFuncArg extends TAC {

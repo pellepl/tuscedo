@@ -369,6 +369,9 @@ public class Processor implements ByteCode {
       sb.append("call_im ");
       sb.append(String.format("0x%06x", codetoi(code, pc, 3)));
       break;
+    case IANO_CRE: 
+      sb.append("ano_cre ");
+      break;
     case IRET: 
       sb.append("ret     ");
       break;
@@ -1262,22 +1265,37 @@ public class Processor implements ByteCode {
     if (addr.type != TINT && addr.type != TFUNC && addr.type != TANON) {
       throw new ProcessorError("calling bad type " + TNAME[addr.type]);
     }
-    int a = addr.i;
-    push(me);
-    push(pc);
-    push(fp);
-    int args = peek(sp+FRAME_3_ARGC).i;
-    fp = sp;
-    pc = a;
-    me = me_banked;
-    if ((pc >>> 24) == PC_MSB_EXT) {
-      ExtCall ec = extLinks.get(pc);
-      if (ec == null) throw new ProcessorError(String.format("bad external call 0x%06x", pc));
-      M ret = ec.exe(this, getArgs(fp, args)); 
-      push(ret == null ? nilM : ret);
-      retv();
-    } else if ((pc >>> 24) == PC_MSB_RAMCODE) {
-      // TODO
+    if (addr.type == TFUNC) {
+      int a = addr.i;
+      push(me);
+      push(pc);
+      push(fp);
+      int args = peek(sp+FRAME_3_ARGC).i;
+      fp = sp;
+      pc = a;
+      me = me_banked;
+      if ((pc & 0xff0000) == 0xff0000) {
+        ExtCall ec = extLinks.get(pc);
+        if (ec == null) throw new ProcessorError(String.format("bad external call 0x%06x", pc));
+        M ret = ec.exe(this, getArgs(fp, args)); 
+        push(ret == null ? nilM : ret);
+        retv();
+      }
+    } else if (addr.type == TANON) {
+      int a = addr.i;
+      push(me);
+      push(pc);
+      push(fp);
+      int args = peek(sp+FRAME_3_ARGC).i;
+      fp = sp;
+      pc = a;
+      me = me_banked;
+      // put ((MSet)addr.ref) on stack
+      MSet vars = ((MSet)addr.ref);
+      int len = vars.size();
+      for (int i = 0; i < len; i++) {
+        push(vars.get(i));
+      }
     }
   }
   
@@ -1296,6 +1314,14 @@ public class Processor implements ByteCode {
       push(ret == null ? nilM : ret);
       retv();
     }
+  }
+  
+  void ano_cre() {
+    // TODO check types
+    M addr = pop();
+    M locals = pop();
+    M ret = new M(addr.i, (MSet)locals.ref);
+    push(ret);
   }
   
   void ret() {
@@ -1625,6 +1651,9 @@ public class Processor implements ByteCode {
     case ICALL_IM: 
       call_im();
       break;
+    case IANO_CRE: 
+      ano_cre();
+      break;
     case IRET: 
       ret();
       break;
@@ -1706,6 +1735,7 @@ public class Processor implements ByteCode {
     public M(int x) { type = TINT; i = x; }
     public M(float x) { type = TFLOAT; f = x; }
     public M(String x) { type = TSTR; str = x; }
+    public M(int addr, MSet locals) { type = TANON; i = addr; ref = locals; }
     public M(Object o) {
       if (o instanceof Integer) {
         i = ((Integer) o).intValue();
@@ -1738,9 +1768,9 @@ public class Processor implements ByteCode {
       case TSTR:
         return str;
       case TFUNC:
-        return String.format("->0x%08x", i);
+        return String.format("->0x%06x", i);
       case TANON:
-        return String.format(":>0x%08x", i);
+        return String.format(":>0x%06x", i);
       case TSET:
         return ((MSet)ref).toString();
       case TRANGE:
