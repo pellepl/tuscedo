@@ -30,7 +30,7 @@ public class Compiler {
   
       System.out.println("* structural analysis");
       //StructAnalysis.dbg = true;
-      StructAnalysis.analyse(e);
+      StructAnalysis.analyse(e, ir);
       
       System.out.println("* intermediate codegen");
       CodeGenFront.dbg = true;
@@ -401,7 +401,11 @@ public class Compiler {
   "  }\n" +
   " return crc ^ ~0;\n" +
   "}";
-//        
+    
+//    src = "f[]; for (i in 1#3) f += {return i;}; i = 12; for (c in f) println(c());";
+//    othersrc = siblingsrc = crcsrc = "";
+
+    //        
 //    src = 
 //        "module mod;\n" +
 //        "WTF.exe();\n"+
@@ -422,39 +426,6 @@ public class Compiler {
 //        "";
 //    crcsrc = 
 //        "";
-
-    
-  src = 
-    "module mod;\n" +
-    "func makeAnon(argVal) {\n" +
-    "  localVal = 'local';\n" +
-    "  localArgVal = argVal + 'nisse';\n" +
-    "  anon = {\n" +
-    "    println('Here goes!');\n" +
-    "    println('localVal:     ' + localVal);\n" +
-    "    println('argVal:       ' + argVal);\n" +
-    "    println('localArgVal:  ' + localArgVal);\n" +
-    "    println('anonArgVal:   ' + $0);\n" +
-    "    all = str(localVal) + str(argVal) + str(localArgVal);\n" +
-    "    println('all:          ' + all);\n" +
-//    "    println('localArgVal:  ' + bajs);\n" +
-    "  };\n" +
-    "  bajs = 2;\n" + 
-    "  return anon;\n" +
-    "}\n" +
-    "cool1 = makeAnon('funcarg1');\n" +
-    "cool2 = makeAnon('funcarg2');\n" +
-    "cool1('anonarg1');\n" +
-    "cool2('anonarg2');\n" +
-    "";
-  
-  othersrc = 
-    "";
-  siblingsrc = 
-    "";
-  crcsrc = 
-    "";
-
     
     Executable e = null;
     try {
@@ -515,7 +486,7 @@ public class Compiler {
       ASTNodeBlok e = AST.buildTree(src);
       ASTOptimiser.optimise(e);
       Grammar.check(e);
-      StructAnalysis.analyse(e);
+      StructAnalysis.analyse(e, ir);
       ir = CodeGenFront.genIR(e, ir);
       CodeGenBack.compile(ir);
       ir.accumulateGlobals();

@@ -623,35 +623,33 @@ public class Processor implements ByteCode {
   void set_drf() {
     M mix = pop();
     M mset = pop();
-    if (mset.type == TSET) {
-      if (mix.type == TSET) {
+    if (mset.type == TSET || mset.type == TRANGE) {
+      if (mix.type == TSET || mix.type == TRANGE) {
         derefSetArgSet((MSet)mset.ref, (MSet)mix.ref);
-      } else if (mix.type == TRANGE) {
-        derefSetArgRange((MSet)mset.ref, (MRange)mix.ref);
       } else {
         push(((MSet)mset.ref).get(mix));
       }
     } else if (mset.type == TSTR) {
-      if (mix.type == TSET) {
+      if (mix.type == TSET || mix.type == TRANGE) {
         derefStringArgSet(mset.str, (MSet)mix.ref);
-      } else if (mix.type == TRANGE) {
-        derefStringArgRange(mset.str, (MRange)mix.ref);
       } else {
         push(mset.str.charAt(mix.asInt()));
       }
-    } else if (mset.type == TRANGE) {
-      if (mix.type == TSET) {
-        derefRangeArgSet((MRange)mset.ref, (MSet)mix.ref);
-      } else if (mix.type == TRANGE) {
-        derefRangeArgRange((MRange)mset.ref, (MRange)mix.ref);
-      }else {
-        if (((MRange)mset.ref).type == TINT) {
-          push((int)((MRange)mset.ref).get(mix.asInt()));
+    } else if (mset.type == TINT) {
+      int res = 0;
+      if (mix.type == TSET || mix.type == TRANGE) {
+        MSet drf = (MSet)mix.ref;
+        int len = drf.size();
+        for (int i = 0; i < len; i++) {
+          M mdrf = drf.getElement(i);
+          if (mdrf.type == TFLOAT || mdrf.type == TINT) {
+            res = (res << 1) | ( (mset.i & (1 << mdrf.asInt())) >>> mdrf.asInt() );
+          }
         }
-        else if (((MRange)mset.ref).type == TFLOAT) {
-          push((float)((MRange)mset.ref).get(mix.asInt()));
-        }
+      } else {
+        res = (mset.i & (1<<mix.asInt()))>>>mix.asInt();
       }
+      push(res);
     } else {
       throw new ProcessorError("cannot dereference type " + TNAME[mset.type]);
     }
@@ -672,17 +670,6 @@ public class Processor implements ByteCode {
     }
     push(res);
   }
-  void derefSetArgRange(MSet set, MRange drf) {
-    MListMap res = new MListMap();
-    int len = drf.size();
-    for (int i = 0; i < len; i++) {
-      float d = drf.get(i);
-      M m = new M();
-      m.copy(set.get((int)d));
-      res.add(m);
-    }
-    push(res);
-  }
   
   void derefStringArgSet(String str, MSet drf) {
     StringBuilder sb = new StringBuilder();
@@ -695,16 +682,6 @@ public class Processor implements ByteCode {
     }
     push(sb.toString());
   }
-  void derefStringArgRange(String str, MRange drf) {
-    StringBuilder sb = new StringBuilder();
-    int len = drf.size();
-    for (int i = 0; i < len; i++) {
-      float d = drf.get(i);
-      sb.append(str.charAt((int)d));
-    }
-    push(sb.toString());
-  }
-  
   
   void derefRangeArgSet(MRange set, MSet drf) {
     MListMap res = new MListMap();
@@ -713,23 +690,6 @@ public class Processor implements ByteCode {
       M mdrf = drf.getElement(i);
       if (mdrf.type == TFLOAT || mdrf.type == TINT) {
         res.add(new M(set.get(mdrf.asInt())));
-      }
-    }
-    push(res);
-  }
-  void derefRangeArgRange(MRange set, MRange drf) {
-    MListMap res = new MListMap();
-    int len = drf.size();
-    if (set.type == TINT) {
-      for (int i = 0; i < len; i++) {
-        float d = drf.get(i);
-        res.add(new M((int)set.get((int)d)));
-      }
-    }
-    else if (set.type == TFLOAT) {
-      for (int i = 0; i < len; i++) {
-        float d = drf.get(i);
-        res.add(new M((float)set.get((int)d)));
       }
     }
     push(res);
@@ -749,6 +709,22 @@ public class Processor implements ByteCode {
         m.copy(mval);
         ((MSet)mset.ref).set(mix, m);
       }
+    } else if (mset.type == TINT) {
+      int res = mset.i;
+      int ix = mix.asInt();
+      if (mval.type == TNIL) {
+        int mask = (1<<ix)-1;
+        int lo = res & mask;
+        int hi = (res >>> 1) & ~mask;
+        res = hi | lo;
+      } else {
+        if (mval.asInt() > 0) {
+          res |= (1 << ix);
+        } else {
+          res &= ~(1 << ix);
+        }
+      }
+      push(res);
     } else if (mset.type == TSTR) {
       if (mval.type == TNIL) {
         int ix = mix.asInt();
@@ -800,19 +776,10 @@ public class Processor implements ByteCode {
   void set_rd() {
     int ix = pop().asInt();
     M mset = pop();
-    if (mset.type == TSET) {
+    if (mset.type == TSET || mset.type == TRANGE) {
       push(((MSet)mset.ref).get(ix));
     } else if (mset.type == TSTR) {
       push(mset.str.charAt(ix));
-    } else if (mset.type == TRANGE) {
-      if (((MRange)mset.ref).type == TINT) {
-        push((int)((MRange)mset.ref).get(ix));
-      }
-      else if (((MRange)mset.ref).type == TFLOAT) {
-        push((float)((MRange)mset.ref).get(ix));
-      } else {
-        throw new ProcessorError("fatal: range of bad type " + TNAME[((MRange)mset.ref).type]);
-      }
      } else {
       throw new ProcessorError("cannot get sub element of type " + TNAME[mset.type]);
     }
@@ -1265,7 +1232,7 @@ public class Processor implements ByteCode {
     if (addr.type != TINT && addr.type != TFUNC && addr.type != TANON) {
       throw new ProcessorError("calling bad type " + TNAME[addr.type]);
     }
-    if (addr.type == TFUNC) {
+    if (addr.type == TFUNC || addr.type == TINT) {
       int a = addr.i;
       push(me);
       push(pc);
@@ -1282,16 +1249,16 @@ public class Processor implements ByteCode {
         retv();
       }
     } else if (addr.type == TANON) {
+      MSet vars = ((MSet)addr.ref);
       int a = addr.i;
       push(me);
       push(pc);
       push(fp);
-      int args = peek(sp+FRAME_3_ARGC).i;
       fp = sp;
       pc = a;
       me = me_banked;
-      // put ((MSet)addr.ref) on stack
-      MSet vars = ((MSet)addr.ref);
+      
+      // put ((MSet)addr.ref) on stack (adsVars)
       int len = vars.size();
       for (int i = 0; i < len; i++) {
         push(vars.get(i));
@@ -1336,7 +1303,7 @@ public class Processor implements ByteCode {
   }
   
   void retv() {
-    M t = pop();
+    M t = new M().copy(pop());
     sp = fp;
     if (fp < 0 || fp >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("abnormal exit");
     fp = pop().i;
@@ -1770,7 +1737,7 @@ public class Processor implements ByteCode {
       case TFUNC:
         return String.format("->0x%06x", i);
       case TANON:
-        return String.format(":>0x%06x", i);
+        return String.format(":>0x%06x", i) + ref;
       case TSET:
         return ((MSet)ref).toString();
       case TRANGE:

@@ -33,7 +33,6 @@ import java.util.HashMap;
 import java.util.List;
 
 import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
-import com.pelleplutt.plang.ASTNode.ASTNodeSymbol;
 import com.pelleplutt.plang.ModuleFragment.Link;
 import com.pelleplutt.plang.ModuleFragment.LinkGoto;
 import com.pelleplutt.plang.TAC.TACAlloc;
@@ -212,14 +211,18 @@ public class CodeGenBack implements ByteCode {
       if (all.variablesOnStack() + all.countADSVars() > 0) {
         int fpoffset = sp - fp;
         for (String sym : all.adsVars) {
-          frag.locals.put(new TACVar(tac.getNode(), sym, all.module, null, all.scope), fpoffset++);
+          TACVar v = new TACVar(tac.getNode(), sym, all.module, null, all.scope);
+          frag.locals.put(v, fpoffset++);
         }
         for (String sym : all.vars) {
-          frag.locals.put(new TACVar(tac.getNode(), sym, all.module, null, all.scope), fpoffset++);
+          TACVar v = new TACVar(tac.getNode(), sym, all.module, null, all.scope);
+          frag.locals.put(v, fpoffset++);
         }
         for (String sym : all.tvars) {
-          frag.locals.put(new TACVar(tac.getNode(), sym, all.module, null, all.scope + all.tScope), fpoffset++);
+          TACVar v = new TACVar(tac.getNode(), sym, all.module, null, all.scope);
+          frag.locals.put(v, fpoffset++);
         }
+        sp += all.countADSVars();
         if (all.variablesOnStack() > 0) {
           sp += all.variablesOnStack();
           addCode(frag, stackInfo() + all.toString(), ISP_INCR, all.variablesOnStack()-1);
@@ -619,7 +622,7 @@ public class CodeGenBack implements ByteCode {
           addCode(frag, stackInfo() + op.toString(), IDUP);
         }
         sp--;
-        addCode(frag, stackInfo() + op.toString(), ISTOR_FP, fpoffset);
+        addCode(frag, stackInfo() + op.toString() + " (local)", ISTOR_FP, fpoffset);
       } else {
         // global value
         pushValue(assignment, frag);
@@ -629,7 +632,7 @@ public class CodeGenBack implements ByteCode {
         }
         frag.links.add(new ModuleFragment.LinkGlobal(frag.getPC(), (TACVar)assignee));
         sp--;
-        addCode(frag, stackInfo() + op.toString(), ISTOR_IM, 0,0,0);
+        addCode(frag, stackInfo() + op.toString() + " (global)", ISTOR_IM, 0,0,0);
       }
     } else if (assignee instanceof TACSetDeref) {
       TACSetDeref de = (TACSetDeref)assignee;
@@ -711,9 +714,19 @@ public class CodeGenBack implements ByteCode {
         // adsVars into set
         for (int i = 0; i < tcode.adsVars.size(); i++) {
           TACVar adsVar = tcode.adsVars.get(i);
-          int fpoffset = frag.locals.get(adsVar);
-          sp++;
-          addCode(frag, stackInfo() + adsVar.toString() + " (local anon)", ILOAD_FP, fpoffset);
+          // TODO ANON do NOT copy global references - these should never be included into tcode.adsVars - check it up in CodeGenFront or something
+          if (frag.locals.containsKey(adsVar)) {
+            // local value
+            int fpoffset = frag.locals.get(adsVar);
+            sp++;
+            addCode(frag, stackInfo() + adsVar.toString() + " (local anon)", ILOAD_FP, fpoffset);
+          } else {
+//            // global variable
+//            frag.links.add(new ModuleFragment.LinkGlobal(frag.getPC(), adsVar));
+//            sp++;
+//            addCode(frag, stackInfo() + a.toString() + " (global anon)", ILOAD_IM, 0,0,0);
+            throw new CompilerError("fatal", a.getNode());
+          }
         }
         pushValue(new TACInt(a.getNode(), tcode.adsVars.size()), frag);
         sp -= tcode.adsVars.size();
@@ -723,7 +736,7 @@ public class CodeGenBack implements ByteCode {
       sp++;
       addCode(frag, stackInfo() + a.toString() + " (const)", ILOAD_IM, 2,0,0);
       if (tcode.type == ASTNodeBlok.TYPE_ANON) {
-        sp -= 2;
+        sp = sp - 2 + 1;
         addCode(frag, stackInfo() + a.toString() + " (anon call def)", IANO_CRE);
       }
     }

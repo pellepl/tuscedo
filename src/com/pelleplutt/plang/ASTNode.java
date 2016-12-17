@@ -166,7 +166,11 @@ public abstract class ASTNode {
       return this.id;
     }
     public boolean gotUnhandledVariables() {
-      return !variablesHandled && (!symList.isEmpty() || (argList != null && !argList.isEmpty()));
+      return !variablesHandled && (
+                !symList.isEmpty() || 
+                (argList != null && !argList.isEmpty()) ||
+                (anonDefScopeSymList != null && !anonDefScopeSymList.isEmpty())
+            );
     }
     public boolean isVariablesHandled() {
       return variablesHandled;

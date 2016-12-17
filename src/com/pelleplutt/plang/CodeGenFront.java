@@ -1039,8 +1039,9 @@ public class CodeGenFront {
       whenceSymNbr = veblk.symNbr;
       veblk = veblk.parentBlock;
     }
-    List<ASTNodeSymbol> modGlobs;
+    List<ASTNodeSymbol> modGlobs = null;
     if (irep != null && (modGlobs = irep.getGlobalVariables(eblk.getModule())) != null) {
+      if (dbg) System.out.print("  is " + sym + " in " + modGlobs);
       if (modGlobs.contains(sym)) {
         if (dbg) System.out.println("  is declared in previous source");
         ASTNodeBlok declBlok = new ASTNodeBlok(); 
@@ -1048,6 +1049,9 @@ public class CodeGenFront {
         declBlok.id = ".0"; // global scope
         return declBlok;
       }
+      else if (dbg) System.out.print(" false");
+    } else {
+      if (dbg) System.out.println("  no global " + irep + " " + modGlobs);
     }
     if (dbg) System.out.println("  NOT FOUND");
     return null;

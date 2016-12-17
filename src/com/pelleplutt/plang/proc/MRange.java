@@ -3,11 +3,12 @@ package com.pelleplutt.plang.proc;
 import com.pelleplutt.plang.CompilerError;
 import com.pelleplutt.plang.proc.Processor.M;
 
-public class MRange {
+public class MRange implements MSet {
   byte type;
   float start;
   float end;
   float step;
+  Processor.M m = new M();
   
   public MRange(M start, M end) {
     type = checkType(start, null, end);
@@ -21,6 +22,7 @@ public class MRange {
     if (this.start == this.end) {
       throw new CompilerError("zero range");
     }
+    this.m.type = type;
   }
 
   public MRange(M start, M step, M end) {
@@ -38,6 +40,7 @@ public class MRange {
         this.start > this.end && this.step > 0) {
       throw new CompilerError("range step sign is invalid");
     }
+    this.m.type = type;
   }
   
   public int size() {
@@ -46,8 +49,22 @@ public class MRange {
     return l;
   }
   
-  public float get(int ix) {
-    return start + ((float)ix*step);
+  public M get(M m) {
+    int ix = m.asInt();
+    return get(ix);
+  }
+  
+  public M get(int ix) {
+    if (type == Processor.TINT) {
+      m.i = (int)(start + ((float)ix*step));
+    } else {
+      m.f = start + ((float)ix*step);
+    }
+    return m;
+  }
+
+  public M getElement(int ix) {
+    return get(ix);
   }
   
   public static byte checkType(M start, M step, M end) {
@@ -71,6 +88,12 @@ public class MRange {
     }
     return (byte)(f ? Processor.TFLOAT : Processor.TINT);
   }
+  
+  public void add(M m) {throw new ProcessorError("ranges are immutable");}
+  public void insert(int ix, M m) {throw new ProcessorError("ranges are immutable");}
+  public void set(M mix, M m) {throw new ProcessorError("ranges are immutable");}
+  public void set(Object key, M m) {throw new ProcessorError("ranges are immutable");}
+  public void remove(M m) {throw new ProcessorError("ranges are immutable");}
 
   public String toString() {
     return start + "#" + step + "#" + end;

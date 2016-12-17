@@ -41,6 +41,7 @@ public class StructAnalysis {
   
   String module = ".main";
   int blockId;
+  IntermediateRepresentation irep;
   
   public StructAnalysis() {
   }
@@ -91,7 +92,7 @@ public class StructAnalysis {
       }
     } 
     else if (e.op == OP_SYMBOL && operator) {
-      if (anonDefiningScopeStack != null && isVarDef(anonDefiningScopeStack, (ASTNodeSymbol)e)) {
+      if (anonDefiningScopeStack != null && isLocalVarDef(anonDefiningScopeStack, (ASTNodeSymbol)e)) {
         // within an anonymous block, so gather all references to external locals
         if (!anonDefLocals.contains((ASTNodeSymbol)e)) {
           anonDefLocals.add((ASTNodeSymbol)e);
@@ -302,9 +303,10 @@ public class StructAnalysis {
     if (dbg) System.out.println("LEAVE anon eblk " + be + " got symbols " + anonScope.symVars);
   }
   
-  public static void analyse(ASTNodeBlok e) {
+  public static void analyse(ASTNodeBlok e, IntermediateRepresentation ir) {
     StructAnalysis cg = new StructAnalysis();
     if (dbg) System.out.println("  * analyse variables");
+    cg.irep = ir;
     cg.structAnalyse(e);
   }
   
@@ -330,6 +332,12 @@ public class StructAnalysis {
         // is defined already
         return;
       };
+      List<ASTNodeSymbol> modGlobs = null;
+      if (irep != null && (modGlobs = irep.getGlobalVariables(module)) != null) {
+        if (modGlobs.contains(esym)) {
+          return;
+        }
+      }
     }
     scopeStack.peek().symVars.put(esym, esym.symNbr);
     if (dbg) System.out.println("  + '" + esym.symbol + "' " + (scopeStack.size() == 1 ? "GLOBAL" : "LOCAL") +
@@ -351,6 +359,16 @@ public class StructAnalysis {
   // see if a variable is reachable from this scope and ancestors
   boolean isVarDef(ScopeStack scopeStack, ASTNodeSymbol esym) {
     for (int i = scopeStack.size()-1; i >= 0; i--) {
+      Scope s = scopeStack.get(i);
+      if (s.symVars.keySet().contains(esym)) return true;
+      if (s.symArgs.contains(esym)) return true;
+    }
+    return false;
+  }
+  
+  // see if a variable is reachable from this scope and ancestors, but not global scope
+  boolean isLocalVarDef(ScopeStack scopeStack, ASTNodeSymbol esym) {
+    for (int i = scopeStack.size()-1; i > 0; i--) {
       Scope s = scopeStack.get(i);
       if (s.symVars.keySet().contains(esym)) return true;
       if (s.symArgs.contains(esym)) return true;
