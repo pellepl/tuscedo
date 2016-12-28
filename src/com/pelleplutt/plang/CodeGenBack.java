@@ -68,8 +68,8 @@ import com.pelleplutt.plang.TAC.TACUnaryOp;
 import com.pelleplutt.plang.TAC.TACUndefineMe;
 import com.pelleplutt.plang.TAC.TACUnresolved;
 import com.pelleplutt.plang.TAC.TACVar;
+import com.pelleplutt.plang.proc.Assembler;
 import com.pelleplutt.plang.proc.ByteCode;
-import com.pelleplutt.plang.proc.Processor;
 
 public class CodeGenBack implements ByteCode {
   static boolean dbg = false;
@@ -100,7 +100,7 @@ public class CodeGenBack implements ByteCode {
         int pc = 0;
         int len = mc.length;
         while (len > 0) {
-          String disasm = String.format("0x%08x %s", pc, Processor.disasm(mc, pc)); 
+          String disasm = String.format("0x%08x %s", pc, Assembler.disasm(mc, pc)); 
           out.print(disasm);
           String com = frag.commentDbg(pc);
           if (com != null) {
@@ -178,12 +178,11 @@ public class CodeGenBack implements ByteCode {
   }
   
   void compileTAC(TAC tac, ModuleFragment frag) {
-    if (dbg) System.out.println("    " + tac);
+    //TODO
+    /*if (dbg) */System.out.println("    " + (tac.referenced ? "ref " : "    ") + tac);
 
     
     if (tac instanceof TACAlloc) {
-      // TODO ANON need to take care of the extra stuff here from anon definition scope locals
-
       TACAlloc all = (TACAlloc)tac;
       // TODO check arg count - do we want this?
 //      if (all.funcEntry) {
@@ -196,8 +195,6 @@ public class CodeGenBack implements ByteCode {
 //        addCode(frag, IBRAEQ, 0,0,5);
 //        addCode(frag, IBKPT); // TODO not bkpt, but raise exception or something
 //      }
-      
-      // TODO ANON point out definition scope locals
       
       // point out argument variables
       if (!all.args.isEmpty()) {
@@ -219,7 +216,7 @@ public class CodeGenBack implements ByteCode {
           frag.locals.put(v, fpoffset++);
         }
         for (String sym : all.tvars) {
-          TACVar v = new TACVar(tac.getNode(), sym, all.module, null, all.scope);
+          TACVar v = new TACVar(tac.getNode(), sym, all.module, null, all.scope + all.tScope);
           frag.locals.put(v, fpoffset++);
         }
         sp += all.countADSVars();
@@ -283,12 +280,15 @@ public class CodeGenBack implements ByteCode {
       else if (c.condOp == OP_LE) braInstr = inverseCond ? IBRA_GT : IBRA_LE;
       else if (c.condOp == OP_CALL || 
                c.condOp == OP_SYMBOL || 
-               c.condOp == OP_EQ || AST.isAssignOperator(c.condOp) ||
+               c.condOp == OP_EQ || 
+               AST.isAssignOperator(c.condOp) ||
                AST.isNumber(c.condOp) || 
                AST.isString(c.condOp) ||
+               AST.isAdditiveOperator(c.condOp) ||
+               AST.isMultiplicativeOperator(c.condOp) ||
+               AST.isLogicalOperator(c.condOp) ||
                AST.isUnaryOperator(c.condOp)
                ) {
-        //pushValue(new TACInt(c.cond.getNode(), 0), frag);
         cmpInstr = ICMP_0;
         braInstr = IBRA_EQ;
       }
@@ -400,27 +400,9 @@ public class CodeGenBack implements ByteCode {
     else if (tac instanceof TACRange) {
       TACRange a = (TACRange)tac;
       if (a.stepDefined) {
-//        boolean fromOnStack = pushValue(a.from, frag);
-//        boolean stepOnStack = pushValue(a.step, frag);
-//        if (!fromOnStack && stepOnStack) {
-//          addCode(frag, ISWAP);
-//        }
-//        boolean toOnStack = pushValue(a.to, frag);
-//        if (!stepOnStack && toOnStack) {
-//          addCode(frag, ISWAP);
-//        }
-//        if (!fromOnStack && toOnStack) {
-//          throw new CompilerError("not implemented " + tac, tac.getNode());
-//          // TODO addCode(frag, IROT);
-//        }
         sp = sp - 3 + 1;
         addCode(frag, stackInfo() + a, IRNG3);
       } else {
-//        boolean fromOnStack = pushValue(a.from, frag);
-//        boolean toOnStack = pushValue(a.to, frag);
-//        if (!fromOnStack && toOnStack) {
-//          addCode(frag, ISWAP);
-//        }
         sp = sp - 2 + 1;
         addCode(frag, stackInfo() + a, IRNG2);
       }
@@ -714,7 +696,6 @@ public class CodeGenBack implements ByteCode {
         // adsVars into set
         for (int i = 0; i < tcode.adsVars.size(); i++) {
           TACVar adsVar = tcode.adsVars.get(i);
-          // TODO ANON do NOT copy global references - these should never be included into tcode.adsVars - check it up in CodeGenFront or something
           if (frag.locals.containsKey(adsVar)) {
             // local value
             int fpoffset = frag.locals.get(adsVar);
@@ -776,11 +757,29 @@ public class CodeGenBack implements ByteCode {
       pushNumber(frag, -1, "create argv array");
       addCode(frag, stackInfo(), ISET_CRE);
     }
-//    else if (a instanceof TACOp) {
-//      // supposed to be on stack TODO
-//      //addCode(frag, stackInfo() + "STACKREF:" + a.toString(), INOP);
-//      //System.out.println("push val ref " + a);
-//    }
+    else if (a instanceof TACOp) {
+// TODO pushing conditionals? need to implement this
+      TACOp tac = (TACOp)a;
+   // TODO added this, perhaps remove??
+      if (AST.isConditionalOperator(tac.op) && tac.referenced) {
+        System.out.println("            pushValue cond " + tac);
+////      throw new CompilerError("not implemented", a.getNode());
+//        sp -= 2;
+//        addCode(frag, stackInfo(), ICMP);
+//        sp++;
+//        addCode(frag, stackInfo() + " presume true", IPUSH_1);
+//        int braInstr = IBRA;
+//        if (tac.getNode().op == OP_EQ2) braInstr = IBRA_EQ;
+//        else if (tac.getNode().op == OP_NEQ) braInstr = IBRA_NE;
+//        else if (tac.getNode().op == OP_GE) braInstr = IBRA_GE;
+//        else if (tac.getNode().op == OP_LT) braInstr = IBRA_LT;
+//        else if (tac.getNode().op == OP_GT) braInstr = IBRA_GT;
+//        else if (tac.getNode().op == OP_LE) braInstr = IBRA_LE;
+//        addCode(frag, stackInfo(), braInstr, 0,0,5);
+//        addCode(frag, stackInfo() + " was false", ISUB_Q1);
+      }
+
+    }
     else {
       return true;
     }

@@ -57,7 +57,7 @@ public class Grammar {
           "cond_op:       if else\n" +
           "expr:          expr_op_bin expr_op_una\n" +
           "num:           numi numd numih numib\n" +
-          "val:           num sym call expr dot arrdecl arrderef\n" +
+          "val:           num sym call expr rel_op dot arrdecl arrderef\n" +
           "arg:           val str code range nil\n" +
           "maparg:        arg tuple\n" +
           "op:            expr assign_op\n" +
@@ -73,7 +73,7 @@ public class Grammar {
           "dot:           sym | dot | arrderef , sym\n" +
           "assign:        sym | arrderef | dot , op | call | val | str | range | nil | assign | blok | rel_op\n" +
           "arrdecl:       maparg*\n" +
-          "arrderef:      arrderef | arrdecl | sym | dot | str | range | call , val | str | range\n" +
+          "arrderef:      arrderef | arrdecl | sym | dot | str | range | call , val | str | range | blok | rel_op | op\n" +
           "return:        op | val | str | range | nil | assign | blok | rel_op\n" +
           "assign_op:     sym | arrderef | dot , op | call | val | assign | rel_op\n" +
           "assign_op_add: sym | arrderef | dot , str\n" +
@@ -81,7 +81,7 @@ public class Grammar {
           "range:         val | range , val\n" +
           "global:        sym\n" +
           "module:        sym\n" +
-          "rel_op:        val | assign , val | assign\n" +
+          "rel_op:        val | assign | nil , val | assign | nil\n" +
           "expr_op_add:   str | val , str | val\n" +
           "expr_op_bin:   val , val\n" +
           "expr_op_una:   val\n" +

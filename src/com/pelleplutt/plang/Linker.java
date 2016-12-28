@@ -20,6 +20,7 @@ import com.pelleplutt.plang.TAC.TACInt;
 import com.pelleplutt.plang.TAC.TACString;
 import com.pelleplutt.plang.TAC.TACUnresolved;
 import com.pelleplutt.plang.TAC.TACVar;
+import com.pelleplutt.plang.proc.Assembler;
 import com.pelleplutt.plang.proc.ByteCode;
 import com.pelleplutt.plang.proc.ExtCall;
 import com.pelleplutt.plang.proc.Processor;
@@ -402,7 +403,7 @@ public class Linker implements ByteCode {
       int len = frag.code.size();
       int fragoffs = fragLUT.get(frag.modname + frag.fragname);
       while (len > 0) {
-        String disasm = String.format("0x%08x %s", pc, Processor.disasm(mc, pc)); 
+        String disasm = String.format("0x%08x %s", pc, Assembler.disasm(mc, pc)); 
         out.print(disasm);
         String com = frag.commentDbg(pc-fragoffs);
         if (com != null) {

@@ -59,8 +59,8 @@ public interface ByteCode {
 
   static final int IADD_Q1  = 0x30; // add quick                     push(pop() + 1)
   static final int IADD_Q2  = 0x31; // add quick                     push(pop() + 2)
-  static final int IADQ3    = 0x32; // add quick                     push(pop() + 3)
-  static final int IADQ4    = 0x33; // add quick                     push(pop() + 4)
+  static final int IADD_Q3  = 0x32; // add quick                     push(pop() + 3)
+  static final int IADD_Q4  = 0x33; // add quick                     push(pop() + 4)
   static final int IADD_Q5  = 0x34; // add quick                     push(pop() + 5)
   static final int IADD_Q6  = 0x35; // add quick                     push(pop() + 6)
   static final int IADD_Q7  = 0x36; // add quick                     push(pop() + 7)

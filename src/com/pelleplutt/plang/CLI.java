@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import com.pelleplutt.plang.proc.Assembler;
 import com.pelleplutt.plang.proc.ExtCall;
 import com.pelleplutt.plang.proc.Processor;
 import com.pelleplutt.plang.proc.Processor.M;
@@ -167,7 +168,7 @@ public class CLI {
         System.out.println(pe.getMessage());
         System.out.println("**********************************************");
         System.out.println("DISASM");
-        p.disasm(System.out, "   ", p.getPC(), 8);
+        Assembler.disasm(System.out, "   ", p.getExecutable().getMachineCode(), p.getPC(), 8);
         System.out.println("STACK");
         p.printStack(System.out, "   ", 16);
         pe.printStackTrace(System.err);

@@ -14,6 +14,7 @@ import static com.pelleplutt.plang.AST.OP_FUNCDEF;
 import static com.pelleplutt.plang.AST.OP_HASH;
 import static com.pelleplutt.plang.AST.OP_IF;
 import static com.pelleplutt.plang.AST.OP_MODULE;
+import static com.pelleplutt.plang.AST.OP_NIL;
 import static com.pelleplutt.plang.AST.OP_RETURN;
 import static com.pelleplutt.plang.AST.OP_SYMBOL;
 import static com.pelleplutt.plang.AST.OP_TUPLE;
@@ -29,6 +30,7 @@ import com.pelleplutt.plang.ASTNode.ASTNodeArrDecl;
 import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
 import com.pelleplutt.plang.ASTNode.ASTNodeFuncDef;
 import com.pelleplutt.plang.ASTNode.ASTNodeNumeric;
+import com.pelleplutt.plang.ASTNode.ASTNodeOp;
 import com.pelleplutt.plang.ASTNode.ASTNodeRange;
 import com.pelleplutt.plang.ASTNode.ASTNodeString;
 import com.pelleplutt.plang.ASTNode.ASTNodeSymbol;
@@ -266,6 +268,30 @@ public class StructAnalysis {
         newAnonymousScope((ASTNodeBlok)val, scopeStack, e);
       } else {
         analyseRecurse(val, scopeStack, e, operator, loop);
+      }
+    }
+    else if (e.op == OP_ADEREF) {
+      analyseRecurse(e.operands.get(0), scopeStack, e, operator, loop);
+      if (e.operands.get(1).op == OP_BLOK) {
+        newAnonymousScope((ASTNodeBlok)e.operands.get(1), scopeStack, e);
+      } else if (AST.isConditionalOperator(e.operands.get(1).op) || AST.isOperator(e.operands.get(1).op)) {
+      	// convert rel op A to { if A return $0; else return nul; } 
+      	ASTNodeBlok eblok = new ASTNodeBlok();
+      	ASTNode eif = new ASTNodeOp(OP_IF);
+      	ASTNode ereturn$0 = new ASTNodeOp(OP_RETURN);
+      	ereturn$0.operands.add(new ASTNodeSymbol("$0"));
+      	ASTNode eelse = new ASTNodeOp(OP_ELSE);
+      	ASTNode ereturnnil = new ASTNodeOp(OP_RETURN);
+      	ereturnnil.operands.add(new ASTNodeOp(OP_NIL));
+      	eelse.operands.add(ereturnnil);
+      	eif.operands.add(e.operands.get(1));
+      	eif.operands.add(ereturn$0);
+      	eif.operands.add(eelse);
+      	eblok.operands.add(eif);
+      	e.operands.set(1, eblok);
+        newAnonymousScope(eblok, scopeStack, e);
+      } else {
+        analyseRecurse(e.operands.get(1), scopeStack, e, operator, loop);
       }
     }
     else {

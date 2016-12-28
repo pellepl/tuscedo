@@ -1,5 +1,7 @@
 package com.pelleplutt.plang.proc;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.Map;
 
@@ -40,11 +42,13 @@ public class Processor implements ByteCode {
   M nilM = new M();
   M zeroM = new M(0);
   String[] args;
+  final byte[] code_internal_func_set_visitor;
   
   public Processor(int memorySize) {
     nilM.type = TNIL;
     memory = new M[memorySize];
     for (int i = 0; i < memorySize; i++) memory[i] = new M();
+    code_internal_func_set_visitor = assemble(INTERNAL_FUNC_SET_VISITOR_ASM);
   }
   
   public Processor(int memorySize, Executable exe) {
@@ -68,8 +72,8 @@ public class Processor implements ByteCode {
     }
     push(args.length);
     push(nilM); // me
-    push(-1); // pc
-    push(-1); // fp
+    push(0xffffffff); // pc
+    push(0xffffffff); // fp
     fp = sp;
     me = null;
     zero = false;
@@ -92,358 +96,6 @@ public class Processor implements ByteCode {
     reset();
   }
   
-  public void disasm(PrintStream out, String pre, int pc, int len) {
-    disasm(out, pre, code, pc, len); 
-  }
-
-  public static void disasm(PrintStream out, byte[] code, int pc, int len) {
-    disasm(out, null, code, pc, len);
-  }
-  public static void disasm(PrintStream out, String pre, byte[] code, int pc, int len) {
-    while (len > 0 && pc < code.length) {
-      if (pre != null) out.print(pre);
-      out.println(String.format("0x%06x %s", pc, disasm(code, pc)));
-      int instr = (int)(code[pc] & 0xff);
-      int step = ISIZE[instr];
-      if (step <= 0) step = 1;
-      pc += step;
-      len -= step;
-    }
-  }
-
-  public static String disasm(byte[] code, int pc) {
-    if (pc < 0 || pc >= code.length) {
-      return String.format("BADADDR 0x%06x", pc);
-    }
-    int instr = (int)(code[pc++] & 0xff);
-    StringBuilder sb = new StringBuilder();
-    switch (instr) {
-    case INOP:
-      sb.append("nop     ");
-      break;
-    case IADD:
-      sb.append("add     ");
-      break;
-    case ISUB:
-      sb.append("sub     ");
-      break;
-    case IMUL:
-      sb.append("mul     ");
-      break;
-    case IDIV:
-      sb.append("div     ");
-      break;
-    case IREM:
-      sb.append("rem     ");
-      break;
-    case ISHIFTL:
-      sb.append("shiftl  ");
-      break;
-    case ISHIFTR:
-      sb.append("shiftr  ");
-      break;
-    case IAND:
-      sb.append("and     ");
-      break;
-    case IOR :
-      sb.append("or      ");
-      break;
-    case IXOR:
-      sb.append("xor     ");
-      break;
-    case ICMP:
-      sb.append("cmp     ");
-      break;
-    case ICMPN:
-      sb.append("cmpn    ");
-      break;
-    case INOT:
-      sb.append("not     ");
-      break;
-    case INEG:
-      sb.append("neg     ");
-      break;
-    case ILNOT:
-      sb.append("lnot    ");
-      break;
-    
-    case ICMP_0:
-      sb.append("cmp_0   ");
-      break;
-    case ICMN_0:
-      sb.append("cmpn_0  ");
-      break;
-    case IADD_IM:
-      sb.append("add_im  ");
-      sb.append(String.format("0x%02x", codetoi(code, pc, 1) + 1));
-      break;
-    case ISUB_IM:
-      sb.append("sub_im  ");
-      sb.append(String.format("0x%02x", codetoi(code, pc, 1) + 1));
-      break;
-    case IPUSH_S:
-      sb.append("push_s  ");
-      sb.append(String.format("%d", codetos(code, pc, 1)));
-      break;
-    case IPUSH_U:
-      sb.append("push_u  ");
-      sb.append(String.format("%d", codetoi(code, pc, 1)+128));
-      break;
-    case IPUSH_NIL:
-      sb.append("push_nil");
-      break;
-    case IPUSH_0:
-      sb.append("push_0  ");
-      break;
-    case IPUSH_1:
-      sb.append("push_1  ");
-      break;
-    case IPUSH_2:
-      sb.append("push_2  ");
-      break;
-    case IPUSH_3:
-      sb.append("push_3  ");
-      break;
-    case IPUSH_4:
-      sb.append("push_4  ");
-      break;
-    case IDEF_ME:
-      sb.append("def_me  ");
-      break;
-    case IPUSH_ME:
-      sb.append("push_me ");
-      break;
-    case IUDEF_ME:
-      sb.append("udef_me ");
-      break;
-
-    case IADD_Q1:
-      sb.append("add_q1  ");
-      break;
-    case IADD_Q2:
-      sb.append("add_q2  ");
-      break;
-    case IADQ3:
-      sb.append("add_q3  ");
-      break;
-    case IADQ4:
-      sb.append("add_q4  ");
-      break;
-    case IADD_Q5:
-      sb.append("add_q5  ");
-      break;
-    case IADD_Q6:
-      sb.append("add_q6  ");
-      break;
-    case IADD_Q7:
-      sb.append("add_q7  ");
-      break;
-    case IADD_Q8:
-      sb.append("add_q8  ");
-      break;
-    case ISUB_Q1:
-      sb.append("sub_q1  ");
-      break;
-    case ISUB_Q2:
-      sb.append("sub_q2  ");
-      break;
-    case ISUB_Q3:
-      sb.append("sub_q3  ");
-      break;
-    case ISUB_Q4:
-      sb.append("sub_q4  ");
-      break;
-    case ISUB_Q5:
-      sb.append("sub_q5  ");
-      break;
-    case ISUB_Q6:
-      sb.append("sub_q6  ");
-      break;
-    case ISUB_Q7:
-      sb.append("sub_q7  ");
-      break;
-    case ISUB_Q8:
-      sb.append("sub_q8  ");
-      break;
-      
-    case ICAST_I:
-      sb.append("cast_I  ");
-      break;
-    case ICAST_F:
-      sb.append("cast_F  ");
-      break;
-    case ICAST_S:
-      sb.append("cast_S  ");
-      break;
-    case ICAST_CH:
-      sb.append("cast_ch ");
-      break;
-      
-    case IPOP:
-      sb.append("pop     ");
-      break;
-    case IDUP:
-      sb.append("dup     ");
-      break;
-    case ISWAP:
-      sb.append("swap    ");
-      break;
-    case ICPY:
-      sb.append("cpy     ");
-      sb.append(String.format("$sp[%4d]", codetos(code, pc, 1)));
-      break;
-    case ISTOR:
-      sb.append("stor    ");
-      break;
-    case ISTOR_IM:
-      sb.append("stor_im ");
-      sb.append(String.format("mem[0x%06x]", codetoi(code, pc, 3)));
-      break;
-    case ILOAD :
-      sb.append("load    ");
-      break;
-    case ILOAD_IM:
-      sb.append("load_im ");
-      sb.append(String.format("mem[0x%06x]", codetoi(code, pc, 3)));
-      break;
-    case ISTOR_FP:
-      sb.append("stor_fp ");
-      sb.append(String.format("$fp[%4d]", codetos(code, pc, 1)));
-      break;
-    case ILOAD_FP:
-      sb.append("load_fp ");
-      sb.append(String.format("$fp[%4d]", codetos(code, pc, 1)));
-      break;
-
-    case ISP_INCR:
-      sb.append("sp_incr ");
-      sb.append(String.format("%d", codetoi(code, pc, 1) + 1));
-      break;
-    case ISP_DECR:
-      sb.append("sp_decr ");
-      sb.append(String.format("%d", codetoi(code, pc, 1) + 1));
-      break;
-
-    case ISET_CRE:
-      sb.append("set_cre ");
-      break;
-    case IARR_CRE:
-      sb.append("arr_cre ");
-      sb.append(String.format("mem[0x%06x]", codetoi(code, pc, 3)));
-      break;
-    case ISET_DRF:
-      sb.append("set_drf ");
-      break;
-    case ISET_WR :
-      sb.append("set_wr  ");
-      break;
-    case IARR_ADD:
-      sb.append("arr_add ");
-      break;
-    case IMAP_ADD:
-      sb.append("map_add ");
-      break;
-    case ISET_DEL:
-      sb.append("set_del ");
-      break;
-    case IARR_INS:
-      sb.append("arr_ins ");
-      break;
-    case ISET_SZ:
-      sb.append("set_sz  ");
-      break;
-    case ISET_RD:
-      sb.append("set_rd  ");
-      break;
-    case IRNG2:
-      sb.append("rng2    ");
-      break;
-    case IRNG3:
-      sb.append("rng3    ");
-      break;
-
-    case ICALL: 
-      sb.append("call    ");
-      break;
-    case ICALL_IM: 
-      sb.append("call_im ");
-      sb.append(String.format("0x%06x", codetoi(code, pc, 3)));
-      break;
-    case IANO_CRE: 
-      sb.append("ano_cre ");
-      break;
-    case IRET: 
-      sb.append("ret     ");
-      break;
-    case IRETV: 
-      sb.append("retv    ");
-      break;
-    case IJUMP: 
-      sb.append("jump    ");
-      sb.append(String.format("%d", codetoi(code, pc, 3)));
-      break;
-    case IJUMP_EQ: 
-      sb.append("jump_eq ");
-      sb.append(String.format("%d", codetoi(code, pc, 3)));
-      break;
-    case IJUMP_NE: 
-      sb.append("jump_ne ");
-      sb.append(String.format("%d", codetoi(code, pc, 3)));
-      break;
-    case IJUMP_GT: 
-      sb.append("jump_gt ");
-      sb.append(String.format("%d", codetoi(code, pc, 3)));
-      break;
-    case IJUMP_GE: 
-      sb.append("jump_ge ");
-      sb.append(String.format("%d", codetoi(code, pc, 3)));
-      break;
-    case IJUMP_LT: 
-      sb.append("jump_lt ");
-      sb.append(String.format("%d", codetoi(code, pc, 3)));
-      break;
-    case IJUMP_LE: 
-      sb.append("jump_le ");
-      sb.append(String.format("%d", codetoi(code, pc, 3)));
-      break;
-    case IBRA: 
-      sb.append("bra     ");
-      sb.append(String.format("%d (0x%06x)", codetos(code, pc, 3), pc + codetos(code, pc, 3)-1));
-      break;
-    case IBRA_EQ: 
-      sb.append("bra_eq  ");
-      sb.append(String.format("%d (0x%06x)", codetos(code, pc, 3), pc + codetos(code, pc, 3)-1));
-      break;
-    case IBRA_NE: 
-      sb.append("bra_ne  ");
-      sb.append(String.format("%d (0x%06x)", codetos(code, pc, 3), pc + codetos(code, pc, 3)-1));
-      break;
-    case IBRA_GT: 
-      sb.append("bra_gt  ");
-      sb.append(String.format("%d (0x%06x)", codetos(code, pc, 3), pc + codetos(code, pc, 3)-1));
-      break;
-    case IBRA_GE: 
-      sb.append("bra_ge  ");
-      sb.append(String.format("%d (0x%06x)", codetos(code, pc, 3), pc + codetos(code, pc, 3)-1));
-      break;
-    case IBRA_LT: 
-      sb.append("bra_lt  ");
-      sb.append(String.format("%d (0x%06x)", codetos(code, pc, 3), pc + codetos(code, pc, 3)-1));
-      break;
-    case IBRA_LE: 
-      sb.append("bra_le  ");
-      sb.append(String.format("%d (0x%06x)", codetos(code, pc, 3), pc + codetos(code, pc, 3)-1));
-      break;
-    case IBKPT: 
-      sb.append("bkpt    ");
-      break;
-    default:
-      sb.append("???     ");
-      break;
-    }
-    return sb.toString();
-  }
-  
   M pop() {
     return memory[++sp];
   }
@@ -463,7 +115,29 @@ public class Processor implements ByteCode {
     return memory[a];
   }
   
-  static int codetoi(byte[] code, int addr, int bytes) {
+  int pcodetoi(int addr, int bytes) {
+  	byte c[];
+  	if ((addr & 0xff80000)!=0) {
+  		addr -= 0xff000000;
+  		c = code_internal_func_set_visitor;
+  	} else {
+  		c = code;
+  	}
+  	return codetoi(c, addr, bytes);
+  }
+  
+  int pcodetos(int addr, int bytes) {
+  	byte c[];
+  	if ((addr & 0xff80000)!=0) {
+  		addr -= 0xff000000;
+  		c = code_internal_func_set_visitor;
+  	} else {
+  		c = code;
+  	}
+  	return codetos(c, addr, bytes);
+  }
+  
+  public static int codetoi(byte[] code, int addr, int bytes) {
     int x = 0;
     for (int i = 0; i < bytes; i++) {
       x <<= 8;
@@ -472,7 +146,7 @@ public class Processor implements ByteCode {
     return x;
   }
 
-  static int codetos(byte[] code, int addr, int bytes) {
+  public static int codetos(byte[] code, int addr, int bytes) {
     int x = codetoi(code, addr, bytes);
     x <<= 8*(4-bytes);
     x >>= 8*(4-bytes);
@@ -530,7 +204,7 @@ public class Processor implements ByteCode {
   }
   
   void cpy() {
-    push(peekStack(codetos(code, pc++, 1)));
+    push(peekStack(pcodetos( pc++, 1)));
   }
   
   void stor() {
@@ -545,7 +219,7 @@ public class Processor implements ByteCode {
   
   void stor_im() {
     M m = pop();
-    int addr = codetoi(code, pc, 3);
+    int addr = pcodetoi( pc, 3);
     pc += 3;
     poke(addr, m);
   }
@@ -560,23 +234,23 @@ public class Processor implements ByteCode {
   }
   
   void load_im() {
-    int addr = codetoi(code, pc, 3);
+    int addr = pcodetoi( pc, 3);
     pc += 3;
     push(peek(addr));
   }
   
   void stor_fp() {
-    int rel = codetos(code, pc++, 1);
+    int rel = pcodetos( pc++, 1);
     poke(fp - rel, pop());
   }
   
   void load_fp() {
-    int rel = codetos(code, pc++, 1);
+    int rel = pcodetos( pc++, 1);
     push(peek(fp - rel));
   }
   
   void sp_incr() {
-    int m = codetoi(code, pc++, 1) + 1;
+    int m = pcodetoi( pc++, 1) + 1;
     for (int i = 0; i < m; i++) {
       poke(sp - i, nilM);
     }
@@ -584,7 +258,7 @@ public class Processor implements ByteCode {
   }
   
   void sp_decr() {
-    int m = codetoi(code, pc++, 1) + 1;
+    int m = pcodetoi( pc++, 1) + 1;
     sp += m;
   }
   
@@ -608,7 +282,7 @@ public class Processor implements ByteCode {
   }
   
   void arr_cre() {
-    int addr = codetoi(code, pc, 3);
+    int addr = pcodetoi( pc, 3);
     pc += 3;
     int elements = pop().asInt();
     MListMap set = new MListMap();
@@ -626,6 +300,8 @@ public class Processor implements ByteCode {
     if (mset.type == TSET || mset.type == TRANGE) {
       if (mix.type == TSET || mix.type == TRANGE) {
         derefSetArgSet((MSet)mset.ref, (MSet)mix.ref);
+      } else if (mix.type == TANON) {
+      	derefSetArgAnon((MSet)mset.ref, mix);
       } else {
         push(((MSet)mset.ref).get(mix));
       }
@@ -671,6 +347,14 @@ public class Processor implements ByteCode {
     push(res);
   }
   
+  void derefSetArgAnon(MSet set, M adrf) {
+  	push(adrf);
+  	push(set);
+  	push(2);
+  	push(0xff000000); // the assembled function INTERNAL_FUNC_SET_VISITOR_ASM
+  	call();
+  }
+  
   void derefStringArgSet(String str, MSet drf) {
     StringBuilder sb = new StringBuilder();
     int len = drf.size();
@@ -683,24 +367,7 @@ public class Processor implements ByteCode {
     push(sb.toString());
   }
   
-  void derefRangeArgSet(MRange set, MSet drf) {
-    MListMap res = new MListMap();
-    int len = drf.size();
-    for (int i = 0; i < len; i++) {
-      M mdrf = drf.getElement(i);
-      if (mdrf.type == TFLOAT || mdrf.type == TINT) {
-        res.add(new M(set.get(mdrf.asInt())));
-      }
-    }
-    push(res);
-  }
-    
-  void set_wr() {
-    // TODO handle set list ie arr[[1,2,3]] = 3
-    // TODO handle set range ie arr[0#2] = 3
-    M mval = pop();
-    M mix = pop();
-    M mset = pop();
+  void set_wr(M mset, M mix, M mval) {
     if (mset.type == TSET) {
       if (mval.type == TNIL) {
         ((MSet)mset.ref).remove(mix);
@@ -742,6 +409,24 @@ public class Processor implements ByteCode {
       }
     } else {
       throw new ProcessorError("cannot write entries in type " + TNAME[mset.type]);
+    }
+  }
+    
+  void set_wr() {
+    // TODO handle set list ie arr[[1,2,3]] = 3
+    M mval = pop();
+    M mix = pop();
+    M mset = pop();
+    if (mix.type == TSET || mix.type == TRANGE) {
+      MSet ixset = (MSet)mix.ref;
+      int len = ixset.size();
+      for (int i = 0; i < len; i++) {
+        M dmix = ixset.get(i);
+        set_wr(mset, dmix, mval);
+      }
+
+    } else {
+      set_wr(mset, mix, mval);
     }
   }
   
@@ -909,9 +594,17 @@ public class Processor implements ByteCode {
         }
         status(r);
         if (push) push(r);
+      } else if (e1.type == TNIL && !push) {
+      	status(0);
       } else {
         throw new ProcessorError("cannot subtract type " + TNAME[e1.type]);
       }
+    }
+    else if (e1.type == TNIL && !push) {
+    	status(-1);
+    }
+    else if (e2.type == TNIL && !push) {
+    	status(1);
     }
     else if (e1.type == TFLOAT && e2.type == TINT) {
       float r = e1.f - e2.i;
@@ -976,21 +669,21 @@ public class Processor implements ByteCode {
   }
   
   void add_im() {
-    push(codetoi(code, pc++, 1) + 1);
+    push(pcodetoi( pc++, 1) + 1);
     add();
   }
 
   void sub_im() {
-    push(codetoi(code, pc++, 1) + 1);
+    push(pcodetoi( pc++, 1) + 1);
     sub();
   }
   
   void push_s() {
-    push(codetos(code, pc++, 1));
+    push(pcodetos( pc++, 1));
   }
 
   void push_u() {
-    push(codetoi(code, pc++, 1)+128);
+    push(pcodetoi( pc++, 1)+128);
   }
 
   void push_im_int(int i) {
@@ -1241,7 +934,7 @@ public class Processor implements ByteCode {
       fp = sp;
       pc = a;
       me = me_banked;
-      if ((pc & 0xff0000) == 0xff0000) {
+      if ((pc & 0x800000) == 0x800000) {
         ExtCall ec = extLinks.get(pc);
         if (ec == null) throw new ProcessorError(String.format("bad external call 0x%06x", pc));
         M ret = ec.exe(this, getArgs(fp, args)); 
@@ -1272,9 +965,9 @@ public class Processor implements ByteCode {
     push(fp);
     int args = peek(sp+FRAME_3_ARGC).i;
     fp = sp;
-    pc = codetos(code, pc, 3);
+    pc = pcodetos( pc, 3);
     me = me_banked;
-    if ((pc & 0xff0000) == 0xff0000) {
+    if ((pc & 0x800000) == 0x800000) {
       ExtCall ec = extLinks.get(pc);
       if (ec == null) throw new ProcessorError(String.format("bad external call 0x%06x", pc));
       M ret = ec.exe(this, getArgs(fp, args)); 
@@ -1293,11 +986,11 @@ public class Processor implements ByteCode {
   
   void ret() {
     sp = fp;
-    if (fp < 0 || fp >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("abnormal exit");
+    if (fp == 0xffffffff) throw new ProcessorError.ProcessorFinishedError("abnormal exit");
     fp = pop().i;
     pc = pop().i;
     me = pop();
-    if (pc < 0 || pc >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("normal exit");
+    if (pc == 0xffffffff) throw new ProcessorError.ProcessorFinishedError("normal exit");
     int argc = pop().i;
     sp += argc;
   }
@@ -1305,18 +998,18 @@ public class Processor implements ByteCode {
   void retv() {
     M t = new M().copy(pop());
     sp = fp;
-    if (fp < 0 || fp >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("abnormal exit");
+    if (fp == 0xffffffff) throw new ProcessorError.ProcessorFinishedError("abnormal exit");
     fp = pop().i;
     pc = pop().i;
     me = pop();
-    if (pc < 0 || pc >= memory.length-1) throw new ProcessorError.ProcessorFinishedError("normal exit");
+    if (pc == 0xffffffff) throw new ProcessorError.ProcessorFinishedError("normal exit");
     int argc = pop().i;
     sp += argc;
     push(t);
   }
   
   void jump(int icond) {
-    int dst = codetoi(code, pc, 3);
+    int dst = pcodetoi( pc, 3);
     pc += 3;
     switch (icond) {
     case ICOND_AL:
@@ -1337,7 +1030,7 @@ public class Processor implements ByteCode {
   }
   
   void bra(int icond) {
-    int rel = codetos(code, pc, 3) - 1 - 3;
+    int rel = pcodetos( pc, 3) - 1 - 3;
     pc += 3;
     switch (icond) {
     case ICOND_AL:
@@ -1372,7 +1065,12 @@ public class Processor implements ByteCode {
   
   void stepDebug(PrintStream out) {
     String procInfo = getProcInfo();
-    String disasm = disasm(code, pc);
+    String disasm;
+    if ((pc & 0xff800000) != 0) {
+    	disasm = Assembler.disasm(code_internal_func_set_visitor, pc - 0xff000000);
+    } else {
+      disasm = Assembler.disasm(code, pc);
+    }
     String dbgComment = exe.getDebugInfo(pc);
     out.println(String.format("%s      %-32s  %s", procInfo, disasm, (dbgComment == null ? "" : ("; " + dbgComment))));
     stepProc();
@@ -1382,7 +1080,12 @@ public class Processor implements ByteCode {
 
   void stepProc() {
     oldpc = pc;
-    int instr = (int)(code[pc++] & 0xff);
+    int instr;
+    if ((pc & 0xff800000) == 0) 
+    	instr = (int)(code[pc] & 0xff);
+    else
+    	instr = (int)(code_internal_func_set_visitor[pc - 0xff000000] & 0xff);
+    pc++;
     switch (instr) {
     case INOP:
       break;
@@ -1484,10 +1187,10 @@ public class Processor implements ByteCode {
     case IADD_Q2:
       add_q(2);
       break;
-    case IADQ3:
+    case IADD_Q3:
       add_q(3);
       break;
-    case IADQ4:
+    case IADD_Q4:
       add_q(4);
       break;
     case IADD_Q5:
@@ -1847,34 +1550,68 @@ public class Processor implements ByteCode {
   public int getFP() {
     return fp;
   }
+  
+  static byte[] assemble(String s) {
+  	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+  	String lines[] = s.split("\n");
+  	for (String l:lines) {
+  		byte code[] = Assembler.asmInstr(l);
+  		if (code != null) {
+  			try { baos.write(code); } catch (IOException e) { e.printStackTrace(); }
+  		}
+  	}
+  	return baos.toByteArray();
+  }
 
+  static final String INTERNAL_FUNC_SET_VISITOR_ASM =
+      //func setVisitor(set, visitor) {
+      //  res[];
+      //  for (i in set) {
+      //    mutation = visitor(i);
+      //    if (mutation != nil) res += mutation;
+      //  }
+      //  return res;
+      //}
+  		"//.main.func.setVisitor\n"+
+  		"sp_incr 2                // sp=2	ALLO [res, i] FUNC[set, visitor]\n"+
+  		"push_0                   // sp=3	\n"+
+  		"set_cre                  // sp=3	MAP 0 tuples\n"+
+  		"stor_fp $fp[0]           // sp=2	res:.main.setVisitor = [1] (local)\n"+
+  		"sp_incr 3                // sp=5	ALLO [mutation] [.iter, .set]\n"+
+  		"load_fp $fp[-5]          // sp=6	set:.main.setVisitor (local)\n"+
+  		"stor_fp $fp[4]           // sp=5	.set:.main.1.$0 = set:.main.setVisitor (local)\n"+
+  		"push_0                   // sp=6	0\n"+
+  		"stor_fp $fp[3]           // sp=5	.iter:.main.1.$0 = 0 (local)\n"+
+  		"load_fp $fp[4]           // sp=6	.set:.main.1.$0 (local)\n"+
+  		"set_sz                   // sp=6	length\n"+
+  		"load_fp $fp[3]           // sp=7	.iter:.main.1.$0 (local)\n"+
+  		"swap    \n"+
+  		"cmp                      // sp=5	IFNOT [9] GOTO .L1_fexit\n"+
+  		"bra_ge  44               // sp=5	->.L1_fexit:\n"+
+  		"load_fp $fp[4]           // sp=6	.set:.main.1.$0 (local)\n"+
+  		"load_fp $fp[3]           // sp=7	.iter:.main.1.$0 (local)\n"+
+  		"set_rd                   // sp=6	SREADIX (.set:.main.1.$0<.iter:.main.1.$0>)\n"+
+  		"stor_fp $fp[1]           // sp=5	i:.main.setVisitor = [12] (local)\n"+
+  		"load_fp $fp[1]           // sp=6	i:.main.setVisitor (local)\n"+
+  		"udef_me                  // sp=6	undefine me (banked)\n"+
+  		"push_1                   // sp=7	argc, replaced by retval\n"+
+  		"load_fp $fp[-6]          // sp=8	visitor:.main.setVisitor (local)\n"+
+  		"call                     // sp=6	<visitor, 1 args>\n"+
+  		"stor_fp $fp[2]           // sp=5	mutation:.main.1 = [16] (local)\n"+
+  		"load_fp $fp[2]           // sp=6	mutation:.main.1 (local)\n"+
+  		"push_nil                 // sp=7	(nil)\n"+
+  		"cmp                      // sp=5	IFNOT [18] GOTO .L2_ifend\n"+
+  		"bra_eq  11               // sp=5	->.L2_ifend:\n"+
+  		"load_fp $fp[0]           // sp=6	res:.main.setVisitor (local)\n"+
+  		"load_fp $fp[2]           // sp=7	mutation:.main.1 (local)\n"+
+  		"add                      // sp=6	res:.main.setVisitor + mutation:.main.1\n"+
+  		"stor_fp $fp[0]           // sp=5	res:.main.setVisitor = [20] (local)\n"+
+  		"load_fp $fp[3]           // sp=6	.iter:.main.1.$0 (local)\n"+
+  		"add_q1                   // sp=6	++U.iter:.main.1.$0\n"+
+  		"stor_fp $fp[3]           // sp=5	++U.iter:.main.1.$0 (local)\n"+
+  		"bra     -47              // sp=5	->.L1_floop:\n"+
+  		"sp_decr 3                // sp=2	FREE [mutation] [.iter, .set]\n"+
+  		"load_fp $fp[0]           // sp=3	res:.main.setVisitor (local)\n"+
+  		"retv                     // sp=2	\n"+
+  		"";
 }
-
-/*
-module map; \
-func new() { \
-  m[]; \
-  m.map = []; \
-  m.put = { \
-    entry = ["key":$0, "val":$1]; \
-    me.map += entry; \
-  }; \
-  m.get = { \
-    for (e in me.map) { \
-      if (e.key == $0) { \
-        return e.val; \
-      } \
-    } \
-    return nil; \
-  }; \
-  return m; \
-}
-
-m = map.new();
-m.put("hello", "world");
-m.put("ice", "cream");
-println("hello:", m.get("hello"));
-println("world:", m.get("world"));
-println("ice  :", m.get("ice"));
-
-*/

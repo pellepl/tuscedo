@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
+import com.pelleplutt.plang.proc.Assembler;
 import com.pelleplutt.plang.proc.ExtCall;
 import com.pelleplutt.plang.proc.Processor;
 import com.pelleplutt.plang.proc.ProcessorError;
@@ -11,6 +12,7 @@ import com.pelleplutt.plang.proc.ProcessorError.ProcessorFinishedError;
 
 public class Compiler {
   static String src;
+
   public static Executable compile(Map<String, ExtCall> extDefs, int ramOffs, int constOffs, String ...sources) {
     IntermediateRepresentation ir = null;
     for (String src : sources) {
@@ -290,12 +292,12 @@ public class Compiler {
     // DONE:   partialarr = oldarr[[3,4,5]], partialarr = oldarr[3#5]
     // DONE:   a=[]; for(i in 0#10) {a['x'+i]='y'+i;} // inverts key/val
     // DONE:   if (a) println('a true'); else println('a false');
-    // FIXME:  { globalscope = 1; { localscope = 2; anon = { return localscope * 4; }; println(anon()); } }
-    // FIXME:  arr = arrb[{x = $0 * 2; return x < 3;}]
-    // FIXME?: argument list for rel ops, funcs, e.g arr[$0 > 10], map[$0.val < 44]  
+    // DONE:   { globalscope = 1; { localscope = 2; anon = { return localscope * 4; }; println(anon()); } }
+    // FIXME:  a = 1>2;
+    // FIXME:  arr = arrb[{if ($0 > 4) return $0; else return nil;}]; // removes all elements below 4
+    // FIXME:  arr = arrb[{return $0*2;}]; // multiplies all elements by 2
     // FIXME:  arr[[1,2,3]] = 4
     // FIXME:  arr[[1,2,3]] = arrb[[3,4,5]]
-    // FIXME:  arr = arrb[$0 > 5]
     // FIXME:  goto
     // FIXME:  handle 'global' keyword
     // FIXME: "r = ['a':1,'b':2,'c':3];\n" +
@@ -402,8 +404,23 @@ public class Compiler {
   " return crc ^ ~0;\n" +
   "}";
     
-//    src = "f[]; for (i in 1#3) f += {return i;}; i = 12; for (c in f) println(c());";
-//    othersrc = siblingsrc = crcsrc = "";
+    src = 
+//    		"{f[]; a = 0; for(i in f) a += i;\n}" +
+//    		  "f = [0,1,2,3,4,5,6,7,8];\n"+
+////          "g = f[{if ($0 % 3 == 0) return $0/3; else return nil;}];\n"+
+////          "println(f);\n" +
+////          "println(g);\n" +
+////          "h = g[{return $0 * 3;}];\n"+
+////          "println(h);\n" +
+////          "println(f);\n" +
+//          "h = f[$0 > 2];\n"+
+//          "println(h);\n" +
+//          "h = f[($0 > 2) & ($0 < 8)];\n"+
+//          "println(h);\n" +
+        
+          "a = 2; for (i in 1#3) println(i > a);\n"+
+          "";
+    othersrc = siblingsrc = crcsrc = "";
 
     //        
 //    src = 
@@ -460,7 +477,7 @@ public class Compiler {
       System.out.println(pe.getMessage());
       System.out.println("**********************************************");
       System.out.println("DISASM");
-      p.disasm(System.out, "   ", p.getPC(), 8);
+      Assembler.disasm(System.out, "   ", p.getExecutable().getMachineCode(), p.getPC(), 8);
       System.out.println("STACK");
       p.printStack(System.out, "   ", 16);
       pe.printStackTrace(System.err);

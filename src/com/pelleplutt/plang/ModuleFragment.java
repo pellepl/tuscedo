@@ -10,7 +10,7 @@ import com.pelleplutt.plang.TAC.TACCall;
 import com.pelleplutt.plang.TAC.TACLabel;
 import com.pelleplutt.plang.TAC.TACUnresolved;
 import com.pelleplutt.plang.TAC.TACVar;
-import com.pelleplutt.plang.proc.Processor;
+import com.pelleplutt.plang.proc.Assembler;
 
 public class ModuleFragment {
   String modname;
@@ -53,7 +53,7 @@ public class ModuleFragment {
           mc[x++] = (byte)c;
         }
       }
-      System.out.println(String.format("        %-32s// %s", Processor.disasm(mc, 0), comment));
+      System.out.println(String.format("        %-32s// %s", Assembler.disasm(mc, 0), comment));
     }
   }
   

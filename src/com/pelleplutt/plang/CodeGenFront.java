@@ -265,7 +265,7 @@ public class CodeGenFront {
         if (i < len-1) {
           add(deref);
         }
-        // do not add last path, as this is returned as the assignee and will be emitted thare
+        // do not add last path, this is returned as the assignee and will be emitted there
       } else {
         add(deref);
       }
