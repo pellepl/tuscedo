@@ -376,6 +376,7 @@ public class Processor implements ByteCode {
         m.copy(mval);
         ((MSet)mset.ref).set(mix, m);
       }
+      push(mset);
     } else if (mset.type == TINT) {
       int res = mset.i;
       int ix = mix.asInt();
@@ -407,13 +408,13 @@ public class Processor implements ByteCode {
             mval.asString() + 
             (ix+1 < len ? mset.str.substring(ix+1) : "");
       }
+      push(mset);
     } else {
       throw new ProcessorError("cannot write entries in type " + TNAME[mset.type]);
     }
   }
     
   void set_wr() {
-    // TODO handle set list ie arr[[1,2,3]] = 3
     M mval = pop();
     M mix = pop();
     M mset = pop();
@@ -423,8 +424,10 @@ public class Processor implements ByteCode {
       for (int i = 0; i < len; i++) {
         M dmix = ixset.get(i);
         set_wr(mset, dmix, mval);
+        if (i < len - 1) {
+          mset = pop();
+        }
       }
-
     } else {
       set_wr(mset, mix, mval);
     }

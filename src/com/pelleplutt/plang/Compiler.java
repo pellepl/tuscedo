@@ -322,7 +322,7 @@ public class Compiler {
     // DONE:   arr = arrb[{if ($0 > 4) return $0; else return nil;}]; // removes all elements below 4
     // DONE:   arr = arrb[{return $0*2;}]; // multiplies all elements by 2
     // DONE:   arr[[1,2,3]] = 4
-    // FIXME:  map = map[{if $0 ...etc}]
+    // DONE:   map = map[{if $0 ...etc}]
     // FIXME:  goto
     // FIXME:  handle 'global' keyword
     // FIXME: "r = ['a':1,'b':2,'c':3];\n" +
@@ -430,16 +430,16 @@ public class Compiler {
   "}";
 
     
-    src = 
-        "map = ['a':1, 'b':2, 'c':3, 'd':4];\n" +
-        "println('map :', map);\n" +
-        "multiplier = 10;\n" +
-        "map = map[{$0.val *= multiplier; return $0;}];\n" +
-        "println('mapp:', map);\n" +
-        "println('mapp:', map[$0.val > 25]);\n" +
-        "for (i in map) println(i.key, i.val);\n" +
-    "";
-   othersrc = siblingsrc = crcsrc = ""; 
+//    src = 
+//        "map = ['a':1, 'b':2, 'c':3, 'd':4];\n" +
+//        "println('map :', map);\n" +
+//        "multiplier = 10;\n" +
+//        "map = map[{$0.val *= multiplier; return $0;}];\n" +
+//        "println('mapp:', map);\n" +
+//        "println('mapp:', map[$0.val > 25]);\n" +
+//        "for (i in map) println(i.key, i.val);\n" +
+//    "";
+//   othersrc = siblingsrc = crcsrc = ""; 
     
 //
 //    src = 

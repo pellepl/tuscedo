@@ -622,12 +622,13 @@ public class CodeGenBack implements ByteCode {
     } else if (assignee instanceof TACSetDeref) {
       TACSetDeref de = (TACSetDeref)assignee;
       pushValues(de.derefVal, assignment, frag);
+      sp += -3 + 1;
+      addCode(frag, stackInfo() + op.toString(), ISET_WR);
       if (referenced) {
         sp++;
         addCode(frag, stackInfo() + op.toString(), IDUP);
       }
-      sp -= 3;
-      addCode(frag, stackInfo() + op.toString(), ISET_WR);
+      emitAssignment(op, de.set, null, false, frag);
     } else if (assignee instanceof TACUnresolved) {
       pushValue(assignment, frag);
       frag.links.add(new ModuleFragment.LinkUnresolved(frag.getPC(), (TACUnresolved)assignee));

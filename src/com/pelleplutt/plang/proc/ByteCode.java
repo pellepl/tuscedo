@@ -82,7 +82,7 @@ public interface ByteCode {
   static final int ISET_CRE = 0x50; // create set                    sz=pop(); while(sz--){l.add($sp[-sz]);};push(l);
   static final int IARR_CRE = 0x51; // create array                  addr=xxxxxx; sz=pop(); while(sz--){l.add(mem[addr++]);};push(l);
   static final int ISET_DRF = 0x52; // set dereference               ix=pop(); l=pop(); push(l[ix]);
-  static final int ISET_WR  = 0x53; // set write index               v=pop(); ix=pop(); l=pop(); l[ix]=v;
+  static final int ISET_WR  = 0x53; // set write index               v=pop(); ix=pop(); l=pop(); l[ix]=v; push(l);
   static final int IARR_ADD = 0x54; // array add                     v=pop(); l=pop(); l.add(v);
   static final int IMAP_ADD = 0x55; // map add tuple                 k=pop(); v=pop(); peek().add(k,v);
   static final int ISET_DEL = 0x56; // set remove                    ix=pop(); l=pop(); l.del(ix);

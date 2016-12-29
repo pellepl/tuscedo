@@ -178,11 +178,69 @@ public class MListMap implements MSet {
   	return this.type;
   }
   
+  protected void stringifyAppend(MListMap m, StringBuilder s, int depth) {
+    if (depth <= 3) {
+      if (m.type == Processor.TNIL) {
+        s.append("{[}]");
+      } else if (m.type == TMAP) {
+        Object keys[] = m.map.keySet().toArray();
+        s.append('{');
+        for (int i = 0; i < keys.length; i++) {
+          M v = m.map.get(keys[i]);
+          s.append(keys[i]);
+          s.append(':');
+          if (v.type == Processor.TSET && v.ref instanceof MListMap) {
+            if (depth >= 3) {
+              s.append("...");
+              break;
+            } else {
+              stringifyAppend((MListMap)v.ref, s, depth + 1);
+            }
+          } else {
+            s.append(v.getRaw());
+          }
+          if (i < keys.length - 1) s.append(", ");
+        }
+        s.append('}');
+      } else if (m.type == TARR) {
+        s.append('[');
+        for (int i = 0; i < m.arr.size(); i++) {
+          M v = m.arr.get(i);
+          if (v.type == Processor.TSET && v.ref instanceof MListMap) {
+            if (depth >= 3) {
+              s.append("...");
+              break;
+            } else {
+              stringifyAppend((MListMap)v.ref, s, depth + 1);
+            }
+          } else {
+            s.append(v.getRaw());
+          }
+          if (i < m.arr.size()- 1) s.append(", ");
+        }
+        s.append(']');
+      } else if (m.type == TTUP) {
+        s.append('(');
+        M v = m.tup[1];
+        s.append(m.tup[0]);
+        s.append(':');
+        if (v.type == Processor.TSET && v.ref instanceof MListMap) {
+          if (depth >= 3) {
+            s.append("...");
+          } else {
+            stringifyAppend((MListMap)v.ref, s, depth + 1);
+          }
+        } else {
+          s.append(v.getRaw());
+        }
+        s.append(')');
+      }
+    }
+  }
+  
   public String toString() {
-    if (type == Processor.TNIL) return "[]";
-    else if (type == TMAP) return map.toString();
-    else if (type == TTUP) return "(" + tup[0].getRaw() + ":" + tup[1].toString() + ")"; // TODO
-    else if (type == TARR) return arr.toString();
-    else return null;
+    StringBuilder s = new StringBuilder();
+    stringifyAppend(this, s, 0);
+    return s.toString();
   }
 }
