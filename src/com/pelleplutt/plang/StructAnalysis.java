@@ -274,7 +274,7 @@ public class StructAnalysis {
       analyseRecurse(e.operands.get(0), scopeStack, e, operator, loop);
       if (e.operands.get(1).op == OP_BLOK) {
         newAnonymousScope((ASTNodeBlok)e.operands.get(1), scopeStack, e);
-      } else if (AST.isConditionalOperator(e.operands.get(1).op) || AST.isOperator(e.operands.get(1).op)) {
+      } else if (AST.isConditionalOperator(e.operands.get(1).op)) {
       	// convert rel op A to { if A return $0; else return nul; } 
       	ASTNodeBlok eblok = new ASTNodeBlok();
       	ASTNode eif = new ASTNodeOp(OP_IF);

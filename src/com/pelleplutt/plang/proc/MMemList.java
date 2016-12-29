@@ -63,6 +63,10 @@ public class MMemList implements MSet {
     return get(ix);
   }
   
+  public int getType() {
+  	return TARR;
+  }
+  
   public String toString() {
     StringBuilder sb = new StringBuilder("[");
     int len = size();

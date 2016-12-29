@@ -6,19 +6,21 @@ import java.util.List;
 import java.util.Map;
 
 import com.pelleplutt.plang.proc.Processor.M;
-
 public class MListMap implements MSet {
-  public static final int TARR = 10;
-  public static final int TMAP = 11;
   public int type;
   public List<M> arr;
   public Map<Object,M> map;
+  public M[] tup;
   public MListMap() {
     type = Processor.TNIL;
   }
   public void makeArr() {
     type = TARR;
     arr = new ArrayList<M>();
+  }
+  public void makeTup() {
+    type = TTUP;
+    tup = new M[2];
   }
   public void makeMap() {
     type = TMAP;
@@ -29,15 +31,29 @@ public class MListMap implements MSet {
       return arr.size();
     } else if (type == TMAP) {
       return map.size();
+    } else if (type == TTUP) {
+      return 2;
     } else {
       return 0;
     }
   }
   public void add(M m) {
     if (size() == 0) {
-      makeArr();
+      if (m.type == Processor.TSET && ((MSet)m.ref).getType() == TTUP) {
+      	makeMap();
+      } else {
+      	makeArr();
+      }
     }
-    arr.add(m);
+    if (type == TARR) {
+    	arr.add(m);
+    } else if (type == TMAP) {
+      if (m.type != Processor.TSET || ((MSet)m.ref).getType() != TTUP) {
+      	throw new ProcessorError("can only add tuples to maps");
+      }
+      MSet tuple = (MSet)m.ref;
+      map.put(tuple.get(0).getRaw(), tuple.get(1));
+    }
   }
   public void insert(int ix, M m) {
     if (size() == 0) {
@@ -55,6 +71,16 @@ public class MListMap implements MSet {
     }
     if (type == TARR) {
       arr.set(mix.asInt(), m);
+    } else if (type == TTUP) {
+      if (mix.type == Processor.TINT) {
+        tup[mix.asInt()] = new M().copy(m);
+      } else if (mix.type == Processor.TSTR) {
+      	if ("key".equals(mix.str)) {
+	      	tup[0] = new M().copy(m);
+	      } else if ("val".equals(mix.str)) {
+	      	tup[1] = new M().copy(m);
+	      }
+      }
     } else if (type == TMAP) {
       map.put(mix.getRaw(), m);
     } else {
@@ -73,6 +99,14 @@ public class MListMap implements MSet {
       if (key instanceof Integer) {
         arr.set(((Integer)key).intValue(), m);
       }
+    } else if (type == TTUP) {
+      if (key instanceof Integer) {
+      	tup[((Integer)key).intValue()] = new M().copy(m);
+      } else if ("key".equals(key)) {
+      	tup[0] = new M().copy(m);
+      } else if ("val".equals(key)) {
+      	tup[1] = new M().copy(m);
+      }
     } else if (type == TMAP) {
       map.put(key, m);
     } else {
@@ -82,15 +116,28 @@ public class MListMap implements MSet {
   public M get(M m) {
     if (type == TARR) {
       return arr.get(m.asInt());
+    } else if (type == TTUP) {
+      if (m.type == Processor.TINT) {
+        return tup[m.asInt()];
+      } else if (m.type == Processor.TSTR) {
+      	if ("key".equals(m.str)) {
+          return tup[0];
+	      } else if ("val".equals(m.str)) {
+	        return tup[1];
+	      } else {
+	      	throw new ProcessorError("can only dereference tuples by 0, 1, 'key', or 'val'");
+	      }
+      }
     } else if (type == TMAP) {
       return map.get(m.getRaw());
-    } else {
-      return null;
     }
+    return null;
   }
   public M get(int ix) {
     if (type == TARR) {
-      return arr.get(ix);
+    	return arr.get(ix);
+    } else if (type == TTUP) {
+    	return tup[ix];
     } else if (type == TMAP) {
       return getElement(ix);
     } else {
@@ -107,17 +154,17 @@ public class MListMap implements MSet {
     }
   }
   public M getElement(int ix) {
-    if (type == TARR) {
+    if (type == TARR || type == TTUP) {
       return arr.get(ix);
     } else if (type == TMAP) {
       Object keys[] = map.keySet().toArray();
       Object key = keys[ix];
       M mval = map.get(key);
       if (mval == null) return null;
-      M mkey = new M(key);
       MListMap res = new MListMap();
-      res.set("key", mkey);
-      res.set("val", mval);
+      res.makeTup();
+      res.tup[0] = new M(key);
+      res.tup[1] = mval;
       M mres = new M();
       mres.type = Processor.TSET;
       mres.ref = res;
@@ -127,9 +174,14 @@ public class MListMap implements MSet {
     }
   }
   
+  public int getType() {
+  	return this.type;
+  }
+  
   public String toString() {
     if (type == Processor.TNIL) return "[]";
     else if (type == TMAP) return map.toString();
+    else if (type == TTUP) return "(" + tup[0].getRaw() + ":" + tup[1].toString() + ")"; // TODO
     else if (type == TARR) return arr.toString();
     else return null;
   }

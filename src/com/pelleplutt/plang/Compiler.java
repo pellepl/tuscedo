@@ -59,13 +59,25 @@ public class Compiler {
     Map<String, ExtCall> extDefs = new HashMap<String, ExtCall>();
     extDefs.put("println", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        System.out.println(args[0].asString());
+        if (args == null || args.length == 0) {
+          System.out.println();
+        } else {
+          for (int i = 0; i < args.length; i++) {
+            System.out.print(args[i].asString() + (i < args.length-1 ? " " : ""));
+          }
+        }
+        System.out.println();
         return null;
       }
     });
     extDefs.put("print", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        System.out.print(args[0].asString());
+        if (args == null || args.length == 0) {
+        } else {
+          for (int i = 0; i < args.length; i++) {
+            System.out.print(args[i].asString() + (i < args.length-1 ? " " : ""));
+          }
+        }
         return null;
       }
     });
@@ -186,7 +198,7 @@ public class Compiler {
         "for (i = len(word) - 1; i >= 0; i--) {\n" +
         "  rev += word[i];\n" +
         "}\n" +
-        "println(word + ' |fornext| ' + rev);\n" +
+        "println(word, ' |fornext| ', rev);\n" +
         "rev = '';\n" +
         "for (c in word) {\n" +
         "  rev = c + rev;\n" +
@@ -279,6 +291,19 @@ public class Compiler {
         "rec(majs);\n" +
         "a = true;\n" +
         "if (a) println('a true'); else for (x in 0#10) println('a false');\n" +
+        "a = 1>2;\n" +
+        "println('1>2=' + a);\n" +
+        "a = 1<2;\n" +
+        "println('1<2=' + a);\n" +
+        "arrb = [0,1,2,3,4,5,6,7];\n"+
+        "arr = arrb[{if ($0 > 4) return $0; else return nil;}];\n"+
+        "println(arr);\n" +
+        "arr = arrb[{return $0*2;}];\n"+
+        "println(arr);\n" +
+        "arrb[[1,2,3]] = 4;\n"+
+        "println(arrb);\n" +
+        "arrb = arrb[{if ($0 != 4) return $0; else return nil;}];\n"+
+        "println(arrb);\n" +
         "__BKPT;\n" +
         ""
         ;
@@ -293,11 +318,11 @@ public class Compiler {
     // DONE:   a=[]; for(i in 0#10) {a['x'+i]='y'+i;} // inverts key/val
     // DONE:   if (a) println('a true'); else println('a false');
     // DONE:   { globalscope = 1; { localscope = 2; anon = { return localscope * 4; }; println(anon()); } }
-    // FIXME:  a = 1>2;
-    // FIXME:  arr = arrb[{if ($0 > 4) return $0; else return nil;}]; // removes all elements below 4
-    // FIXME:  arr = arrb[{return $0*2;}]; // multiplies all elements by 2
-    // FIXME:  arr[[1,2,3]] = 4
-    // FIXME:  arr[[1,2,3]] = arrb[[3,4,5]]
+    // DONE:   a = 1>2;
+    // DONE:   arr = arrb[{if ($0 > 4) return $0; else return nil;}]; // removes all elements below 4
+    // DONE:   arr = arrb[{return $0*2;}]; // multiplies all elements by 2
+    // DONE:   arr[[1,2,3]] = 4
+    // FIXME:  map = map[{if $0 ...etc}]
     // FIXME:  goto
     // FIXME:  handle 'global' keyword
     // FIXME: "r = ['a':1,'b':2,'c':3];\n" +
@@ -403,26 +428,20 @@ public class Compiler {
   "  }\n" +
   " return crc ^ ~0;\n" +
   "}";
+
     
     src = 
-//    		"{f[]; a = 0; for(i in f) a += i;\n}" +
-//    		  "f = [0,1,2,3,4,5,6,7,8];\n"+
-////          "g = f[{if ($0 % 3 == 0) return $0/3; else return nil;}];\n"+
-////          "println(f);\n" +
-////          "println(g);\n" +
-////          "h = g[{return $0 * 3;}];\n"+
-////          "println(h);\n" +
-////          "println(f);\n" +
-//          "h = f[$0 > 2];\n"+
-//          "println(h);\n" +
-//          "h = f[($0 > 2) & ($0 < 8)];\n"+
-//          "println(h);\n" +
-        
-          "a = 2; for (i in 1#3) println(i > a);\n"+
-          "";
-    othersrc = siblingsrc = crcsrc = "";
-
-    //        
+        "map = ['a':1, 'b':2, 'c':3, 'd':4];\n" +
+        "println('map :', map);\n" +
+        "multiplier = 10;\n" +
+        "map = map[{$0.val *= multiplier; return $0;}];\n" +
+        "println('mapp:', map);\n" +
+        "println('mapp:', map[$0.val > 25]);\n" +
+        "for (i in map) println(i.key, i.val);\n" +
+    "";
+   othersrc = siblingsrc = crcsrc = ""; 
+    
+//
 //    src = 
 //        "module mod;\n" +
 //        "WTF.exe();\n"+

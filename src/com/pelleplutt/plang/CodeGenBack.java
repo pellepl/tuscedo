@@ -178,8 +178,7 @@ public class CodeGenBack implements ByteCode {
   }
   
   void compileTAC(TAC tac, ModuleFragment frag) {
-    //TODO
-    /*if (dbg) */System.out.println("    " + (tac.referenced ? "ref " : "    ") + tac);
+    if (dbg) System.out.println("    " + (tac.referenced ? "ref " : "    ") + tac);
 
     
     if (tac instanceof TACAlloc) {
@@ -267,9 +266,8 @@ public class CodeGenBack implements ByteCode {
       addCode(frag, stackInfo() + "->" + ((TACGoto)tac).label.toString(), IBRA, 0xff,0xff,0xff);
     }
     else if (tac instanceof TACGotoCond) {
-      int cmpInstr = ICMP;
+      boolean cmp0 = false;
       TACGotoCond c = (TACGotoCond)tac;
-      pushValue(c.cond, frag);
       boolean inverseCond = !c.positive; 
       int braInstr = IBRA;
       if (c.condOp == OP_EQ2) braInstr = inverseCond ? IBRA_NE : IBRA_EQ;
@@ -289,14 +287,17 @@ public class CodeGenBack implements ByteCode {
                AST.isLogicalOperator(c.condOp) ||
                AST.isUnaryOperator(c.condOp)
                ) {
-        cmpInstr = ICMP_0;
+        cmp0 = true;
         braInstr = IBRA_EQ;
       }
       else {
         throw new CompilerError("bad condition '" + c.cond + "' for '" + c +  "', is '" + AST.opString(c.condOp)+"'", c.getNode());
       }
-      sp -= cmpInstr == ICMP_0 ? 1 : 2;
-      addCode(frag, stackInfo() + tac.toString(), cmpInstr);
+      if (cmp0) {
+        pushValue(c.cond, frag);
+        sp--;
+        addCode(frag, stackInfo() + tac.toString(), ICMP_0);
+      }
       frag.links.add(new ModuleFragment.LinkGoto(frag.getPC(), c.label));
       addCode(frag, stackInfo() + "->" + c.label.toString(), braInstr, 0xff,0xff,0xff);
     }
@@ -585,6 +586,8 @@ public class CodeGenBack implements ByteCode {
     }
     else if (AST.isConditionalOperator(tac.op)) {
       pushValues(tac.left, tac.right, frag);
+      sp = sp - 2;
+      addCode(frag, stackInfo() + tac.toString(), ICMP);
     }
     // TODO moar
     else {
@@ -758,27 +761,24 @@ public class CodeGenBack implements ByteCode {
       addCode(frag, stackInfo(), ISET_CRE);
     }
     else if (a instanceof TACOp) {
-// TODO pushing conditionals? need to implement this
       TACOp tac = (TACOp)a;
-   // TODO added this, perhaps remove??
       if (AST.isConditionalOperator(tac.op) && tac.referenced) {
-        System.out.println("            pushValue cond " + tac);
-////      throw new CompilerError("not implemented", a.getNode());
-//        sp -= 2;
-//        addCode(frag, stackInfo(), ICMP);
-//        sp++;
-//        addCode(frag, stackInfo() + " presume true", IPUSH_1);
-//        int braInstr = IBRA;
-//        if (tac.getNode().op == OP_EQ2) braInstr = IBRA_EQ;
-//        else if (tac.getNode().op == OP_NEQ) braInstr = IBRA_NE;
-//        else if (tac.getNode().op == OP_GE) braInstr = IBRA_GE;
-//        else if (tac.getNode().op == OP_LT) braInstr = IBRA_LT;
-//        else if (tac.getNode().op == OP_GT) braInstr = IBRA_GT;
-//        else if (tac.getNode().op == OP_LE) braInstr = IBRA_LE;
-//        addCode(frag, stackInfo(), braInstr, 0,0,5);
-//        addCode(frag, stackInfo() + " was false", ISUB_Q1);
+        // push 1 if conditional is true, push 0 if conditional is false
+        sp++;
+        addCode(frag, stackInfo() + " presume true", IPUSH_1);
+        int braInstr = IBRA;
+        if (tac.getNode().op == OP_EQ2) braInstr = IBRA_EQ;
+        else if (tac.getNode().op == OP_NEQ) braInstr = IBRA_NE;
+        else if (tac.getNode().op == OP_GE) braInstr = IBRA_GE;
+        else if (tac.getNode().op == OP_LT) braInstr = IBRA_LT;
+        else if (tac.getNode().op == OP_GT) braInstr = IBRA_GT;
+        else if (tac.getNode().op == OP_LE) braInstr = IBRA_LE;
+        addCode(frag, stackInfo(), braInstr, 0,0,5);
+        addCode(frag, stackInfo() + " was false", ISUB_Q1);
+      } else {
+        // already on stack
+        return true;
       }
-
     }
     else {
       return true;

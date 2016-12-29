@@ -95,6 +95,10 @@ public class MRange implements MSet {
   public void set(Object key, M m) {throw new ProcessorError("ranges are immutable");}
   public void remove(M m) {throw new ProcessorError("ranges are immutable");}
 
+  public int getType() {
+  	return TARR;
+  }
+
   public String toString() {
     return start + "#" + step + "#" + end;
   }

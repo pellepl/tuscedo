@@ -283,7 +283,7 @@ public class ACTextField extends JTextPane implements CaretListener {
       }
     }
     if (curSug != null) {
-      setText(curSug.substring(0, minOffs));
+      setText(curSug.substring(0, Math.min(curSug.length(),minOffs)));
       userSelectedSuggestion = true;
     }
   }
