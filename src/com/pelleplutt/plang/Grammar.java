@@ -106,7 +106,7 @@ public class Grammar {
   // For each rule, there is a list of OperandAccepts. Each entry in the list denotes list of possible
   // operators for given operand index == list index.
   Map<Integer, List<Rule>> ruleMap = new HashMap<Integer, List<Rule>>();
-  static boolean dbg = false;
+  public static boolean dbg = false;
   
   void build() throws IOException {
     // read all definitions

@@ -57,46 +57,10 @@ public class Compiler {
   
   public static void main(String[] args) {
     Map<String, ExtCall> extDefs = new HashMap<String, ExtCall>();
-    extDefs.put("println", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0) {
-          System.out.println();
-        } else {
-          for (int i = 0; i < args.length; i++) {
-            System.out.print(args[i].asString() + (i < args.length-1 ? " " : ""));
-          }
-        }
-        System.out.println();
-        return null;
-      }
-    });
-    extDefs.put("print", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0) {
-        } else {
-          for (int i = 0; i < args.length; i++) {
-            System.out.print(args[i].asString() + (i < args.length-1 ? " " : ""));
-          }
-        }
-        return null;
-      }
-    });
+    Processor.addCommonExtdefs(extDefs);
     extDefs.put("cos", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         return new Processor.M((float)Math.cos(args[0].f));
-      }
-    });
-    extDefs.put("halt", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        throw new ProcessorError("halt");
-      }
-    });
-    extDefs.put("argcheckext", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        System.out.println("1:" + args[0].asString());
-        System.out.println("2:" + args[1].asString());
-        System.out.println("3:" + args[2].asString());
-        return null;
       }
     });
     
@@ -250,8 +214,10 @@ public class Compiler {
         "walnut.fmap.call = mandel.add;\n" +
         "println(walnut.fmap.call(2,3));\n" +
         "walnut.fmap.sub.call();\n" +
+
         "walnut.fmap.sub.call = mandel.add;\n" +
         "println(walnut.fmap.sub.call(4,5));\n" +
+        
         "map.call = fib;\n" +
         "println(map.call(12));\n" +
         "map.call = walnut.fmap.sub.call;\n" +

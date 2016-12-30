@@ -3,9 +3,19 @@ package com.pelleplutt.plang.proc;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
+import com.pelleplutt.plang.AST;
+import com.pelleplutt.plang.CodeGenBack;
+import com.pelleplutt.plang.CodeGenFront;
 import com.pelleplutt.plang.Executable;
+import com.pelleplutt.plang.Grammar;
+import com.pelleplutt.plang.Linker;
+import com.pelleplutt.plang.StructAnalysis;
 import com.pelleplutt.plang.proc.ProcessorError.ProcessorBreakpointError;
 
 public class Processor implements ByteCode {
@@ -1617,4 +1627,121 @@ public class Processor implements ByteCode {
   		"load_fp $fp[0]           // sp=3	res:.main.setVisitor (local)\n"+
   		"retv                     // sp=2	\n"+
   		"";
+  
+  
+  public static void addCommonExtdefs(Map<String, ExtCall> extDefs) {
+    extDefs.put("__dbg", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          System.out.println("  run : " + Processor.dbgRun);
+          System.out.println("  mem : " + Processor.dbgMem);
+          System.out.println("  ast : " + AST.dbg);
+          System.out.println("  gra : " + Grammar.dbg);
+          System.out.println("  str : " + StructAnalysis.dbg);
+          System.out.println("  fro : " + CodeGenFront.dbg);
+          System.out.println("  bak : " + CodeGenBack.dbg);
+          System.out.println("  lin : " + Linker.dbg);
+        } else {
+          List<String> areas = new ArrayList<String>();
+          for (M marg : args) {
+            String cmd = marg.str.toLowerCase();
+            if (cmd.equals("on") || cmd.equals("1")) {
+              setDbg(areas, true);
+              areas.clear();
+            } else if (cmd.equals("off") || cmd.equals("0")) {
+              setDbg(areas, false);
+              areas.clear();
+            } else {
+              areas.add(cmd);
+            }
+          }
+        }
+        return null;
+      }
+    });
+    extDefs.put("println", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          System.out.println();
+        } else {
+          for (int i = 0; i < args.length; i++) {
+            System.out.print(args[i].asString() + (i < args.length-1 ? " " : ""));
+          }
+        }
+        System.out.println();
+        return null;
+      }
+    });
+    extDefs.put("print", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+        } else {
+          for (int i = 0; i < args.length; i++) {
+            System.out.print(args[i].asString() + (i < args.length-1 ? " " : ""));
+          }
+        }
+        return null;
+      }
+    });
+    extDefs.put("halt", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        throw new ProcessorError("halt");
+      }
+    });
+    extDefs.put("__const", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        SortedSet<Integer> asort = new TreeSet<Integer>();
+        asort.addAll(p.getExecutable().getConstants().keySet());
+        for (int addr : asort) {
+          System.out.println(String.format("  0x%06x  %s", addr, p.getExecutable().getConstants().get(addr).toString()));
+        }
+        return null;
+      }
+    });
+    extDefs.put("__stack", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          for (int addr = p.getSP(); addr < p.getMemory().length; addr++) {
+            System.out.println(String.format("  0x%06x  %s", addr, p.getMemory()[addr].toString()));
+          }
+        } else {
+          for (int addr = p.getMemory().length - args[0].i; addr < p.getMemory().length; addr++) {
+            System.out.println(String.format("  0x%06x  %s", addr, p.getMemory()[addr].toString()));
+          }
+        }
+        return null;
+      }
+    });
+    extDefs.put("__mem", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          System.out.println(String.format("  0x%06x--0x%06x", 0, p.getMemory().length));
+        } else {
+          int start = args[0].i;
+          int addr = start;
+          int len = args.length < 2 ? 1 : args[1].i;
+          while (addr < p.getMemory().length && addr < start + len) {
+            System.out.println(String.format("  0x%06x  %s", addr, p.getMemory()[addr].toString()));
+            addr++;
+          }
+        }
+        return null;
+      }
+    });
+  }
+  
+  
+  static void setDbg(List<String> a, boolean ena) {
+    for (String s:a) {
+      if (s.equals("run") || s.equals("*")) Processor.dbgRun = ena;
+      if (s.equals("mem") || s.equals("*")) Processor.dbgMem = ena;
+      if (s.equals("ast") || s.equals("*")) AST.dbg = ena;
+      if (s.equals("gra") || s.equals("*")) Grammar.dbg = ena;
+      if (s.equals("str") || s.equals("*")) StructAnalysis.dbg = ena;
+      if (s.equals("fro") || s.equals("*")) CodeGenFront.dbg = ena;
+      if (s.equals("bak") || s.equals("*")) CodeGenBack.dbg = ena;
+      if (s.equals("lin") || s.equals("*")) Linker.dbg = ena;
+    }
+  }
+  
 }

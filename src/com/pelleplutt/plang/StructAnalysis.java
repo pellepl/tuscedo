@@ -36,7 +36,7 @@ import com.pelleplutt.plang.ASTNode.ASTNodeString;
 import com.pelleplutt.plang.ASTNode.ASTNodeSymbol;
 
 public class StructAnalysis {
-  static boolean dbg = false;
+  public static boolean dbg = false;
   public ScopeStack mainScopeStack;
   ScopeStack anonDefiningScopeStack = null;
   List<ASTNodeSymbol> anonDefLocals = new ArrayList<ASTNodeSymbol>();

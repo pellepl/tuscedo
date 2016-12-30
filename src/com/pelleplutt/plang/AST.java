@@ -17,7 +17,7 @@ import com.pelleplutt.tuscedo.Lexer;
 
 public class AST implements Lexer.Emitter {
   Lexer lexer;
-  static boolean dbg = false;
+  public static boolean dbg = false;
   static int __id = 0;
   final static int OP_COMMENTMULTI = __id++;
   final static int OP_COMMENTLINE  = __id++;

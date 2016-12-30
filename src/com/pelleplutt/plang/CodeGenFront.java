@@ -93,7 +93,7 @@ import com.pelleplutt.plang.TAC.TACUnresolved;
 import com.pelleplutt.plang.TAC.TACVar;
 
 public class CodeGenFront {
-  static boolean dbg = false;
+  public static boolean dbg = false;
   static int label = 0;
   static int anonIx = 0;
   List<FrontFragment> ffrags = new ArrayList<FrontFragment>();
@@ -1027,7 +1027,7 @@ public class CodeGenFront {
     int whenceSymNbr = sym.symNbr;
     ASTNodeBlok veblk = eblk;
     while (veblk != null) {
-      if (dbg) System.out.println((ix++) + "looking for " + sym + " in " + veblk.getVariables() + veblk.getArguments() + veblk.getAnonymousDefinedScopeVariables() + ": " + veblk);
+      if (dbg) System.out.println((ix++) + " looking for " + sym + " in vars:" + veblk.getVariables() + " args:" + veblk.getArguments() + " ads: " +veblk.getAnonymousDefinedScopeVariables());// + ": " + veblk);
       if (dbg) System.out.println("  declared here  " + veblk.declaresVariableInThisScope(sym));
       if (dbg) System.out.println("  is declared b4 " +  veblk.isSymbolDeclared(sym, whenceSymNbr));
       if ((veblk.getArguments() != null && veblk.getArguments().contains(sym)) ||
@@ -1051,7 +1051,7 @@ public class CodeGenFront {
       }
       else if (dbg) System.out.print(" false");
     } else {
-      if (dbg) System.out.println("  no global " + irep + " " + modGlobs);
+      if (dbg) System.out.println("  no globals, mod " + eblk.getModule() + " modGlobs:" + modGlobs);
     }
     if (dbg) System.out.println("  NOT FOUND");
     return null;

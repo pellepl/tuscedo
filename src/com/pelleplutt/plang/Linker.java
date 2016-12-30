@@ -27,7 +27,7 @@ import com.pelleplutt.plang.proc.Processor;
 import com.pelleplutt.plang.proc.Processor.M;
 
 public class Linker implements ByteCode {
-  static boolean dbg =  false;
+  public static boolean dbg =  false;
   int extFunc = -1;
   int codeOffset = 0;
   int mainIx = 0;

@@ -72,7 +72,7 @@ import com.pelleplutt.plang.proc.Assembler;
 import com.pelleplutt.plang.proc.ByteCode;
 
 public class CodeGenBack implements ByteCode {
-  static boolean dbg = false;
+  public static boolean dbg = false;
   int sp;
   int fp;
   
@@ -628,7 +628,11 @@ public class CodeGenBack implements ByteCode {
         sp++;
         addCode(frag, stackInfo() + op.toString(), IDUP);
       }
-      emitAssignment(op, de.set, null, false, frag);
+      if (de.set instanceof TACSetDeref) {
+        addCode(frag, stackInfo() + "nested deref write", IPOP);
+      } else {
+        emitAssignment(op, de.set, null, false, frag);
+      }
     } else if (assignee instanceof TACUnresolved) {
       pushValue(assignment, frag);
       frag.links.add(new ModuleFragment.LinkUnresolved(frag.getPC(), (TACUnresolved)assignee));
