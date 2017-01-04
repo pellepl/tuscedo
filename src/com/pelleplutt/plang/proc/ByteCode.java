@@ -78,6 +78,8 @@ public interface ByteCode {
   static final int ICAST_F  = 0x41; // cast to float
   static final int ICAST_S  = 0x42; // cast to string
   static final int ICAST_CH = 0x43; // cast to char
+
+  static final int IGET_TYP = 0x48; // get top stack element type
   
   static final int ISET_CRE = 0x50; // create set                    sz=pop(); while(sz--){l.add($sp[-sz]);};push(l);
   static final int IARR_CRE = 0x51; // create array                  addr=xxxxxx; sz=pop(); while(sz--){l.add(mem[addr++]);};push(l);
@@ -122,7 +124,7 @@ public interface ByteCode {
         1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1,UD, //1x
         1, 1, 1, 2, 1, 4, 1, 4, 2, 2,UD,UD, 2, 2,UD,UD, //2x
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, //3x
-        1, 1, 1, 1,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //4x
+        1, 1, 1, 1,UD,UD,UD,UD, 1,UD,UD,UD,UD,UD,UD,UD, //4x
         1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,UD,UD,UD,UD, //5x
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //6x
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //7x

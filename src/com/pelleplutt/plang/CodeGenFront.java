@@ -441,6 +441,7 @@ public class CodeGenFront {
       if (declBlok != null) {
         return new TACVar(e, ((ASTNodeSymbol)e).symbol, declBlok.getModule(), null, declBlok.getScopeId());
       } else {
+        if (dbg) System.out.println("  sym " + e + " is unresolved");
         return new TACUnresolved((ASTNodeSymbol)e, parentEblk);
       }
     }
@@ -1028,10 +1029,10 @@ public class CodeGenFront {
     ASTNodeBlok veblk = eblk;
     while (veblk != null) {
       if (dbg) System.out.println((ix++) + " looking for " + sym + " in vars:" + veblk.getVariables() + " args:" + veblk.getArguments() + " ads: " +veblk.getAnonymousDefinedScopeVariables());// + ": " + veblk);
-      if (dbg) System.out.println("  declared here  " + veblk.declaresVariableInThisScope(sym));
-      if (dbg) System.out.println("  is declared b4 " +  veblk.isSymbolDeclared(sym, whenceSymNbr));
+      if (dbg) System.out.println("  declared in this scope: " + veblk.declaresVariableInThisScope(sym));
+      if (dbg) System.out.println("  is declared previously: " +  veblk.isSymbolDeclaredBefore(sym, whenceSymNbr));
       if ((veblk.getArguments() != null && veblk.getArguments().contains(sym)) ||
-          (veblk.declaresVariableInThisScope(sym) && veblk.isSymbolDeclared(sym, whenceSymNbr)) ||
+          (veblk.declaresVariableInThisScope(sym) && veblk.isSymbolDeclaredBefore(sym, whenceSymNbr)) ||
           (veblk.getAnonymousDefinedScopeVariables() != null && veblk.getAnonymousDefinedScopeVariables().contains(sym))) {
         if (dbg) System.out.println("  found");
         return veblk;
@@ -1041,7 +1042,7 @@ public class CodeGenFront {
     }
     List<ASTNodeSymbol> modGlobs = null;
     if (irep != null && (modGlobs = irep.getGlobalVariables(eblk.getModule())) != null) {
-      if (dbg) System.out.print("  is " + sym + " in " + modGlobs);
+      if (dbg) System.out.print("  is " + sym + " in globals " + modGlobs + "?");
       if (modGlobs.contains(sym)) {
         if (dbg) System.out.println("  is declared in previous source");
         ASTNodeBlok declBlok = new ASTNodeBlok(); 
@@ -1051,7 +1052,7 @@ public class CodeGenFront {
       }
       else if (dbg) System.out.print(" false");
     } else {
-      if (dbg) System.out.println("  no globals, mod " + eblk.getModule() + " modGlobs:" + modGlobs);
+      if (dbg) System.out.println("  no globals in mod " + eblk.getModule() + " modGlobs:" + modGlobs);
     }
     if (dbg) System.out.println("  NOT FOUND");
     return null;

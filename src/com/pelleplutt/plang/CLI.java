@@ -57,7 +57,9 @@ public class CLI {
         for (; i < 10000000*1+800000; i++) {
           p.step();
         }
-      } catch (ProcessorFinishedError pfe) {}
+      } catch (ProcessorFinishedError pfe) {
+        System.out.println("processor end, retval " + pfe.getRet());
+      }
       catch (ProcessorError pe) {
         System.out.println("**********************************************");
         System.out.println(String.format("Exception at pc 0x%06x", p.getPC()));

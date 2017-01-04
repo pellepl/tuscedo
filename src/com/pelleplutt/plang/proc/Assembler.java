@@ -3,6 +3,8 @@ package com.pelleplutt.plang.proc;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.HashMap;
+import java.util.Map;
 
 import com.pelleplutt.plang.CompilerError;
 
@@ -22,14 +24,56 @@ public class Assembler implements ByteCode {
     }
   }
   
-  public static byte[] asmInstr(String line) {
-  	if (line == null) return null;
-  	String l = line.toLowerCase().trim();
-  	int commentOffs = l.indexOf("//");
-  	if (commentOffs >= 0) {
-  		l = l.substring(0, commentOffs);	
-  	}
-  	String[] tokens = l.split("\\s+");
+  public static byte[] assemble(String s) {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    Map<String, Integer> labels = new HashMap<String, Integer>();
+    Map<Integer, String> labelRefs = new HashMap<Integer, String>();
+    String lines[] = s.split("\n");
+    for (String line:lines) {
+      if (line == null) continue;
+      String l = line;
+      int commentOffs = l.indexOf("//");
+      if (commentOffs >= 0) {
+        l = l.substring(0, commentOffs);  
+      }
+      l = l.toLowerCase().trim();
+      if (l.endsWith(":")) {
+        labels.put(l.substring(0, l.length()-1), baos.size());
+      } else {
+        byte code[] = Assembler.asmInstr(l, baos.size(), labelRefs);
+        if (code != null) {
+          try { baos.write(code); } catch (IOException e) { e.printStackTrace(); }
+        }
+      }
+    }
+    byte[] d = baos.toByteArray();
+    
+    // resolve label references
+    for (int labelInstrAddr : labelRefs.keySet()) {
+      String label = labelRefs.get(labelInstrAddr);
+      int jmp = 0;
+      int instr = (int)(d[labelInstrAddr] & 0xff); 
+      if (instr >= IBRA && instr <= IBRA_LE) {
+        // branch, relative
+        jmp = labels.get(label) - labelInstrAddr;
+      } else if (instr >= IJUMP && instr <= IJUMP_LE ||
+          instr == ICALL_IM) {
+        // jump | call, absolute
+        jmp = labels.get(label);
+      } else {
+        throw new CompilerError("unknown label instruction");
+      }
+      d[labelInstrAddr+1] = (byte)(jmp>>16);
+      d[labelInstrAddr+2] = (byte)(jmp>>8);
+      d[labelInstrAddr+3] = (byte)(jmp);
+    }
+    
+    return d;
+  }
+
+  
+  public static byte[] asmInstr(String line, int addr, Map<Integer, String> labelRefs) {
+  	String[] tokens = line.split("\\s+");
   	if (tokens.length == 0) return null;
   	if (tokens[0].length() == 0) return null;
   	String op = tokens[0];
@@ -189,9 +233,12 @@ public class Assembler implements ByteCode {
 	  	else if (op.equals("cast_S")) {
 	  		baos.write(ICAST_S);
 	  	}
-	  	else if (op.equals("cast_ch")) {
-	  		baos.write(ICAST_CH);
-	  	}
+      else if (op.equals("cast_ch")) {
+        baos.write(ICAST_CH);
+      }
+      else if (op.equals("get_typ")) {
+        baos.write(IGET_TYP);
+      }
 	  	else if (op.equals("pop")) {
 	  		baos.write(IPOP);
 	  	}
@@ -277,7 +324,7 @@ public class Assembler implements ByteCode {
 	  	}
 	  	else if (op.equals("call_im")) {
 	  		baos.write(ICALL_IM);
-	  		baos.write(utobytes(tokens[1], 3));
+	  		baos.write(utobytesl(tokens[1], 3, addr, labelRefs));
 	  	}
 	  	else if (op.equals("ano_cre")) {
 	  		baos.write(IANO_CRE);
@@ -290,63 +337,63 @@ public class Assembler implements ByteCode {
 	  	}
 	  	else if (op.equals("jump")) {
 	  		baos.write(IJUMP);
-	  		baos.write(utobytes(tokens[1], 3));
+	  		baos.write(utobytesl(tokens[1], 3, addr, labelRefs));
 	  	}
 	  	else if (op.equals("jump_eq")) {
 	  		baos.write(IJUMP_EQ);
-	  		baos.write(utobytes(tokens[1], 3));
+	  		baos.write(utobytesl(tokens[1], 3, addr, labelRefs));
 	  	}
 	  	else if (op.equals("jump_ne")) {
 	  		baos.write(IJUMP_NE);
-	  		baos.write(utobytes(tokens[1], 3));
+	  		baos.write(utobytesl(tokens[1], 3, addr, labelRefs));
 	  	}
 	  	else if (op.equals("jump_gt")) {
 	  		baos.write(IJUMP_GT);
-	  		baos.write(utobytes(tokens[1], 3));
+	  		baos.write(utobytesl(tokens[1], 3, addr, labelRefs));
 	  	}
 	  	else if (op.equals("jump_ge")) {
 	  		baos.write(IJUMP_GE);
-	  		baos.write(utobytes(tokens[1], 3));
+	  		baos.write(utobytesl(tokens[1], 3, addr, labelRefs));
 	  	}
 	  	else if (op.equals("jump_lt")) {
 	  		baos.write(IJUMP_LT);
-	  		baos.write(utobytes(tokens[1], 3));
+	  		baos.write(utobytesl(tokens[1], 3, addr, labelRefs));
 	  	}
 	  	else if (op.equals("jump_le")) {
 	  		baos.write(IJUMP_LE);
-	  		baos.write(utobytes(tokens[1], 3));
+	  		baos.write(utobytesl(tokens[1], 3, addr, labelRefs));
 	  	}
 	  	else if (op.equals("bra")) {
 	  		baos.write(IBRA);
-	  		baos.write(stobytes(tokens[1], 3));
+	  		baos.write(stobytesl(tokens[1], 3, addr, labelRefs));
 	  	}
 	  	else if (op.equals("bra_eq")) {
 	  		baos.write(IBRA_EQ);
-	  		baos.write(stobytes(tokens[1], 3));
+	  		baos.write(stobytesl(tokens[1], 3, addr, labelRefs));
 	  	}
 	  	else if (op.equals("bra_ne")) {
 	  		baos.write(IBRA_NE);
-	  		baos.write(stobytes(tokens[1], 3));
+	  		baos.write(stobytesl(tokens[1], 3, addr, labelRefs));
 	  	}
 	  	else if (op.equals("bra_gt")) {
 	  		baos.write(IBRA_GT);
-	  		baos.write(stobytes(tokens[1], 3));
+	  		baos.write(stobytesl(tokens[1], 3, addr, labelRefs));
 	  	}
 	  	else if (op.equals("bra_ge")) {
 	  		baos.write(IBRA_GE);
-	  		baos.write(stobytes(tokens[1], 3));
+	  		baos.write(stobytesl(tokens[1], 3, addr, labelRefs));
 	  	}
 	  	else if (op.equals("bra_lt")) {
 	  		baos.write(IBRA_LT);
-	  		baos.write(stobytes(tokens[1], 3));
+	  		baos.write(stobytesl(tokens[1], 3, addr, labelRefs));
 	  	}
 	  	else if (op.equals("bra_le")) {
 	  		baos.write(IBRA_LE);
-	  		baos.write(stobytes(tokens[1], 3));
+	  		baos.write(stobytesl(tokens[1], 3, addr, labelRefs));
 	  	}
 	  	else if (op.equals("bkpt")) {
 	  		baos.write(IBKPT);
-	  		baos.write(stobytes(tokens[1], 3));
+	  		baos.write(stobytesl(tokens[1], 3, addr, labelRefs));
 	  	} else {
 	  		throw new CompilerError("unknown instruction '" + tokens[0] + "'");
 	  	}
@@ -382,11 +429,29 @@ public class Assembler implements ByteCode {
   }
   
   static byte[] utobytes(String s, int len) {
-  	return strtobytes(s, len, 0, false);
+    return strtobytes(s, len, 0, false);
   }
 
   static byte[] stobytes(String s, int len) {
-  	return strtobytes(s, len, 0, true);
+    return strtobytes(s, len, 0, true);
+  }
+  
+  static byte[] utobytesl(String s, int len, int addr, Map<Integer, String> labelRefs) {
+    try {
+      return strtobytes(s, len, 0, false);
+    } catch (Throwable t) {
+      labelRefs.put(addr, s);
+      return new byte[len];
+    }
+  }
+
+  static byte[] stobytesl(String s, int len, int addr, Map<Integer, String> labelRefs) {
+    try {
+      return strtobytes(s, len, 0, true);
+    } catch (Throwable t) {
+      labelRefs.put(addr, s);
+      return new byte[len];
+    }
   }
   
   static String checkreg(String reg, String s) {
@@ -578,6 +643,9 @@ public class Assembler implements ByteCode {
       break;
     case ICAST_CH:
       sb.append("cast_ch ");
+      break;
+    case IGET_TYP:
+      sb.append("get_typ ");
       break;
       
     case IPOP:

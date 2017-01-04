@@ -1,9 +1,9 @@
 package com.pelleplutt.plang.proc;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
@@ -12,11 +12,14 @@ import java.util.TreeSet;
 import com.pelleplutt.plang.AST;
 import com.pelleplutt.plang.CodeGenBack;
 import com.pelleplutt.plang.CodeGenFront;
+import com.pelleplutt.plang.Compiler;
+import com.pelleplutt.plang.CompilerError;
 import com.pelleplutt.plang.Executable;
 import com.pelleplutt.plang.Grammar;
 import com.pelleplutt.plang.Linker;
 import com.pelleplutt.plang.StructAnalysis;
 import com.pelleplutt.plang.proc.ProcessorError.ProcessorBreakpointError;
+import com.pelleplutt.plang.proc.ProcessorError.ProcessorFinishedError;
 
 public class Processor implements ByteCode {
   public static final int TNIL = 0;
@@ -32,6 +35,7 @@ public class Processor implements ByteCode {
   
   public static boolean dbgMem = false;
   public static boolean dbgRun = false;
+  public static boolean silence = false;
   
   public static final String TNAME[] = {
     "nil", "int", "float", "string", "range", "func", "anon", "set"
@@ -57,7 +61,10 @@ public class Processor implements ByteCode {
   public Processor(int memorySize) {
     nilM.type = TNIL;
     memory = new M[memorySize];
-    for (int i = 0; i < memorySize; i++) memory[i] = new M();
+    for (int i = 0; i < memorySize; i++) {
+      memory[i] = new M();
+      memory[i].type = TNIL;
+    }
     code_internal_func_set_visitor = assemble(INTERNAL_FUNC_SET_VISITOR_ASM);
   }
   
@@ -126,25 +133,25 @@ public class Processor implements ByteCode {
   }
   
   int pcodetoi(int addr, int bytes) {
-  	byte c[];
-  	if ((addr & 0xff80000)!=0) {
-  		addr -= 0xff000000;
-  		c = code_internal_func_set_visitor;
-  	} else {
-  		c = code;
-  	}
-  	return codetoi(c, addr, bytes);
+    byte c[];
+    if ((addr & 0xff80000)!=0) {
+      addr -= 0xff000000;
+      c = code_internal_func_set_visitor;
+    } else {
+      c = code;
+    }
+    return codetoi(c, addr, bytes);
   }
   
   int pcodetos(int addr, int bytes) {
-  	byte c[];
-  	if ((addr & 0xff80000)!=0) {
-  		addr -= 0xff000000;
-  		c = code_internal_func_set_visitor;
-  	} else {
-  		c = code;
-  	}
-  	return codetos(c, addr, bytes);
+    byte c[];
+    if ((addr & 0xff80000)!=0) {
+      addr -= 0xff000000;
+      c = code_internal_func_set_visitor;
+    } else {
+      c = code;
+    }
+    return codetos(c, addr, bytes);
   }
   
   public static int codetoi(byte[] code, int addr, int bytes) {
@@ -311,13 +318,15 @@ public class Processor implements ByteCode {
       if (mix.type == TSET || mix.type == TRANGE) {
         derefSetArgSet((MSet)mset.ref, (MSet)mix.ref);
       } else if (mix.type == TANON) {
-      	derefSetArgAnon((MSet)mset.ref, mix);
+        derefSetArgAnon((MSet)mset.ref, mix);
       } else {
         push(((MSet)mset.ref).get(mix));
       }
     } else if (mset.type == TSTR) {
       if (mix.type == TSET || mix.type == TRANGE) {
         derefStringArgSet(mset.str, (MSet)mix.ref);
+      } else if (mix.type == TANON) {
+        derefStringArgAnon(mset.str, mix);
       } else {
         push(mset.str.charAt(mix.asInt()));
       }
@@ -332,6 +341,8 @@ public class Processor implements ByteCode {
             res = (res << 1) | ( (mset.i & (1 << mdrf.asInt())) >>> mdrf.asInt() );
           }
         }
+      } else if (mix.type == TANON) {
+        throw new ProcessorError("cannot dereference integers with mutators");
       } else {
         res = (mset.i & (1<<mix.asInt()))>>>mix.asInt();
       }
@@ -358,11 +369,19 @@ public class Processor implements ByteCode {
   }
   
   void derefSetArgAnon(MSet set, M adrf) {
-  	push(adrf);
-  	push(set);
-  	push(2);
-  	push(0xff000000); // the assembled function INTERNAL_FUNC_SET_VISITOR_ASM
-  	call();
+    push(adrf);
+    push(set);
+    push(2);
+    push(0xff000000); // the assembled function INTERNAL_FUNC_SET_VISITOR_ASM
+    call();
+  }
+  
+  void derefStringArgAnon(String string, M adrf) {
+    push(adrf);
+    push(string);
+    push(2);
+    push(0xff000000); // the assembled function INTERNAL_FUNC_SET_VISITOR_ASM
+    call();
   }
   
   void derefStringArgSet(String str, MSet drf) {
@@ -566,7 +585,7 @@ public class Processor implements ByteCode {
       push(e2);
     }
     else if (e1.type == TSTR || e2.type == TSTR) {
-      String r = e1.asString() + e2.asString();
+      String r = (e1.type == TNIL ? "" : e1.asString()) + (e2.type == TNIL ? "" : e2.asString());
       status(r);
       push(r);
     } else {
@@ -600,24 +619,42 @@ public class Processor implements ByteCode {
         if (push) push(r);
       }
       else if (e1.type == TSTR) {
-        String r = e1.str;
-        int pos = r.lastIndexOf(e2.str);
-        if (pos >= 0) {
-          r = r.substring(0, pos) + r.substring(pos + e2.str.length());
+        if (!push) {
+          // comparison
+          if (e1.str.length() != e2.str.length()) {
+            status(e1.str.length() - e2.str.length());
+          } else {
+            boolean equal = true;
+            for (int i = 0; i < e1.str.length(); i++) {
+              if (e1.str.charAt(i) != e2.str.charAt(i)) {
+                status(e1.str.charAt(i) - e2.str.charAt(i));
+                equal = false;
+                break;
+              }
+            }
+            if (equal) status(0);
+          }
+        } else {
+          // operation
+          String r = e1.str;
+          int pos = r.lastIndexOf(e2.str);
+          if (pos >= 0) {
+            r = r.substring(0, pos) + r.substring(pos + e2.str.length());
+          }
+          status(r);
+          push(r);
         }
-        status(r);
-        if (push) push(r);
       } else if (e1.type == TNIL && !push) {
-      	status(0);
+        status(0);
       } else {
         throw new ProcessorError("cannot subtract type " + TNAME[e1.type]);
       }
     }
     else if (e1.type == TNIL && !push) {
-    	status(-1);
+      status(-1);
     }
     else if (e2.type == TNIL && !push) {
-    	status(1);
+      status(1);
     }
     else if (e1.type == TFLOAT && e2.type == TINT) {
       float r = e1.f - e2.i;
@@ -778,6 +815,11 @@ public class Processor implements ByteCode {
       break;
     }
     m.type = (byte)(type == TO_CHAR ? TSTR : type);
+  }
+  
+  void get_typ() {
+    M m = pop();
+    push(m.type);
   }
   
   void mul() {
@@ -999,11 +1041,11 @@ public class Processor implements ByteCode {
   
   void ret() {
     sp = fp;
-    if (fp == 0xffffffff) throw new ProcessorError.ProcessorFinishedError("abnormal exit");
+    if (fp == 0xffffffff) throw new ProcessorError.ProcessorStackError();
     fp = pop().i;
     pc = pop().i;
     me = pop();
-    if (pc == 0xffffffff) throw new ProcessorError.ProcessorFinishedError("normal exit");
+    if (pc == 0xffffffff) throw new ProcessorError.ProcessorFinishedError(nilM);
     int argc = pop().i;
     sp += argc;
   }
@@ -1011,11 +1053,11 @@ public class Processor implements ByteCode {
   void retv() {
     M t = new M().copy(pop());
     sp = fp;
-    if (fp == 0xffffffff) throw new ProcessorError.ProcessorFinishedError("abnormal exit");
+    if (fp == 0xffffffff) throw new ProcessorError.ProcessorStackError();
     fp = pop().i;
     pc = pop().i;
     me = pop();
-    if (pc == 0xffffffff) throw new ProcessorError.ProcessorFinishedError("normal exit");
+    if (pc == 0xffffffff) throw new ProcessorError.ProcessorFinishedError(t);
     int argc = pop().i;
     sp += argc;
     push(t);
@@ -1080,7 +1122,7 @@ public class Processor implements ByteCode {
     String procInfo = getProcInfo();
     String disasm;
     if ((pc & 0xff800000) != 0) {
-    	disasm = Assembler.disasm(code_internal_func_set_visitor, pc - 0xff000000);
+      disasm = Assembler.disasm(code_internal_func_set_visitor, pc - 0xff000000);
     } else {
       disasm = Assembler.disasm(code, pc);
     }
@@ -1095,9 +1137,9 @@ public class Processor implements ByteCode {
     oldpc = pc;
     int instr;
     if ((pc & 0xff800000) == 0) 
-    	instr = (int)(code[pc] & 0xff);
+      instr = (int)(code[pc] & 0xff);
     else
-    	instr = (int)(code_internal_func_set_visitor[pc - 0xff000000] & 0xff);
+      instr = (int)(code_internal_func_set_visitor[pc - 0xff000000] & 0xff);
     pc++;
     switch (instr) {
     case INOP:
@@ -1254,6 +1296,9 @@ public class Processor implements ByteCode {
       break;
     case ICAST_CH:
       cast(TO_CHAR);
+      break;
+    case IGET_TYP:
+      get_typ();
       break;
 
     case IPOP:
@@ -1565,15 +1610,7 @@ public class Processor implements ByteCode {
   }
   
   static byte[] assemble(String s) {
-  	ByteArrayOutputStream baos = new ByteArrayOutputStream();
-  	String lines[] = s.split("\n");
-  	for (String l:lines) {
-  		byte code[] = Assembler.asmInstr(l);
-  		if (code != null) {
-  			try { baos.write(code); } catch (IOException e) { e.printStackTrace(); }
-  		}
-  	}
-  	return baos.toByteArray();
+    return Assembler.assemble(s);
   }
 
   static final String INTERNAL_FUNC_SET_VISITOR_ASM =
@@ -1585,70 +1622,84 @@ public class Processor implements ByteCode {
       //  }
       //  return res;
       //}
-  		"//.main.func.setVisitor\n"+
-  		"sp_incr 2                // sp=2	ALLO [res, i] FUNC[set, visitor]\n"+
-  		"push_0                   // sp=3	\n"+
-  		"set_cre                  // sp=3	MAP 0 tuples\n"+
-  		"stor_fp $fp[0]           // sp=2	res:.main.setVisitor = [1] (local)\n"+
-  		"sp_incr 3                // sp=5	ALLO [mutation] [.iter, .set]\n"+
-  		"load_fp $fp[-5]          // sp=6	set:.main.setVisitor (local)\n"+
-  		"stor_fp $fp[4]           // sp=5	.set:.main.1.$0 = set:.main.setVisitor (local)\n"+
-  		"push_0                   // sp=6	0\n"+
-  		"stor_fp $fp[3]           // sp=5	.iter:.main.1.$0 = 0 (local)\n"+
-  		"load_fp $fp[4]           // sp=6	.set:.main.1.$0 (local)\n"+
-  		"set_sz                   // sp=6	length\n"+
-  		"load_fp $fp[3]           // sp=7	.iter:.main.1.$0 (local)\n"+
-  		"swap    \n"+
-  		"cmp                      // sp=5	IFNOT [9] GOTO .L1_fexit\n"+
-  		"bra_ge  44               // sp=5	->.L1_fexit:\n"+
-  		"load_fp $fp[4]           // sp=6	.set:.main.1.$0 (local)\n"+
-  		"load_fp $fp[3]           // sp=7	.iter:.main.1.$0 (local)\n"+
-  		"set_rd                   // sp=6	SREADIX (.set:.main.1.$0<.iter:.main.1.$0>)\n"+
-  		"stor_fp $fp[1]           // sp=5	i:.main.setVisitor = [12] (local)\n"+
-  		"load_fp $fp[1]           // sp=6	i:.main.setVisitor (local)\n"+
-  		"udef_me                  // sp=6	undefine me (banked)\n"+
-  		"push_1                   // sp=7	argc, replaced by retval\n"+
-  		"load_fp $fp[-6]          // sp=8	visitor:.main.setVisitor (local)\n"+
-  		"call                     // sp=6	<visitor, 1 args>\n"+
-  		"stor_fp $fp[2]           // sp=5	mutation:.main.1 = [16] (local)\n"+
-  		"load_fp $fp[2]           // sp=6	mutation:.main.1 (local)\n"+
-  		"push_nil                 // sp=7	(nil)\n"+
-  		"cmp                      // sp=5	IFNOT [18] GOTO .L2_ifend\n"+
-  		"bra_eq  11               // sp=5	->.L2_ifend:\n"+
-  		"load_fp $fp[0]           // sp=6	res:.main.setVisitor (local)\n"+
-  		"load_fp $fp[2]           // sp=7	mutation:.main.1 (local)\n"+
-  		"add                      // sp=6	res:.main.setVisitor + mutation:.main.1\n"+
-  		"stor_fp $fp[0]           // sp=5	res:.main.setVisitor = [20] (local)\n"+
-  		"load_fp $fp[3]           // sp=6	.iter:.main.1.$0 (local)\n"+
-  		"add_q1                   // sp=6	++U.iter:.main.1.$0\n"+
-  		"stor_fp $fp[3]           // sp=5	++U.iter:.main.1.$0 (local)\n"+
-  		"bra     -47              // sp=5	->.L1_floop:\n"+
-  		"sp_decr 3                // sp=2	FREE [mutation] [.iter, .set]\n"+
-  		"load_fp $fp[0]           // sp=3	res:.main.setVisitor (local)\n"+
-  		"retv                     // sp=2	\n"+
-  		"";
+      "//.main.func.setVisitor:   \n"+
+      "  sp_incr 2                \n"+
+      "  load_fp $fp[-5]          \n"+
+      "  get_typ                  \n"+
+      "  push_3                   \n"+
+      "  cmp                      \n"+
+      "  bra_ne L1_notstr         \n"+
+      "  push_nil                 \n"+
+      "  bra L1_init              \n"+
+      "L1_notstr:                 \n"+
+      "  push_0                   \n"+
+      "  set_cre                  \n"+
+      "L1_init:                   \n"+
+      "  stor_fp $fp[0]           \n"+
+      "  sp_incr 3                \n"+
+      "  load_fp $fp[-5]          \n"+
+      "  stor_fp $fp[4]           \n"+
+      "  push_0                   \n"+
+      "  stor_fp $fp[3]           \n"+
+      "L1_floop:                  \n"+
+      "  load_fp $fp[3]           \n"+
+      "  load_fp $fp[4]           \n"+
+      "  set_sz                   \n"+
+      "  cmp                      \n"+
+      "  bra_ge L1_fexit          \n"+
+      "  load_fp $fp[4]           \n"+
+      "  load_fp $fp[3]           \n"+
+      "  set_rd                   \n"+
+      "  dup                      \n"+
+      "  stor_fp $fp[1]           \n"+
+      "  udef_me                  \n"+
+      "  push_1                   \n"+
+      "  load_fp $fp[-6]          \n"+
+      "  call                     \n"+
+      "  dup                      \n"+
+      "  stor_fp $fp[2]           \n"+
+      "  push_nil                 \n"+
+      "  cmp                      \n"+
+      "  bra_eq L2_ifend          \n"+
+      "  load_fp $fp[0]           \n"+
+      "  load_fp $fp[2]           \n"+
+      "  add                      \n"+
+      "  stor_fp $fp[0]           \n"+
+      "L2_ifend:                  \n"+
+      "  load_fp $fp[3]           \n"+
+      "  add_q1                   \n"+
+      "  stor_fp $fp[3]           \n"+
+      "  bra L1_floop             \n"+
+      "L1_fexit:                  \n"+
+      "  sp_decr 3                \n"+
+      "  load_fp $fp[0]           \n"+
+      "  retv                     \n"+
+      "  "  ;
   
   
   public static void addCommonExtdefs(Map<String, ExtCall> extDefs) {
+    addCommonExtdefs(extDefs, System.in, System.out);
+  }
+  public static void addCommonExtdefs(Map<String, ExtCall> extDefs, final InputStream in, final PrintStream out) {
     extDefs.put("__dbg", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
-          System.out.println("  run : " + Processor.dbgRun);
-          System.out.println("  mem : " + Processor.dbgMem);
-          System.out.println("  ast : " + AST.dbg);
-          System.out.println("  gra : " + Grammar.dbg);
-          System.out.println("  str : " + StructAnalysis.dbg);
-          System.out.println("  fro : " + CodeGenFront.dbg);
-          System.out.println("  bak : " + CodeGenBack.dbg);
-          System.out.println("  lin : " + Linker.dbg);
+          out.println("  run : " + Processor.dbgRun);
+          out.println("  mem : " + Processor.dbgMem);
+          out.println("  ast : " + AST.dbg);
+          out.println("  gra : " + Grammar.dbg);
+          out.println("  str : " + StructAnalysis.dbg);
+          out.println("  fro : " + CodeGenFront.dbg);
+          out.println("  bak : " + CodeGenBack.dbg);
+          out.println("  lin : " + Linker.dbg);
         } else {
           List<String> areas = new ArrayList<String>();
           for (M marg : args) {
             String cmd = marg.str.toLowerCase();
-            if (cmd.equals("on") || cmd.equals("1")) {
+            if (marg.type == TSTR && (cmd.equals("on") || cmd.equals("1")) || marg.type == TINT && marg.i != 0) {
               setDbg(areas, true);
               areas.clear();
-            } else if (cmd.equals("off") || cmd.equals("0")) {
+            } else if (marg.type == TSTR && (cmd.equals("off") || cmd.equals("0")) || marg.type == TINT && marg.i == 0) {
               setDbg(areas, false);
               areas.clear();
             } else {
@@ -1662,13 +1713,13 @@ public class Processor implements ByteCode {
     extDefs.put("println", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
-          System.out.println();
+          out.println();
         } else {
           for (int i = 0; i < args.length; i++) {
-            System.out.print(args[i].asString() + (i < args.length-1 ? " " : ""));
+            out.print(args[i].asString() + (i < args.length-1 ? " " : ""));
           }
         }
-        System.out.println();
+        out.println();
         return null;
       }
     });
@@ -1677,7 +1728,7 @@ public class Processor implements ByteCode {
         if (args == null || args.length == 0) {
         } else {
           for (int i = 0; i < args.length; i++) {
-            System.out.print(args[i].asString() + (i < args.length-1 ? " " : ""));
+            out.print(args[i].asString() + (i < args.length-1 ? " " : ""));
           }
         }
         return null;
@@ -1693,7 +1744,7 @@ public class Processor implements ByteCode {
         SortedSet<Integer> asort = new TreeSet<Integer>();
         asort.addAll(p.getExecutable().getConstants().keySet());
         for (int addr : asort) {
-          System.out.println(String.format("  0x%06x  %s", addr, p.getExecutable().getConstants().get(addr).toString()));
+          out.println(String.format("  0x%06x  %s", addr, p.getExecutable().getConstants().get(addr).toString()));
         }
         return null;
       }
@@ -1702,11 +1753,11 @@ public class Processor implements ByteCode {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           for (int addr = p.getSP(); addr < p.getMemory().length; addr++) {
-            System.out.println(String.format("  0x%06x  %s", addr, p.getMemory()[addr].toString()));
+            out.println(String.format("  0x%06x  %s", addr, p.getMemory()[addr].toString()));
           }
         } else {
           for (int addr = p.getMemory().length - args[0].i; addr < p.getMemory().length; addr++) {
-            System.out.println(String.format("  0x%06x  %s", addr, p.getMemory()[addr].toString()));
+            out.println(String.format("  0x%06x  %s", addr, p.getMemory()[addr].toString()));
           }
         }
         return null;
@@ -1715,13 +1766,13 @@ public class Processor implements ByteCode {
     extDefs.put("__mem", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
-          System.out.println(String.format("  0x%06x--0x%06x", 0, p.getMemory().length));
+          out.println(String.format("  0x%06x--0x%06x", 0, p.getMemory().length));
         } else {
           int start = args[0].i;
           int addr = start;
           int len = args.length < 2 ? 1 : args[1].i;
           while (addr < p.getMemory().length && addr < start + len) {
-            System.out.println(String.format("  0x%06x  %s", addr, p.getMemory()[addr].toString()));
+            out.println(String.format("  0x%06x  %s", addr, p.getMemory()[addr].toString()));
             addr++;
           }
         }
@@ -1743,5 +1794,65 @@ public class Processor implements ByteCode {
       if (s.equals("lin") || s.equals("*")) Linker.dbg = ena;
     }
   }
-  
+  public static M compileAndRun(String... sources) {
+    return compileAndRun(0x0000, 0x4000, null, false, false, sources);
+  }
+
+  public static M compileAndRun(boolean dbgRun, boolean dbgMem, String... sources) {
+    return compileAndRun(0x0000, 0x4000, null, dbgRun, dbgMem, sources);
+  }
+
+  public static M compileAndRun(int ramOffs, int constOffs, Map<String, ExtCall> extDefs, 
+      boolean dbgRun, boolean dbgMem, String... sources) {
+    if (extDefs == null) {
+      extDefs = new HashMap<String, ExtCall>();
+    }
+    Processor.addCommonExtdefs(extDefs);
+    M ret = null;
+    Executable e = null;
+    try {
+      e = Compiler.compile(extDefs, ramOffs, constOffs, sources);
+    } catch (CompilerError ce) {
+      String s = Compiler.getSource();
+      int strstart = Math.min(s.length(), Math.max(0, ce.getStringStart()));
+      int strend = Math.min(s.length(), Math.max(0, ce.getStringEnd()));
+      if (strstart > 0) {
+        int ps = Math.min(s.length(), Math.max(0, strstart - 50));
+        int pe = Math.max(0, Math.min(s.length(), strend + 50));
+        if (!silence) System.out.println(ce.getMessage());
+        if (!silence) System.out.println("... " + s.substring(ps, strstart) + 
+            " -->" + s.substring(strstart, strend) + "<-- " +
+            s.substring(strend, pe) + " ...");
+      }
+      throw ce;
+    }
+    Processor p = new Processor(0x10000, e);
+    Processor.dbgRun = dbgRun;
+    Processor.dbgMem = dbgMem;
+    int i = 0;
+    try {
+      for (; i < 10000000*2; i++) {
+        p.step();
+      }
+      throw new ProcessorError("processor hanged");
+    } catch (ProcessorFinishedError pfe) {
+      //System.out.println("processor end, retval " + pfe.getRet());
+      ret = pfe.getRet();
+    }
+    catch (ProcessorError pe) {
+      if (!silence) {
+        System.out.println("**********************************************");
+        System.out.println(String.format("Exception at pc 0x%06x", p.getPC()));
+        System.out.println(p.getProcInfo());
+        System.out.println(pe.getMessage());
+        System.out.println("**********************************************");
+        System.out.println("DISASM");
+        Assembler.disasm(System.out, "   ", p.getExecutable().getMachineCode(), p.getPC(), 8);
+        System.out.println("STACK");
+        p.printStack(System.out, "   ", 16);
+      }
+      throw pe;
+    }
+    return ret;
+  }
 }

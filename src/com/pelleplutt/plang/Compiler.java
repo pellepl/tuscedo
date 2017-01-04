@@ -17,28 +17,28 @@ public class Compiler {
     IntermediateRepresentation ir = null;
     for (String src : sources) {
       Compiler.src = src;
-      //System.out.println("* build tree");
+      //System.out.println("* 1. build tree");
       //AST.dbg = true;
       ASTNodeBlok e = AST.buildTree(src);
       //System.out.println(e);
       
-      System.out.println("* optimise tree");
+      //System.out.println("* 2. optimise tree");
       ASTOptimiser.optimise(e);
-      System.out.println(e);
+      //System.out.println(e);
   
-      System.out.println("* check grammar");
+      //System.out.println("* 3. check grammar");
       //Grammar.dbg = true;
       Grammar.check(e);
   
-      System.out.println("* structural analysis");
+      //System.out.println("* 4. structural analysis");
       //StructAnalysis.dbg = true;
       StructAnalysis.analyse(e, ir);
       
-      System.out.println("* intermediate codegen");
-      CodeGenFront.dbg = true;
+      //System.out.println("* 5. intermediate codegen");
+      //CodeGenFront.dbg = true;
       ir = CodeGenFront.genIR(e, ir);
   
-      System.out.println("* backend codegen");
+      //System.out.println("* 6. backend codegen");
       //CodeGenBack.dbg = true;
       CodeGenBack.compile(ir);
       
@@ -46,24 +46,16 @@ public class Compiler {
     }
     TAC.dbgResolveRefs = true;
 
-    System.out.println("* link");
-    Linker.dbg = true;
+    //System.out.println("* link");
+    //Linker.dbg = true;
     Executable exe = Linker.link(ir, ramOffs, constOffs, extDefs, true);
     
-    System.out.println(".. all ok, " + exe.machineCode.length + " bytes of code, pc start @ 0x" + Integer.toHexString(exe.getPCStart()));
+    //System.out.println(".. all ok, " + exe.machineCode.length + " bytes of code, pc start @ 0x" + Integer.toHexString(exe.getPCStart()));
     
     return exe;
   }
   
   public static void main(String[] args) {
-    Map<String, ExtCall> extDefs = new HashMap<String, ExtCall>();
-    Processor.addCommonExtdefs(extDefs);
-    extDefs.put("cos", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        return new Processor.M((float)Math.cos(args[0].f));
-      }
-    });
-    
     String src = 
         "module mandel;\n" +
         "println('*************');\n" + 
@@ -429,6 +421,14 @@ public class Compiler {
 //    crcsrc = 
 //        "";
     
+    Map<String, ExtCall> extDefs = new HashMap<String, ExtCall>();
+    Processor.addCommonExtdefs(extDefs);
+    extDefs.put("cos", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        return new Processor.M((float)Math.cos(args[0].f));
+      }
+    });
+    
     Executable e = null;
     try {
       e = Compiler.compile(extDefs, 0x0000, 0x4000, crcsrc, othersrc, siblingsrc, src);
@@ -451,10 +451,13 @@ public class Compiler {
     //Processor.dbgMem = true;
     int i = 0;
     try {
-      for (; i < 10000000*1+800000; i++) {
+      for (; i < 10000000*2; i++) {
         p.step();
       }
-    } catch (ProcessorFinishedError pfe) {}
+      throw new ProcessorError("processor hanged");
+    } catch (ProcessorFinishedError pfe) {
+      System.out.println("processor end, retval " + pfe.getRet());
+    }
     catch (ProcessorError pe) {
       System.out.println("**********************************************");
       System.out.println(String.format("Exception at pc 0x%06x", p.getPC()));
@@ -470,7 +473,7 @@ public class Compiler {
     System.out.println(i + " instructions executed");
   }
 
-  private static String getSource() {
+  public static String getSource() {
     return src;
   }
   

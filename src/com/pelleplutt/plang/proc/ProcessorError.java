@@ -1,5 +1,7 @@
 package com.pelleplutt.plang.proc;
 
+import com.pelleplutt.plang.proc.Processor.M;
+
 public class ProcessorError extends Error {
 
   public ProcessorError() {
@@ -28,9 +30,18 @@ public class ProcessorError extends Error {
   }
 
   public static class ProcessorFinishedError extends ProcessorError {
-    public ProcessorFinishedError(String message) {
+    M ret;
+    public ProcessorFinishedError(M ret) {
       super("execution stopped");
+      this.ret = ret;
     }
+    
+    public M getRet() {
+      return ret;
+    }
+  }
+  public static class ProcessorStackError extends ProcessorError {
+    public ProcessorStackError() { super("bad stack contents at return"); }
   }
   public static class ProcessorBreakpointError extends ProcessorError {
     public ProcessorBreakpointError() { super("breakpoint hit"); }

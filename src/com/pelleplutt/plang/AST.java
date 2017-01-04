@@ -46,33 +46,33 @@ public class AST implements Lexer.Emitter {
   final static int OP_GOTO         = __id++;
   
   final static int OP_EQ           = __id++;
+  final static int OP_HASH         = __id++;
+  final static int OP_OREQ         = __id++;
+  final static int OP_XOREQ        = __id++;
+  final static int OP_ANDEQ        = __id++;
+  final static int OP_SHLEFTEQ     = __id++;
+  final static int OP_SHRIGHTEQ    = __id++;
+  final static int OP_PLUSEQ       = __id++;
+  final static int OP_MINUSEQ      = __id++;
+  final static int OP_MODEQ        = __id++;
+  final static int OP_DIVEQ        = __id++;
+  final static int OP_MULEQ        = __id++;
+  final static int OP_OR           = __id++;
+  final static int OP_XOR          = __id++;
+  final static int OP_AND          = __id++;
+  final static int OP_SHLEFT       = __id++;
+  final static int OP_SHRIGHT      = __id++;
   final static int OP_EQ2          = __id++;
   final static int OP_GT           = __id++;
   final static int OP_LT           = __id++;
   final static int OP_GE           = __id++;
   final static int OP_LE           = __id++;
   final static int OP_NEQ          = __id++;
-  final static int OP_HASH         = __id++;
-  final static int OP_AND          = __id++;
-  final static int OP_ANDEQ        = __id++;
-  final static int OP_OR           = __id++;
-  final static int OP_OREQ         = __id++;
-  final static int OP_XOR          = __id++;
-  final static int OP_XOREQ        = __id++;
-  final static int OP_SHLEFT       = __id++;
-  final static int OP_SHLEFTEQ     = __id++;
-  final static int OP_SHRIGHT      = __id++;
-  final static int OP_SHRIGHTEQ    = __id++;
   final static int OP_PLUS         = __id++;
-  final static int OP_PLUSEQ       = __id++;
   final static int OP_MINUS        = __id++;
-  final static int OP_MINUSEQ      = __id++;
-  final static int OP_DIV          = __id++;
-  final static int OP_DIVEQ        = __id++;
   final static int OP_MOD          = __id++;
-  final static int OP_MODEQ        = __id++;
+  final static int OP_DIV          = __id++;
   final static int OP_MUL          = __id++;
-  final static int OP_MULEQ        = __id++;
   final static int OP_PLUS2        = __id++;
   final static int OP_MINUS2       = __id++;
   final static int OP_DOT          = __id++;
@@ -141,33 +141,33 @@ public class AST implements Lexer.Emitter {
       new Op("goto", OP_GOTO, 1),
       
       new Op("=", OP_EQ, 2, Op.LEFT_ASSOCIATIVITY),
+      new Op("#", OP_HASH, 2),
+      new Op("|=", OP_OREQ, 2),
+      new Op("\\^=", OP_XOREQ, 2),
+      new Op("&=", OP_ANDEQ, 2),
+      new Op("<<=", OP_SHLEFTEQ, 2),
+      new Op(">>=", OP_SHRIGHTEQ, 2),
+      new Op("+=", OP_PLUSEQ, 2),
+      new Op("-=", OP_MINUSEQ, 2),
+      new Op("\\%=", OP_MODEQ, 2),
+      new Op("/=", OP_DIVEQ, 2),
+      new Op("\\*=", OP_MULEQ, 2),
+      new Op("|", OP_OR, 2),
+      new Op("\\^", OP_XOR, 2),
+      new Op("&", OP_AND, 2),
+      new Op("<<", OP_SHLEFT, 2),
+      new Op(">>", OP_SHRIGHT, 2),
       new Op("==", OP_EQ2, 2),
       new Op(">", OP_GT, 2),
       new Op("<", OP_LT, 2),
       new Op(">=", OP_GE, 2),
       new Op("<=", OP_LE, 2),
       new Op("\\!=", OP_NEQ, 2),
-      new Op("#", OP_HASH, 2),
-      new Op("&", OP_AND, 2),
-      new Op("&=", OP_ANDEQ, 2),
-      new Op("|", OP_OR, 2),
-      new Op("|=", OP_OREQ, 2),
-      new Op("\\^", OP_XOR, 2),
-      new Op("\\^=", OP_XOREQ, 2),
-      new Op("<<", OP_SHLEFT, 2),
-      new Op("<<=", OP_SHLEFTEQ, 2),
-      new Op(">>", OP_SHRIGHT, 2),
-      new Op(">>=", OP_SHRIGHTEQ, 2),
       new Op("+", OP_PLUS, 2),
-      new Op("+=", OP_PLUSEQ, 2),
       new Op("-", OP_MINUS, 2),
-      new Op("-=", OP_MINUSEQ, 2),
-      new Op("/", OP_DIV, 2),
-      new Op("/=", OP_DIVEQ, 2),
       new Op("\\%", OP_MOD, 2),
-      new Op("\\%=", OP_MODEQ, 2),
+      new Op("/", OP_DIV, 2),
       new Op("\\*", OP_MUL, 2),
-      new Op("\\*=", OP_MULEQ, 2),
       new Op("++", OP_PLUS2, 1), 
       new Op("--", OP_MINUS2, 1),
       new Op(".", OP_DOT, 2),
@@ -206,11 +206,14 @@ public class AST implements Lexer.Emitter {
 
   Stack<ASTNode> exprs = new Stack<ASTNode>();
   Stack<Op> opers = new Stack<Op>();
+  // stack of current blocks
   Stack<Integer> blcks = new Stack<Integer>();
-  Stack<Integer> blkSymNbrs = new Stack<Integer>();
+  // stack of current block symbol number
+  Stack<Integer> blkSymNbrs = new Stack<Integer>(); 
   int callid;
   int arrdeclid;
-  int blkSymNbr;
+  // symbol counter for current block
+  int blkSymCounter;
   int prevTokix = -1;
   int prevPrevTokix = -1;
   int stroffset, strlen;
@@ -236,7 +239,7 @@ public class AST implements Lexer.Emitter {
     AST ast = new AST();
     ast.callid = 0;
     ast.arrdeclid = 0;
-    ast.blkSymNbr = 0;
+    ast.blkSymCounter = 0;
     byte tst[] = s.getBytes();
     for (byte b : tst) {
       ast.lexer.feed(b);
@@ -395,7 +398,7 @@ public class AST implements Lexer.Emitter {
   void onSymbol(String symbol) {
     if (dbg) System.out.println("   epush sym " + symbol);
     ASTNodeSymbol esym = new ASTNodeSymbol(symbol);
-    esym.symNbr = blkSymNbr++;
+    esym.symNbr = blkSymCounter++; // assign symbol number for this symbol in this block
     exprs.push(esym);
   }
   
@@ -448,6 +451,7 @@ public class AST implements Lexer.Emitter {
       }
     } 
     else if ((prevTokix == OP_SYMBOL || prevTokix == OP_DOT) && prevPrevTokix == OP_DOT && !opers.isEmpty() && opers.peek().id == OP_DOT) {
+      // TODO FIX THIS FOR THE SAKE OF GOD
       // function call, dotted symbol
       collapseStack(OP_DOT);
       ASTNodeCompoundSymbol funcName = new ASTNodeCompoundSymbol(exprs.pop());
@@ -534,6 +538,7 @@ public class AST implements Lexer.Emitter {
         prevTokix == OP_BRACKETO || 
         prevTokix == OP_COMMA || 
         prevTokix == OP_SEMI || 
+        prevTokix == OP_RETURN || 
         prevTokix == OP_LABEL) {
       // declare
       opers.push(new OpArrDecl(arrdeclid++));
@@ -579,9 +584,9 @@ public class AST implements Lexer.Emitter {
     if (dbg) System.out.println("      epush " + opString(tokix));
     opers.push(OPS[tokix]);
     blcks.push(exprs.size());
-    blkSymNbr++;
-    blkSymNbrs.push(blkSymNbr);
-    blkSymNbr = 0;
+    blkSymCounter++;
+    blkSymNbrs.push(blkSymCounter); // push current symbol counter, and restart counter for new block
+    blkSymCounter = 0;
   }
   
   void onBraceClose(int tokix) {
@@ -589,14 +594,14 @@ public class AST implements Lexer.Emitter {
     if (blcks.isEmpty()) {
       throw new CompilerError("'" + OPS[OP_BRACEC] + "' missing '" + OPS[OP_BRACEO] + "'", stroffset, strlen);
     }
-    blkSymNbr = blkSymNbrs.pop();
+    blkSymCounter = blkSymNbrs.pop(); // restore symbol counter when returning to previous block
     int blckSize = blcks.pop();
     List<ASTNode> arguments = new ArrayList<ASTNode>();
     while (exprs.size() > blckSize) {
       arguments.add(0, exprs.pop());
     }
     ASTNodeBlok result = new ASTNodeBlok(arguments.toArray(new ASTNode[arguments.size()]));
-    result.symNbr = blkSymNbr;
+    result.symNbr = blkSymCounter; // assign the symbol number to this block
     if (dbg) System.out.println("      epush " + result);
     exprs.push(result);
     if (collapseStack(OP_FINALIZER, OP_BRACEO) != OP_BRACEO) {

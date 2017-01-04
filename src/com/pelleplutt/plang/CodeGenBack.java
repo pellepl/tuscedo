@@ -178,7 +178,7 @@ public class CodeGenBack implements ByteCode {
   }
   
   void compileTAC(TAC tac, ModuleFragment frag) {
-    if (dbg) System.out.println("    " + (tac.referenced ? "ref " : "    ") + tac);
+    if (dbg) System.out.println("  " + (tac.referenced ? "r " : "  ") + tac);
 
     
     if (tac instanceof TACAlloc) {
@@ -432,7 +432,7 @@ public class CodeGenBack implements ByteCode {
     }
 
     else {
-      throw new Error("not implemented " + tac + " " + tac.getClass().getSimpleName() + " "+ AST.opString(tac.getNode().op));
+      throw new CompilerError("not implemented " + tac + " " + tac.getClass().getSimpleName() + " "+ AST.opString(tac.getNode().op), tac.getNode());
     }
   }
   
@@ -591,7 +591,7 @@ public class CodeGenBack implements ByteCode {
     }
     // TODO moar
     else {
-      throw new Error("not implemented " + tac);
+      throw new CompilerError("not implemented " + tac, tac.getNode());
     }
   }
   
@@ -628,7 +628,8 @@ public class CodeGenBack implements ByteCode {
         sp++;
         addCode(frag, stackInfo() + op.toString(), IDUP);
       }
-      if (de.set instanceof TACSetDeref) {
+      if (de.set instanceof TACSetDeref || de.set instanceof TACArgNbr || 
+          de.set instanceof TACGetMe) {
         addCode(frag, stackInfo() + "nested deref write", IPOP);
       } else {
         emitAssignment(op, de.set, null, false, frag);
@@ -691,7 +692,7 @@ public class CodeGenBack implements ByteCode {
         // global variable
         frag.links.add(new ModuleFragment.LinkGlobal(frag.getPC(), (TACVar)a));
         sp++;
-        addCode(frag, stackInfo() + a.toString() + " (var)", ILOAD_IM, 0,0,0);
+        addCode(frag, stackInfo() + a.toString() + " (global)", ILOAD_IM, 0,0,0);
       }
     }
     else if (a instanceof TACFloat || a instanceof TACString) {

@@ -30,7 +30,7 @@ public class Linker implements ByteCode {
   public static boolean dbg =  false;
   int extFunc = -1;
   int codeOffset = 0;
-  int mainIx = 0;
+  static int mainFragIx = 0;
   int ramOffset, constOffset;
   int symbolVarOffset = -1, symbolConstOffset = -1;
   List<ModuleFragment> fragments;
@@ -99,7 +99,7 @@ public class Linker implements ByteCode {
     for (Module m : modules) {
       for (ModuleFragment frag : m.frags) {
         if (frag.type == ASTNode.ASTNodeBlok.TYPE_MAIN) {
-          frag.fragname += "$" + mainIx++;
+          frag.fragname += "_MAIN" + mainFragIx++;
           fragments.add(frag);
           if (firstMainFrag == null) firstMainFrag = frag;
           lastMainFrag = frag;
@@ -270,7 +270,7 @@ public class Linker implements ByteCode {
         TACVar refVar = new TACVar(tu.getNode(), tu.name, tu.module, null, ".0"); // '.0', must be a global scope
         if (dbg) System.out.print("       " + lu);
         if (dbg) System.out.print(", as variable " + refVar);
-        if (globalLUT.containsKey(refVar)){
+        if (globalLUT.containsKey(refVar)) {
           // this is a global variable reference
           frag.write(srcvar + 1, globalLUT.get(refVar), 3);
           if (dbg) System.out.println(": found");

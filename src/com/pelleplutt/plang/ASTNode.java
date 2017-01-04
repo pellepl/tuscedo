@@ -95,6 +95,7 @@ public abstract class ASTNode {
   }
   
   public static class ASTNodeBlok extends ASTNode {
+    // map of symbols declared in this block, and at what index they are declared in this block
     Map<ASTNodeSymbol, Integer> symList;
     List<ASTNodeSymbol> argList;
     List<ASTNodeSymbol> anonDefScopeSymList;
@@ -137,12 +138,11 @@ public abstract class ASTNode {
     public boolean declaresVariableInThisScope(ASTNodeSymbol sym) {
       return symList.containsKey(sym);
     }
-    public boolean isSymbolDeclared(ASTNodeSymbol sym, int whenceSymNbr) {
+    public boolean isSymbolDeclaredBefore(ASTNodeSymbol sym, int whenceSymNbr) {
       Integer symNbr = symList.get(sym);
       if (symNbr == null) return false;
       //if (CodeGenFront.dbg) System.out.println("       " + sym.symbol + "  " + symNbr.intValue() + " <= " + whenceSymNbr + "?");
       return symNbr.intValue() <= whenceSymNbr; 
-
     }
     public List<ASTNodeSymbol> getVariables() {
       if (symList == null) return null;
@@ -228,8 +228,11 @@ public abstract class ASTNode {
   }
 
   public static class ASTNodeSymbol extends ASTNode {
+    // the symbol string
     String symbol;
+    // if this node is declaring this symbol
     public boolean declare;
+    // each time a symbol is encountered in a block, it is assigned a unique increasing number
     public int symNbr;
 
     public ASTNodeSymbol(String s) {
@@ -260,23 +263,30 @@ public abstract class ASTNode {
     List<ASTNodeSymbol> dots = new ArrayList<ASTNodeSymbol>();
 
     public ASTNodeCompoundSymbol(ASTNode e) {
+      // TODO FIX THIS FOR THE SAKE OF GOD
       super(null);
-      op = OP_SYMBOL; // TODO
-      StringBuilder sb = new StringBuilder();
-      ASTNode de = e;
-      while (de != null) {
-        dots.add(0, ((ASTNodeSymbol)de.operands.get(1)));
-        sb.insert(0, "." + ((ASTNodeSymbol)de.operands.get(1)).symbol);
-        if (de.operands.get(0).op == OP_DOT) {
-          de = de.operands.get(0);
-        } else {
-          dots.add(0, ((ASTNodeSymbol)de.operands.get(0)));
-          sb.insert(0, ((ASTNodeSymbol)de.operands.get(0)).symbol);
-          de = null;
+      try {
+        op = OP_SYMBOL; // TODO
+        StringBuilder sb = new StringBuilder();
+        ASTNode de = e;
+        while (de != null) {
+          dots.add(0, ((ASTNodeSymbol)de.operands.get(1)));
+          sb.insert(0, "." + ((ASTNodeSymbol)de.operands.get(1)).symbol);
+          if (de.operands.get(0).op == OP_DOT) {
+            de = de.operands.get(0);
+          } else {
+            dots.add(0, ((ASTNodeSymbol)de.operands.get(0)));
+            sb.insert(0, ((ASTNodeSymbol)de.operands.get(0)).symbol);
+            de = null;
+          }
         }
+        
+        symbol = sb.toString();
+      } catch (Throwable t) {
+        System.out.println(e);
+        t.printStackTrace(); // TODO
+        throw new CompilerError(t.getMessage(), e);
       }
-      
-      symbol = sb.toString();
     }
 
     public String toString() {
@@ -293,6 +303,7 @@ public abstract class ASTNode {
   }
 
   public static class ASTNodeArrSymbol extends ASTNodeSymbol {
+    // TODO FIX THIS FOR THE SAKE OF GOD
     ASTNode e;
     List<ASTNode> path = new ArrayList<ASTNode>();
 

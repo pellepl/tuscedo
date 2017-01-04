@@ -59,8 +59,8 @@ public class StructAnalysis {
   
 
   void analyseRecurse(ASTNode e, ScopeStack scopeStack, ASTNode parentNode, boolean operator, boolean loop) {
-    //System.out.println("*** anaylyseRec " + e);
-    // System.out.println("    scopeStack:" + scopeStack.id + " " + scopeStack);
+    //System.out.println("*** anaylyseRec oper:" + operator + " loop:" + loop + "   " + e + ":" + AST.opString(e.op));
+    //System.out.println("    scopeStack:" + scopeStack.id + " " + scopeStack);
     if (e.op == OP_MODULE) {
       module = ((ASTNodeSymbol)e.operands.get(0)).symbol;
       if (scopeStack.size() > 1) {
@@ -274,6 +274,11 @@ public class StructAnalysis {
       analyseRecurse(e.operands.get(0), scopeStack, e, operator, loop);
       if (e.operands.get(1).op == OP_BLOK) {
         newAnonymousScope((ASTNodeBlok)e.operands.get(1), scopeStack, e);
+      } else if (e.operands.get(1).op == OP_RETURN) {
+        ASTNodeBlok eblok = new ASTNodeBlok();
+        eblok.operands.add(e.operands.get(1));
+        e.operands.set(1, eblok);
+        newAnonymousScope(eblok, scopeStack, e);
       } else if (AST.isConditionalOperator(e.operands.get(1).op)) {
       	// convert rel op A to { if A return $0; else return nul; } 
       	ASTNodeBlok eblok = new ASTNodeBlok();
@@ -374,7 +379,7 @@ public class StructAnalysis {
   // define variable for scope, if same name already reachable this will shadow ancestor
   void defVar(ScopeStack scopeStack, ASTNodeSymbol esym, ASTNode definer) {
     boolean shadow = isVarDefAbove(scopeStack, esym);
-    if (!isVarDef(scopeStack, esym)) {
+    if (scopeStack.peek().symVars.get(esym) == null) {
       scopeStack.peek().symVars.put(esym, esym.symNbr);
       if (dbg) System.out.println("  + '" + esym.symbol + "' " + (scopeStack.size() == 1 ? "GLOBAL" : "LOCAL") + (shadow ? " SHADOW" : "")+
           " in " + definer);
