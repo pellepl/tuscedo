@@ -751,7 +751,7 @@ public class CodeGenFront {
       }
       
       TACCall call = null;
-      if (!callNode.callByArrayDereference) {
+      if (!callNode.callByOperation) {
         ASTNodeSymbol callSym = callNode.name;
         if (callSym instanceof ASTNodeCompoundSymbol) {
           // call by dotted symbol

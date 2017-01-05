@@ -155,4 +155,18 @@ public class Scope {
         "map=['one':1000, 'ten':10000, 'hundred':100000];\n";
     assertEquals(111111, Processor.compileAndRun(sB, sA).i); 
   }
+  @Test
+  public void testModularPreference() {
+    String sA, sB;
+    sA = 
+        "module a;\n" +
+        "res1 = b.map.value; // from module 'b', variable 'map', entry 'value'\n" +
+        "b = ['map':['value':'froma']];\n" +
+        "res2 = b.map.value; // from this module, variable 'b', entry 'map', subentry 'value'\n" +
+        "return res1 + res2;\n";
+    sB = 
+        "module b;\n" +
+        "map=['value':'fromb'];\n";
+    assertEquals("frombfroma", Processor.compileAndRun(sB, sA).str); 
+  }
 }

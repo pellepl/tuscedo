@@ -18,7 +18,7 @@ public class Compiler {
     for (String src : sources) {
       Compiler.src = src;
       //System.out.println("* 1. build tree");
-      //AST.dbg = true;
+      AST.dbg = true;
       ASTNodeBlok e = AST.buildTree(src);
       //System.out.println(e);
       
@@ -388,16 +388,16 @@ public class Compiler {
   "}";
 
     
-//    src = 
-//        "map = ['a':1, 'b':2, 'c':3, 'd':4];\n" +
-//        "println('map :', map);\n" +
-//        "multiplier = 10;\n" +
-//        "map = map[{$0.val *= multiplier; return $0;}];\n" +
-//        "println('mapp:', map);\n" +
-//        "println('mapp:', map[$0.val > 25]);\n" +
-//        "for (i in map) println(i.key, i.val);\n" +
-//    "";
-//   othersrc = siblingsrc = crcsrc = ""; 
+    src = 
+        "b.c.d.e = 2;\n" +
+        "b['c']['d']['e'] = 3;\n" +
+        "b.c['d'].e = 3;\n" +
+        "b['c'].d['e'] = 3;\n" +
+        "b['c'].getd()['e'] = 4;\n" +
+        "b.c['getd']().e = 5;\n" +
+        "b.c.getd().e = 6;\n" +
+    "";
+   othersrc = siblingsrc = crcsrc = ""; 
     
 //
 //    src = 

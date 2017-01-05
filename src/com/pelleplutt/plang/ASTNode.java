@@ -370,22 +370,22 @@ public abstract class ASTNode {
   public static class ASTNodeFuncCall extends ASTNode {
     ASTNodeSymbol name;
     ASTNodeOp callAddrOp;
-    // if true, call function denoted by name. if false, call funcion address generated
+    // if false, call function denoted by name. if false, call funcion address generated
     // by callAddrOp
-    boolean callByArrayDereference;
+    boolean callByOperation;
     int callid;
 
     public ASTNodeFuncCall(ASTNodeSymbol sym, int callid, ASTNode... operands) {
       super(AST.OP_CALL, operands);
       this.callid = callid;
-      callByArrayDereference = false;
+      callByOperation = false;
       name = sym;
     }
     
     public ASTNodeFuncCall(ASTNodeOp callAddr, int callid, ASTNode... operands) {
       super(AST.OP_CALL, operands);
       this.callid = callid;
-      callByArrayDereference = true;
+      callByOperation = true;
       callAddrOp = callAddr;
     }
     
@@ -395,7 +395,7 @@ public abstract class ASTNode {
 
     public String toString() {
       StringBuilder sb = new StringBuilder();
-      sb.append("<" + (!callByArrayDereference ? name : "FUNCADDR:"+callAddrOp) + ">");
+      sb.append("<" + (!callByOperation ? name : "FUNCADDR:"+callAddrOp) + ">");
       sb.append('(');
       for (int i = 0; i < operands.size(); i++) {
         sb.append(operands.get(i).toString());

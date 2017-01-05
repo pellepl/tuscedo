@@ -193,8 +193,8 @@ public class AST implements Lexer.Emitter {
       
       new Op("<@>", _OP_FINAL),
       
-      new Op("arrdeclr", OP_ADECL, 2, OP_BRACKETO),
-      new Op("arrderef", OP_ADEREF, 2, OP_BRACKETO),
+      new Op("setdeclr", OP_ADECL, 2, OP_BRACKETO),
+      new Op("deref", OP_ADEREF, 2, OP_BRACKETO),
       new Op("tuple", OP_TUPLE, 2, OP_LABEL),
       new Op("U-", OP_MINUS_UNARY, 1, OP_MINUS),
       new Op("U+", OP_PLUS_UNARY, 1, OP_PLUS),
@@ -423,7 +423,13 @@ public class AST implements Lexer.Emitter {
   }
   
   void onParenthesisOpen(int tokix) {
-    if (!exprs.isEmpty() && exprs.peek().op == OP_ADEREF && prevTokix == OP_BRACKETC) {
+    if (!exprs.isEmpty() && 
+        (exprs.peek().op == OP_ADEREF && prevTokix == OP_BRACKETC ||
+        exprs.peek().op == OP_CALL || 
+        prevPrevTokix == OP_DOT)) {
+      System.out.println("CALL BY OPERATION ADDRESS");
+      if (prevPrevTokix == OP_DOT) collapseStack(OP_DOT);
+
       // function call, arr deref
       int callid = getCallId();
       ASTNodeFuncCall callnode = new ASTNodeFuncCall((ASTNodeOp)exprs.pop(), callid);

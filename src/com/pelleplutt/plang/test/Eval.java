@@ -9,7 +9,7 @@ import com.pelleplutt.plang.proc.Processor;
 public class Eval {
 
   @Test
-  public void test() {
+  public void testEval() {
     int a = 2; int b = 3; int c = 4; int d = 5; int e = 6;
     assertEquals(Processor.compileAndRun("a=2;b=3;c=4;d=5;e=6;return a+b*c-d/a%e;").i, 
         a+b*c-d/a%e);

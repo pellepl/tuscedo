@@ -388,13 +388,13 @@ public abstract class TAC {
     boolean funcNameDefined;
     // if true, func address is a variable, denoted in var
     boolean funcAddrInVar;
-    // if link is false, this is the variable func pointer
+    // if funcAddrInVar is true, this is the variable func pointer
     TACVar var;
     
     public TACCall(ASTNodeFuncCall e, int args, String module, String declaredModule, TACVar var) {
       super(e); 
       this.args = args; this.var = var; this.module = module; this.declaredModule = declaredModule;
-      funcNameDefined = !e.callByArrayDereference;
+      funcNameDefined = !e.callByOperation;
       funcAddrInVar = var != null;
       if (e.name instanceof ASTNodeCompoundSymbol) {
         ASTNodeCompoundSymbol ce = (ASTNodeCompoundSymbol)e.name;
@@ -418,7 +418,7 @@ public abstract class TAC {
       String id;
       ASTNodeFuncCall efc = null;
       if (getNode() instanceof ASTNodeFuncCall) efc = (ASTNodeFuncCall)getNode(); 
-      if (efc == null || !efc.callByArrayDereference) {
+      if (efc == null || !efc.callByOperation) {
         String funcName = func;
         String moduleName = ((module != null ? (":" + module + ".func") : " (resolve)"));
         id = funcName+moduleName;

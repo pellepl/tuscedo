@@ -70,7 +70,7 @@ public class Grammar {
   static final String GRAMMAR_RULES = 
           "label:         sym\n" +
           "tuple:         op | call | val | str | range | nil | assign | blok | rel_op , op | call | val | str | range | nil | assign | blok | rel_op\n" +
-          "dot:           sym | dot | arrderef , sym\n" +
+          "dot:           sym | dot | arrderef | call , sym\n" +
           "assign:        sym | arrderef | dot , op | call | val | str | range | nil | assign | blok | rel_op\n" +
           "arrdecl:       maparg*\n" +
           "arrderef:      arrderef | arrdecl | sym | dot | str | range | call , val | str | range | blok | rel_op | op | return\n" +
