@@ -357,6 +357,11 @@ public class CodeGenBack implements ByteCode {
       pushValue(a.derefVal, frag);
       sp = sp - 2 + 1;
       addCode(frag, stackInfo() + a, ISET_DRF);
+      if (!a.referenced) {
+        sp--;
+        addCode(frag, stackInfo() + "derefed val not used", IPOP);
+      }
+        
     }
     else if (tac instanceof TACSetRead) {
       TACSetRead a = (TACSetRead)tac;

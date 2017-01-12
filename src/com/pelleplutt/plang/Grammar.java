@@ -65,7 +65,7 @@ public class Grammar {
           "stat:          assign global op call\n" + 
           "oper:          stat jmp cond_op\n" + 
           "condition:     rel_op val expr assign_op assign\n" +
-          "code:          blok oper sym jmp module funcdef return bkpt\n" + 
+          "code:          blok oper sym jmp module funcdef return bkpt arrderef\n" + 
   "";
   static final String GRAMMAR_RULES = 
           "label:         sym\n" +

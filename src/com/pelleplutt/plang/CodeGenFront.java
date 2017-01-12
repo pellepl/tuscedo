@@ -333,7 +333,7 @@ public class CodeGenFront {
             // on call, set unresolved to "me"
             if (dbgUnwind) System.out.println("   + defme2");
             add(new TACDefineMe(e));
-            clearAboveTraceCall(info, 2); //unmark this call so we do not get 2 defmes
+            clearAboveTraceCall(info, 2); // unmark this call so we do not get 2 defmes
           }
           info.trace.pop();
           return tunres;
@@ -353,12 +353,18 @@ public class CodeGenFront {
       TAC tdotter = new TACString(edotter, ((ASTNodeSymbol)edotter).symbol);
       setReferenced(tdotter);
       TAC tderef = new TACSetDeref(e, tdottee, tdotter);
-      setReferenced(tderef);
 
-      if (edottee.op != OP_DOT && edottee.op != OP_ADEREF && !isFirstTraceAssign(info)) {
-        // on assignment, do not add last read dereference, as backend will add write here
-        if (dbgUnwind) System.out.println("   + dotderef " + tderef);
-        add(tderef);
+      if (edottee.op != OP_DOT && edottee.op != OP_ADEREF) {
+        // last dereference
+        if (!isFirstTraceAssign(info)) {
+          if (dbgUnwind) System.out.println("   + dotderef " + tderef);
+          add(tderef);
+        } else {
+          // on assignment, do not add last read dereference, as backend will add write to that dereference
+          setReferenced(tderef);
+        }
+      } else {
+        setReferenced(tderef);
       }
       
       info.trace.pop();
@@ -383,12 +389,18 @@ public class CodeGenFront {
       TAC tderefer = genIR(ederefer, parentEblk, new Info());
       setReferenced(tderefer);
       TAC tderef = new TACSetDeref(e, tderefee, tderefer);
-      setReferenced(tderef);
 
-      if (ederefee.op != OP_DOT && ederefee.op != OP_ADEREF && !isFirstTraceAssign(info)) {
-        // on assignment, do not add last read dereference, as backend will add write here
-        if (dbgUnwind) System.out.println("   + arrderef " + tderef);
-        add(tderef);
+      if (ederefee.op != OP_DOT && ederefee.op != OP_ADEREF) {
+        // last dereference
+        if (!isFirstTraceAssign(info)) {
+          if (dbgUnwind) System.out.println("   + arrderef " + tderef);
+          add(tderef);
+        } else {
+          // on assignment, do not add last read dereference, as backend will add write to that dereference
+          setReferenced(tderef);
+        }
+      } else {
+        setReferenced(tderef);
       }
       
       info.trace.pop();
@@ -684,11 +696,13 @@ public class CodeGenFront {
         
         // inital .set = y, .iter = 0
         // .set = y 
+        TAC setAssignment = genIR(e.operands.get(1).operands.get(0), parentEblk, info);
+        setReferenced(setAssignment);
         add(new TACAssign(
             e.operands.get(1),                                            // ASTNode
             OP_EQ,                                                        // op
             _set,                                                         // inner set variable
-            genIR(e.operands.get(1).operands.get(0), parentEblk, info))); // the set itself
+            setAssignment));                                              // the set itself
         // .iter = 0 
         add(new TACAssign(
             e.operands.get(1),                                            // ASTNode

@@ -22,6 +22,15 @@ public class MiscConstructs {
   }
 
   @Test
+  public void oddConstruct0() {
+    String sA;
+    sA = 
+        "a[];\n" +
+        "a[{println $0;}];\n" +
+        "return 'OK';";
+    assertEquals("OK", Processor.compileAndRun(false, false, sA).str); 
+  }
+  @Test
   public void oddConstruct1() {
     String sA;
     sA = 
@@ -76,7 +85,7 @@ public class MiscConstructs {
         "  histcount[r]++;\n" +
         "}\n" +
         "min = iters; max = 0; sum = 0;\n"+
-        "void = histcount[{\n" + 
+        "histcount[{\n" + 
         "  v = $0.val;\n" +
         "  if (v < min) min = v;\n" +
         "  if (v > max) max = v;\n" +
