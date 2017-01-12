@@ -423,19 +423,18 @@ public class AST implements Lexer.Emitter {
   }
   
   void onParenthesisOpen(int tokix) {
-    if (!exprs.isEmpty() && 
-        (exprs.peek().op == OP_ADEREF && prevTokix == OP_BRACKETC ||
-        exprs.peek().op == OP_CALL || 
-        prevPrevTokix == OP_DOT)) {
-      System.out.println("CALL BY OPERATION ADDRESS");
+    if (!exprs.isEmpty() && prevTokix != OP_FOR && prevTokix != OP_IF && 
+          (exprs.peek().op == OP_ADEREF && prevTokix == OP_BRACKETC ||
+          exprs.peek().op == OP_CALL && opers.peek().id != OP_CALL || 
+          prevPrevTokix == OP_DOT)) {
       if (prevPrevTokix == OP_DOT) collapseStack(OP_DOT);
 
-      // function call, arr deref
+      // function call, addr by op
       int callid = getCallId();
-      ASTNodeFuncCall callnode = new ASTNodeFuncCall((ASTNodeOp)exprs.pop(), callid);
+      ASTNodeFuncCall callnode = new ASTNodeFuncCall(exprs.pop(), callid);
       OpCall callop = new OpCall("<call addr on stack>", callid);
       opers.push(callop);
-      if (dbg) System.out.println("      opush pareno " + opString(tokix) + ", funccall " + callnode);
+      if (dbg) System.out.println("      opush pareno " + opString(tokix) + ", funccallbyop " + callnode);
       exprs.push(callnode);
     } 
     else if (prevTokix == OP_SYMBOL && prevPrevTokix != OP_DOT) {
@@ -452,22 +451,11 @@ public class AST implements Lexer.Emitter {
         ASTNodeFuncCall callnode = new ASTNodeFuncCall(funcName, callid);
         OpCall callop = new OpCall(funcName.symbol, callid);
         opers.push(callop);
-        if (dbg) System.out.println("      opush pareno " + opString(tokix) + ", funccall " + callnode);
+        if (dbg) System.out.println("      opush pareno " + opString(tokix) + ", funccallbysym " + callnode);
         exprs.push(callnode);
       }
     } 
-    else if ((prevTokix == OP_SYMBOL || prevTokix == OP_DOT) && prevPrevTokix == OP_DOT && !opers.isEmpty() && opers.peek().id == OP_DOT) {
-      // TODO FIX THIS FOR THE SAKE OF GOD
-      // function call, dotted symbol
-      collapseStack(OP_DOT);
-      ASTNodeCompoundSymbol funcName = new ASTNodeCompoundSymbol(exprs.pop());
-      int callid = getCallId();
-      ASTNodeFuncCall callnode = new ASTNodeFuncCall(funcName, callid);
-      OpCall callop = new OpCall(funcName.symbol, callid);
-      opers.push(callop);
-      if (dbg) System.out.println("      opush pareno " + opString(tokix) + ", funccall " + callnode);
-      exprs.push(callnode);
-    } else {
+    else {
       // simple parenthesis
       if (dbg) System.out.println("      opush pareno " + opString(tokix));
       opers.push(OPS[tokix]);
@@ -489,28 +477,38 @@ public class AST implements Lexer.Emitter {
       OpCall call = (OpCall)opers.pop();
       // collect arguments to func call
       List<ASTNode> args = new ArrayList<ASTNode>();
+      boolean checkFuncFound = false;
       while (!exprs.isEmpty()) {
         ASTNode a = exprs.pop();
         if (a instanceof ASTNodeFuncCall && ((ASTNodeFuncCall)a).callid == call.callid) {
           ((ASTNodeFuncCall)a).setArguments(args);
           exprs.push(a);
+          checkFuncFound = true;
           break;
         } else {
           args.add(0, a);
         }
       }
+      if (!checkFuncFound) {
+        throw new CompilerError("fatal, collected args but no func");
+      }
     } else if (endedAtTokix == OP_FUNCDEF) {
       // collect arguments to func def
       List<ASTNode> args = new ArrayList<ASTNode>();
+      boolean checkFuncFound = false;
       while (!exprs.isEmpty()) {
         ASTNode a = exprs.pop();
         if (a instanceof ASTNodeFuncDef) {
           ((ASTNodeFuncDef)a).setArguments(args);
           exprs.push(a);
+          checkFuncFound = true;
           break;
         } else {
           args.add(0, a);
         }
+      }
+      if (!checkFuncFound) {
+        throw new CompilerError("fatal, collected args but no func def");
       }
     } else {
       throw new CompilerError("missing left parenthesis");
@@ -549,7 +547,7 @@ public class AST implements Lexer.Emitter {
       // declare
       opers.push(new OpArrDecl(arrdeclid++));
     } else {
-      throw new CompilerError("unhandled " + opString(prevTokix), exprs.peek());
+      throw new CompilerError("unhandled operation (" + opString(prevTokix) + ")", exprs.peek());
     }
   }
   

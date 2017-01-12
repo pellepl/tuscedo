@@ -302,42 +302,7 @@ public class CodeGenBack implements ByteCode {
       addCode(frag, stackInfo() + "->" + c.label.toString(), braInstr, 0xff,0xff,0xff);
     }
     else if (tac instanceof TACCall) {
-      TACCall call = (TACCall)tac;
-      if (!call.funcNameDefined) {
-        // func address is pushed by previous operation
-        // push nbr of args
-        pushNumber(frag, call.args, "argc, replaced by retval");
-        addCode(frag, ISWAP);
-        // func address is on stack
-        sp = sp - 1          // read call address
-            - 1 - call.args  // return, pop args and argc
-            + 1;             // retval
-        addCode(frag, stackInfo() + "<_stack_addr_, " + call.args + " args>", ICALL);
-      } else if (call.funcAddrInVar) {
-        // func is a variable func pointer, no need for linking
-        // push nbr of args
-        pushNumber(frag, call.args, "argc, replaced by retval");
-        // func is a local variable
-        pushValue(call.var, frag);
-        sp = sp - 1          // read call address
-            - 1 - call.args  // return, pop args and argc
-            + 1;             // retval
-        addCode(frag, stackInfo() + "<" + call.func + ", " + call.args + " args>", ICALL);
-      } else {
-        // func is a function name, needs linking
-        // push nbr of args
-        if (generateInbuiltFunction(call, frag)) return;
-        pushNumber(frag, call.args, "argc, replaced by retval");
-        frag.links.add(new ModuleFragment.LinkCall(frag.getPC(), call));
-        sp = sp 
-            - 1 - call.args  // return, pop args and argc
-            + 1;             // retval
-        addCode(frag, stackInfo() + "<" + call.func + ", " + call.args + " args>", ICALL_IM, 0x03,0x00,0x00);
-      }
-      if (!call.referenced) {
-        sp--;
-        addCode(frag, stackInfo() + "unused retval", IPOP);
-      }
+      emitCall((TACCall)tac, frag);
     }
     else if (tac instanceof TACReturn) {
       TACReturn ret = (TACReturn)tac;
@@ -629,7 +594,8 @@ public class CodeGenBack implements ByteCode {
         addCode(frag, stackInfo() + op.toString(), IDUP);
       }
       if (de.set instanceof TACSetDeref || de.set instanceof TACArgNbr || 
-          de.set instanceof TACGetMe) {
+          de.set instanceof TACGetMe || de.set instanceof TACCall) {
+        sp--;
         addCode(frag, stackInfo() + "nested deref write", IPOP);
       } else {
         emitAssignment(op, de.set, null, false, frag);
@@ -642,6 +608,45 @@ public class CodeGenBack implements ByteCode {
     } else {
       throw new CompilerError("not implemented " + assignee.getClass().getName(), op.getNode());
     }
+  }
+  
+  void emitCall(TACCall call, ModuleFragment frag) {
+    if (!call.funcNameDefined) {
+      // func address is pushed by previous operation
+      // push nbr of args
+      pushNumber(frag, call.args, "argc, replaced by retval");
+      addCode(frag, ISWAP);
+      // func address is on stack
+      sp = sp - 1          // read call address
+          - 1 - call.args  // return, pop args and argc
+          + 1;             // retval
+      addCode(frag, stackInfo() + "<_stack_addr_, " + call.args + " args>", ICALL);
+    } else if (call.funcAddrInVar) {
+      // func is a variable func pointer, no need for linking
+      // push nbr of args
+      pushNumber(frag, call.args, "argc, replaced by retval");
+      // func is a local variable
+      pushValue(call.var, frag);
+      sp = sp - 1          // read call address
+          - 1 - call.args  // return, pop args and argc
+          + 1;             // retval
+      addCode(frag, stackInfo() + "<" + call.func + ", " + call.args + " args>", ICALL);
+    } else {
+      // func is a function name, needs linking
+      // push nbr of args
+      if (generateInbuiltFunction(call, frag)) return;
+      pushNumber(frag, call.args, "argc, replaced by retval");
+      frag.links.add(new ModuleFragment.LinkCall(frag.getPC(), call));
+      sp = sp 
+          - 1 - call.args  // return, pop args and argc
+          + 1;             // retval
+      addCode(frag, stackInfo() + "<" + call.func + ", " + call.args + " args>", ICALL_IM, 0x03,0x00,0x00);
+    }
+    if (!call.referenced) {
+      sp--;
+      addCode(frag, stackInfo() + "unused retval", IPOP);
+    }
+
   }
   
   void pushValues(TAC left, TAC right, ModuleFragment frag) {

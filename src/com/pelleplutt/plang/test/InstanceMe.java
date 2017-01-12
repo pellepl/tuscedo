@@ -25,15 +25,6 @@ public class InstanceMe {
   public void testInstMe() {
     String sA;
     sA = 
-        "obj.objfunc().retfunc().retfuncobjvar = 3;";
-   // =.[[<.[<obj.objfunc>(),retfunc]>(), retfuncobjvar]],3]
-    assertEquals("eve,10 and ada,30", Processor.compileAndRun(sA).str); 
-  }
-/*
-  @Test
-  public void testInstMe() {
-    String sA;
-    sA = 
         "func inst(name) {\n"+
         "  inst = [];\n" +
         "  inst.name = name;\n" +
@@ -51,7 +42,7 @@ public class InstanceMe {
         "eve.set_age(10)\n" +
         "ada2.set_age(30);\n" +
         "return eve.name + ',' + eve.age + ' and ' + ada.name + ',' + ada.age;";
-    assertEquals("eve,10 and ada,30", Processor.compileAndRun(sA).str); 
+    assertEquals("eve,10 and ada,30", Processor.compileAndRun(false, false, sA).str); 
   }
   @Test
   public void testInstMeSub() {
@@ -88,21 +79,11 @@ public class InstanceMe {
         "eve.add_child(inst('ada'));\n" +
         "eve.add_child(inst('ina'));\n" +
         "eve.set_age(50);\n" +
-
-        // TODO
         "eve.get_child(0).set_age(25);\n" +
         "eve.get_child(1).set_age(22);\n" +
         "eve.get_child(0).add_child(inst('ori'));\n" +
         "eve.get_child(0).get_child(0).set_age(1);\n" +
-
-//        "tmp = eve.get_child(0); tmp.set_age(25);\n" +
-//        "tmp = eve.get_child(1); tmp.set_age(22);\n" +
-//        "tmp = eve.get_child(0); tmp.add_child(inst('ori'));\n" +
-//        "tmp = eve.get_child(0); tmp = tmp.get_child(0); tmp.set_age(1);\n" +
-
-        "println(eve.list_family());\n" +
         "return eve.list_family();";
-    assertEquals("eve:50 ada:25 ori:1 ina:22 ", Processor.compileAndRun(sA).str); 
+    assertEquals("eve:50 ada:25 ori:1 ina:22 ", Processor.compileAndRun(false, false, sA).str); 
   }
-*/
 }

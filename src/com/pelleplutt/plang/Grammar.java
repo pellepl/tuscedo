@@ -71,9 +71,9 @@ public class Grammar {
           "label:         sym\n" +
           "tuple:         op | call | val | str | range | nil | assign | blok | rel_op , op | call | val | str | range | nil | assign | blok | rel_op\n" +
           "dot:           sym | dot | arrderef | call , sym\n" +
+          "arrderef:      sym | dot | arrderef | call | arrdecl | str | range , val | str | range | blok | rel_op | op | return\n" +
           "assign:        sym | arrderef | dot , op | call | val | str | range | nil | assign | blok | rel_op\n" +
           "arrdecl:       maparg*\n" +
-          "arrderef:      arrderef | arrdecl | sym | dot | str | range | call , val | str | range | blok | rel_op | op | return\n" +
           "return:        op | val | str | range | nil | assign | blok | rel_op\n" +
           "assign_op:     sym | arrderef | dot , op | call | val | assign | rel_op\n" +
           "assign_op_add: sym | arrderef | dot , str\n" +

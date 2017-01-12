@@ -257,13 +257,34 @@ public abstract class ASTNode {
       return symbol.hashCode();
     }
   }
+  
+  // TODO instead, make a ASTNodeDerefPathSymbol which can contain
+  // both dots and arrderefs, and not necessarily only symbols.
+  // More like <symbol> deref-arr <node> deref-dot <node>
+  // Special case is when path begins with
+  // (1) <symbol-a> deref-dot <symbol-b> or  
+  // (2) <symbol-a> deref-dot <symbol-b> deref-dot <symbol-c> 
+  //
+  // In both cases, the symbol-a may be a variable or a module definition
+  // depending on context, i.e. if symbol-a is a reachable scope variable or
+  // not. If not, symbol-a is a module specification.
+  //
+  // In case (1), if symbol-a is a known variable, symbol-a must be a map
+  // and symbol-b is a deref if this map. If symbol-a is an unknown, it is
+  // considered a module spec and symbol-b is thus a variable in that module.
+  //
+  // In case (2), if symbol-a is a known variable, symbol-a must be a map
+  // and symbols b and c are derefs of this map. If symbol-a is an 
+  // unknown, it is a module spec and symbol-b is thus a map in that module,
+  // where symbol-c is a deref value of that map.
 
+// TODO FIX THIS FOR THE SAKE OF GOD
+// remove?
   public static class ASTNodeCompoundSymbol extends ASTNodeSymbol {
     ASTNode e;
     List<ASTNodeSymbol> dots = new ArrayList<ASTNodeSymbol>();
 
     public ASTNodeCompoundSymbol(ASTNode e) {
-      // TODO FIX THIS FOR THE SAKE OF GOD
       super(null);
       try {
         op = OP_SYMBOL; // TODO
@@ -302,8 +323,9 @@ public abstract class ASTNode {
     }
   }
 
+// TODO FIX THIS FOR THE SAKE OF GOD
+// remove?
   public static class ASTNodeArrSymbol extends ASTNodeSymbol {
-    // TODO FIX THIS FOR THE SAKE OF GOD
     ASTNode e;
     List<ASTNode> path = new ArrayList<ASTNode>();
 
@@ -369,7 +391,7 @@ public abstract class ASTNode {
 
   public static class ASTNodeFuncCall extends ASTNode {
     ASTNodeSymbol name;
-    ASTNodeOp callAddrOp;
+    ASTNode callAddrOp;
     // if false, call function denoted by name. if false, call funcion address generated
     // by callAddrOp
     boolean callByOperation;
@@ -382,7 +404,7 @@ public abstract class ASTNode {
       name = sym;
     }
     
-    public ASTNodeFuncCall(ASTNodeOp callAddr, int callid, ASTNode... operands) {
+    public ASTNodeFuncCall(ASTNode callAddr, int callid, ASTNode... operands) {
       super(AST.OP_CALL, operands);
       this.callid = callid;
       callByOperation = true;

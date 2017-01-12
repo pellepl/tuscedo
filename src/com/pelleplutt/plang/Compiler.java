@@ -18,7 +18,7 @@ public class Compiler {
     for (String src : sources) {
       Compiler.src = src;
       //System.out.println("* 1. build tree");
-      AST.dbg = true;
+      //AST.dbg = true;
       ASTNodeBlok e = AST.buildTree(src);
       //System.out.println(e);
       
@@ -36,6 +36,7 @@ public class Compiler {
       
       //System.out.println("* 5. intermediate codegen");
       //CodeGenFront.dbg = true;
+      //CodeGenFront.dbgUnwind = true;
       ir = CodeGenFront.genIR(e, ir);
   
       //System.out.println("* 6. backend codegen");
@@ -203,7 +204,7 @@ public class Compiler {
         "println(walnut.walnutmap.call(12));\n" +
         "func add(x, y) { println('add' + x + '+' + y); return x+y; }\n" +
         "walnut.fmap.call();\n" +
-        "walnut.fmap.call = mandel.add;\n" +
+        "walnut.fmap.call = mandel.add;\n" + // TODO FIX
         "println(walnut.fmap.call(2,3));\n" +
         "walnut.fmap.sub.call();\n" +
 
@@ -387,40 +388,15 @@ public class Compiler {
   " return crc ^ ~0;\n" +
   "}";
 
-    
-    src = 
-        "b.c.d.e = 2;\n" +
-        "b['c']['d']['e'] = 3;\n" +
-        "b.c['d'].e = 3;\n" +
-        "b['c'].d['e'] = 3;\n" +
-        "b['c'].getd()['e'] = 4;\n" +
-        "b.c['getd']().e = 5;\n" +
-        "b.c.getd().e = 6;\n" +
-    "";
-   othersrc = siblingsrc = crcsrc = ""; 
-    
-//
+
 //    src = 
-//        "module mod;\n" +
-//        "WTF.exe();\n"+
-//        "WTF.init(100);\n" +   
-//        "b = [[{return 1234;}]];\n" +
-//        "println(b['c']['d']());\n" +
-//        "println(b.c.d());\n" +
-//        "a = ['age':12, 'older':{me.age++; println('Im now ',me.age,'years');}];" +
+//        "false = 0;\n" +
+//        "true = !false;\n" +
+//        "println(('abcdef'[0#3])[2#0]);\n" +
+//        "a = true;\n" +
 //        "";
-//    
-//    othersrc = 
-//        "module mod;\n" +
-//        "println('skit:' + WTF);\n" + // TODO should not work
-//        "hello = {println('hello');};\n" +
-//        "WTF = ['init':{ for(x in 0#10) {println($0+x);} }, 'exe':hello, 'nbr':123];n" +
-//        "";
-//    siblingsrc = 
-//        "";
-//    crcsrc = 
-//        "";
-    
+//   othersrc = siblingsrc = crcsrc = ""; 
+
     Map<String, ExtCall> extDefs = new HashMap<String, ExtCall>();
     Processor.addCommonExtdefs(extDefs);
     extDefs.put("cos", new ExtCall() {

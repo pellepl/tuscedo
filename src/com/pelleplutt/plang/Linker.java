@@ -276,7 +276,7 @@ public class Linker implements ByteCode {
           if (dbg) System.out.println(": found");
           continue;
         }
-        String callName = frag.modname + ".func." + tu.name;
+        String callName = tu.module + ".func." + tu.name;
         if (dbg) System.out.print(", as function " + callName);
         if (fragLUT.containsKey(callName)) {
           // this is a function reference
@@ -286,7 +286,7 @@ public class Linker implements ByteCode {
           continue;
         }
         if (dbg) System.out.println(": failed");
-        throw new CompilerError("unresolved reference to " + lu.sym.name, lu.sym.getNode());
+        throw new CompilerError("unresolved reference to " + lu.sym.module + "." + lu.sym.name, lu.sym.getNode());
       } // all LinkUnresolveds 
     }
   }
