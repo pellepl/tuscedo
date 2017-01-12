@@ -27,9 +27,10 @@ public class MMemList implements MSet {
   }
 
   @Override
-  public M get(int index) {
-    if (index >= len) return null;
-    return memory[start + index * sign];
+  public M get(int ix) {
+    if (ix < 0) ix = len + ix;
+    if (ix >= len) return null;
+    return memory[start + ix * sign];
   }
   @Override
   public void add(M e) {
@@ -60,6 +61,7 @@ public class MMemList implements MSet {
 
   @Override
   public M getElement(int ix) {
+    if (ix < 0) ix = len + ix;
     return get(ix);
   }
   

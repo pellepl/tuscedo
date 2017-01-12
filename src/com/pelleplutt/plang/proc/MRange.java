@@ -55,6 +55,8 @@ public class MRange implements MSet {
   }
   
   public M get(int ix) {
+    if (ix < 0) ix = size() + ix;
+
     if (type == Processor.TINT) {
       m.i = (int)(start + ((float)ix*step));
     } else {

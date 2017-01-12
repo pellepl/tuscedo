@@ -115,7 +115,9 @@ public class MListMap implements MSet {
   }
   public M get(M m) {
     if (type == TARR) {
-      return arr.get(m.asInt());
+      int ix = m.asInt();
+      if (ix < 0) ix = arr.size() + ix;
+      return arr.get(ix);
     } else if (type == TTUP) {
       if (m.type == Processor.TINT) {
         return tup[m.asInt()];
@@ -135,6 +137,7 @@ public class MListMap implements MSet {
   }
   public M get(int ix) {
     if (type == TARR) {
+      if (ix < 0) ix = arr.size() + ix;
     	return arr.get(ix);
     } else if (type == TTUP) {
     	return tup[ix];
@@ -146,7 +149,9 @@ public class MListMap implements MSet {
   }
   public void remove(M m) {
     if (type == TARR) {
-      arr.remove(m.asInt());
+      int ix = m.asInt();
+      if (ix < 0) ix = arr.size() + ix;
+      arr.remove(ix);
     } else if (type == TMAP) {
       map.remove(m.getRaw());
     } else {
@@ -155,9 +160,11 @@ public class MListMap implements MSet {
   }
   public M getElement(int ix) {
     if (type == TARR || type == TTUP) {
+      if (ix < 0) ix = arr.size() + ix;
       return arr.get(ix);
     } else if (type == TMAP) {
       Object keys[] = map.keySet().toArray();
+      if (ix < 0) ix = keys.length + ix;
       Object key = keys[ix];
       M mval = map.get(key);
       if (mval == null) return null;

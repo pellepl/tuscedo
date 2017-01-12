@@ -328,7 +328,9 @@ public class Processor implements ByteCode {
       } else if (mix.type == TANON) {
         derefStringArgAnon(mset.str, mix);
       } else {
-        push(mset.str.charAt(mix.asInt()));
+        int ix = mix.asInt();
+        if (ix < 0) ix = mset.str.length() + ix;
+        push(mset.str.charAt(ix));
       }
     } else if (mset.type == TINT) {
       int res = 0;
@@ -344,7 +346,9 @@ public class Processor implements ByteCode {
       } else if (mix.type == TANON) {
         throw new ProcessorError("cannot dereference integers with mutators");
       } else {
-        res = (mset.i & (1<<mix.asInt()))>>>mix.asInt();
+        int ix = mix.asInt();
+        if (ix < 0) ix = 32 + ix;
+        res = (mset.i & (1<<ix))>>>ix;
       }
       push(res);
     } else {
@@ -409,6 +413,7 @@ public class Processor implements ByteCode {
     } else if (mset.type == TINT) {
       int res = mset.i;
       int ix = mix.asInt();
+      if (ix < 0) ix = 32+ix;
       if (mval.type == TNIL) {
         int mask = (1<<ix)-1;
         int lo = res & mask;
@@ -426,12 +431,14 @@ public class Processor implements ByteCode {
       if (mval.type == TNIL) {
         int ix = mix.asInt();
         int len = mset.str.length();
+        if (ix < 0) ix = len + ix;
         mset.str = 
             (ix > 0 ? mset.str.substring(0, ix-1) : "") +  
             (ix+1 < len ? mset.str.substring(ix+1) : "");
       } else {
         int ix = mix.asInt();
         int len = mset.str.length();
+        if (ix < 0) ix = len + ix;
         mset.str = 
             (ix > 0 ? mset.str.substring(0, ix-1) : "") +  
             mval.asString() + 
