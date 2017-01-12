@@ -310,21 +310,7 @@ public class CodeGenFront {
         info.trace.pop();
         return tcall;
       }
-//      
-//      
-//      TACCall tcall = null;
-//      // call by operation
-//      if (callNode.callAddrOp == null) {
-//        throw new CompilerError("fatal, unwind problem: call address op null", callNode);
-//      }
-//      TAC addrGen = genIRUnwindSymbol(callNode.callAddrOp, parentEblk, info);
-//      setReferenced(addrGen);
-//      if (dbgUnwind) System.out.println("   + funcaddr " + addrGen + " func " + callNode);
-//      add(addrGen);
-//      tcall = new TACCall((ASTNodeFuncCall)e, args.length, parentEblk.module, null, null);
-//      info.trace.pop();
-//      return tcall;
-      
+
     } else if (e.op == OP_DOT) {
       
       ASTNode edottee = e.operands.get(0);
@@ -343,10 +329,6 @@ public class CodeGenFront {
           // add unresolved for first two path entries <module>.<variable>
           TAC tunres = new TACUnresolved(e, ((ASTNodeSymbol)edottee).symbol, ((ASTNodeSymbol)edotter).symbol); 
           // <module>.<map>....
-// TODO check this up MiscConstructs.oddConstruct3
-//          if (dbgUnwind) System.out.println("   + dotunres " + tunres);
-//          add(tunres);
-//          setReferenced(tunres);
           if (isAboveTraceCall(info, 2)) {
             // on call, set unresolved to "me"
             if (dbgUnwind) System.out.println("   + defme2");
@@ -608,7 +590,6 @@ public class CodeGenFront {
       TACLabel lExit = new TACLabel(e, label+"_ifend");
       if (!hasElse) {
         TAC cond = genIR(e.operands.get(0), parentEblk, info);
-        setReferenced(cond);
         TAC iffalsegoto = new TACGotoCond(e, cond, lExit, false);
         add(iffalsegoto);
         newBlock();
@@ -618,7 +599,6 @@ public class CodeGenFront {
       } else {
         TACLabel lElse = new TACLabel(e, label+"_ifelse");
         TAC cond = genIR(e.operands.get(0), parentEblk, info);
-        setReferenced(cond);
         TAC iffalsegoto = new TACGotoCond(e, cond, lElse, false);
         add(iffalsegoto);
         newBlock();
@@ -659,7 +639,6 @@ public class CodeGenFront {
         add(lLoop);
         // conditional : y
         TAC cond = genIR(e.operands.get(1), parentEblk, info);
-        setReferenced(cond);
         TAC iffalsegoto = new TACGotoCond(e, cond, lExit, false);
         add(iffalsegoto);
         newBlock();
@@ -729,7 +708,6 @@ public class CodeGenFront {
         setReferenced(_len_set);
         TAC cond = new TACOp(e, AST.OP_LT, _iter, _len_set);
         add(cond);
-        setReferenced(cond);
         TACGotoCond iffalsegoto = new TACGotoCond(e, cond, lExit, false);
         iffalsegoto.condOp = AST.OP_LT;
         add(iffalsegoto);
@@ -792,7 +770,6 @@ public class CodeGenFront {
       newBlock();
       add(lLoop);
       TAC cond = genIR(e.operands.get(0), parentEblk, info);
-      setReferenced(cond);
       TAC iffalsegoto = new TACGotoCond(e, cond, lExit, false);
       add(iffalsegoto);
       newBlock();

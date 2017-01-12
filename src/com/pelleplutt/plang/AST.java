@@ -523,6 +523,7 @@ public class AST implements Lexer.Emitter {
         prevTokix == OP_SYMBOL || 
         prevTokix == OP_ARGV || 
         prevTokix == OP_ARG || 
+        prevTokix == OP_ME || 
         isString(prevTokix) || 
         (!exprs.isEmpty() && ( 
             (exprs.peek().op == OP_CALL && prevTokix != OP_PARENO) ||

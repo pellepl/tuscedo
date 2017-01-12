@@ -63,4 +63,49 @@ public class MiscConstructs {
         "\n";
     assertEquals("called A.fmap.call5", Processor.compileAndRun(false, false, sA, sB).str); 
   }
+  @Test
+  public void testRand() {
+    String sA;
+    int iters = 100000;
+    sA = 
+        "histcount = [];\n" +
+        "iters = float(" + iters + ");\n" +
+        "for (i in 0#iters-1) {\n" +
+        "  r = str(rand() & 0xff);\n" +
+        "  if (histcount[r] == nil) histcount[r] = 0;\n" +
+        "  histcount[r]++;\n" +
+        "}\n" +
+        "min = iters; max = 0; sum = 0;\n"+
+        "void = histcount[{\n" + 
+        "  v = $0.val;\n" +
+        "  if (v < min) min = v;\n" +
+        "  if (v > max) max = v;\n" +
+        "  sum += v;\n" +
+        "}];\n" +
+        "if (sum != iters) return 'fail sum=' + sum;\n" +
+        "avg = sum / len(histcount);\n" +
+        "dmin = (avg-min) * 256 / iters;\n" +
+        "dmax = (max-avg) * 256 / iters;\n" +
+        "if (dmin > 1.0) return 'fail dmin=' + dmin;\n" +
+        "if (dmax > 1.0) return 'fail dmax=' + dmax;\n" +
+        "dd = dmin/(dmin+dmax);\n" +
+        "if (dd < 0.48) return 'fail lo dmin/(dmin+dmax)=' + dd;\n" +
+        "if (dd > 0.52) return 'fail hi dmin/(dmin+dmax)=' + dd;\n" +
+        "return 'OK';\n" +
+        "\n";
+    assertEquals("OK", Processor.compileAndRun(false, false, sA).str); 
+  }
+  @Test
+  public void testArrFill() {
+    String sA;
+    sA = 
+        "arr = [];\n" +
+        "for (i in 0#255) arr += 0;\n" +
+        "sum = 0;\n" +
+        "void = arr[{sum += $0;}];\n" +
+        "if (len(arr) == 256 & sum == 0) return 'OK';\n" +
+        "return 'fail';\n" +
+        "\n";
+    assertEquals("OK", Processor.compileAndRun(false, false, sA).str); 
+  }
 }

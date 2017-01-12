@@ -335,6 +335,24 @@ public class Assembler implements ByteCode {
 	  	else if (op.equals("retv")) {
 	  		baos.write(IRETV);
 	  	}
+      else if (op.equals("push_eq")) {
+        baos.write(IPUSH_EQ);
+      }
+      else if (op.equals("push_ne")) {
+        baos.write(IPUSH_NE);
+      }
+      else if (op.equals("push_gt")) {
+        baos.write(IPUSH_GT);
+      }
+      else if (op.equals("push_ge")) {
+        baos.write(IPUSH_GE);
+      }
+      else if (op.equals("push_lt")) {
+        baos.write(IPUSH_LT);
+      }
+      else if (op.equals("push_le")) {
+        baos.write(IPUSH_LE);
+      }
 	  	else if (op.equals("jump")) {
 	  		baos.write(IJUMP);
 	  		baos.write(utobytesl(tokens[1], 3, addr, labelRefs));
@@ -746,6 +764,24 @@ public class Assembler implements ByteCode {
       break;
     case IRETV: 
       sb.append("retv    ");
+      break;
+    case IPUSH_EQ: 
+      sb.append("push_eq ");
+      break;
+    case IPUSH_NE: 
+      sb.append("push_ne ");
+      break;
+    case IPUSH_GT: 
+      sb.append("push_gt ");
+      break;
+    case IPUSH_GE: 
+      sb.append("push_ge ");
+      break;
+    case IPUSH_LT: 
+      sb.append("push_lt ");
+      break;
+    case IPUSH_LE: 
+      sb.append("push_le ");
       break;
     case IJUMP: 
       sb.append("jump    ");

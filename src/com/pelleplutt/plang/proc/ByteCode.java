@@ -97,9 +97,16 @@ public interface ByteCode {
   static final int ICALL    = 0xe0; // call function                 (argc on stack) a=pop(); push($pc+3); push($fp); $fp=sp; $pc=a
   static final int ICALL_IM = 0xe1; // call function immediate       (argc on stack) push($pc+3); push($fp); $fp=sp; $pc=xxxxxx
   static final int IANO_CRE = 0xe2; // create anonymous function     locals=pop(); addr=pop(); push(anon{addr, locals});
-  static final int IRET     = 0xe8; // return                        $sp=$fp; $fp=pop(); $pc=pop(); argc=pop(); $sp-=argc;
-  static final int IRETV    = 0xe9; // return val                    t=pop(); $sp=$fp; $fp=pop(); $pc=pop(); argc=pop(); $sp-=argc; push(t);
+  static final int IRET     = 0xe6; // return                        $sp=$fp; $fp=pop(); $pc=pop(); argc=pop(); $sp-=argc;
+  static final int IRETV    = 0xe7; // return val                    t=pop(); $sp=$fp; $fp=pop(); $pc=pop(); argc=pop(); $sp-=argc; push(t);
   
+  static final int IPUSH_EQ = 0xe9; // push condition                if (cond) push(1) else push(0); 
+  static final int IPUSH_NE = 0xea; 
+  static final int IPUSH_GT = 0xeb; 
+  static final int IPUSH_GE = 0xec; 
+  static final int IPUSH_LT = 0xed; 
+  static final int IPUSH_LE = 0xee; 
+
   static final int IJUMP    = 0xf0; // jump                          $pc = xxxxxx 
   static final int IJUMP_EQ = 0xf1; 
   static final int IJUMP_NE = 0xf2; 
@@ -134,7 +141,7 @@ public interface ByteCode {
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //bx
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //cx
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //dx
-        1, 4, 1,UD,UD,UD,UD,UD, 1,UD,UD,UD,UD,UD,UD,UD, //ex
+        1, 4, 1,UD,UD,UD, 1, 1,UD,UD,UD,UD,UD,UD,UD,UD, //ex
         4, 4, 4, 4, 4, 4, 4,UD, 4, 4, 4, 4, 4, 4, 4, 0, //fx
   };
   

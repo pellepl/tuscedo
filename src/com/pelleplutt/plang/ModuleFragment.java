@@ -59,7 +59,8 @@ public class ModuleFragment {
   
   public void write(int pc, int data, int len) {
     for (int i = 0; i < len; i++) {
-      code.set(pc+i, (byte)((data >> ((len - i - 1)*8)) & 0xff));
+      int d = (data >> ((len - i - 1)*8)) & 0xff;
+      code.set(pc+i, (byte)(d));
     }
   }
   

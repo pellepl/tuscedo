@@ -152,6 +152,7 @@ public class CodeGenBack implements ByteCode {
   }
   
   boolean generateInbuiltFunction(TACCall call, ModuleFragment frag) {
+    if (dbg) System.out.println("    GEN_INBUILT_FUNC");
     if (call.func.equals("str")) {
       if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
       addCode(frag, stackInfo() + "tostr", ICAST_S);
@@ -402,6 +403,7 @@ public class CodeGenBack implements ByteCode {
   }
   
   void compileUnaryOp(TACUnaryOp tac, ModuleFragment frag) {
+    if (dbg) System.out.println("    COMPILE UNARY");
     if (tac.op == OP_PREINC) {
       pushValue(tac.operand, frag);
       sp = sp - 1 + 1;
@@ -459,22 +461,23 @@ public class CodeGenBack implements ByteCode {
   }
   
   void compileBinaryOp(TACOp tac, ModuleFragment frag) {
+    if (dbg) System.out.println("    COMPILE BINARY");
     if (tac.op == OP_PLUS) {
       TAC l = tac.left;
       TAC r = tac.right;
-      if (l instanceof TACInt && ((TACInt)l).x < 9) {
+      if (l instanceof TACInt && ((TACInt)l).x < 9 && ((TACInt)l).x > 0) {
         pushValue(r, frag);
         sp = sp - 1 + 1;
         addCode(frag, stackInfo() + tac.toString(), IADD_Q1 + (((TACInt)l).x - 1));
-      } else if (r instanceof TACInt && ((TACInt)r).x < 9) {
+      } else if (r instanceof TACInt && ((TACInt)r).x < 9 && ((TACInt)r).x > 0) {
         pushValue(l, frag);
         sp = sp - 1 + 1;
         addCode(frag, stackInfo() + tac.toString(), IADD_Q1 + (((TACInt)r).x - 1));
-      } else if (l instanceof TACInt && ((TACInt)l).x < 256) {
+      } else if (l instanceof TACInt && ((TACInt)l).x < 256 && ((TACInt)l).x > 0) {
         pushValue(r, frag);
         sp = sp - 1 + 1;
         addCode(frag, stackInfo() + tac.toString(), IADD_IM, ((TACInt)l).x - 1);
-      } else if (r instanceof TACInt && ((TACInt)r).x < 256) {
+      } else if (r instanceof TACInt && ((TACInt)r).x < 256 && ((TACInt)r).x > 0) {
         pushValue(l, frag);
         sp = sp - 1 + 1;
         addCode(frag, stackInfo() + tac.toString(), IADD_IM, ((TACInt)r).x - 1);
@@ -487,19 +490,19 @@ public class CodeGenBack implements ByteCode {
     else if (tac.op == OP_MINUS) {
       TAC l = tac.left;
       TAC r = tac.right;
-      if (l instanceof TACInt && ((TACInt)l).x < 9) {
+      if (l instanceof TACInt && ((TACInt)l).x < 9 && ((TACInt)l).x > 0) {
         pushValue(r, frag);
         sp = sp - 1 + 1;
         addCode(frag, stackInfo() + tac.toString(), ISUB_Q1 + (((TACInt)l).x - 1));
-      } else if (r instanceof TACInt && ((TACInt)r).x < 9) {
+      } else if (r instanceof TACInt && ((TACInt)r).x < 9 && ((TACInt)r).x > 0) {
         pushValue(l, frag);
         sp = sp - 1 + 1;
         addCode(frag, stackInfo() + tac.toString(), ISUB_Q1 + (((TACInt)r).x - 1));
-      } else if (l instanceof TACInt && ((TACInt)l).x < 256) {
+      } else if (l instanceof TACInt && ((TACInt)l).x < 256  && ((TACInt)l).x > 0) {
         pushValue(r, frag);
         sp = sp - 1 + 1;
         addCode(frag, stackInfo() + tac.toString(), ISUB_IM, ((TACInt)l).x - 1);
-      } else if (r instanceof TACInt && ((TACInt)r).x < 256) {
+      } else if (r instanceof TACInt && ((TACInt)r).x < 256 && ((TACInt)r).x > 0) {
         pushValue(l, frag);
         sp = sp - 1 + 1;
         addCode(frag, stackInfo() + tac.toString(), ISUB_IM, ((TACInt)r).x - 1);
@@ -553,6 +556,19 @@ public class CodeGenBack implements ByteCode {
       pushValues(tac.left, tac.right, frag);
       sp = sp - 2;
       addCode(frag, stackInfo() + tac.toString(), ICMP);
+      TACOp tacop = (TACOp)tac;
+      if (tacop.referenced) {
+        // push 1 if conditional is true, push 0 if conditional is false
+        sp++;
+        int instr = IPUSH_0;
+        if (tacop.getNode().op == OP_EQ2) instr = IPUSH_EQ;
+        else if (tacop.getNode().op == OP_NEQ) instr = IPUSH_NE;
+        else if (tacop.getNode().op == OP_GE) instr = IPUSH_GE;
+        else if (tacop.getNode().op == OP_LT) instr = IPUSH_LT;
+        else if (tacop.getNode().op == OP_GT) instr = IPUSH_GT;
+        else if (tacop.getNode().op == OP_LE) instr = IPUSH_LE;
+        addCode(frag, stackInfo() + " push cond", instr);
+      }
     }
     // TODO moar
     else {
@@ -562,6 +578,7 @@ public class CodeGenBack implements ByteCode {
   
   // if assignment is already on stack, set assignment argument to null
   void emitAssignment(TAC op, TAC assignee, TAC assignment, boolean referenced, ModuleFragment frag) {
+    if (dbg) System.out.println("    EMIT ASSIGNMENT");
     if (assignee instanceof TACVar) {
       if (frag.locals.containsKey(assignee)) {
         // local value
@@ -611,6 +628,7 @@ public class CodeGenBack implements ByteCode {
   }
   
   void emitCall(TACCall call, ModuleFragment frag) {
+    if (dbg) System.out.println("    EMIT CALL");
     if (!call.funcNameDefined) {
       // func address is pushed by previous operation
       // push nbr of args
@@ -650,6 +668,7 @@ public class CodeGenBack implements ByteCode {
   }
   
   void pushValues(TAC left, TAC right, ModuleFragment frag) {
+    if (dbg) System.out.println("    PUSH VALUES");
     boolean lOnStack = pushValue(left, frag);
     boolean rOnStack = pushValue(right, frag);
     if (rOnStack && !lOnStack) {
@@ -658,6 +677,7 @@ public class CodeGenBack implements ByteCode {
   }
   
   void pushNumber(ModuleFragment frag, int num, String comment) {
+    if (dbg) System.out.println("    PUSH NUM");
     sp++;
     if (num >= 0 && num <= 4) {
       addCode(frag, comment != null ? (stackInfo() + comment) : null, IPUSH_0 + num);
@@ -674,6 +694,7 @@ public class CodeGenBack implements ByteCode {
   }
   
   boolean pushValue(TAC a, ModuleFragment frag) {
+    if (dbg) System.out.println("    PUSH VAL " + a);
     if (a instanceof TACNil) {
       sp++;
       addCode(frag, stackInfo() + a.toString(), IPUSH_NIL);
@@ -772,24 +793,8 @@ public class CodeGenBack implements ByteCode {
       addCode(frag, stackInfo(), ISET_CRE);
     }
     else if (a instanceof TACOp) {
-      TACOp tac = (TACOp)a;
-      if (AST.isConditionalOperator(tac.op) && tac.referenced) {
-        // push 1 if conditional is true, push 0 if conditional is false
-        sp++;
-        addCode(frag, stackInfo() + " presume true", IPUSH_1);
-        int braInstr = IBRA;
-        if (tac.getNode().op == OP_EQ2) braInstr = IBRA_EQ;
-        else if (tac.getNode().op == OP_NEQ) braInstr = IBRA_NE;
-        else if (tac.getNode().op == OP_GE) braInstr = IBRA_GE;
-        else if (tac.getNode().op == OP_LT) braInstr = IBRA_LT;
-        else if (tac.getNode().op == OP_GT) braInstr = IBRA_GT;
-        else if (tac.getNode().op == OP_LE) braInstr = IBRA_LE;
-        addCode(frag, stackInfo(), braInstr, 0,0,5);
-        addCode(frag, stackInfo() + " was false", ISUB_Q1);
-      } else {
-        // already on stack
-        return true;
-      }
+      // already on stack
+      return true;
     }
     else {
       return true;

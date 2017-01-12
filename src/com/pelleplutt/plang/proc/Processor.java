@@ -1062,6 +1062,25 @@ public class Processor implements ByteCode {
     sp += argc;
     push(t);
   }
+
+  void push_cond(int icond) {
+    int val = 0;
+    switch (icond) {
+    case ICOND_EQ:
+      if (zero) val = 1; break;
+    case ICOND_NE:
+      if (!zero) val = 1; break;
+    case ICOND_GE:
+      if (zero || !minus) val = 1; break;
+    case ICOND_GT:
+      if (!zero && !minus) val = 1; break;
+    case ICOND_LE:
+      if (zero || minus) val = 1; break;
+    case ICOND_LT:
+      if (!zero && minus) val = 1; break;
+    }
+    push(val);
+  }
   
   void jump(int icond) {
     int dst = pcodetoi( pc, 3);
@@ -1387,6 +1406,24 @@ public class Processor implements ByteCode {
       break;
     case IRETV: 
       retv();
+      break;
+    case IPUSH_EQ: 
+      push_cond(ICOND_EQ);
+      break;
+    case IPUSH_NE: 
+      push_cond(ICOND_NE);
+      break;
+    case IPUSH_GE: 
+      push_cond(ICOND_GE);
+      break;
+    case IPUSH_GT: 
+      push_cond(ICOND_GT);
+      break;
+    case IPUSH_LE: 
+      push_cond(ICOND_LE);
+      break;
+    case IPUSH_LT: 
+      push_cond(ICOND_LT);
       break;
     case IJUMP: 
       jump(ICOND_AL);
@@ -1734,6 +1771,20 @@ public class Processor implements ByteCode {
         return null;
       }
     });
+    extDefs.put("rand", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        return new M(calcRand());
+      }
+    });
+    extDefs.put("randseed", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+        } else {
+          randSeed(args[0].asInt());
+        }
+        return null;
+      }
+    });
     extDefs.put("halt", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         throw new ProcessorError("halt");
@@ -1779,6 +1830,20 @@ public class Processor implements ByteCode {
         return null;
       }
     });
+  }
+  
+  static long regA = 0x20070515, regB = 0x20090129, regC = 0x20140315;
+  static int calcRand() {
+    // https://www.schneier.com/academic/archives/1994/09/pseudo-random_sequen.html
+    regA = (((((regA>>31)^(regA>>6)^(regA>>4)^(regA>>2)^(regA<<1)^regA)
+        & 0x00000001)<<31) | regA>>1);
+    regB = ((((regB>>30)^(regB>>2)) & 0x00000001)<<30) | (regB>>1);
+    regC = ((((regC>>28)^(regC>>1)) & 0x00000001)<<28) | (regC>>1);
+    return (int)(regA ^ regB ^ regC);
+  }
+  static void randSeed(int seed) {
+    if (seed == 0x19760401) seed = 0;
+    regA = regB = regC = (0x19760401 ^ seed);
   }
   
   
