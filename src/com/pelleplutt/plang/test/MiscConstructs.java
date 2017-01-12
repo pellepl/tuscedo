@@ -111,7 +111,7 @@ public class MiscConstructs {
         "arr = [];\n" +
         "for (i in 0#255) arr += 0;\n" +
         "sum = 0;\n" +
-        "void = arr[{sum += $0;}];\n" +
+        "arr[{sum += $0;}];\n" +
         "if (len(arr) == 256 & sum == 0) return 'OK';\n" +
         "return 'fail';\n" +
         "\n";
