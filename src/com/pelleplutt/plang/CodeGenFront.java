@@ -784,6 +784,7 @@ public class CodeGenFront {
       newBlock();
       add(lLoop);
       TAC cond = genIR(e.operands.get(0), parentEblk, info);
+      setReferenced(cond);
       TAC iffalsegoto = new TACGotoCond(e, cond, lExit, false);
       add(iffalsegoto);
       newBlock();

@@ -53,6 +53,19 @@ public class Loops {
     assertEquals("[0, 16, 32, 48]", Processor.compileAndRun(false, false, sA).str); 
   }
   @Test
+  public void testWhileSimple() {
+    String sA;
+    sA = 
+        "res = '';\n" +
+        "i = 10;\n" +
+        "while (i--) {\n" +
+        "  res += i;\n" +
+        "}\n" +
+        "return res;\n" + 
+        "";
+    assertEquals("9876543210", Processor.compileAndRun(true, false, sA).str); 
+  }
+  @Test
   public void testWhile() {
     String sA;
     sA = 

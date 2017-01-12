@@ -204,7 +204,7 @@ public class Compiler {
         "println(walnut.walnutmap.call(12));\n" +
         "func add(x, y) { println('add' + x + '+' + y); return x+y; }\n" +
         "walnut.fmap.call();\n" +
-        "walnut.fmap.call = mandel.add;\n" + // TODO FIX
+        "walnut.fmap.call = mandel.add;\n" +
         "println(walnut.fmap.call(2,3));\n" +
         "walnut.fmap.sub.call();\n" +
 
@@ -282,11 +282,11 @@ public class Compiler {
     // DONE:   arr = arrb[{return $0*2;}]; // multiplies all elements by 2
     // DONE:   arr[[1,2,3]] = 4
     // DONE:   map = map[{if $0 ...etc}]
-    // FIXME:  goto
-    // FIXME:  handle 'global' keyword
-    // FIXME: "r = ['a':1,'b':2,'c':3];\n" +
+    // DONE:  "r = ['a':1,'b':2,'c':3];\n" +
     //        "r.b = r;\n" +
     //        "println(r.b.b['b'].c);\n" +
+    // FIXME:  goto
+    // FIXME:  handle 'global' keyword
 
 
     String siblingsrc = 
