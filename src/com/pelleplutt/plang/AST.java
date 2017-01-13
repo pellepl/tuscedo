@@ -133,7 +133,7 @@ public class AST implements Lexer.Emitter {
       new Op("else", OP_ELSE, 1),
       new Op("if", OP_IF, 2),
       new Op("while", OP_WHILE, 2),
-      new Op("in", OP_IN, 1),
+      new Op("in", OP_IN, 2),
       new Op("for", OP_FOR, 4),
       new Op("break", OP_BREAK),
       new Op("continue", OP_CONTINUE),
@@ -728,8 +728,8 @@ public class AST implements Lexer.Emitter {
         }
         ASTNode e = exprs.pop();
         if (operator.id == OP_FOR && e.op == OP_IN) {
-          // for / in, skip one arg
-          i++;
+          // for / in, skip two args
+          i += 2;
         }
         arguments.add(0, e);
       }

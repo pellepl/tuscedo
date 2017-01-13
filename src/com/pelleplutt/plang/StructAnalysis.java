@@ -13,6 +13,7 @@ import static com.pelleplutt.plang.AST.OP_FOR;
 import static com.pelleplutt.plang.AST.OP_FUNCDEF;
 import static com.pelleplutt.plang.AST.OP_HASH;
 import static com.pelleplutt.plang.AST.OP_IF;
+import static com.pelleplutt.plang.AST.OP_IN;
 import static com.pelleplutt.plang.AST.OP_MODULE;
 import static com.pelleplutt.plang.AST.OP_NIL;
 import static com.pelleplutt.plang.AST.OP_RETURN;
@@ -213,12 +214,18 @@ public class StructAnalysis {
         analyseRecurse(e.operands.get(1), scopeStack, e, true, loop);
         analyseRecurse(e.operands.get(2), scopeStack, e, true, loop);
         analyseRecurse(e.operands.get(3), scopeStack, e, false, true);
-      } else {
+      } else if (e.operands.size() == 2) {
         // for (x in y) w
-        analyseRecurse(e.operands.get(0), scopeStack, e, false, loop);
-        analyseRecurse(e.operands.get(1), scopeStack, e, true, loop);
-        analyseRecurse(e.operands.get(2), scopeStack, e, false, true);
+        if (e.operands.get(0).op != OP_IN) throw new CompilerError("expected 'in'", e.operands.get(0));
+        analyseRecurse(e.operands.get(0), scopeStack, e, true, loop);  // for X IN Y w
+        analyseRecurse(e.operands.get(1), scopeStack, e, false, true); // for x in y W
+      } else {
+        throw new CompilerError("invalid for construct", e);
       }
+    }
+    else if (e.op == OP_IN) {
+      analyseRecurse(e.operands.get(0), scopeStack, e, false, loop); // X in y
+      analyseRecurse(e.operands.get(1), scopeStack, e, true, loop);  // x in Y
     }
     else if (e.op == OP_WHILE) {
       analyseRecurse(e.operands.get(0), scopeStack, e, false, loop);

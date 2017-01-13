@@ -63,7 +63,7 @@ public class Loops {
         "}\n" +
         "return res;\n" + 
         "";
-    assertEquals("9876543210", Processor.compileAndRun(true, false, sA).str); 
+    assertEquals("9876543210", Processor.compileAndRun(false, false, sA).str); 
   }
   @Test
   public void testWhile() {

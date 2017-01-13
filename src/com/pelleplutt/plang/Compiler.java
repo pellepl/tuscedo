@@ -390,10 +390,8 @@ public class Compiler {
 
 
 //    src = 
-//        "false = 0;\n" +
-//        "true = !false;\n" +
-//        "println(('abcdef'[0#3])[2#0]);\n" +
-//        "a = true;\n" +
+//        "a = [1,2,3,4,5];\n" +
+//        "for (x in a) println(x);\n" +
 //        "";
 //   othersrc = siblingsrc = crcsrc = ""; 
 

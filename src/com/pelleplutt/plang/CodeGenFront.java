@@ -677,11 +677,13 @@ public class CodeGenFront {
       } else {
         //for (x in y) {w}
         String innerScope = getInnerScope();
-        ASTNode eloopCode = e.operands.get(2);
-        if (eloopCode.op == OP_BLOK) {
-          ((ASTNodeBlok)eloopCode).setVariablesHandled();
+        ASTNode ex = e.operands.get(0).operands.get(0); // for >X< in  y   w
+        ASTNode ey = e.operands.get(0).operands.get(1); // for  x  in >Y<  w
+        ASTNode ew = e.operands.get(1);                 // for  x  in  y  >W<
+        if (ew.op == OP_BLOK) {
+          ((ASTNodeBlok)ew).setVariablesHandled();
         }
-        TACAlloc talloc = new TACAlloc(eloopCode, innerScope, parentEblk);
+        TACAlloc talloc = new TACAlloc(ew, innerScope, parentEblk);
         add(talloc);
         String label = genLabel();
 
@@ -692,23 +694,23 @@ public class CodeGenFront {
         TACVar _set = new TACVar(parentEblk, TACAlloc.varSet, talloc.module, null, talloc.scope + innerScope); 
         TACVar _iter = new TACVar(parentEblk, TACAlloc.varIterator, talloc.module, null, talloc.scope + innerScope); 
         
-        TAC assignee = genIRAssignment(e.operands.get(0), parentEblk, info);
+        TAC assignee = genIRAssignment(ex, parentEblk, info);
         
         // inital .set = y, .iter = 0
         // .set = y 
-        TAC setAssignment = genIR(e.operands.get(1).operands.get(0), parentEblk, info);
+        TAC setAssignment = genIR(ey, parentEblk, info);
         setReferenced(setAssignment);
         add(new TACAssign(
-            e.operands.get(1),                                            // ASTNode
+            ey,                                                           // ASTNode
             OP_EQ,                                                        // op
             _set,                                                         // inner set variable
             setAssignment));                                              // the set itself
         // .iter = 0 
         add(new TACAssign(
-            e.operands.get(1),                                            // ASTNode
+            ex,                                                           // ASTNode
             OP_EQ,                                                        // op
             _iter,                                                        // inner iterator variable
-            new TACInt(e.operands.get(1).operands.get(0), 0)));           // zero
+            new TACInt(ey, 0)));                                          // zero
         
         newBlock();
         add(lLoop);
@@ -731,17 +733,17 @@ public class CodeGenFront {
         // loop : x = .set[.iter]
         add(_set);
         setReferenced(_set);
-        TAC _set_iter = new TACSetRead(e.operands.get(2), _set, _iter);
+        TAC _set_iter = new TACSetRead(ex, _set, _iter);
         add(_set_iter);
         setReferenced(_set_iter);
         add(new TACAssign(
-            e.operands.get(0),                                            // ASTNode
+            ex,                                                           // ASTNode
             OP_EQ,                                                        // op
             assignee,                                                     // x
             _set_iter));                                                  // .set[.iter]
 
         // loop : w
-        genIR(e.operands.get(2), parentEblk, info);
+        genIR(ew, parentEblk, info);
         boolean contCalled = loopWasContinued();
         popLoop();
         if (contCalled) {

@@ -90,8 +90,8 @@ public class Grammar {
           "call:          arg*\n" +
           "blok:          code*\n" +
           "for:           stat | sym , condition , stat , code\n" +
-          "for:           sym , in , code\n" +
-          "in:            sym | call | dot | arrdecl | arrderef | str | range\n" +
+          "for:           in , code\n" +
+          "in:            sym | call | dot | arrdecl | arrderef | str | range , sym | call | dot | arrdecl | arrderef | str | range\n" +
           "while:         condition , code\n" +
           "if:            condition , code\n" + 
           "if:            condition , code , else\n" + 
