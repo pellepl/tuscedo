@@ -6,7 +6,6 @@ import java.util.Stack;
 
 import com.pelleplutt.plang.ASTNode.ASTNodeArrDecl;
 import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
-import com.pelleplutt.plang.ASTNode.ASTNodeCompoundSymbol;
 import com.pelleplutt.plang.ASTNode.ASTNodeFuncCall;
 import com.pelleplutt.plang.ASTNode.ASTNodeFuncDef;
 import com.pelleplutt.plang.ASTNode.ASTNodeNumeric;
@@ -255,8 +254,40 @@ public class AST implements Lexer.Emitter {
   int getCallId() {
     return callid++;
   }
+
+  int globoffs, globlen;
+  void pushExpr(ASTNode e) {
+    if (e != null) {
+      e.stroffset = stroffset;
+      e.strlen = strlen;
+      exprs.push(e);
+      collateNodeDbgInfo(e);
+    }
+  }
   
-  
+  void collateNodeDbgInfo(ASTNode e) {
+    int minOffs = Integer.MAX_VALUE, maxOffs = Integer.MIN_VALUE;
+    Stack<ASTNode> rece = new Stack<ASTNode>();
+    rece.add(e);
+    while (!rece.isEmpty()) {
+      ASTNode ev = rece.pop();
+      if (ev.strlen > 0 && ev.stroffset > 0) {
+        minOffs = Math.min(minOffs, ev.stroffset);
+        maxOffs = Math.max(maxOffs, ev.stroffset + ev.strlen);
+      }
+      if (ev.op == OP_CALL) {
+        ASTNodeFuncCall evCall = (ASTNodeFuncCall)ev;
+        rece.push(evCall.callByOperation ? evCall.callAddrOp : evCall.name);
+      }
+      if (ev.operands != null) {
+        for (ASTNode e2 : ev.operands) {
+          rece.push(e2);
+        }
+      }
+    }
+    e.stroffset = minOffs;
+    e.strlen = maxOffs - minOffs;
+  }
   
   // impl Parser.Emitter
   
@@ -370,12 +401,6 @@ public class AST implements Lexer.Emitter {
       onOperator(tokix);
     }
     
-    ASTNode node = !exprs.isEmpty() ? exprs.peek() : null;
-    if (node != null) {
-      node.stroffset = offset;
-      node.strlen = len;
-    }
-
     prevPrevTokix = prevTokix;
     prevTokix = tokix;
 
@@ -388,19 +413,19 @@ public class AST implements Lexer.Emitter {
   
   void onNumber(double number, boolean f) {
     if (dbg) System.out.println("   epush num " + number);
-    exprs.push(new ASTNodeNumeric(number, f));
+    pushExpr(new ASTNodeNumeric(number, f));
   }
   
   void onString(String str) {
     if (dbg) System.out.println("   epush str " + str);
-    exprs.push(new ASTNodeString(str));
+    pushExpr(new ASTNodeString(str));
   }
   
   void onSymbol(String symbol) {
     if (dbg) System.out.println("   epush sym " + symbol);
     ASTNodeSymbol esym = new ASTNodeSymbol(symbol);
     esym.symNbr = blkSymCounter++; // assign symbol number for this symbol in this block
-    exprs.push(esym);
+    pushExpr(esym);
   }
   
   void onLabelOrTuple(int tokix) {
@@ -415,7 +440,7 @@ public class AST implements Lexer.Emitter {
       ASTNode a = exprs.pop();
       collapseStack(OP_FINALIZER, OP_BRACEO);
       // collapse label
-      exprs.push(a);
+      pushExpr(a);
       onOperator(tokix);
       collapseStack(OP_FINALIZER, OP_BRACEO);
     } else {
@@ -436,7 +461,7 @@ public class AST implements Lexer.Emitter {
       OpCall callop = new OpCall("<call addr on stack>", callid);
       opers.push(callop);
       if (dbg) System.out.println("      opush pareno " + opString(tokix) + ", funccallbyop " + callnode);
-      exprs.push(callnode);
+      pushExpr(callnode);
     } 
     else if (prevTokix == OP_SYMBOL && prevPrevTokix != OP_DOT) {
       if (prevPrevTokix == OP_FUNCDEF) {
@@ -444,7 +469,7 @@ public class AST implements Lexer.Emitter {
         ASTNodeSymbol funcName = (ASTNodeSymbol)exprs.pop();
         ASTNodeFuncDef defnode = new ASTNodeFuncDef(funcName.symbol);
         if (dbg) System.out.println("      opush pareno " + opString(tokix) + ", funcdef " + defnode);
-        exprs.push(defnode);
+        pushExpr(defnode);
       } else {
         // function call, plain symbol
         ASTNodeSymbol funcName = (ASTNodeSymbol)exprs.pop();
@@ -453,7 +478,7 @@ public class AST implements Lexer.Emitter {
         OpCall callop = new OpCall(funcName.symbol, callid);
         opers.push(callop);
         if (dbg) System.out.println("      opush pareno " + opString(tokix) + ", funccallbysym " + callnode);
-        exprs.push(callnode);
+        pushExpr(callnode);
       }
     } 
     else {
@@ -468,7 +493,7 @@ public class AST implements Lexer.Emitter {
     // cannot have this for case "(1)"
     //if (!opers.isEmpty() && opers.peek().id == OP_PARENO) {
     //  // empty paren (), push empty block
-    //  exprs.push(new ASTNodeBlok());
+    //  pushExpr(new ASTNodeBlok());
     //}
     int endedAtTokix = collapseStack(tokix, OP_PARENO, OP_CALL, OP_FUNCDEF);
     if (endedAtTokix == OP_PARENO) {
@@ -483,7 +508,7 @@ public class AST implements Lexer.Emitter {
         ASTNode a = exprs.pop();
         if (a instanceof ASTNodeFuncCall && ((ASTNodeFuncCall)a).callid == call.callid) {
           ((ASTNodeFuncCall)a).setArguments(args);
-          exprs.push(a);
+          pushExpr(a);
           checkFuncFound = true;
           break;
         } else {
@@ -501,7 +526,7 @@ public class AST implements Lexer.Emitter {
         ASTNode a = exprs.pop();
         if (a instanceof ASTNodeFuncDef) {
           ((ASTNodeFuncDef)a).setArguments(args);
-          exprs.push(a);
+          pushExpr(a);
           checkFuncFound = true;
           break;
         } else {
@@ -561,12 +586,12 @@ public class AST implements Lexer.Emitter {
           ASTNode symbol = exprs.pop();
           ASTNode emptyarr = new ASTNodeArrDecl(arrdeclid++);
           ASTNodeOp assign = new ASTNodeOp(OP_EQ, symbol, emptyarr);
-          exprs.push(assign);
+          pushExpr(assign);
         } else {
           throw new CompilerError("Array declaration must be preceded by symbol only", exprs.peek());
         }
       } else {
-        exprs.push(new ASTNodeArrDecl(((OpArrDecl)op).arrid));
+        pushExpr(new ASTNodeArrDecl(((OpArrDecl)op).arrid));
       }
     } else {
       int endedAtTokix = collapseStack(OP_FINALIZER, OP_ADEREF, OP_ADECL);
@@ -575,7 +600,7 @@ public class AST implements Lexer.Emitter {
         opers.pop(); // pop off the [ aderef
         ASTNode e2 = exprs.pop();
         ASTNode e1 = exprs.pop();
-        exprs.push(new ASTNodeOp(OP_ADEREF, e1, e2));
+        pushExpr(new ASTNodeOp(OP_ADEREF, e1, e2));
       } else if (endedAtTokix == OP_ADECL) {
         if (dbg) System.out.println("      opop  " + opers.peek());
         handleArrayDeclaration();
@@ -609,7 +634,7 @@ public class AST implements Lexer.Emitter {
     ASTNodeBlok result = new ASTNodeBlok(arguments.toArray(new ASTNode[arguments.size()]));
     result.symNbr = blkSymCounter; // assign the symbol number to this block
     if (dbg) System.out.println("      epush " + result);
-    exprs.push(result);
+    pushExpr(result);
     if (collapseStack(OP_FINALIZER, OP_BRACEO) != OP_BRACEO) {
     };
     if (dbg) System.out.println("      opop  " + opers.peek());
@@ -644,14 +669,14 @@ public class AST implements Lexer.Emitter {
     } else {
       ASTNodeArrDecl adecle = new ASTNodeArrDecl(((OpArrDecl)opers.peek()).arrid);
       adecle.operands.add(exprs.pop());
-      exprs.push(adecle);
+      pushExpr(adecle);
     }
   }
   
   void onSemi(int tokix) {
     // check if empty semi, if so push empty ASTNodeBlok on ex stack
     if (prevTokix == OP_PARENO || prevTokix == OP_BRACEO || prevTokix == OP_SEMI) {
-      exprs.push(new ASTNodeBlok());
+      pushExpr(new ASTNodeBlok());
     } else {
       collapseStack(tokix, OP_PARENO, OP_CALL, OP_BRACEO);
     }
@@ -754,7 +779,7 @@ public class AST implements Lexer.Emitter {
         ifop.operands.add(result);
       } else {
         if (dbg) System.out.println("      epush " + result + " collapse");
-        exprs.push(result);
+        pushExpr(result);
       }
     }
     return OP_FINALIZER;

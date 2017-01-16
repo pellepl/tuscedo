@@ -118,6 +118,7 @@ public class Processor implements ByteCode {
     pc = exe.getPCStart();
     this.code = exe.getMachineCode();
     this.extLinks = exe.getExternalLinkMap();
+    //exe.wipeDebugInfo();
     Map<Integer, M> consts = exe.getConstants();
     for (int addr : consts.keySet()) {
       M m = consts.get(addr);

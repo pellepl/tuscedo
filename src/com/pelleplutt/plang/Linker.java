@@ -107,7 +107,7 @@ public class Linker implements ByteCode {
       }
     }
     if (lastMainFrag != null) {
-      lastMainFrag.addCode("main return", IRET);
+      lastMainFrag.addCode("main return", null, IRET);
     }
     
     // allocate code
@@ -118,6 +118,8 @@ public class Linker implements ByteCode {
         if (dbg) System.out.println(String.format("  %-32s @ 0x%08x:%d", 
             fragId, codeOffset, frag.code.size()));
         fragLUT.put(fragId, codeOffset);
+        frag.fragId = fragId;
+        frag.executableOffset = codeOffset;
       } else {
         throw new CompilerError("duplicate definition of " + fragId, frag.tacs.get(0).get(0).getNode());
       }

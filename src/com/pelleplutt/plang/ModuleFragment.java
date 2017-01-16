@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
 import com.pelleplutt.plang.TAC.TACArrInit;
 import com.pelleplutt.plang.TAC.TACCall;
 import com.pelleplutt.plang.TAC.TACLabel;
@@ -17,39 +18,60 @@ public class ModuleFragment {
   String fragname;
   // three address codes, block organised
   List<List<TAC>> tacs = new ArrayList<List<TAC>>();
-  // executable offset
-  int exeOffset;
   // machine codes
   List<Byte> code = new ArrayList<Byte>();
   // labels / fragment machine code offset
   Map<TACLabel, Integer> labels = new HashMap<TACLabel, Integer>();
   // unresolved references
   List<Link> links = new ArrayList<Link>();
-  // fragment machine code offset / string comment
-  Map<Integer, String> dbgcomments = new HashMap<Integer, String>();
   // ASTNode.ASTNodeBlok.TYPE_*
   int type;
   // locals
   Map<TACVar, Integer> locals;
+  // Linked fragment id
+  public String fragId;
+  // Linked executable offset
+  public int executableOffset;
+  // fragment machine code offset / string comment
+  Map<Integer, String> dbgcomments = new HashMap<Integer, String>();
+  // source code for this fragment
+  Source source;
   
-  public ModuleFragment() {
-    
+  public ModuleFragment(Source src) {
+    source = src;
   }
  
-  public void addCode(String comment, int i, Integer... codes) {
+  ASTNode prevNode = null;
+  public void addCode(String comment, ASTNode node, int bytecode, Integer... bytecodeext) {
     if (comment != null) dbgcomments.put(code.size(), comment);
-    code.add((byte)i);
-    if (codes != null) {
-      for (int c : codes) {
+    code.add((byte)bytecode);
+    if (bytecodeext != null) {
+      for (int c : bytecodeext) {
         code.add((byte)c);
       }
     }
     if (CodeGenBack.dbg) {
-      byte[] mc = new byte[i + (codes == null ? 0 : codes.length)];
+      if (!(node instanceof ASTNodeBlok)) {
+        if (node != prevNode && node != null) {
+          Object[] srcinfo = source.getLine(node.stroffset);
+          if (srcinfo != null) {
+            String srcline = (String)srcinfo[1];
+            String prefix = String.format("%s@%-4d: ", source.getName(), srcinfo[0]);
+            System.out.println(prefix + srcline);
+            int linemarkix = node.stroffset - (Integer)srcinfo[2];
+            int linemarklen = node.strlen;
+            for (int i = 0; i < linemarkix + prefix.length(); i++) System.out.print(" ");
+            for (int i = 0; i < Math.min(linemarklen, srcline.length()); i++) System.out.print("-");
+            System.out.println();
+          }
+        }
+      }
+      prevNode = node;
+      byte[] mc = new byte[1 + (bytecodeext == null ? 0 : bytecodeext.length)];
       int x = 0;
-      mc[x++] = (byte)i;
-      if (codes != null) {
-        for (int c : codes) {
+      mc[x++] = (byte)bytecode;
+      if (bytecodeext != null) {
+        for (int c : bytecodeext) {
           mc[x++] = (byte)c;
         }
       }
@@ -81,7 +103,7 @@ public class ModuleFragment {
   }
   
   public String commentDbg(int codeIx) {
-    return dbgcomments.get(codeIx);
+    return dbgcomments != null ? dbgcomments.get(codeIx) : null;
   }
 
   

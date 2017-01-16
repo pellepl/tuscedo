@@ -24,7 +24,6 @@ public class Executable {
   public int getPCStart() {
     return pcStart;
   }
-  
   public byte[] getMachineCode() {
     return machineCode;
   }
@@ -36,16 +35,18 @@ public class Executable {
   }
   public String getDebugInfo(int pc) {
     if (dbgModules == null) return null;
-    int rpc = 0;
     for (Module m : dbgModules) {
       for (ModuleFragment frag : m.frags) {
+        int offs = frag.executableOffset;
         int len = frag.getMachineCodeLength();
-        if (pc >= rpc && pc < rpc + len) {
-          return frag.commentDbg(pc - rpc);
+        if (pc >= offs && pc < offs + len) {
+          return frag.commentDbg(pc - offs);
         }
-        rpc += len;
       }
     }
     return null;
+  }
+  public void wipeDebugInfo() {
+    dbgModules = null;
   }
 }

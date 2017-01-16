@@ -99,13 +99,13 @@ public class CodeGenFront {
   FrontFragment ffrag;
   IntermediateRepresentation irep;
   
-  public static IntermediateRepresentation genIR(ASTNodeBlok e, IntermediateRepresentation ir) {
+  public static IntermediateRepresentation genIR(ASTNodeBlok e, IntermediateRepresentation ir, Source src) {
     if (ir == null) {
       ir = new IntermediateRepresentation();
     }
     CodeGenFront cg = new CodeGenFront();
     cg.irep = ir;
-    List<Module> mods = cg.doIntermediateCode(e);
+    List<Module> mods = cg.doIntermediateCode(e, src);
     ir.getModules().addAll(mods);
     return ir;
   }
@@ -113,16 +113,16 @@ public class CodeGenFront {
   public CodeGenFront() {
   }
   
-  public List<Module> doIntermediateCode(ASTNodeBlok eblk) {
+  public List<Module> doIntermediateCode(ASTNodeBlok eblk, Source src) {
     genIR(eblk, eblk, new Info());
     if (dbg) printIR(System.out);
     genCFG(ffrags);
     //printDot(System.out);
-    List<Module> res = gather();
+    List<Module> res = gather(src);
     return res;
   }
   
-  List<Module> gather() {
+  List<Module> gather(Source src) {
     Map<String, Module> mmap = new HashMap<String, Module>();
     for (FrontFragment ffrag : ffrags) {
       Module module = mmap.get(ffrag.module);
@@ -131,7 +131,7 @@ public class CodeGenFront {
         module.id = ffrag.module;
         mmap.put(ffrag.module, module);
       }
-      ModuleFragment frag = new ModuleFragment();
+      ModuleFragment frag = new ModuleFragment(src);
       frag.fragname = ffrag.name;
       frag.type = ffrag.type;
       frag.modname = module.id;
@@ -606,7 +606,9 @@ public class CodeGenFront {
         TAC iffalsegoto = new TACGotoCond(e, cond, lExit, false);
         add(iffalsegoto);
         newBlock();
-        genIR(e.operands.get(1), parentEblk, info);
+        TAC cres = genIR(e.operands.get(1), parentEblk, info);
+        add(cres);
+        setReferenced(cres);
         newBlock();
         add(lExit);
       } else {
@@ -616,12 +618,16 @@ public class CodeGenFront {
         TAC iffalsegoto = new TACGotoCond(e, cond, lElse, false);
         add(iffalsegoto);
         newBlock();
-        genIR(e.operands.get(1), parentEblk, info);
+        TAC cres = genIR(e.operands.get(1), parentEblk, info);
+        add(cres);
+        setReferenced(cres);
         TAC gotoExit = new TACGoto(e, lExit);
         add(gotoExit);
         newBlock();
         add(lElse);
-        genIR(e.operands.get(2).operands.get(0), parentEblk, info);
+        TAC celse = genIR(e.operands.get(2).operands.get(0), parentEblk, info);
+        add(celse);
+        setReferenced(celse);
         newBlock();
         add(lExit);
       }
@@ -971,6 +977,7 @@ public class CodeGenFront {
   }
   
   void add(TAC t) {
+    if (t == null) return;
     if (t.added) return;
     if (ffrag.block == null) {
       ffrag.block = new Block();

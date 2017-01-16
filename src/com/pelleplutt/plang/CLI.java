@@ -10,6 +10,7 @@ import com.pelleplutt.plang.proc.Assembler;
 import com.pelleplutt.plang.proc.ExtCall;
 import com.pelleplutt.plang.proc.Processor;
 import com.pelleplutt.plang.proc.ProcessorError;
+import com.pelleplutt.plang.proc.Processor.M;
 import com.pelleplutt.plang.proc.ProcessorError.ProcessorFinishedError;
 
 public class CLI {
@@ -58,7 +59,10 @@ public class CLI {
           p.step();
         }
       } catch (ProcessorFinishedError pfe) {
-        System.out.println("processor end, retval " + pfe.getRet());
+        M m = pfe.getRet();
+        if (m != null && m.type != Processor.TNIL) {
+          System.out.println("processor end, retval " + m);
+        }
       }
       catch (ProcessorError pe) {
         System.out.println("**********************************************");

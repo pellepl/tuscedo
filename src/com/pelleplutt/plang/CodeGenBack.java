@@ -119,9 +119,9 @@ public class CodeGenBack implements ByteCode {
     }
   }
   
-  
+  ASTNode curNode;
   void addCode(ModuleFragment frag, String comment, int i, Integer... codes) {
-    frag.addCode(comment, i, codes);
+    frag.addCode(comment, curNode, i, codes);
   }
   void addCode(ModuleFragment frag, int i, Integer... codes) {
     addCode(frag, null, i, codes);
@@ -181,6 +181,7 @@ public class CodeGenBack implements ByteCode {
   
   void compileTAC(TAC tac, ModuleFragment frag) {
     if (dbg) System.out.println("  " + (tac.referenced ? "r " : "  ") + tac);
+    curNode = tac.getNode();
 
     
     if (tac instanceof TACAlloc) {

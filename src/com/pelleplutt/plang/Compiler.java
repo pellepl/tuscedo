@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.pelleplutt.plang.ASTNode.ASTNodeBlok;
+import com.pelleplutt.plang.Source.SourceString;
 import com.pelleplutt.plang.proc.Assembler;
 import com.pelleplutt.plang.proc.ExtCall;
 import com.pelleplutt.plang.proc.Processor;
@@ -12,10 +13,20 @@ import com.pelleplutt.plang.proc.ProcessorError.ProcessorFinishedError;
 
 public class Compiler {
   static String src;
-
+  
   public static Executable compile(Map<String, ExtCall> extDefs, int ramOffs, int constOffs, String ...sources) {
+    Source srcs[] = new Source[sources.length];
+    int i = 0;
+    for (String s : sources) {
+      srcs[i++] = new Source.SourceString("<string>", s);
+    }
+    return compile(extDefs, ramOffs, constOffs, srcs);
+  }
+
+  public static Executable compile(Map<String, ExtCall> extDefs, int ramOffs, int constOffs, Source ...sources) {
     IntermediateRepresentation ir = null;
-    for (String src : sources) {
+    for (Source osrc : sources) {
+      String src = osrc.getSource();
       Compiler.src = src;
       //System.out.println("* 1. build tree");
       //AST.dbg = true;
@@ -37,7 +48,7 @@ public class Compiler {
       //System.out.println("* 5. intermediate codegen");
       //CodeGenFront.dbg = true;
       //CodeGenFront.dbgUnwind = true;
-      ir = CodeGenFront.genIR(e, ir);
+      ir = CodeGenFront.genIR(e, ir, osrc);
   
       //System.out.println("* 6. backend codegen");
       //CodeGenBack.dbg = true;
@@ -287,6 +298,7 @@ public class Compiler {
     //        "println(r.b.b['b'].c);\n" +
     // FIXME:  goto
     // FIXME:  handle 'global' keyword
+    // FIXME:  on $0..999, in StructAnalyser, replace these by internal variables so we do not need to check range all the time
 
 
     String siblingsrc = 
@@ -379,6 +391,7 @@ public class Compiler {
   "0x54de5729, 0x23d967bf, 0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94,\n" +
   "0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d" +
   "];\n" +
+  "\n" +
   "func crc32(crc, buf, size) { \n" +
   "  i = 0;\n" +
   "  crc = crc ^ ~0;\n" +
@@ -386,7 +399,7 @@ public class Compiler {
   "   crc = crc32_tab[(crc ^ int(buf[i++])) & 0xff] ^ (crc >> 8);\n"+
   "  }\n" +
   " return crc ^ ~0;\n" +
-  "}";
+  "}\n";
 
 
 //    src = 
@@ -465,13 +478,16 @@ public class Compiler {
   
   IntermediateRepresentation ir = null;
   public Executable compileIncrementally(String src) {
+    return compileIncrementally(new SourceString("<string>", src));
+  }
+  public Executable compileIncrementally(Source src) {
     Executable exe = null;
     try {
-      ASTNodeBlok e = AST.buildTree(src);
+      ASTNodeBlok e = AST.buildTree(src.getSource());
       ASTOptimiser.optimise(e);
       Grammar.check(e);
       StructAnalysis.analyse(e, ir);
-      ir = CodeGenFront.genIR(e, ir);
+      ir = CodeGenFront.genIR(e, ir, src);
       CodeGenBack.compile(ir);
       ir.accumulateGlobals();
       exe = linker.link(ir, extDefs, true);

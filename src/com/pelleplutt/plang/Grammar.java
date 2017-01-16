@@ -72,7 +72,7 @@ public class Grammar {
           "tuple:         op | call | val | str | range | nil | assign | blok | rel_op , op | call | val | str | range | nil | assign | blok | rel_op\n" +
           "dot:           sym | dot | arrderef | call , sym\n" +
           "arrderef:      sym | dot | arrderef | call | arrdecl | str | range , val | str | range | blok | rel_op | op | return\n" +
-          "assign:        sym | arrderef | dot , op | call | val | str | range | nil | assign | blok | rel_op\n" +
+          "assign:        sym | arrderef | dot , op | call | val | str | range | nil | assign | blok | rel_op | if\n" +
           "arrdecl:       maparg*\n" +
           "return:        op | val | str | range | nil | assign | blok | rel_op\n" +
           "assign_op:     sym | arrderef | dot , op | call | val | assign | rel_op\n" +
@@ -93,9 +93,9 @@ public class Grammar {
           "for:           in , code\n" +
           "in:            sym | call | dot | arrdecl | arrderef | str | range , sym | call | dot | arrdecl | arrderef | str | range\n" +
           "while:         condition , code\n" +
-          "if:            condition , code\n" + 
-          "if:            condition , code , else\n" + 
-          "else:          code\n" + 
+          "if:            condition , code | val\n" + 
+          "if:            condition , code | val , else\n" + 
+          "else:          code | val\n" + 
           "funcdef:       blok\n" + 
   "";
       
@@ -266,6 +266,7 @@ public class Grammar {
     // run thru all rules and see if everything matches
     if (dbg) System.out.println("CHEK: " + e);
     boolean ruleMatch = false;
+    ASTNode failingOperand = null;
     for (Rule rule : rules) {
       if (dbg) System.out.println("  RULE: " + rule);
       int nodeOpIx = 0;
@@ -286,6 +287,7 @@ public class Grammar {
             ruleOpIx++;
           } else {
             if (dbg) System.out.println("  FAIL @ " + opNode);
+            failingOperand = opNode;
             break; // rule fail
           }
         }
@@ -301,7 +303,7 @@ public class Grammar {
         if (dbg) System.out.println("  FAIL ops:" + nodeOpIx + " opLen:" + nodeOpLen + " ruleOps:" + ruleOpIx + " ruleLen:" + ruleOpLen);
     } // per rule
     if (!ruleMatch) {
-      throw new CompilerError("Bad operands for " + e, e);
+      throw new CompilerError("Bad operands for " + e, failingOperand == null ? e:failingOperand);
     } else {
       if (dbg) System.out.println("  PASS");
     }
