@@ -87,13 +87,9 @@ public class MListMap implements MSet {
       
     }
   }
-  public void set(Object key, M m) {
+  public void put(Object key, M m) {
     if (size() == 0) {
-      if (key instanceof Integer) {
-        makeArr();
-      } else {
-        makeMap();
-      }
+      makeMap();
     }
     if (type == TARR) {
       if (key instanceof Integer) {

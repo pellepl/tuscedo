@@ -45,7 +45,7 @@ public class MMemList implements MSet {
     throw new ProcessorError("cannot modify arg vector");
   }
   @Override
-  public void set(Object key, M m) {
+  public void put(Object key, M m) {
     throw new ProcessorError("cannot modify arg vector");
   }
 

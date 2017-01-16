@@ -390,11 +390,16 @@ public class Compiler {
 
 
 //    src = 
-//        "a = [1,2,3,4,5];\n" +
-//        "for (x in a) println(x);\n" +
+//        "arr = [1,2,3,4,5];\n"+
+//        "for (i in -3#8) {\n" +
+//        " if (i in arr) println('found', i);\n"+
+//        " else          println('did not find',i);\n"+
+//        "}\n"+
+//        "if ('korv' in 'bajskorv') println('found korv');\n"+
+//        "if ('dore' in 'bajskorv') println('found dore');\n"+
 //        "";
 //   othersrc = siblingsrc = crcsrc = ""; 
-
+   
     Map<String, ExtCall> extDefs = new HashMap<String, ExtCall>();
     Processor.addCommonExtdefs(extDefs);
     extDefs.put("cos", new ExtCall() {

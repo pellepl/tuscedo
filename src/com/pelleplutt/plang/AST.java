@@ -111,6 +111,7 @@ public class AST implements Lexer.Emitter {
   final static int OP_FINALIZER    = -1;
   final static int OP_BLOK         = -2;
   final static int OP_CALL         = -3;
+  final static int OP_FOR_IN       = -4;
   final static int OP_RANGE        = -5;
   
   public final static Op[] OPS = {
@@ -821,7 +822,8 @@ public class AST implements Lexer.Emitter {
   
   static boolean isConditionalOperator(int op) {
     return op == OP_EQ2 ||
-        op == OP_GE || op == OP_GT || op == OP_LE || op == OP_LT || op == OP_NEQ;
+        op == OP_GE || op == OP_GT || op == OP_LE || op == OP_LT || op == OP_NEQ ||
+        op == OP_IN;
  
   }
   

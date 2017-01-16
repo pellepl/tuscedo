@@ -10,6 +10,7 @@ import static com.pelleplutt.plang.AST.OP_DOT;
 import static com.pelleplutt.plang.AST.OP_ELSE;
 import static com.pelleplutt.plang.AST.OP_EQ;
 import static com.pelleplutt.plang.AST.OP_FOR;
+import static com.pelleplutt.plang.AST.OP_FOR_IN;
 import static com.pelleplutt.plang.AST.OP_FUNCDEF;
 import static com.pelleplutt.plang.AST.OP_HASH;
 import static com.pelleplutt.plang.AST.OP_IF;
@@ -217,13 +218,15 @@ public class StructAnalysis {
       } else if (e.operands.size() == 2) {
         // for (x in y) w
         if (e.operands.get(0).op != OP_IN) throw new CompilerError("expected 'in'", e.operands.get(0));
+        e.operands.get(0).op = OP_FOR_IN; // rewrite to a OP_FOR_IN operaation
         analyseRecurse(e.operands.get(0), scopeStack, e, true, loop);  // for X IN Y w
         analyseRecurse(e.operands.get(1), scopeStack, e, false, true); // for x in y W
       } else {
         throw new CompilerError("invalid for construct", e);
       }
     }
-    else if (e.op == OP_IN) {
+    else if (e.op == OP_FOR_IN) {
+      if (e.operands.get(0).op != OP_SYMBOL) throw new CompilerError("expected symbol", e.operands.get(0));
       analyseRecurse(e.operands.get(0), scopeStack, e, false, loop); // X in y
       analyseRecurse(e.operands.get(1), scopeStack, e, true, loop);  // x in Y
     }

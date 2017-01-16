@@ -8,6 +8,7 @@ import static com.pelleplutt.plang.AST.OP_EQ;
 import static com.pelleplutt.plang.AST.OP_EQ2;
 import static com.pelleplutt.plang.AST.OP_GE;
 import static com.pelleplutt.plang.AST.OP_GT;
+import static com.pelleplutt.plang.AST.OP_IN;
 import static com.pelleplutt.plang.AST.OP_LE;
 import static com.pelleplutt.plang.AST.OP_LNOT;
 import static com.pelleplutt.plang.AST.OP_LT;
@@ -135,7 +136,7 @@ public class CodeGenBack implements ByteCode {
         compileTAC(tac, frag);
         //peepholeOptimise(frag);
         // TODO
-        // update comments and links and what now -- phew!!
+        // update comments and links and what not -- phew!!
       }
     }
     // resolve fragment branches and labels
@@ -290,6 +291,9 @@ public class CodeGenBack implements ByteCode {
                ) {
         cmp0 = true;
         braInstr = IBRA_EQ;
+      } else if (c.condOp == OP_IN) {
+        cmp0 = false;
+        braInstr = IBRA_NE;
       }
       else {
         throw new CompilerError("bad condition '" + c.cond + "' for '" + c +  "', is '" + AST.opString(c.condOp)+"'", c.getNode());
@@ -560,7 +564,11 @@ public class CodeGenBack implements ByteCode {
     else if (AST.isConditionalOperator(tac.op)) {
       pushValues(tac.left, tac.right, frag);
       sp = sp - 2;
-      addCode(frag, stackInfo() + tac.toString(), ICMP);
+      if (tac.op == OP_IN) {
+        addCode(frag, stackInfo() + tac.toString(), IIN);
+      } else {
+        addCode(frag, stackInfo() + tac.toString(), ICMP);
+      }
       TACOp tacop = (TACOp)tac;
       if (tacop.referenced) {
         // push 1 if conditional is true, push 0 if conditional is false
@@ -572,7 +580,8 @@ public class CodeGenBack implements ByteCode {
         else if (tacop.getNode().op == OP_LT) instr = IPUSH_LT;
         else if (tacop.getNode().op == OP_GT) instr = IPUSH_GT;
         else if (tacop.getNode().op == OP_LE) instr = IPUSH_LE;
-        addCode(frag, stackInfo() + " push cond", instr);
+        else if (tacop.getNode().op == OP_IN) instr = IPUSH_EQ;
+        addCode(frag, stackInfo() + "push cond " + tac, instr);
       }
     }
     // TODO moar

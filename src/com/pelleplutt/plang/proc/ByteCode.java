@@ -107,6 +107,8 @@ public interface ByteCode {
   static final int IPUSH_LT = 0xed; 
   static final int IPUSH_LE = 0xee; 
 
+  static final int IIN      = 0xef; 
+
   static final int IJUMP    = 0xf0; // jump                          $pc = xxxxxx 
   static final int IJUMP_EQ = 0xf1; 
   static final int IJUMP_NE = 0xf2; 
@@ -141,7 +143,7 @@ public interface ByteCode {
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //bx
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //cx
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //dx
-        1, 4, 1,UD,UD,UD, 1, 1,UD,UD,UD,UD,UD,UD,UD,UD, //ex
+        1, 4, 1,UD,UD,UD, 1, 1,UD, 1, 1, 1, 1, 1, 1, 1, //ex
         4, 4, 4, 4, 4, 4, 4,UD, 4, 4, 4, 4, 4, 4, 4, 0, //fx
   };
   

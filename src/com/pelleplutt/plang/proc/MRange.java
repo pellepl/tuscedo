@@ -94,7 +94,7 @@ public class MRange implements MSet {
   public void add(M m) {throw new ProcessorError("ranges are immutable");}
   public void insert(int ix, M m) {throw new ProcessorError("ranges are immutable");}
   public void set(M mix, M m) {throw new ProcessorError("ranges are immutable");}
-  public void set(Object key, M m) {throw new ProcessorError("ranges are immutable");}
+  public void put(Object key, M m) {throw new ProcessorError("ranges are immutable");}
   public void remove(M m) {throw new ProcessorError("ranges are immutable");}
 
   public int getType() {

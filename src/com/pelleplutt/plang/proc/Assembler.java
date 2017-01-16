@@ -353,6 +353,9 @@ public class Assembler implements ByteCode {
       else if (op.equals("push_le")) {
         baos.write(IPUSH_LE);
       }
+      else if (op.equals("in")) {
+        baos.write(IIN);
+      }
 	  	else if (op.equals("jump")) {
 	  		baos.write(IJUMP);
 	  		baos.write(utobytesl(tokens[1], 3, addr, labelRefs));
@@ -782,6 +785,9 @@ public class Assembler implements ByteCode {
       break;
     case IPUSH_LE: 
       sb.append("push_le ");
+      break;
+    case IIN: 
+      sb.append("in      ");
       break;
     case IJUMP: 
       sb.append("jump    ");

@@ -11,7 +11,7 @@ public interface MSet {
   public void add(M m);
   public void insert(int ix, M m);
   public void set(M mix, M m);
-  public void set(Object key, M m);
+  public void put(Object key, M m);
   public M get(M m);
   public M get(int ix);
   public void remove(M m);

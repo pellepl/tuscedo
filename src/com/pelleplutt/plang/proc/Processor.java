@@ -1,5 +1,7 @@
 package com.pelleplutt.plang.proc;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -41,6 +43,11 @@ public class Processor implements ByteCode {
     "nil", "int", "float", "string", "range", "func", "anon", "set"
   };
   
+  public final static int IFUNC_SET_VISITOR_IX = 0;
+  final static int[] IFUNC_OFFS = new int[1];
+
+  final byte[] code_internal_funcs;
+
   M[] memory;
   byte[] code;
   int sp;
@@ -56,7 +63,6 @@ public class Processor implements ByteCode {
   M nilM = new M();
   M zeroM = new M(0);
   String[] args;
-  final byte[] code_internal_func_set_visitor;
   
   public Processor(int memorySize) {
     nilM.type = TNIL;
@@ -65,7 +71,14 @@ public class Processor implements ByteCode {
       memory[i] = new M();
       memory[i].type = TNIL;
     }
-    code_internal_func_set_visitor = assemble(INTERNAL_FUNC_SET_VISITOR_ASM);
+    ByteArrayOutputStream ifcbuf = new ByteArrayOutputStream();
+    byte[] ifc;
+    try {
+      IFUNC_OFFS[IFUNC_SET_VISITOR_IX] = ifcbuf.size();
+      ifc = assemble(IFUNC_SET_VISITOR_ASM);
+      ifcbuf.write(ifc);
+    } catch (IOException ignore) {}
+    code_internal_funcs = ifcbuf.toByteArray();
   }
   
   public Processor(int memorySize, Executable exe) {
@@ -136,7 +149,7 @@ public class Processor implements ByteCode {
     byte c[];
     if ((addr & 0xff80000)!=0) {
       addr -= 0xff000000;
-      c = code_internal_func_set_visitor;
+      c = code_internal_funcs;
     } else {
       c = code;
     }
@@ -147,7 +160,7 @@ public class Processor implements ByteCode {
     byte c[];
     if ((addr & 0xff80000)!=0) {
       addr -= 0xff000000;
-      c = code_internal_func_set_visitor;
+      c = code_internal_funcs;
     } else {
       c = code;
     }
@@ -376,7 +389,8 @@ public class Processor implements ByteCode {
     push(adrf);
     push(set);
     push(2);
-    push(0xff000000); // the assembled function INTERNAL_FUNC_SET_VISITOR_ASM
+    // the assembled function IFUNC_SET_VISITOR_ASM
+    push(0xff000000 | IFUNC_OFFS[IFUNC_SET_VISITOR_IX]);
     call();
   }
   
@@ -384,7 +398,8 @@ public class Processor implements ByteCode {
     push(adrf);
     push(string);
     push(2);
-    push(0xff000000); // the assembled function INTERNAL_FUNC_SET_VISITOR_ASM
+    // the assembled function IFUNC_SET_VISITOR_ASM
+    push(0xff000000 | IFUNC_OFFS[IFUNC_SET_VISITOR_IX]);
     call();
   }
   
@@ -478,7 +493,7 @@ public class Processor implements ByteCode {
       mk.copy(mkey);
       M mv = new M();
       mv.copy(mval);
-      ((MSet)mmap.ref).set(mk.getRaw(), mv);
+      ((MSet)mmap.ref).put(mk.getRaw(), mv);
     } else {
       throw new ProcessorError("cannot add tuples to type " + TNAME[mmap.type]);
     }
@@ -601,14 +616,12 @@ public class Processor implements ByteCode {
   }
 
   void sub() {
-    sub(true, true);
+    sub_i(true, true, pop(), pop());
   }
-  void sub(boolean push) {
-    sub(push, true);
+  void sub(boolean push, M e2, M e1) {
+    sub_i(push, true, e2, e1);
   }
-  void sub(boolean push, boolean naturalOrder) {
-    M e2 = pop();
-    M e1 = pop();
+  void sub_i(boolean push, boolean naturalOrder, M e2, M e1) {
     if (!naturalOrder) {
       M tmp = e1;
       e1 = e2;
@@ -653,6 +666,8 @@ public class Processor implements ByteCode {
         }
       } else if (e1.type == TNIL && !push) {
         status(0);
+      } else if (e1.type == TSET && !push) {
+        status(e1.ref == e2.ref ? 0 : 1);
       } else {
         throw new ProcessorError("cannot subtract type " + TNAME[e1.type]);
       }
@@ -672,6 +687,29 @@ public class Processor implements ByteCode {
       float r = e1.i - e2.f;
       status(r);
       if (push) push(r);
+    } 
+    else if (e1.type == TSTR && e2.type == TINT) {
+      float r = e1.asInt() - e2.i;
+      status(r);
+      if (push) push(r);
+    }
+    else if (e2.type == TSTR && e1.type == TINT) {
+      float r = e1.i - e2.asInt();
+      status(r);
+      if (push) push(r);
+    } 
+    else if (e1.type == TSTR && e2.type == TFLOAT) {
+      float r = e1.asFloat() - e2.f;
+      status(r);
+      if (push) push(r);
+    }
+    else if (e2.type == TSTR && e1.type == TFLOAT) {
+      float r = e1.f - e2.asFloat();
+      status(r);
+      if (push) push(r);
+    } 
+    else if (!push && (e1.type == TSET || e2.type == TSET)) {
+      status(1);
     }
     else {
       throw new ProcessorError("cannot subtract types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
@@ -679,21 +717,19 @@ public class Processor implements ByteCode {
   }
   
   void cmp() {
-    sub(false);
+    sub(false, pop(), pop());
   }
   
   void cmpn() {
-    sub(false, false);
+    sub_i(false, false, pop(), pop());
   }
   
   void cmp_0() {
-    push(zeroM);
-    sub(false);
+    sub(false, zeroM, pop());
   }
   
   void cmn_0() {
-    push(zeroM);
-    sub(false, false);
+    sub_i(false, false, zeroM, pop());
   }
   
   void not() {
@@ -938,7 +974,7 @@ public class Processor implements ByteCode {
     M e2 = pop();
     M e1 = pop();
     if (e1.type == e2.type && e1.type == TINT) {
-      int r = e1.i >> e2.i;
+      int r = e1.i >>> e2.i;
       status(r);
       push(r);
     } else {
@@ -1069,7 +1105,33 @@ public class Processor implements ByteCode {
     sp += argc;
     push(t);
   }
-
+  
+  void in() {
+    M mset = pop();
+    M mval = pop();
+    if (mset.type == TSET || mset.type == TRANGE) {
+      MSet set = (MSet)mset.ref;
+      int len = set.size();
+      if (set.getType() == MSet.TMAP) {
+        for (int i = 0; i < len; i++) {
+          M element = ((MSet)set.getElement(i).ref).get(0); // get key
+          sub_i(false, true, element, mval);
+          if (zero) return;
+        }
+      } else {
+        for (int i = 0; i < len; i++) {
+          M element = set.getElement(i);
+          sub_i(false, true, element, mval);
+          if (zero) return;
+        }
+      }
+    } else if (mset.type == TSTR) {
+      zero = mset.str.contains(mval.asString());
+    } else {
+      throw new ProcessorError("cannot check containment of type " + TNAME[mset.type]);
+    }
+  }
+  
   void push_cond(int icond) {
     int val = 0;
     switch (icond) {
@@ -1148,7 +1210,7 @@ public class Processor implements ByteCode {
     String procInfo = getProcInfo();
     String disasm;
     if ((pc & 0xff800000) != 0) {
-      disasm = Assembler.disasm(code_internal_func_set_visitor, pc - 0xff000000);
+      disasm = Assembler.disasm(code_internal_funcs, pc - 0xff000000);
     } else {
       disasm = Assembler.disasm(code, pc);
     }
@@ -1165,7 +1227,7 @@ public class Processor implements ByteCode {
     if ((pc & 0xff800000) == 0) 
       instr = (int)(code[pc] & 0xff);
     else
-      instr = (int)(code_internal_func_set_visitor[pc - 0xff000000] & 0xff);
+      instr = (int)(code_internal_funcs[pc - 0xff000000] & 0xff);
     pc++;
     switch (instr) {
     case INOP:
@@ -1432,6 +1494,9 @@ public class Processor implements ByteCode {
     case IPUSH_LT: 
       push_cond(ICOND_LT);
       break;
+    case IIN: 
+      in();
+      break;
     case IJUMP: 
       jump(ICOND_AL);
       break;
@@ -1558,6 +1623,9 @@ public class Processor implements ByteCode {
         return (float)i;
       case TFLOAT:
         return f;
+      case TSTR:
+        try { return Float.parseFloat(str); } catch (Throwable t) {}
+        return Float.NaN;
       default:
         return Float.NaN;
       }
@@ -1569,6 +1637,9 @@ public class Processor implements ByteCode {
         return i;
       case TFLOAT:
         return (int)f;
+      case TSTR:
+        try { return Integer.parseInt(str); } catch (Throwable t) {}
+        return 0;
       default:
         return 0;
       }
@@ -1657,7 +1728,7 @@ public class Processor implements ByteCode {
     return Assembler.assemble(s);
   }
 
-  static final String INTERNAL_FUNC_SET_VISITOR_ASM =
+  static final String IFUNC_SET_VISITOR_ASM =
       //func setVisitor(set, visitor) {
       //  res[];
       //  for (i in set) {
@@ -1719,8 +1790,7 @@ public class Processor implements ByteCode {
       "  load_fp $fp[0]           \n"+
       "  retv                     \n"+
       "  "  ;
-  
-  
+
   public static void addCommonExtdefs(Map<String, ExtCall> extDefs) {
     addCommonExtdefs(extDefs, System.in, System.out);
   }

@@ -20,7 +20,7 @@ public class Grammar {
           "nil:           OP_NIL\n" +
           "sym:           OP_SYMBOL\n" +
           "str:           OP_QUOTE1 OP_QUOTE2\n" +
-          "rel_op:        OP_EQ2 OP_GT OP_LT OP_GE OP_LE OP_NEQ\n" +
+          "rel_op:        OP_EQ2 OP_GT OP_LT OP_GE OP_LE OP_NEQ OP_IN\n" +
           "expr_op_add:   OP_PLUS OP_MINUS\n" +
           "expr_op_mul:   OP_MUL OP_DIV OP_MOD\n" +
           "expr_op_log:   OP_AND OP_OR OP_XOR OP_SHLEFT OP_SHRIGHT\n" +
