@@ -544,7 +544,9 @@ public class CodeGenFront {
     
     else if (e.op == OP_EQ) {
       TAC assignee = genIRAssignment(e.operands.get(0), parentEblk, info);
+      info.assignment++;
       TAC assignment = genIR(e.operands.get(1), parentEblk, info);
+      info.assignment--;
       setReferenced(assignment);
       TAC op = new TACAssign(e, e.op, assignee, assignment); 
       add(op);
@@ -608,7 +610,10 @@ public class CodeGenFront {
         newBlock();
         TAC cres = genIR(e.operands.get(1), parentEblk, info);
         add(cres);
-        setReferenced(cres);
+        // on a = (if b c else d); it should be referenced
+        if (info.assignment > 0) {
+          setReferenced(cres);
+        }
         newBlock();
         add(lExit);
       } else {
@@ -620,14 +625,20 @@ public class CodeGenFront {
         newBlock();
         TAC cres = genIR(e.operands.get(1), parentEblk, info);
         add(cres);
-        setReferenced(cres);
+        // on a = (if b c else d); it should be referenced
+        if (info.assignment > 0) {
+          setReferenced(cres);
+        }
         TAC gotoExit = new TACGoto(e, lExit);
         add(gotoExit);
         newBlock();
         add(lElse);
         TAC celse = genIR(e.operands.get(2).operands.get(0), parentEblk, info);
         add(celse);
-        setReferenced(celse);
+        // on a = (if b c else d); it should be referenced
+        if (info.assignment > 0) {
+          setReferenced(celse);
+        }
         newBlock();
         add(lExit);
       }
@@ -1123,6 +1134,7 @@ public class CodeGenFront {
   }
   
   class Info {
+    public int assignment;
     Stack<Integer> trace = new Stack<Integer>();
     public Info() {}
     public Info(int op) {trace.push(op);}

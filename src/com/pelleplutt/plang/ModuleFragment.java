@@ -16,6 +16,8 @@ import com.pelleplutt.plang.proc.Assembler;
 public class ModuleFragment {
   String modname;
   String fragname;
+  // source code for this fragment
+  Source source;
   // three address codes, block organised
   List<List<TAC>> tacs = new ArrayList<List<TAC>>();
   // machine codes
@@ -34,8 +36,11 @@ public class ModuleFragment {
   public int executableOffset;
   // fragment machine code offset / string comment
   Map<Integer, String> dbgcomments = new HashMap<Integer, String>();
-  // source code for this fragment
-  Source source;
+  // fragment machine code offset / (source location reference)
+  List<Integer> FRAGMCsrcref = new ArrayList<Integer>();
+  // (fragment machine code offset) / source location reference
+  List<SrcRef> fragmcSRCREF = new ArrayList<SrcRef>();
+  Map<Integer, SrcRef> fragmcsrcrefMap = new HashMap<Integer, SrcRef>();
   
   public ModuleFragment(Source src) {
     source = src;
@@ -44,6 +49,23 @@ public class ModuleFragment {
   ASTNode prevNode = null;
   public void addCode(String comment, ASTNode node, int bytecode, Integer... bytecodeext) {
     if (comment != null) dbgcomments.put(code.size(), comment);
+    Object[] srcinfo = null;
+    if (!(node instanceof ASTNodeBlok)) {
+      if (node != prevNode && node != null) {
+        srcinfo = source.getLine(node.stroffset);
+        if (srcinfo != null) {
+          FRAGMCsrcref.add(new Integer(code.size()));
+          SrcRef srcref = new SrcRef();
+          srcref.line = (Integer)srcinfo[0];
+          srcref.lineLen = ((String)srcinfo[1]).length();
+          srcref.lineOffset = (Integer)srcinfo[2];
+          srcref.symLen = node.strlen;
+          srcref.symOffs = node.stroffset;
+          fragmcSRCREF.add(srcref);
+          fragmcsrcrefMap.put(new Integer(code.size()), srcref);
+        }
+      }
+    }
     code.add((byte)bytecode);
     if (bytecodeext != null) {
       for (int c : bytecodeext) {
@@ -53,7 +75,6 @@ public class ModuleFragment {
     if (CodeGenBack.dbg) {
       if (!(node instanceof ASTNodeBlok)) {
         if (node != prevNode && node != null) {
-          Object[] srcinfo = source.getLine(node.stroffset);
           if (srcinfo != null) {
             String srcline = (String)srcinfo[1];
             String prefix = String.format("%s@%-4d: ", source.getName(), srcinfo[0]);
@@ -66,7 +87,6 @@ public class ModuleFragment {
           }
         }
       }
-      prevNode = node;
       byte[] mc = new byte[1 + (bytecodeext == null ? 0 : bytecodeext.length)];
       int x = 0;
       mc[x++] = (byte)bytecode;
@@ -77,6 +97,7 @@ public class ModuleFragment {
       }
       System.out.println(String.format("        %-32s// %s", Assembler.disasm(mc, 0), comment));
     }
+    prevNode = node;
   }
   
   public void write(int pc, int data, int len) {
@@ -90,6 +111,10 @@ public class ModuleFragment {
     return code.size();
   }
   
+  public Source getSource() {
+    return source;
+  }
+
   public byte[] getMachineCode() {
     byte b[] = new byte[code.size()];
     for (int i = 0; i < code.size(); i++) {
@@ -102,10 +127,23 @@ public class ModuleFragment {
     return code.size();
   }
   
-  public String commentDbg(int codeIx) {
+  public String instructionDbg(int codeIx) {
     return dbgcomments != null ? dbgcomments.get(codeIx) : null;
   }
 
+  public SrcRef getDebugInfoSourceNearest(int codeIx) {
+    int i = 0;
+    while (i < FRAGMCsrcref.size()) {
+      if (codeIx >= FRAGMCsrcref.get(i)) {
+        return fragmcSRCREF.get(i);
+      }
+    }
+    return null;
+  }
+  
+  public SrcRef getDebugInfoSourcePrecise(int codeIx) {
+    return fragmcsrcrefMap.get(codeIx);
+  }
   
   public static  abstract class Link {
     int pc;
@@ -158,5 +196,8 @@ public class ModuleFragment {
       this.arr = arr;
     }
     public String toString() {return String.format("link const array %d entries @ 0x%06x", arr.entries.size(), pc);}
+  }
+  public static class SrcRef {
+    int line, lineLen, lineOffset, symOffs, symLen;
   }
 }

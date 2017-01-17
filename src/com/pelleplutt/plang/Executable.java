@@ -33,14 +33,32 @@ public class Executable {
   public Map<Integer, ExtCall> getExternalLinkMap() {
     return extLinks;
   }
-  public String getDebugInfo(int pc) {
+  public String getSrcDebugInfo(int pc) {
     if (dbgModules == null) return null;
     for (Module m : dbgModules) {
       for (ModuleFragment frag : m.frags) {
         int offs = frag.executableOffset;
         int len = frag.getMachineCodeLength();
         if (pc >= offs && pc < offs + len) {
-          return frag.commentDbg(pc - offs);
+          Source source = frag.getSource();
+          if (source == null) return null;
+          ModuleFragment.SrcRef srcref = frag.getDebugInfoSourcePrecise(pc-offs);
+          if (srcref == null) return null;
+          String line = source.getCSource().substring(srcref.lineOffset, srcref.lineOffset + srcref.lineLen);
+          return source.getName() + "@" + srcref.line + ":" + line;
+        }
+      }
+    }
+    return null;
+  }
+  public String getInstrDebugInfo(int pc) {
+    if (dbgModules == null) return null;
+    for (Module m : dbgModules) {
+      for (ModuleFragment frag : m.frags) {
+        int offs = frag.executableOffset;
+        int len = frag.getMachineCodeLength();
+        if (pc >= offs && pc < offs + len) {
+          return frag.instructionDbg(pc - offs);
         }
       }
     }

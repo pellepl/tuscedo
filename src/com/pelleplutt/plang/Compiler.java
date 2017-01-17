@@ -13,12 +13,13 @@ import com.pelleplutt.plang.proc.ProcessorError.ProcessorFinishedError;
 
 public class Compiler {
   static String src;
+  static int stringix = 0;
   
   public static Executable compile(Map<String, ExtCall> extDefs, int ramOffs, int constOffs, String ...sources) {
     Source srcs[] = new Source[sources.length];
     int i = 0;
     for (String s : sources) {
-      srcs[i++] = new Source.SourceString("<string>", s);
+      srcs[i++] = new Source.SourceString("<string" + (stringix++) + ">", s);
     }
     return compile(extDefs, ramOffs, constOffs, srcs);
   }
@@ -99,7 +100,7 @@ public class Compiler {
         "  for (x in -1.6 # step/2 # 0.4) {\n" +
         "    iters = calcIterations(x,y);\n" +
         "    if (iters == mul) output = output + '0';\n" +
-        "    else                output = output + '1';\n" +
+        "    else              output = output + '1';\n" +
         "  }\n" +
         "  output = output + '\n';\n" + 
         "}\n" +
@@ -422,6 +423,7 @@ public class Compiler {
     });
     
     Executable e = null;
+    Linker.dbg = true;
     try {
       e = Compiler.compile(extDefs, 0x0000, 0x4000, crcsrc, othersrc, siblingsrc, src);
     } catch (CompilerError ce) {
@@ -440,6 +442,7 @@ public class Compiler {
     }
     Processor p = new Processor(0x10000, e);
     //Processor.dbgRun = true;
+    Processor.dbgRunSrc = true;
     //Processor.dbgMem = true;
     int i = 0;
     try {
@@ -478,7 +481,7 @@ public class Compiler {
   
   IntermediateRepresentation ir = null;
   public Executable compileIncrementally(String src) {
-    return compileIncrementally(new SourceString("<string>", src));
+    return compileIncrementally(new SourceString("<string" + (stringix++) + ">", src));
   }
   public Executable compileIncrementally(Source src) {
     Executable exe = null;

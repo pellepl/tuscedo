@@ -404,10 +404,20 @@ public class Linker implements ByteCode {
       out.println(frag.modname + frag.fragname);
       int len = frag.code.size();
       int fragoffs = fragLUT.get(frag.modname + frag.fragname);
+      Source source = frag.getSource();
+      int lastLine = -1;
       while (len > 0) {
-        String disasm = String.format("0x%08x %s", pc, Assembler.disasm(mc, pc)); 
+        ModuleFragment.SrcRef srcref = frag.getDebugInfoSourcePrecise(pc-fragoffs);
+        if (srcref != null) {
+          if (lastLine != srcref.line) {
+            String line = source.getCSource().substring(srcref.lineOffset, srcref.lineOffset + srcref.lineLen);
+            System.out.println(source.getName() + "@" + srcref.line + ":" + line);
+          }
+          lastLine = srcref.line;
+        }
+        String disasm = String.format("  0x%08x %s", pc, Assembler.disasm(mc, pc)); 
         out.print(disasm);
-        String com = frag.commentDbg(pc-fragoffs);
+        String com = frag.instructionDbg(pc-fragoffs);
         if (com != null) {
           for (int i = 0; i < (34 - disasm.length()) + 2; i++) out.print(" ");
           out.print("// " + com);

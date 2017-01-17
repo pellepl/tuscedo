@@ -103,7 +103,7 @@ public class CodeGenBack implements ByteCode {
         while (len > 0) {
           String disasm = String.format("0x%08x %s", pc, Assembler.disasm(mc, pc)); 
           out.print(disasm);
-          String com = frag.commentDbg(pc);
+          String com = frag.instructionDbg(pc);
           if (com != null) {
             for (int i = 0; i < (34 - disasm.length()) + 2; i++) out.print(" ");
             out.print("// " + com);

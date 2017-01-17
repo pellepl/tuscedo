@@ -37,6 +37,7 @@ public class Processor implements ByteCode {
   
   public static boolean dbgMem = false;
   public static boolean dbgRun = false;
+  public static boolean dbgRunSrc = false;
   public static boolean silence = false;
   
   public static final String TNAME[] = {
@@ -1196,8 +1197,9 @@ public class Processor implements ByteCode {
   
   public void step() {
     try {
-      if (dbgRun) stepDebug(System.out);
-      else        stepProc();
+      if (dbgRun)    stepInstr(System.out);
+      if (dbgRunSrc) stepSrc(System.out);
+      else           stepProc();
     } catch (Throwable t) {
       if (t instanceof ProcessorError) throw t;
       else {
@@ -1207,7 +1209,7 @@ public class Processor implements ByteCode {
     }
   }
   
-  void stepDebug(PrintStream out) {
+  void stepInstr(PrintStream out) {
     String procInfo = getProcInfo();
     String disasm;
     if ((pc & 0xff800000) != 0) {
@@ -1215,11 +1217,24 @@ public class Processor implements ByteCode {
     } else {
       disasm = Assembler.disasm(code, pc);
     }
-    String dbgComment = exe.getDebugInfo(pc);
+    String dbgComment = exe.getInstrDebugInfo(pc);
     out.println(String.format("%s      %-32s  %s", procInfo, disasm, (dbgComment == null ? "" : ("; " + dbgComment))));
     stepProc();
     String stack = getStack();
     out.println(stack);
+  }
+  
+  String lastSrcLine = null;
+  void stepSrc(PrintStream out) {
+    String d = exe.getSrcDebugInfo(pc);
+    if (d != null) {
+      lastSrcLine = d;
+      out.println(d);
+    }
+    do {
+      stepProc();
+      d = exe.getSrcDebugInfo(pc);
+    } while (d == null || lastSrcLine.equals(d));
   }
 
   void stepProc() {
@@ -1996,6 +2011,7 @@ public class Processor implements ByteCode {
       }
       throw pe;
     }
+    System.out.println(p.getSP());
     return ret;
   }
 }
