@@ -33,7 +33,7 @@ public class Executable {
   public Map<Integer, ExtCall> getExternalLinkMap() {
     return extLinks;
   }
-  public String getSrcDebugInfo(int pc) {
+  public String getSrcDebugInfoPrecise(int pc) {
     if (dbgModules == null) return null;
     for (Module m : dbgModules) {
       for (ModuleFragment frag : m.frags) {
@@ -46,6 +46,44 @@ public class Executable {
           if (srcref == null) return null;
           String line = source.getCSource().substring(srcref.lineOffset, srcref.lineOffset + srcref.lineLen);
           return source.getName() + "@" + srcref.line + ":" + line;
+        }
+      }
+    }
+    return null;
+  }
+  public String getSrcDebugInfoNearest(int pc) {
+    return getSrcDebugInfoNearest(pc, true);
+  }
+  public String getSrcDebugInfoNearest(int pc, boolean showPrecise) {
+    if (dbgModules == null) return null;
+    for (Module m : dbgModules) {
+      for (ModuleFragment frag : m.frags) {
+        int offs = frag.executableOffset;
+        int len = frag.getMachineCodeLength();
+        if (pc >= offs && pc < offs + len) {
+          Source source = frag.getSource();
+          if (source == null) return null;
+          ModuleFragment.SrcRef srcref = frag.getDebugInfoSourceNearest(pc-offs);
+          if (srcref == null) return null;
+          String line = source.getCSource().substring(srcref.lineOffset, srcref.lineOffset + srcref.lineLen);
+          String prefix = source.getName() + "@" + srcref.line + ":";
+          String mark = "";
+          for (int i = 0; i < prefix.length() + srcref.symOffs - srcref.lineOffset; i++) mark += " ";
+          for (int i = 0; i < Math.min(srcref.symLen, line.length() - (srcref.symOffs - srcref.lineOffset)); i++) mark += "~";
+          return prefix + line + (showPrecise ? System.getProperty("line.separator") + mark : "");
+        }
+      }
+    }
+    return null;
+  }
+  public String getFunctionName(int pc) {
+    if (dbgModules == null) return null;
+    for (Module m : dbgModules) {
+      for (ModuleFragment frag : m.frags) {
+        int offs = frag.executableOffset;
+        int len = frag.getMachineCodeLength();
+        if (pc >= offs && pc < offs + len) {
+          return frag.modname + frag.fragname;
         }
       }
     }

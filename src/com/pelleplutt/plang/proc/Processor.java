@@ -28,10 +28,9 @@ public class Processor implements ByteCode {
   public static final int TINT = 1;
   public static final int TFLOAT = 2;
   public static final int TSTR = 3;
-  public static final int TRANGE = 4;
-  public static final int TFUNC = 5;
-  public static final int TANON = 6;
-  public static final int TSET = 7;
+  public static final int TFUNC = 4;
+  public static final int TANON = 5;
+  public static final int TSET = 6;
   
   static final int TO_CHAR = -1;
   
@@ -41,7 +40,7 @@ public class Processor implements ByteCode {
   public static boolean silence = false;
   
   public static final String TNAME[] = {
-    "nil", "int", "float", "string", "range", "func", "anon", "set"
+    "nil", "int", "float", "string", "func", "anon", "set"
   };
   
   public final static int IFUNC_SET_VISITOR_IX = 0;
@@ -329,17 +328,17 @@ public class Processor implements ByteCode {
   void set_drf() {
     M mix = pop();
     M mset = pop();
-    if (mset.type == TSET || mset.type == TRANGE) {
-      if (mix.type == TSET || mix.type == TRANGE) {
-        derefSetArgSet((MSet)mset.ref, (MSet)mix.ref);
+    if (mset.type == TSET) {
+      if (mix.type == TSET) {
+        derefSetArgSet(mset.ref, mix.ref);
       } else if (mix.type == TANON) {
-        derefSetArgAnon((MSet)mset.ref, mix);
+        derefSetArgAnon(mset.ref, mix);
       } else {
-        push(((MSet)mset.ref).get(mix));
+        push((mset.ref).get(mix));
       }
     } else if (mset.type == TSTR) {
-      if (mix.type == TSET || mix.type == TRANGE) {
-        derefStringArgSet(mset.str, (MSet)mix.ref);
+      if (mix.type == TSET) {
+        derefStringArgSet(mset.str, mix.ref);
       } else if (mix.type == TANON) {
         derefStringArgAnon(mset.str, mix);
       } else {
@@ -349,8 +348,8 @@ public class Processor implements ByteCode {
       }
     } else if (mset.type == TINT) {
       int res = 0;
-      if (mix.type == TSET || mix.type == TRANGE) {
-        MSet drf = (MSet)mix.ref;
+      if (mix.type == TSET) {
+        MSet drf = mix.ref;
         int len = drf.size();
         for (int i = 0; i < len; i++) {
           M mdrf = drf.getElement(i);
@@ -420,11 +419,11 @@ public class Processor implements ByteCode {
   void set_wr(M mset, M mix, M mval) {
     if (mset.type == TSET) {
       if (mval.type == TNIL) {
-        ((MSet)mset.ref).remove(mix);
+        mset.ref.remove(mix);
       } else {
         M m = new M();
         m.copy(mval);
-        ((MSet)mset.ref).set(mix, m);
+        mset.ref.set(mix, m);
       }
       push(mset);
     } else if (mset.type == TINT) {
@@ -471,8 +470,8 @@ public class Processor implements ByteCode {
     M mval = pop();
     M mix = pop();
     M mset = pop();
-    if (mix.type == TSET || mix.type == TRANGE) {
-      MSet ixset = (MSet)mix.ref;
+    if (mix.type == TSET) {
+      MSet ixset = mix.ref;
       int len = ixset.size();
       for (int i = 0; i < len; i++) {
         M dmix = ixset.get(i);
@@ -495,7 +494,7 @@ public class Processor implements ByteCode {
       mk.copy(mkey);
       M mv = new M();
       mv.copy(mval);
-      ((MSet)mmap.ref).put(mk.getRaw(), mv);
+      mmap.ref.put(mk.getRaw(), mv);
     } else {
       throw new ProcessorError("cannot add tuples to type " + TNAME[mmap.type]);
     }
@@ -504,11 +503,9 @@ public class Processor implements ByteCode {
   void set_sz() {
     M e = pop();
     if (e.type == TSET) {
-      push(((MSet)e.ref).size());
+      push(e.ref.size());
     } else if (e.type == TSTR) {
       push(e.str.length());
-    } else if (e.type == TRANGE) {
-      push(((MRange)e.ref).size());
     } else {
       push(0);
     }
@@ -517,8 +514,8 @@ public class Processor implements ByteCode {
   void set_rd() {
     int ix = pop().asInt();
     M mset = pop();
-    if (mset.type == TSET || mset.type == TRANGE) {
-      push(((MSet)mset.ref).get(ix));
+    if (mset.type == TSET) {
+      push(mset.ref.get(ix));
     } else if (mset.type == TSTR) {
       push(mset.str.charAt(ix));
      } else {
@@ -538,10 +535,7 @@ public class Processor implements ByteCode {
       M mfrom = pop();
       range = new MRange(mfrom, mstep, mto);
     }
-    M mr = new M();
-    mr.ref = range;
-    mr.type = TRANGE;
-    push(mr);
+    push(range);
   }
   
   void status(int x) {
@@ -580,7 +574,7 @@ public class Processor implements ByteCode {
         me1.copy(e1);
         M me2 = new M();
         me2.copy(e2);
-        ((MSet)me1.ref).add(me2);
+        me1.ref.add(me2);
         push(me1);
       } else {
         throw new ProcessorError("cannot add type " + TNAME[e1.type]);
@@ -599,13 +593,13 @@ public class Processor implements ByteCode {
     else if (e1.type == TSET) {
       M m = new M();
       m.copy(e2);
-      ((MSet)e1.ref).add(m);
+      e1.ref.add(m);
       push(e1);
     }
     else if (e2.type == TSET) {
       M m = new M();
       m.copy(e1);
-      ((MSet)e2.ref).insert(0, m);
+      e2.ref.insert(0, m);
       push(e2);
     }
     else if (e1.type == TSTR || e2.type == TSTR) {
@@ -827,7 +821,6 @@ public class Processor implements ByteCode {
       case TFLOAT: m.i = (int)m.f; break;
       case TNIL: m.i = 0; break;
       case TSTR: m.i = m.str.length() == 1 ? m.str.charAt(0) : Integer.parseInt(m.str); break;
-      case TRANGE: break;
       case TSET: break;
       }
       break;
@@ -839,7 +832,6 @@ public class Processor implements ByteCode {
       case TINT: m.f = m.i; break;
       case TNIL: m.f = 0; break;
       case TSTR: m.f = Float.parseFloat(m.str); break;
-      case TRANGE: break;
       case TSET: break;
       }
       break;
@@ -851,7 +843,6 @@ public class Processor implements ByteCode {
       case TINT: m.str = "" + (char)(m.i); break;
       case TNIL: break;
       case TSTR: break;
-      case TRANGE: break;
       case TSET: break;
       }
       break;
@@ -1042,7 +1033,7 @@ public class Processor implements ByteCode {
         retv();
       }
     } else if (addr.type == TANON) {
-      MSet vars = ((MSet)addr.ref);
+      MSet vars = addr.ref;
       int a = addr.i;
       push(me);
       push(pc);
@@ -1111,12 +1102,12 @@ public class Processor implements ByteCode {
   void in() {
     M mset = pop();
     M mval = pop();
-    if (mset.type == TSET || mset.type == TRANGE) {
-      MSet set = (MSet)mset.ref;
+    if (mset.type == TSET) {
+      MSet set = mset.ref;
       int len = set.size();
       if (set.getType() == MSet.TMAP) {
         for (int i = 0; i < len; i++) {
-          M element = ((MSet)set.getElement(i).ref).get(0); // get key
+          M element = set.getElement(i).ref.get(0); // get key
           sub_i(false, true, element, mval);
           if (zero) return;
         }
@@ -1226,14 +1217,14 @@ public class Processor implements ByteCode {
   
   String lastSrcLine = null;
   void stepSrc(PrintStream out) {
-    String d = exe.getSrcDebugInfo(pc);
+    String d = exe.getSrcDebugInfoPrecise(pc);
     if (d != null) {
       lastSrcLine = d;
       out.println(d);
     }
     do {
       stepProc();
-      d = exe.getSrcDebugInfo(pc);
+      d = exe.getSrcDebugInfoPrecise(pc);
     } while (d == null || lastSrcLine.equals(d));
   }
 
@@ -1572,10 +1563,11 @@ public class Processor implements ByteCode {
   
   public static class M {
     public byte type;
-    public Object ref;
+    public MSet ref;
     public String str;
     public int i;
     public float f;
+
     public M copy(M m) {
       type = m.type;
       ref = m.ref;
@@ -1602,9 +1594,9 @@ public class Processor implements ByteCode {
         str = ((String) o);
         type = TSTR;
       } 
-      else if (o instanceof MRange) {
-        ref = o;
-        type = TRANGE;
+      else if (o instanceof MSet) {
+        ref = (MSet)o;
+        type = TSET;
       } 
       else {
         throw new ProcessorError("bad memory class " + o.getClass().getSimpleName());
@@ -1625,9 +1617,7 @@ public class Processor implements ByteCode {
       case TANON:
         return String.format(":>0x%06x", i) + ref;
       case TSET:
-        return ((MSet)ref).toString();
-      case TRANGE:
-        return ((MRange)ref).toString();
+        return ref.toString();
       default:
         return "?" + type;
       }
@@ -1669,8 +1659,6 @@ public class Processor implements ByteCode {
         return "i"+ asString();
       case TFLOAT:
         return "f"+ asString();
-      case TRANGE:
-        return "r"+ asString();
       case TSTR:
         return "s\'" + asString() + "'";
       case TFUNC:
@@ -1692,8 +1680,6 @@ public class Processor implements ByteCode {
         return i;
       case TFLOAT:
         return f;
-      case TRANGE:
-        return ref;
       case TSTR:
         return str;
       case TFUNC:
@@ -1742,6 +1728,40 @@ public class Processor implements ByteCode {
   
   static byte[] assemble(String s) {
     return Assembler.assemble(s);
+  }
+
+  public void unwindStackTrace() {
+    int fp = this.fp;
+    int pc = this.oldpc;
+    int sp = this.sp;
+    M me = this.me;
+    
+    while(pc != 0xffffffff && fp != 0xffffffff) {
+      int argc = peek(fp + FRAME_3_ARGC).i;
+      System.out.println(String.format("PC:0x%08x FP:0x%08x SP:0x%08x", 
+          pc, fp, sp));
+      String func = exe.getFunctionName(pc);
+      if (func != null) {
+        System.out.print(func);
+      } else {
+        System.out.print(String.format("@ 0x%08x", pc));
+      }
+      System.out.print("( ");
+      for (int a = 0; a < argc; a++) {
+        M arg = peek(fp + FRAME_SIZE + 1 + a);
+        System.out.print(arg.asString() + " ");
+      }
+      System.out.println(") me:" + me.asString());
+      String dbg = exe.getSrcDebugInfoNearest(pc, false);
+      if (dbg != null) {
+        System.out.println(dbg);
+      }
+      sp = fp;
+      if (sp == 0xffffffff) break;
+      fp = peek(sp+1).i;
+      pc = peek(sp+2).i;
+      me = peek(sp+3);
+    }
   }
 
   static final String IFUNC_SET_VISITOR_ASM =
@@ -2004,6 +2024,15 @@ public class Processor implements ByteCode {
         System.out.println(p.getProcInfo());
         System.out.println(pe.getMessage());
         System.out.println("**********************************************");
+        String func = p.getExecutable().getFunctionName(p.getPC());
+        if (func != null) {
+          System.out.println("in context " + func);
+        }
+        String dbg = p.getExecutable().getSrcDebugInfoNearest(p.getPC());
+        if (dbg != null) {
+          System.out.println(dbg);
+        }
+        p.unwindStackTrace();
         System.out.println("DISASM");
         Assembler.disasm(System.out, "   ", p.getExecutable().getMachineCode(), p.getPC(), 8);
         System.out.println("STACK");
@@ -2011,7 +2040,7 @@ public class Processor implements ByteCode {
       }
       throw pe;
     }
-    System.out.println(p.getSP());
+    System.out.println(p.getSP()); // TODO remove
     return ret;
   }
 }

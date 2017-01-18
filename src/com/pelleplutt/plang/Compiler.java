@@ -442,7 +442,7 @@ public class Compiler {
     }
     Processor p = new Processor(0x10000, e);
     //Processor.dbgRun = true;
-    Processor.dbgRunSrc = true;
+    //Processor.dbgRunSrc = true;
     //Processor.dbgMem = true;
     int i = 0;
     try {
@@ -459,6 +459,15 @@ public class Compiler {
       System.out.println(p.getProcInfo());
       System.out.println(pe.getMessage());
       System.out.println("**********************************************");
+      String func = p.getExecutable().getFunctionName(p.getPC());
+      if (func != null) {
+        System.out.println("in context " + func);
+      }
+      String dbg = p.getExecutable().getSrcDebugInfoNearest(p.getPC());
+      if (dbg != null) {
+        System.out.println(dbg);
+      }
+      p.unwindStackTrace();
       System.out.println("DISASM");
       Assembler.disasm(System.out, "   ", p.getExecutable().getMachineCode(), p.getPC(), 8);
       System.out.println("STACK");

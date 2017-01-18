@@ -81,7 +81,7 @@ public class InstanceMe {
         "eve.get_child(1).set_age(22);\n" +
         "eve.get_child(0).add_child(inst('ori'));\n" +
         "eve.get_child(0).get_child(0).set_age(1);\n" +
-        "return eve.list_family();";
+        "return eve.list_family();\n";
     assertEquals("eve:50 ada:25 ori:1 ina:22 ", Processor.compileAndRun(false, false, sA).str); 
   }
 

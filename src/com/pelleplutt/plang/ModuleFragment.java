@@ -134,9 +134,10 @@ public class ModuleFragment {
   public SrcRef getDebugInfoSourceNearest(int codeIx) {
     int i = 0;
     while (i < FRAGMCsrcref.size()) {
-      if (codeIx >= FRAGMCsrcref.get(i)) {
+      if (codeIx <= FRAGMCsrcref.get(i)) {
         return fragmcSRCREF.get(i);
       }
+      i++;
     }
     return null;
   }
