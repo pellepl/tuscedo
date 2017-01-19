@@ -19,6 +19,7 @@ import com.pelleplutt.plang.CompilerError;
 import com.pelleplutt.plang.Executable;
 import com.pelleplutt.plang.Grammar;
 import com.pelleplutt.plang.Linker;
+import com.pelleplutt.plang.Source;
 import com.pelleplutt.plang.StructAnalysis;
 import com.pelleplutt.plang.proc.ProcessorError.ProcessorBreakpointError;
 import com.pelleplutt.plang.proc.ProcessorError.ProcessorFinishedError;
@@ -110,7 +111,6 @@ public class Processor implements ByteCode {
     minus = false;
     pc = exe == null ? 0 : exe.getPCStart();
   }
-
   
   public void setExe(Executable exe, String ...args) {
     this.exe = exe;
@@ -128,7 +128,8 @@ public class Processor implements ByteCode {
   }
   
   M pop() {
-    return memory[++sp];
+    sp++;
+    return memory[sp];
   }
   
   void poke(int a, M m) {
@@ -138,7 +139,6 @@ public class Processor implements ByteCode {
     memory[a].str = m.str;
     memory[a].ref = m.ref;
     if (dbgMem) System.out.println(String.format("poke 0x%06x %s" , a, m));
-
   }
   
   M peek(int a) {
@@ -282,14 +282,14 @@ public class Processor implements ByteCode {
   
   void sp_incr() {
     int m = pcodetoi( pc++, 1) + 1;
-    for (int i = 0; i < m; i++) {
-      poke(sp - i, nilM);
-    }
     sp -= m;
   }
   
   void sp_decr() {
     int m = pcodetoi( pc++, 1) + 1;
+    for (int i = 0; i < m; i++) {
+      poke(sp + i, nilM);
+    }
     sp += m;
   }
   
@@ -663,7 +663,11 @@ public class Processor implements ByteCode {
       } else if (e1.type == TNIL && !push) {
         status(0);
       } else if (e1.type == TSET && !push) {
-        status(e1.ref == e2.ref ? 0 : 1);
+        int diff = e1.ref.size() - e2.ref.size();
+        if (diff == 0 && e1.ref != e2.ref) {
+          diff = 1;
+        }
+        status(diff);
       } else {
         throw new ProcessorError("cannot subtract type " + TNAME[e1.type]);
       }
@@ -705,7 +709,7 @@ public class Processor implements ByteCode {
       if (push) push(r);
     } 
     else if (!push && (e1.type == TSET || e2.type == TSET)) {
-      status(1);
+      status(e1.type == TSET ? 1 : -1);
     }
     else {
       throw new ProcessorError("cannot subtract types " + TNAME[e1.type] + " and " + TNAME[e2.type]);
@@ -783,10 +787,10 @@ public class Processor implements ByteCode {
     push(nilM);
   }
 
+  M m_me = new M();
   void def_me() {
-    M m = new M();
-    m.copy(peekStack(0));
-    me_banked = m;
+    m_me.copy(peekStack(0));
+    me_banked = m_me;
   }
 
   void push_me() {
@@ -811,7 +815,7 @@ public class Processor implements ByteCode {
     sub();
   }
   void cast(int type) {
-    M m = peekStack(0);
+    M m = pop();
     switch (type) {
     case TINT:
       switch (m.type) {
@@ -851,11 +855,16 @@ public class Processor implements ByteCode {
       break;
     }
     m.type = (byte)(type == TO_CHAR ? TSTR : type);
+    push(m);
   }
   
   void get_typ() {
     M m = pop();
-    push(m.type);
+    int t = m.type;
+    if (t == TSET) {
+      t = m.ref.getType();
+    }
+    push(t);
   }
   
   void mul() {
@@ -1730,7 +1739,7 @@ public class Processor implements ByteCode {
     return Assembler.assemble(s);
   }
 
-  public void unwindStackTrace() {
+  public void unwindStackTrace(PrintStream out) {
     int fp = this.fp;
     int pc = this.oldpc;
     int sp = this.sp;
@@ -1738,23 +1747,23 @@ public class Processor implements ByteCode {
     
     while(pc != 0xffffffff && fp != 0xffffffff) {
       int argc = peek(fp + FRAME_3_ARGC).i;
-      System.out.println(String.format("PC:0x%08x FP:0x%08x SP:0x%08x", 
+      out.println(String.format("PC:0x%08x FP:0x%08x SP:0x%08x", 
           pc, fp, sp));
       String func = exe.getFunctionName(pc);
       if (func != null) {
-        System.out.print(func);
+        out.print(func);
       } else {
-        System.out.print(String.format("@ 0x%08x", pc));
+        out.print(String.format("@ 0x%08x", pc));
       }
-      System.out.print("( ");
+      out.print("( ");
       for (int a = 0; a < argc; a++) {
         M arg = peek(fp + FRAME_SIZE + 1 + a);
-        System.out.print(arg.asString() + " ");
+        out.print(arg.asString() + " ");
       }
-      System.out.println(") me:" + me.asString());
+      out.println(") me:" + (me != null ? me.asString() : ""));
       String dbg = exe.getSrcDebugInfoNearest(pc, false);
       if (dbg != null) {
-        System.out.println(dbg);
+        out.println(dbg);
       }
       sp = fp;
       if (sp == 0xffffffff) break;
@@ -1991,7 +2000,8 @@ public class Processor implements ByteCode {
     try {
       e = Compiler.compile(extDefs, ramOffs, constOffs, sources);
     } catch (CompilerError ce) {
-      String s = Compiler.getSource();
+      Source src = Compiler.getSource();
+      String s = src.getCSource();
       int strstart = Math.min(s.length(), Math.max(0, ce.getStringStart()));
       int strend = Math.min(s.length(), Math.max(0, ce.getStringEnd()));
       if (strstart > 0) {
@@ -2019,28 +2029,32 @@ public class Processor implements ByteCode {
     }
     catch (ProcessorError pe) {
       if (!silence) {
-        System.out.println("**********************************************");
-        System.out.println(String.format("Exception at pc 0x%06x", p.getPC()));
-        System.out.println(p.getProcInfo());
-        System.out.println(pe.getMessage());
-        System.out.println("**********************************************");
-        String func = p.getExecutable().getFunctionName(p.getPC());
-        if (func != null) {
-          System.out.println("in context " + func);
-        }
-        String dbg = p.getExecutable().getSrcDebugInfoNearest(p.getPC());
-        if (dbg != null) {
-          System.out.println(dbg);
-        }
-        p.unwindStackTrace();
-        System.out.println("DISASM");
-        Assembler.disasm(System.out, "   ", p.getExecutable().getMachineCode(), p.getPC(), 8);
-        System.out.println("STACK");
-        p.printStack(System.out, "   ", 16);
+        p.dumpError(pe, System.out);
       }
       throw pe;
     }
     System.out.println(p.getSP()); // TODO remove
     return ret;
+  }
+
+  public void dumpError(ProcessorError pe, PrintStream out) {
+    out.println("**********************************************");
+    out.println(String.format("Exception at pc 0x%06x", getPC()));
+    out.println(getProcInfo());
+    out.println(pe.getMessage());
+    out.println("**********************************************");
+    String func = getExecutable().getFunctionName(getPC());
+    if (func != null) {
+      out.println("in context " + func);
+    }
+    String dbg = getExecutable().getSrcDebugInfoNearest(getPC());
+    if (dbg != null) {
+      out.println(dbg);
+    }
+    unwindStackTrace(out);
+    out.println("DISASM");
+    Assembler.disasm(out, "   ", getExecutable().getMachineCode(), getPC(), 8);
+    out.println("STACK");
+    printStack(out, "   ", 16);
   }
 }

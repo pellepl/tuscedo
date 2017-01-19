@@ -172,5 +172,17 @@ public class Algo {
     "return calc_iters(" + rx + "," + ry + ");\n";
     assertEquals(calc_iters(rx, ry, max_iter), Processor.compileAndRun(false, false, sA).f, 0);
   }
-
+  
+  @Test
+  public void testFib() {
+    String sA;
+    sA = 
+    "func fib(n) {\n" +
+    "  if (n == 0) return 0;\n" +
+    "  else if (n == 1) return 1;\n" + 
+    "  else return fib(n - 1) + fib(n - 2);\n"  +
+    "}\n"+
+    "return fib(12);\n";
+    assertEquals(144, Processor.compileAndRun(false, false, sA).i, 0);
+  }
 }

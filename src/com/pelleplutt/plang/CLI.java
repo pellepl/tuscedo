@@ -65,15 +65,7 @@ public class CLI {
         }
       }
       catch (ProcessorError pe) {
-        System.out.println("**********************************************");
-        System.out.println(String.format("Exception at pc 0x%06x", p.getPC()));
-        System.out.println(p.getProcInfo());
-        System.out.println(pe.getMessage());
-        System.out.println("**********************************************");
-        System.out.println("DISASM");
-        Assembler.disasm(System.out, "   ", p.getExecutable().getMachineCode(), p.getPC(), 8);
-        System.out.println("STACK");
-        p.printStack(System.out, "   ", 16);
+        p.dumpError(pe, System.out);
         pe.printStackTrace(System.err);
       } finally {
         p.reset();

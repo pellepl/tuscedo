@@ -233,8 +233,6 @@ public class Linker implements ByteCode {
     }
   }
   
-  // TODO perhaps do something clever with the module name here
-  //      would be good to know if the module was actually declared or not
   public void linkFragFunc(ModuleFragment frag) {
     for (Link l : frag.links) {
       if (l instanceof LinkCall) {
@@ -269,7 +267,7 @@ public class Linker implements ByteCode {
         TACUnresolved tu = lu.sym;
         int srcvar = lu.pc;
         
-        TACVar refVar = new TACVar(tu.getNode(), tu.name, tu.module, null, ".0"); // '.0', must be a global scope
+        TACVar refVar = new TACVar(tu.getNode(), tu.name, tu.module, null, ".0"); // '.0', unresolved may only point to global scope
         if (dbg) System.out.print("       " + lu);
         if (dbg) System.out.print(", as variable " + refVar);
         if (globalLUT.containsKey(refVar)) {
@@ -302,15 +300,12 @@ public class Linker implements ByteCode {
       } 
     }
   }
-  
-
-  
+    
   public void collectCode() {
     for (ModuleFragment frag : fragments) {
       code.addAll(frag.code);
     }
   }
-
   
   public byte[] getMachineCode() {
     byte mc[] = new byte[code.size()];
@@ -364,7 +359,6 @@ public class Linker implements ByteCode {
     }
     return constants;
   }
-
   
   public Linker(int ramOffset, int constOffset) {
     this.ramOffset = ramOffset;
@@ -372,7 +366,6 @@ public class Linker implements ByteCode {
   }
   
   public void printLinkedCode(PrintStream out) {
-    
     System.out.println("  * ram");
     for (TAC t : globalLUT.keySet()) {
       if (t instanceof TACVar) {
