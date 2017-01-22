@@ -131,12 +131,12 @@ public class CodeGenFront {
         module.id = ffrag.module;
         mmap.put(ffrag.module, module);
       }
-      ModuleFragment frag = new ModuleFragment(src);
+      ModuleFragment frag = new ModuleFragment(ffrag.defNode, src);
       frag.fragname = ffrag.name;
       frag.type = ffrag.type;
       frag.modname = module.id;
       for (Block block : ffrag.blocks) {
-        frag.tacs.add(new ArrayList<TAC>(block.ir));
+        frag.addTACBlock(block.ir);
       }
       module.frags.add(frag);
     }
@@ -443,18 +443,18 @@ public class CodeGenFront {
       FrontFragment newFrag = null;
       
       if (eblk.type == ASTNodeBlok.TYPE_ANON) {
-        newFrag = new FrontFragment(oldFrag.module, ".anon" + (anonIx++));
+        newFrag = new FrontFragment(eblk, oldFrag.module, ".anon" + (anonIx++));
         newFrag.type = ASTNode.ASTNodeBlok.TYPE_ANON;
         ffrags.add(newFrag);
         ffrag = newFrag;
       } else if (eblk.type == ASTNodeBlok.TYPE_FUNC) {
-        newFrag = new FrontFragment(oldFrag.module, ".func" + ((ASTNodeBlok)eblk).id);
+        newFrag = new FrontFragment(eblk, oldFrag.module, ".func" + ((ASTNodeBlok)eblk).id);
         newFrag.type = ASTNode.ASTNodeBlok.TYPE_FUNC;
         ffrags.add(newFrag);
         ffrag = newFrag;
       } else if (ffrag == null) {
         // first context, must be globals
-        ffrag = new FrontFragment(eblk.module == null ? ".MAIN" : eblk.module, ".main");
+        ffrag = new FrontFragment(eblk, eblk.module == null ? ".MAIN" : eblk.module, ".main");
         ffrag.type = ASTNode.ASTNodeBlok.TYPE_MAIN;
         ffrags.add(ffrag);
       }
@@ -482,7 +482,7 @@ public class CodeGenFront {
       
       if (eblk.type == ASTNodeBlok.TYPE_ANON || eblk.type == ASTNodeBlok.TYPE_FUNC) {
         // add 'return' if not set by programmer for TYPE_ANON and TYPE_FUNC
-        if (!(ffrag.ir.get(ffrag.ir.size()-1) instanceof TACReturn)) {
+        if (ffrag.ir.size() == 0 || !(ffrag.ir.get(ffrag.ir.size()-1) instanceof TACReturn)) {
           add(new TACReturn(e, new TACNil(e))); 
         }
         
@@ -1112,6 +1112,7 @@ public class CodeGenFront {
   //
   
   class FrontFragment {
+    ASTNode defNode;
     String module, name;
     Block block; 
     List<Block> blocks = new ArrayList<Block>();
@@ -1119,7 +1120,8 @@ public class CodeGenFront {
     Stack<Loop> loopStack = new Stack<Loop>();
     int type; // ASTNode.ASTNodeBlok.TYPE_*
     
-    public FrontFragment(String module, String name) {
+    public FrontFragment(ASTNode defNode, String module, String name) {
+      this.defNode = defNode;
       this.module = module;
       this.name = name;
     }

@@ -34,12 +34,13 @@ public class Linker implements ByteCode {
   int ramOffset, constOffset;
   int symbolVarOffset = -1, symbolConstOffset = -1;
   List<ModuleFragment> fragments;
-  Map<TAC, Integer> globalLUT = new HashMap<TAC, Integer>();
-  Map<String, Integer> fragLUT = new HashMap<String, Integer>();
+  Map<TAC, Integer> globalAddrLUT = new HashMap<TAC, Integer>();
+  Map<String, Integer> fragAddrLUT = new HashMap<String, Integer>();
+  Map<String, Integer> extCallsAddrLut = new HashMap<String, Integer>();
   List<Byte> code = new ArrayList<Byte>();
-  Map<String, Integer> extCalls = new HashMap<String, Integer>();
   Map<String, ExtCall> extDefs;
   Map<Integer, ExtCall> extLinks = new HashMap<Integer, ExtCall>();
+  Executable incrementalPreviousExe;
   
   public static Executable link(IntermediateRepresentation ir, int ramOffset, int constOffset) {
     return link(ir, ramOffset, constOffset, null, false);
@@ -57,23 +58,34 @@ public class Linker implements ByteCode {
   }
   
   public Executable link(IntermediateRepresentation ir, Map<String, ExtCall> extDefs, boolean keepDbg) {
+    return link(ir, extDefs, keepDbg, null);
+  }
+  public Executable link(IntermediateRepresentation ir, Map<String, ExtCall> extDefs, 
+      boolean keepDbg, Executable incrementalPreviousExe) {
     List<Module> modules = ir.getModules();
     
     fragments = new ArrayList<ModuleFragment>();
-    extCalls = new HashMap<String, Integer>();
+    extCallsAddrLut = new HashMap<String, Integer>();
     this.extDefs = extDefs;
     
     int ocodeOffset = codeOffset;
     int osymbolVarOffset = symbolVarOffset;
     int osymbolConstOffset = symbolConstOffset;
+    this.incrementalPreviousExe = incrementalPreviousExe;
 
     try {
       int pcStart = linkAll(modules);
       if (dbg) printLinkedCode(System.out);
       
       Map<Integer, M> constants = getConstants();
+
+      Executable exe = new Executable(pcStart, symbolVarOffset, getMachineCode(), constants, extLinks, 
+          keepDbg ? new ArrayList<Module>(modules) : null);
+      if (incrementalPreviousExe != null && keepDbg) {
+        exe.mergeDebugInfo(incrementalPreviousExe);
+      }
       
-      return new Executable(pcStart, getMachineCode(), constants, extLinks, keepDbg ? modules : null);
+      return exe; 
     } catch (Throwable t) {
       codeOffset = ocodeOffset;
       symbolVarOffset = osymbolVarOffset;
@@ -114,15 +126,24 @@ public class Linker implements ByteCode {
     for (ModuleFragment frag : fragments) {
       if (frag == firstMainFrag) pcStart = codeOffset;
       String fragId = frag.modname + frag.fragname;
-      if (!fragLUT.containsKey(fragId)) {
+      if (!fragAddrLUT.containsKey(fragId)) {
         if (dbg) System.out.println(String.format("  %-32s @ 0x%08x:%d", 
             fragId, codeOffset, frag.code.size()));
-        fragLUT.put(fragId, codeOffset);
+        fragAddrLUT.put(fragId, codeOffset);
         frag.fragId = fragId;
         frag.executableOffset = codeOffset;
       } else {
-        throw new CompilerError("duplicate definition of " + fragId, frag.tacs.get(0).get(0).getNode());
+        int addr = fragAddrLUT.get(fragId);
+        String otherplace = null;
+        otherplace = Linker.getSrcDbgInfoNearest(addr, false, false, modules);
+        if (otherplace == null && incrementalPreviousExe != null) {
+          otherplace = Linker.getSrcDbgInfoNearest(addr, false, false, incrementalPreviousExe.dbgModules);
+        }
+        throw new CompilerError("duplicate definition of " + frag.fragname +
+            (otherplace != null ? (" (the other is declared in " + otherplace) +")" : ""),
+            /*((ASTNodeBlok)frag.defNode)); */ frag.getTACBlocks().get(0).get(0).getNode());
       }
+      frag.defNode = null; // remove reference to tree
       codeOffset += frag.code.size();
     }
     
@@ -135,24 +156,24 @@ public class Linker implements ByteCode {
       for (Link l : frag.links) {
         if (l instanceof LinkConst) {
           LinkConst lc = (LinkConst)l;
-          if (!globalLUT.containsKey(lc.cnst)) {
-            globalLUT.put(lc.cnst, symbolConstOffset++);
+          if (!globalAddrLUT.containsKey(lc.cnst)) {
+            globalAddrLUT.put(lc.cnst, symbolConstOffset++);
           }
         } 
         else if (l instanceof LinkUnresolved) {
           LinkUnresolved lu = (LinkUnresolved)l;
           String callName = lu.sym.module + ".func." + lu.sym.name;
-          if (fragLUT.containsKey(callName)) {
+          if (fragAddrLUT.containsKey(callName)) {
             // this is a function reference, add address as constant
-            TACCode funcRef = new TACCode(lu.sym.getNode(), fragLUT.get(callName), ASTNodeBlok.TYPE_FUNC);
-            if (!globalLUT.containsKey(funcRef)) {
-              globalLUT.put(funcRef, symbolConstOffset++);
+            TACCode funcRef = new TACCode(lu.sym.getNode(), fragAddrLUT.get(callName), ASTNodeBlok.TYPE_FUNC);
+            if (!globalAddrLUT.containsKey(funcRef)) {
+              globalAddrLUT.put(funcRef, symbolConstOffset++);
             }
           } 
         }
         else if (l instanceof LinkArrayInitializer) {
           LinkArrayInitializer lai = (LinkArrayInitializer)l;
-          globalLUT.put(lai.arr, symbolConstOffset);
+          globalAddrLUT.put(lai.arr, symbolConstOffset);
           symbolConstOffset += lai.arr.entries.size();
         }
       }
@@ -171,8 +192,8 @@ public class Linker implements ByteCode {
       for (Link l : frag.links) {
         if (l instanceof LinkGlobal) {
           LinkGlobal lg = (LinkGlobal)l;
-          if (!globalLUT.containsKey(lg.var)) {
-            globalLUT.put(lg.var, symbolVarOffset++);
+          if (!globalAddrLUT.containsKey(lg.var)) {
+            globalAddrLUT.put(lg.var, symbolVarOffset++);
           }
         } 
       }
@@ -186,8 +207,8 @@ public class Linker implements ByteCode {
     collectCode();
     
     // resolve external definitions
-    for (String linkName : extCalls.keySet()) {
-      int extOffs = extCalls.get(linkName);
+    for (String linkName : extCallsAddrLut.keySet()) {
+      int extOffs = extCallsAddrLut.get(linkName);
       ExtCall extCall = extDefs.get(linkName);
       if (extCall == null) {
         throw new CompilerError("unresolved reference to " + linkName);
@@ -195,10 +216,6 @@ public class Linker implements ByteCode {
       extLinks.put(extOffs, extCall);
     }
 
-    for (Module m : modules) {
-      m.linked = true;
-    }
-    
     return pcStart;
   }
   
@@ -218,7 +235,7 @@ public class Linker implements ByteCode {
       if (l instanceof LinkGlobal) {
         LinkGlobal lvar = (LinkGlobal)l;
         int srcvar = lvar.pc;
-        frag.write(srcvar + 1, globalLUT.get(lvar.var), 3);
+        frag.write(srcvar + 1, globalAddrLUT.get(lvar.var), 3);
       } 
     }
   }
@@ -228,7 +245,7 @@ public class Linker implements ByteCode {
       if (l instanceof LinkConst) {
         LinkConst lc = (LinkConst)l;
         int srcvar = lc.pc;
-        frag.write(srcvar + 1, globalLUT.get(lc.cnst), 3);
+        frag.write(srcvar + 1, globalAddrLUT.get(lc.cnst), 3);
       } 
     }
   }
@@ -239,20 +256,20 @@ public class Linker implements ByteCode {
         LinkCall lc = (LinkCall)l;
         int srcvar = lc.pc;
         String funcFragName = lc.call.module + ".func." + lc.call.func;
-        if (fragLUT.containsKey(funcFragName)) {
+        if (fragAddrLUT.containsKey(funcFragName)) {
           // got a defined address for this function
-          int codeOffset = fragLUT.get(funcFragName);
+          int codeOffset = fragAddrLUT.get(funcFragName);
           frag.write(srcvar + 1, codeOffset, 3);
         } else {
           String extCallId = (lc.call.declaredModule == null ? "" : (lc.call.declaredModule + ".")) + lc.call.func;
           int codeOffset;
-          if (extCalls.containsKey(extCallId)) {
+          if (extCallsAddrLut.containsKey(extCallId)) {
             // already have a negative address for unresolved (external?) call
-            codeOffset = extCalls.get(extCallId);
+            codeOffset = extCallsAddrLut.get(extCallId);
           } else {
             // assign a new negative address for unresolved (external?) call
             codeOffset = extFunc--;
-            extCalls.put(extCallId, codeOffset);
+            extCallsAddrLut.put(extCallId, codeOffset);
           }
           frag.write(srcvar + 1, codeOffset, 3);
         }
@@ -270,18 +287,18 @@ public class Linker implements ByteCode {
         TACVar refVar = new TACVar(tu.getNode(), tu.name, tu.module, null, ".0"); // '.0', unresolved may only point to global scope
         if (dbg) System.out.print("       " + lu);
         if (dbg) System.out.print(", as variable " + refVar);
-        if (globalLUT.containsKey(refVar)) {
+        if (globalAddrLUT.containsKey(refVar)) {
           // this is a global variable reference
-          frag.write(srcvar + 1, globalLUT.get(refVar), 3);
+          frag.write(srcvar + 1, globalAddrLUT.get(refVar), 3);
           if (dbg) System.out.println(": found");
           continue;
         }
         String callName = tu.module + ".func." + tu.name;
         if (dbg) System.out.print(", as function " + callName);
-        if (fragLUT.containsKey(callName)) {
+        if (fragAddrLUT.containsKey(callName)) {
           // this is a function reference
-          TACCode funcRef = new TACCode(tu.getNode(), fragLUT.get(callName), ASTNodeBlok.TYPE_FUNC);
-          frag.write(srcvar + 1, globalLUT.get(funcRef), 3);
+          TACCode funcRef = new TACCode(tu.getNode(), fragAddrLUT.get(callName), ASTNodeBlok.TYPE_FUNC);
+          frag.write(srcvar + 1, globalAddrLUT.get(funcRef), 3);
           if (dbg) System.out.println(": found");
           continue;
         }
@@ -296,7 +313,7 @@ public class Linker implements ByteCode {
       if (l instanceof LinkArrayInitializer) {
         LinkArrayInitializer lai = (LinkArrayInitializer)l;
         int srcvar = lai.pc;
-        frag.write(srcvar + 1, globalLUT.get(lai.arr), 3);
+        frag.write(srcvar + 1, globalAddrLUT.get(lai.arr), 3);
       } 
     }
   }
@@ -314,6 +331,14 @@ public class Linker implements ByteCode {
     }
     return mc;
   }
+  
+  public void wipeRunOnceCode(Executable exe) {
+    if (exe == null) return;
+    while (code.size() > exe.pcStart) {
+      code.remove(exe.pcStart);
+    }
+    codeOffset = exe.pcStart;
+  }
 
   M makeConstPrimitive(TAC t) {
     M m = null;
@@ -329,7 +354,7 @@ public class Linker implements ByteCode {
     }
     else if (t instanceof TACCode) {
       if (((TACCode)t).ffrag != null) {
-        m = new M(fragLUT.get(((TACCode)t).ffrag.module + ((TACCode)t).ffrag.name));
+        m = new M(fragAddrLUT.get(((TACCode)t).ffrag.module + ((TACCode)t).ffrag.name));
       } else {
         m = new M(((TACCode)t).addr);
       }
@@ -342,9 +367,9 @@ public class Linker implements ByteCode {
   
   Map<Integer, M> getConstants() {
     Map<Integer, M> constants = new HashMap<Integer, M>();
-    for (TAC t : globalLUT.keySet()) {
+    for (TAC t : globalAddrLUT.keySet()) {
       if (!(t instanceof TACVar)) {
-        int addr = globalLUT.get(t);
+        int addr = globalAddrLUT.get(t);
         M m = null;
         if (t instanceof TACArrInit) {
           List<TAC> arr = ((TACArrInit)t).entries;
@@ -367,22 +392,22 @@ public class Linker implements ByteCode {
   
   public void printLinkedCode(PrintStream out) {
     System.out.println("  * ram");
-    for (TAC t : globalLUT.keySet()) {
+    for (TAC t : globalAddrLUT.keySet()) {
       if (t instanceof TACVar) {
-        System.out.println(String.format("    0x%06x %s", globalLUT.get(t), t));
+        System.out.println(String.format("    0x%06x %s", globalAddrLUT.get(t), t));
       }
     }
     System.out.println("  * const");
-    for (TAC t : globalLUT.keySet()) {
+    for (TAC t : globalAddrLUT.keySet()) {
       if (!(t instanceof TACVar)) {
-        System.out.println(String.format("    0x%06x %-8s %s", globalLUT.get(t), 
+        System.out.println(String.format("    0x%06x %-8s %s", globalAddrLUT.get(t), 
             t.getClass().getSimpleName().substring(3).toLowerCase(), t));
       }
     }
     System.out.println("  * ext defs");
     for (String linkName : extDefs.keySet()) {
-      if (extCalls.containsKey(linkName)) {
-        int extOffs = extCalls.get(linkName);
+      if (extCallsAddrLut.containsKey(linkName)) {
+        int extOffs = extCallsAddrLut.get(linkName);
         ExtCall extCall = extLinks.get(extOffs);
         System.out.println(String.format("    0x%06x  %-20s  %s", extOffs & 0xffffff, 
             linkName, extCall));
@@ -396,7 +421,7 @@ public class Linker implements ByteCode {
       out.println();
       out.println(frag.modname + frag.fragname);
       int len = frag.code.size();
-      int fragoffs = fragLUT.get(frag.modname + frag.fragname);
+      int fragoffs = fragAddrLUT.get(frag.modname + frag.fragname);
       Source source = frag.getSource();
       int lastLine = -1;
       while (len > 0) {
@@ -424,4 +449,56 @@ public class Linker implements ByteCode {
       }
     }
   }
+
+  public static String getSrcDbgInfoNearest(int pc, boolean showCode, boolean showPrecise,
+      List<Module> dbgModules) {
+    for (Module m : dbgModules) {
+      for (ModuleFragment frag : m.frags) {
+        int offs = frag.executableOffset;
+        int len = frag.getMachineCodeLength();
+        if (pc >= offs && pc < offs + len) {
+          Source source = frag.getSource();
+          if (source == null) return null;
+          ModuleFragment.SrcRef srcref = frag.getDebugInfoSourceNearest(pc-offs);
+          if (srcref == null) return null;
+          String res = null;
+          String line = source.getCSource().substring(srcref.lineOffset, srcref.lineOffset + srcref.lineLen);
+          String prefix = source.getName() + "@" + srcref.line;
+          if (showCode) {
+            prefix += ":";
+            res = prefix + line;
+            if (showPrecise) {
+              String mark = "";
+              for (int i = 0; i < prefix.length() + srcref.symOffs - srcref.lineOffset; i++) mark += " ";
+              for (int i = 0; i < Math.min(srcref.symLen, line.length() - (srcref.symOffs - srcref.lineOffset)); i++) mark += "~";
+              res += System.getProperty("line.separator") + mark;
+            }
+          } else {
+            res = prefix;
+          }
+          return res;
+        }
+      }
+    }
+    return null;
+  }
+
+  public static String getSrcDebugInfoPrecise(int pc, List<Module> dbgModules) {
+    for (Module m : dbgModules) {
+      for (ModuleFragment frag : m.frags) {
+        int offs = frag.executableOffset;
+        int len = frag.getMachineCodeLength();
+        if (pc >= offs && pc < offs + len) {
+          Source source = frag.getSource();
+          if (source == null) return null;
+          ModuleFragment.SrcRef srcref = frag.getDebugInfoSourcePrecise(pc-offs);
+          if (srcref == null) return null;
+          String line = source.getCSource().substring(srcref.lineOffset, srcref.lineOffset + srcref.lineLen);
+          return source.getName() + "@" + srcref.line + ":" + line;
+        }
+      }
+    }
+    return null;
+  }
+
 }

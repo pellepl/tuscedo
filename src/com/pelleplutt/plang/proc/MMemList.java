@@ -64,9 +64,19 @@ public class MMemList implements MSet {
     if (ix < 0) ix = len + ix;
     return get(ix);
   }
-  
+  @Override
   public int getType() {
   	return TARR;
+  }
+  
+  @Override
+  public MSet copyShallow() {
+    MListMap ml = new MListMap();
+    ml.type = TARR;
+    for (int i = 0; i < len; i++) {
+      ml.add(new M().copy(get(i)));
+    }
+    return ml;
   }
   
   public String toString() {

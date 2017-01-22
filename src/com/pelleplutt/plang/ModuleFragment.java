@@ -16,10 +16,11 @@ import com.pelleplutt.plang.proc.Assembler;
 public class ModuleFragment {
   String modname;
   String fragname;
+  ASTNode defNode;
   // source code for this fragment
   Source source;
   // three address codes, block organised
-  List<List<TAC>> tacs = new ArrayList<List<TAC>>();
+  private List<List<TAC>> tacs = new ArrayList<List<TAC>>();
   // machine codes
   List<Byte> code = new ArrayList<Byte>();
   // labels / fragment machine code offset
@@ -42,10 +43,19 @@ public class ModuleFragment {
   List<SrcRef> fragmcSRCREF = new ArrayList<SrcRef>();
   Map<Integer, SrcRef> fragmcsrcrefMap = new HashMap<Integer, SrcRef>();
   
-  public ModuleFragment(Source src) {
+  public ModuleFragment(ASTNode defNode, Source src) {
+    this.defNode = defNode;
     source = src;
   }
+  
+  public List<List<TAC>> getTACBlocks() {
+    return tacs;
+  }
  
+  public void addTACBlock(List<TAC> ir) {
+    tacs.add(new ArrayList<TAC>(ir));
+  }
+  
   ASTNode prevNode = null;
   public void addCode(String comment, ASTNode node, int bytecode, Integer... bytecodeext) {
     if (comment != null) dbgcomments.put(code.size(), comment);

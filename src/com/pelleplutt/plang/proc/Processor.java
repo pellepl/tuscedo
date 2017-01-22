@@ -325,6 +325,14 @@ public class Processor implements ByteCode {
     push(set);
   }
   
+  void tup_cre() {
+    MListMap tup = new MListMap();
+    M mval = pop();
+    M mkey = pop();
+    tup.makeTup(new M().copy(mkey), new M().copy(mval));
+    push(tup);
+  }
+  
   void set_drf() {
     M mix = pop();
     M mset = pop();
@@ -1240,10 +1248,18 @@ public class Processor implements ByteCode {
   void stepProc() {
     oldpc = pc;
     int instr;
-    if ((pc & 0xff800000) == 0) 
+    if (sp < exe.getStackTop()) {
+      throw new ProcessorError("stack overflow");
+    }
+    if ((pc & 0xff800000) == 0) {
       instr = (int)(code[pc] & 0xff);
-    else
+      if (pc < 0 || pc >= code.length) {
+        throw new ProcessorError(String.format("bad instruction address 0x%08x", pc));
+      }
+    }
+    else {
       instr = (int)(code_internal_funcs[pc - 0xff000000] & 0xff);
+    }
     pc++;
     switch (instr) {
     case INOP:
@@ -1448,6 +1464,9 @@ public class Processor implements ByteCode {
       break;
     case IARR_CRE:
       arr_cre();
+      break;
+    case ITUP_CRE:
+      tup_cre();
       break;
     case ISET_DRF:
       set_drf();
@@ -1744,7 +1763,7 @@ public class Processor implements ByteCode {
     int pc = this.oldpc;
     int sp = this.sp;
     M me = this.me;
-    
+    int maxHops = 40;
     while(pc != 0xffffffff && fp != 0xffffffff) {
       int argc = peek(fp + FRAME_3_ARGC).i;
       out.println(String.format("PC:0x%08x FP:0x%08x SP:0x%08x", 
@@ -1770,6 +1789,11 @@ public class Processor implements ByteCode {
       fp = peek(sp+1).i;
       pc = peek(sp+2).i;
       me = peek(sp+3);
+      out.println();
+      if (maxHops-- == 0) {
+        out.println("*** stacktrace abort, too long ***");
+        break;
+      }
     }
   }
 
@@ -1950,6 +1974,23 @@ public class Processor implements ByteCode {
           }
         }
         return null;
+      }
+    });
+    extDefs.put("cpy", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        } else {
+          M res = new M();
+          M src = args[0];
+          if (src.type != TSET) {
+            res.copy(src);
+          } else {
+            res.type = TSET;
+            res.ref = src.ref.copyShallow();
+          }
+          return res;
+        }
       }
     });
   }

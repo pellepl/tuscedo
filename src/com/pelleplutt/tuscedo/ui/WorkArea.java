@@ -46,8 +46,10 @@ import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.plaf.basic.BasicScrollBarUI;
+import javax.swing.text.BadLocationException;
 
 import com.pelleplutt.Essential;
+import com.pelleplutt.tuscedo.PlangScript;
 import com.pelleplutt.tuscedo.ProcessGroup;
 import com.pelleplutt.tuscedo.ProcessGroupInfo;
 import com.pelleplutt.tuscedo.Serial;
@@ -78,7 +80,8 @@ public class WorkArea extends JPanel implements Disposable {
   static final int ISTATE_OPEN_SERIAL = 3;
   static final int ISTATE_BASH = 4;
   static final int ISTATE_HEX = 5;
-  static final int _ISTATE_NUM = 6;
+  static final int ISTATE_SCRIPT = 6;
+  static final int _ISTATE_NUM = 7;
   
   static final String PORT_ARG_BAUD = "baud:";
   static final String PORT_ARG_DATABITS = "databits:";
@@ -141,6 +144,7 @@ public class WorkArea extends JPanel implements Disposable {
   List<OffsetSpan> findResult;
   Settings settings;
   Serial serial;
+  PlangScript script;
   
   static String[] prevSerialDevices;
   
@@ -202,6 +206,7 @@ public class WorkArea extends JPanel implements Disposable {
   public WorkArea() {
     settings = Settings.inst();
     serial = new Serial(this);
+    script = new PlangScript();
   }
   
   public static void decorateFTP(FastTextPane ftp) {
@@ -306,6 +311,7 @@ public class WorkArea extends JPanel implements Disposable {
       defineAction(input[i], "input.findregx", "alt+f", actionOpenFindRegex);
       defineAction(input[i], "input.findregxback", "alt+shift+f", actionOpenFindRegexBack);
       defineAction(input[i], "input.hex", "ctrl+h", actionOpenHex);
+      defineAction(input[i], "input.script", "ctrl+p", actionOpenScript);
       defineAction(input[i], "input.inputclose", "escape", actionInputClose);
       defineAction(input[i], "input.inputenter", "enter", actionInputEnter);
       defineAction(input[i], "input.inputenterback", "shift+enter", actionInputEnterBack);
@@ -562,6 +568,9 @@ public class WorkArea extends JPanel implements Disposable {
     case ISTATE_BASH:
       inputLabel[istate].setText("BASH");
       break;
+    case ISTATE_SCRIPT:
+      inputLabel[istate].setText("SCRIPT");
+      break;
     default:
       this.istate = ISTATE_INPUT;
       inputLabel[istate].setVisible(false);
@@ -593,25 +602,35 @@ public class WorkArea extends JPanel implements Disposable {
   
   void actionInputEnter(boolean shift) {
     if (winSug.isVisible()) {
+      input[istate].setFilterNewLine(false);
       input[istate].setText(winSugList.getSelectedValue());
+      input[istate].setFilterNewLine(true);
       winSug.setVisible(false);
       return;
     }
     String in = input[istate].getText(); 
-    if (!input[istate].isForcedModel() && in.length() > 0) {
+    if (!input[istate].isForcedModel() && in.length() > 0 && !shift) {
       input[istate].addSuggestion(in);
     }
     input[istate].resetLastSuggestionIndex();
     switch (istate) {
     case ISTATE_INPUT:
-      input[istate].setText("");
-      if (in.startsWith(settings.string(Settings.BASH_PREFIX_STRING))) {
-        String s = in.substring(settings.string(Settings.BASH_PREFIX_STRING).length()); 
-        views[ISTATE_INPUT].ftp.addText(s + "\n", STYLE_BASH_INPUT);
-        bash[istate].input(s);
+      if (!shift) {
+        input[istate].setText("");
+        if (in.startsWith(settings.string(Settings.BASH_PREFIX_STRING))) {
+          String s = in.substring(settings.string(Settings.BASH_PREFIX_STRING).length()); 
+          views[ISTATE_INPUT].ftp.addText(s + "\n", STYLE_BASH_INPUT);
+          bash[istate].input(s);
+        } else {
+          views[ISTATE_INPUT].ftp.addText(in + "\n", STYLE_CONN_IN);
+          serial.transmit(in + "\n");
+        }
       } else {
-        views[ISTATE_INPUT].ftp.addText(in + "\n", STYLE_CONN_IN);
-        serial.transmit(in + "\n");
+        input[istate].setFilterNewLine(false);
+        try {
+          input[istate].getDocument().insertString(input[istate].getCaretPosition(), "\n", null);
+        } catch (BadLocationException e) {}
+        input[istate].setFilterNewLine(true);
       }
       break;
     case ISTATE_FIND:
@@ -640,9 +659,30 @@ public class WorkArea extends JPanel implements Disposable {
       bash[istate].input(in);
       input[istate].setText("");
       break;
+    case ISTATE_SCRIPT:
+      if (!shift) {
+        getCurrentView().ftp.addText(in + "\n", STYLE_BASH_INPUT);
+        script.runScript(this, in + "\n");
+        input[istate].setText("");
+      } else {
+        input[istate].setFilterNewLine(false);
+        try {
+          input[istate].getDocument().insertString(input[istate].getCaretPosition(), "\n", null);
+        } catch (BadLocationException e) {}
+        input[istate].setFilterNewLine(true);
+      }
+      break;
     default:
       break;
     }
+  }
+  
+  public View getCurrentView() {
+    return curView;
+  }
+  
+  public void appendViewText(View view, String text, FastTextPane.Style style) {
+    view.ftp.addText(text, style);
   }
   
   String serialMatch(final String prefix, final String in, final String[] defs, 
@@ -750,6 +790,12 @@ public class WorkArea extends JPanel implements Disposable {
     }
   }
   
+  void actionScript(boolean shift) {
+    if (istate != ISTATE_HEX) {
+      WorkArea.this.enterInputState(ISTATE_SCRIPT);
+    }
+  }
+  
   void actionBash() {
     WorkArea.this.enterInputState(ISTATE_BASH);
   }
@@ -767,7 +813,9 @@ public class WorkArea extends JPanel implements Disposable {
       return;
     }
     if (s.size() == 1) {
+      input[istate].setFilterNewLine(false);
       input[istate].setText(s.get(0));
+      input[istate].setFilterNewLine(true);
       return;
     }
     String[] arr = s.toArray(new String[s.size()]);
@@ -919,6 +967,13 @@ public class WorkArea extends JPanel implements Disposable {
     @Override
     public void actionPerformed(ActionEvent e) {
       actionHex(false);
+    }
+  };
+
+  AbstractAction actionOpenScript = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      actionScript(false);
     }
   };
 
@@ -1160,7 +1215,9 @@ public class WorkArea extends JPanel implements Disposable {
   
   public boolean onKeyEnter(ActionEvent e) {
     if (winSug.isVisible()) {
+      ((ProcessACTextField)e.getSource()).setFilterNewLine(false);
       ((ProcessACTextField)e.getSource()).setText(winSugList.getSelectedValue());
+      ((ProcessACTextField)e.getSource()).setFilterNewLine(true);
       winSug.setVisible(false);
       return false;
     }
@@ -1282,7 +1339,7 @@ public class WorkArea extends JPanel implements Disposable {
     }
   } // class AutoAdjustmentListener
 
-  class View extends JPanel implements MouseListener {
+  public class View extends JPanel implements MouseListener {
     FastTermPane ftp;
     FastTextPane ftpSec;
     JSplitPane splitVer, splitHor;

@@ -6,11 +6,10 @@ import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.pelleplutt.plang.proc.Assembler;
 import com.pelleplutt.plang.proc.ExtCall;
 import com.pelleplutt.plang.proc.Processor;
-import com.pelleplutt.plang.proc.ProcessorError;
 import com.pelleplutt.plang.proc.Processor.M;
+import com.pelleplutt.plang.proc.ProcessorError;
 import com.pelleplutt.plang.proc.ProcessorError.ProcessorFinishedError;
 
 public class CLI {
@@ -20,12 +19,13 @@ public class CLI {
   void run() throws IOException {
     Processor.addCommonExtdefs(extDefs);
 
-    Compiler compiler = new Compiler(extDefs, 0x0000, 0x4000);
-    Processor p = new Processor(0x10000);
+    Compiler comp = new Compiler(extDefs, 0x4000, 0x0000);
+    Processor proc = new Processor(0x10000);
 
     BufferedReader c = new BufferedReader(new InputStreamReader(System.in));
     String line;
-    Executable e;
+    Executable exe = null;
+    Executable pexe = null;
     StringBuilder input = new StringBuilder();
     while ((line = c.readLine()) != null) {
       if (line.endsWith("\\")) {
@@ -37,26 +37,17 @@ public class CLI {
       String src = input.toString();
       input = new StringBuilder();
       try {
-        e = compiler.compileIncrementally(src);
+        exe = comp.compileIncrementally(src, pexe);
+        pexe = exe;
       } catch (CompilerError ce) {
-        String s = src;
-        int strstart = ce.getStringStart();
-        int strend = ce.getStringEnd();
-        if (strstart > 0) {
-          int ps = Math.max(0, strstart - 50);
-          int pe = Math.min(s.length(), strend + 50);
-          System.out.println(ce.getMessage());
-          System.out.println("... " + s.substring(ps, strstart) + 
-              " -->" + s.substring(strstart, strend) + "<-- " +
-              s.substring(strend, pe) + " ...");
-        }
+        comp.printCompilerError(System.out, Compiler.getSource(), ce);
         continue;
       }
       int i = 0;
-      p.setExe(e);
+      proc.setExe(exe);
       try {
         for (; i < 10000000*1+800000; i++) {
-          p.step();
+          proc.step();
         }
       } catch (ProcessorFinishedError pfe) {
         M m = pfe.getRet();
@@ -65,10 +56,10 @@ public class CLI {
         }
       }
       catch (ProcessorError pe) {
-        p.dumpError(pe, System.out);
+        proc.dumpError(pe, System.out);
         pe.printStackTrace(System.err);
       } finally {
-        p.reset();
+        proc.reset();
       }
     }
   }

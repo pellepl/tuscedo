@@ -17,4 +17,5 @@ public interface MSet {
   public void remove(M m);
   public M getElement(int ix);
   public int getType();
+  public MSet copyShallow();
 }

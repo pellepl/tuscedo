@@ -130,8 +130,8 @@ public class CodeGenBack implements ByteCode {
   void compileFrag(ModuleFragment frag) {
     // translate to machine code
     frag.locals = new HashMap<TACVar, Integer>();
-    for (int i = 0; i < frag.tacs.size(); i++) {
-      List<TAC> tacBlock = frag.tacs.get(i);
+    for (int i = 0; i < frag.getTACBlocks().size(); i++) {
+      List<TAC> tacBlock = frag.getTACBlocks().get(i);
       for (TAC tac : tacBlock) {
         compileTAC(tac, frag);
         //peepholeOptimise(frag);
@@ -806,6 +806,13 @@ public class CodeGenBack implements ByteCode {
     else if (a instanceof TACArgv) {
       pushNumber(frag, -1, "create argv array");
       addCode(frag, stackInfo(), ISET_CRE);
+    }
+    else if (a instanceof TACMapTuple) {
+      pushValue(((TACMapTuple) a).key, frag);
+      pushValue(((TACMapTuple) a).val, frag);
+      sp--;
+      addCode(frag, stackInfo() + a, ITUP_CRE);
+
     }
     else if (a instanceof TACOp) {
       // already on stack

@@ -285,10 +285,13 @@ public class Assembler implements ByteCode {
 	  	else if (op.equals("set_cre")) {
 	  		baos.write(ISET_CRE);
 	  	}
-	  	else if (op.equals("arr_cre")) {
-	  		baos.write(IARR_CRE);
-	  		baos.write(stobytesreg("mem", tokens[1], 3));
-	  	}
+      else if (op.equals("arr_cre")) {
+        baos.write(IARR_CRE);
+        baos.write(stobytesreg("mem", tokens[1], 3));
+      }
+      else if (op.equals("tup_cre")) {
+        baos.write(ITUP_CRE);
+      }
 	  	else if (op.equals("set_drf")) {
 	  		baos.write(ISET_DRF);
 	  	}
@@ -720,6 +723,9 @@ public class Assembler implements ByteCode {
     case IARR_CRE:
       sb.append("arr_cre ");
       sb.append(String.format("mem[0x%06x]", Processor.codetoi(code, pc, 3)));
+      break;
+    case ITUP_CRE:
+      sb.append("tup_cre ");
       break;
     case ISET_DRF:
       sb.append("set_drf ");

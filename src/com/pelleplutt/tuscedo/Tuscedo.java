@@ -33,6 +33,7 @@ public class Tuscedo {
   static List<Window> windows = new ArrayList<Window>();
   static volatile int __tabId;
   
+  
   private Tuscedo() {
   }
   

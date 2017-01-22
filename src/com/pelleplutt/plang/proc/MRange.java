@@ -104,5 +104,9 @@ public class MRange implements MSet {
   public String toString() {
     return start + "#" + step + "#" + end;
   }
-  
+
+  @Override
+  public MSet copyShallow() {
+    return this;
+  }
 }

@@ -7,7 +7,6 @@ public class Module {
   String id;
   List<ModuleFragment> frags = new ArrayList<ModuleFragment>();
   boolean compiled;
-  boolean linked;
   
   public String toString() {
     StringBuffer sb = new StringBuffer();

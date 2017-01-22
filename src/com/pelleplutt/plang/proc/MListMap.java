@@ -22,6 +22,12 @@ public class MListMap implements MSet {
     type = TTUP;
     tup = new M[2];
   }
+  public void makeTup(M key, M val) {
+    makeTup();
+    tup[0] = key;
+    tup[1] = val;
+  }
+
   public void makeMap() {
     type = TMAP;
     map = new HashMap<Object, M>();
@@ -179,6 +185,25 @@ public class MListMap implements MSet {
   
   public int getType() {
   	return this.type;
+  }
+  
+  @Override
+  public MSet copyShallow() {
+    MListMap ml = new MListMap();
+    int len = size();
+    if (getType() != TMAP) {
+      for (int i = 0; i < len; i++) {
+        ml.add(new M().copy(get(i)));
+      }
+    } else {
+      ml.makeMap();
+      Object keys[] = map.keySet().toArray();
+      for (int i = 0; i < len; i++) {
+        ml.map.put(keys[i], new M().copy(map.get(keys[i])));
+      }
+    }
+    ml.type = getType();
+    return ml;
   }
   
   protected void stringifyAppend(MListMap m, StringBuilder s, int depth) {

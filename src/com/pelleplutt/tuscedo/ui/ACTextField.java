@@ -50,6 +50,8 @@ public class ACTextField extends JTextPane implements CaretListener {
   /** Indicates if setText was called, set during update */
   volatile boolean temporaryStringUpdate;
   
+  volatile boolean filterNewLine;
+  
   public ACTextField() {
     setDocument(new DefaultStyledDocument());
     ((AbstractDocument)getDocument()).setDocumentFilter(filter);
@@ -75,6 +77,15 @@ public class ACTextField extends JTextPane implements CaretListener {
     history.index = -1;
     userModel = new Model();
     userModel.index = -1;
+    filterNewLine = true;
+  }
+  
+  /**
+   * Disable/enable newline filtering
+   * @param f
+   */
+  public void setFilterNewLine(boolean f) {
+    filterNewLine = f;
   }
   
   /**
@@ -455,7 +466,9 @@ public class ACTextField extends JTextPane implements CaretListener {
     public void insertString(FilterBypass fb, int offset, String string,
         AttributeSet attr) throws BadLocationException {
       if (userString == null) userString = "";
-      string = string.replaceAll("\\r?\\n", "");
+      if (filterNewLine) {
+        string = string.replaceAll("\\r?\\n", "");
+      }
       if (string.equals(PROGRAMMATICALLY_TRIGGER_STRING)) {
         handleUpdate(fb, PROGRAMMATICALLY_TRIGGER_OFFSET, userString);
       } else {
@@ -468,7 +481,9 @@ public class ACTextField extends JTextPane implements CaretListener {
     public void replace(FilterBypass fb, int offset, int length, String text,
         AttributeSet attrs) throws BadLocationException {
       if (userString == null) userString = "";
-      text = text.replaceAll("\\r?\\n", "");
+      if (filterNewLine) {
+        text = text.replaceAll("\\r?\\n", "");
+      }
       int usLen = userString.length();
       String refString = userString;
       if (offset >= usLen) refString = ACTextField.super.getText();

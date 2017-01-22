@@ -57,7 +57,7 @@ public class Grammar {
           "cond_op:       if else\n" +
           "expr:          expr_op_bin expr_op_una\n" +
           "num:           numi numd numih numib\n" +
-          "val:           num sym call expr rel_op dot arrdecl arrderef str\n" +
+          "val:           num sym call expr rel_op dot arrdecl arrderef str tuple\n" +
           "arg:           val str code range nil\n" +
           "maparg:        arg tuple\n" +
           "op:            expr assign_op\n" +

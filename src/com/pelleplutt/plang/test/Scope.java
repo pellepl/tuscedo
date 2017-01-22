@@ -169,4 +169,18 @@ public class Scope {
         "map=['value':'fromb'];\n";
     assertEquals("frombfroma", Processor.compileAndRun(sB, sA).str); 
   }
+  @Test
+  public void testModularFunc() {
+    String sA, sB;
+    sA = 
+        "module a;\n" +
+        "func genericname() {return 1;}\n" +
+        "c = ['genericname':{return 100;}];\n" +
+        "return genericname() + b.genericname() + c.genericname() + b.d.genericname();\n";
+    sB = 
+        "module b;\n" +
+        "d = ['genericname':{return 1000;}];\n" +
+        "func genericname() {return 10;}\n";
+    assertEquals(1111, Processor.compileAndRun(sB, sA).i); 
+  }
 }

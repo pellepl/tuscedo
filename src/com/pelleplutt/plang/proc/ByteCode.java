@@ -93,6 +93,7 @@ public interface ByteCode {
   static final int ISET_RD  = 0x59; // read set entry                ix=pop(); s=pop(); push(s[ix]);
   static final int IRNG2    = 0x5a; // range(from,to)                push(range(pop(to), pop(from));
   static final int IRNG3    = 0x5b; // range(from,step,to)           push(range(pop(to), pop(step), pop(from));
+  static final int ITUP_CRE = 0x5c; // create tuple                  push(tuple(pop(),pop()));
 
   static final int ICALL    = 0xe0; // call function                 (argc on stack) a=pop(); push($pc+3); push($fp); $fp=sp; $pc=a
   static final int ICALL_IM = 0xe1; // call function immediate       (argc on stack) push($pc+3); push($fp); $fp=sp; $pc=xxxxxx
@@ -134,7 +135,7 @@ public interface ByteCode {
         1, 1, 1, 2, 1, 4, 1, 4, 2, 2,UD,UD, 2, 2,UD,UD, //2x
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, //3x
         1, 1, 1, 1,UD,UD,UD,UD, 1,UD,UD,UD,UD,UD,UD,UD, //4x
-        1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,UD,UD,UD,UD, //5x
+        1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,UD,UD,UD, //5x
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //6x
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //7x
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //8x
