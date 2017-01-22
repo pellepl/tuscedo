@@ -49,7 +49,7 @@ import javax.swing.plaf.basic.BasicScrollBarUI;
 import javax.swing.text.BadLocationException;
 
 import com.pelleplutt.Essential;
-import com.pelleplutt.tuscedo.PlangScript;
+import com.pelleplutt.tuscedo.OperandiScript;
 import com.pelleplutt.tuscedo.ProcessGroup;
 import com.pelleplutt.tuscedo.ProcessGroupInfo;
 import com.pelleplutt.tuscedo.Serial;
@@ -144,7 +144,7 @@ public class WorkArea extends JPanel implements Disposable {
   List<OffsetSpan> findResult;
   Settings settings;
   Serial serial;
-  PlangScript script;
+  OperandiScript script;
   
   static String[] prevSerialDevices;
   
@@ -206,7 +206,7 @@ public class WorkArea extends JPanel implements Disposable {
   public WorkArea() {
     settings = Settings.inst();
     serial = new Serial(this);
-    script = new PlangScript();
+    script = new OperandiScript();
   }
   
   public static void decorateFTP(FastTextPane ftp) {
