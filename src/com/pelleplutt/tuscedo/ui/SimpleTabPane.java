@@ -163,7 +163,7 @@ public class SimpleTabPane extends JPanel {
 
     return tab;
   }
-
+  
   Tab getTab(String id) {
     for (Tab t : tabs) {
       if (t.id.equals(id)) {
@@ -326,6 +326,9 @@ public class SimpleTabPane extends JPanel {
   public void onEvacuationNewWindow(Window w) {
   }
 
+  public void onEvacuationNewTab(Tab oldTab, Tab newTab) {
+  }
+
   public void evacuateTab(Tab tab, Point location) {
     if (tab.owner.tabs.size() < 2) {
       Window w = SwingUtilities.windowForComponent(tab);
@@ -337,6 +340,7 @@ public class SimpleTabPane extends JPanel {
     SimpleTabPane.this.removeTab(tab, false, true);
     Tab newTab = newPane.createTab(tab.id, tab.content);
     newTab.setText(tab.getText());
+    onEvacuationNewTab(tab, newTab);
     createNewWindow(newPane, SwingUtilities.getWindowAncestor(this).getSize(), 
         location);
   }

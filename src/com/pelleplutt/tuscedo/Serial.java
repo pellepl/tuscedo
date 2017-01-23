@@ -16,7 +16,7 @@ import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.io.Port;
 import com.pelleplutt.util.io.PortConnector;
 
-public class Serial implements SerialStreamProvider {
+public class Serial implements SerialStreamProvider, Tickable {
   PortConnector serial;
   InputStream serialIn;
   OutputStream serialOut;
@@ -147,12 +147,14 @@ public class Serial implements SerialStreamProvider {
   final Runnable pushSerialToLogRunnable = new Runnable() {
     @Override
     public void run() {
-      String t;
+      String t = null;
       synchronized (serialBuf) {
-        t = new String(serialBuf, 0, serialBufIx);
-        serialBufIx = 0;
+        if (serialBufIx > 0) {
+          t = new String(serialBuf, 0, serialBufIx);
+          serialBufIx = 0;
+        }
       }
-      area.onSerialData(t);
+      if (t != null) area.onSerialData(t);
     }
   };
 
@@ -217,6 +219,14 @@ public class Serial implements SerialStreamProvider {
       //Log.println("closing attached stream " + this);
       super.close();
       deattachSerialIO(attached);
+    }
+  }
+
+
+  @Override
+  public void tick() {
+    if (serialRunning) {
+      SwingUtilities.invokeLater(pushSerialToLogRunnable);
     }
   }
 }

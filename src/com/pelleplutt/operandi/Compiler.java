@@ -39,59 +39,64 @@ public class Compiler {
   static int stringix = 0;
   Map<String, ExtCall> extDefs;
   Linker linker;
-  IntermediateRepresentation ir = null;
+  IntermediateRepresentation ir = new IntermediateRepresentation();
   
-  public static Executable compile(Map<String, ExtCall> extDefs, int ramOffs, int constOffs, String ...sources) {
+  public static Executable compileOnce(Map<String, ExtCall> extDefs, int ramOffs, int constOffs, String ...sources) {
     Source srcs[] = new Source[sources.length];
     int i = 0;
     for (String s : sources) {
       srcs[i++] = new Source.SourceString("<string" + (stringix++) + ">", s);
     }
-    return compile(extDefs, ramOffs, constOffs, srcs);
+    return compileOnce(extDefs, ramOffs, constOffs, srcs);
   }
-
-  public static Executable compile(Map<String, ExtCall> extDefs, int ramOffs, int constOffs, Source ...sources) {
-    IntermediateRepresentation ir = null;
+  public Executable compileIncrementally(String src, Executable exe) {
+    return compileIncrementally(new SourceString("<string" + (stringix++) + ">", src), exe);
+  }
+  public static Executable compileOnce(Map<String, ExtCall> extDefs, int ramOffs, int constOffs, Source ...sources) {
+    return new Compiler(extDefs, ramOffs, constOffs).compile(sources);
+  }
+  public Executable compileIncrementally(Source src, Executable prevExe) {
+    Executable exe = null;
+    try {
+      Compiler.src = src;
+      ASTNodeBlok e = AST.buildTree(src.getSource());
+      ASTOptimiser.optimise(e);
+      Grammar.check(e);
+      StructAnalysis.analyse(e, ir);
+      ir = CodeGenFront.genIR(e, ir, src);
+      CodeGenBack.compile(ir);
+      ir.accumulateGlobals();
+      linker.wipeRunOnceCode(prevExe);
+      exe = linker.link(ir, extDefs, true, prevExe);
+    } finally {
+      if (ir != null) ir.clearModules();
+    }
+    return exe;
+  }
+  
+  public Executable compile(Source ...sources) {
     for (Source osrc : sources) {
       String src = osrc.getSource();
       Compiler.src = osrc;
-      //System.out.println("* 1. build tree");
-      //AST.dbg = true;
       ASTNodeBlok e = AST.buildTree(src);
-      //System.out.println(e);
-      
-      //System.out.println("* 2. optimise tree");
       ASTOptimiser.optimise(e);
-      //System.out.println(e);
-  
-      //System.out.println("* 3. check grammar");
-      //Grammar.dbg = true;
       Grammar.check(e);
-  
-      //System.out.println("* 4. structural analysis");
-      //StructAnalysis.dbg = true;
       StructAnalysis.analyse(e, ir);
-      
-      //System.out.println("* 5. intermediate codegen");
-      //CodeGenFront.dbg = true;
-      //CodeGenFront.dbgUnwind = true;
       ir = CodeGenFront.genIR(e, ir, osrc);
-  
-      //System.out.println("* 6. backend codegen");
-      //CodeGenBack.dbg = true;
       CodeGenBack.compile(ir);
-      
       ir.accumulateGlobals();
     }
     TAC.dbgResolveRefs = true;
 
-    //System.out.println("* link");
-    //Linker.dbg = true;
-    Executable exe = Linker.link(ir, ramOffs, constOffs, extDefs, true);
-    
-    //System.out.println(".. all ok, " + exe.machineCode.length + " bytes of code, pc start @ 0x" + Integer.toHexString(exe.getPCStart()));
-    
+    Executable exe = linker.link(ir, extDefs, true);
+
     return exe;
+  }
+  
+  public void injectGlobalVariable(String module, String varName) {
+    if (module == null) module = ".main";
+    ir.injectGlobalVariable(module, varName);
+    linker.injectGlobalVariable(module, varName);
   }
 
   public static Source getSource() {
@@ -138,28 +143,6 @@ public class Compiler {
 
   }
   
-  public Executable compileIncrementally(String src, Executable exe) {
-    return compileIncrementally(new SourceString("<string" + (stringix++) + ">", src), exe);
-  }
-  public Executable compileIncrementally(Source src, Executable prevExe) {
-    Executable exe = null;
-    try {
-      Compiler.src = src;
-      ASTNodeBlok e = AST.buildTree(src.getSource());
-      ASTOptimiser.optimise(e);
-      Grammar.check(e);
-      StructAnalysis.analyse(e, ir);
-      ir = CodeGenFront.genIR(e, ir, src);
-      CodeGenBack.compile(ir);
-      ir.accumulateGlobals();
-      linker.wipeRunOnceCode(prevExe);
-      exe = linker.link(ir, extDefs, true, prevExe);
-    } finally {
-      if (ir != null) ir.clearModules();
-    }
-    return exe;
-  }
-
   public Linker getLinker() {
     return linker;
   }

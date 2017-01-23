@@ -97,9 +97,8 @@ public class Linker implements ByteCode {
    * Injects a global variable into linker
    * @param module module name, may be null for unnamed module
    * @param name variable name
-   * @return memory address for variable
    */
-  public int injectGlobalVariable(String module, String name) {
+  void injectGlobalVariable(String module, String name) {
     if (symbolVarOffset == - 1) {
       if (ramOffset != constOffset) {
         symbolVarOffset = ramOffset;
@@ -111,23 +110,28 @@ public class Linker implements ByteCode {
     String modname = module == null ? ".main" : module;
     TACVar var = new TACVar(null, name, modname, modname, ".0");
     
-    int symAddr; 
     if (!globalAddrLUT.containsKey(var)) {
-      symAddr = symbolVarOffset;
       globalAddrLUT.put(var, symbolVarOffset++);
-    } else {
-      symAddr = globalAddrLUT.get(var);
     }
-    return symAddr;
   }
 
-  public int lookupFunction(String func) {
+  public int lookupFunctionAddress(String func) {
     if (fragAddrLUT.containsKey(func)) {
       return fragAddrLUT.get(func);
     } else if (extDefs.containsKey(func)){
       return getExtCallAddress(func);
     }
     throw new Error("function " + func + " not found");
+  }
+
+  public int lookupVariableAddress(String module, String var) {
+    if (module == null) module = ".main";
+    TACVar tvar = new TACVar(null, var, module, module, ".0");
+
+    if (globalAddrLUT.containsKey(tvar)) {
+      return globalAddrLUT.get(tvar);
+    }
+    throw new Error("variable" + tvar + " not found");
   }
 
   /**

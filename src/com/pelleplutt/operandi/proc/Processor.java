@@ -1237,6 +1237,7 @@ public class Processor implements ByteCode {
   }
   
   String lastSrcLine = null;
+  
   void stepSrc(PrintStream out) {
     String d = exe.getSrcDebugInfoPrecise(pc);
     if (d != null) {
@@ -1757,6 +1758,9 @@ public class Processor implements ByteCode {
   public int getFP() {
     return fp;
   }
+  public M getMe() {
+    return me;
+  }
   
   static byte[] assemble(String s) {
     return Assembler.assemble(s);
@@ -2043,7 +2047,7 @@ public class Processor implements ByteCode {
     M ret = null;
     Executable e = null;
     try {
-      e = Compiler.compile(extDefs, ramOffs, constOffs, sources);
+      e = Compiler.compileOnce(extDefs, ramOffs, constOffs, sources);
     } catch (CompilerError ce) {
       Source src = Compiler.getSource();
       String s = src.getCSource();

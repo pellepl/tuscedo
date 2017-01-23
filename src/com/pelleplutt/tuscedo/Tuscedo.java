@@ -8,12 +8,11 @@ import java.awt.Point;
 import java.awt.Window;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
@@ -22,19 +21,25 @@ import javax.swing.WindowConstants;
 
 import com.pelleplutt.tuscedo.ui.GraphPanel;
 import com.pelleplutt.tuscedo.ui.SimpleTabPane;
+import com.pelleplutt.tuscedo.ui.SimpleTabPane.Tab;
 import com.pelleplutt.tuscedo.ui.WorkArea;
 import com.pelleplutt.util.AppSystem;
 
 import purejavacomm.CommPortIdentifier;
 
-public class Tuscedo {
+public class Tuscedo implements Runnable {
   Container mainContainer;
   static Tuscedo inst;
   static List<Window> windows = new ArrayList<Window>();
   static volatile int __tabId;
-  
+  volatile boolean running = true;
+  List <Tickable> tickables = new ArrayList<Tickable>();
+  Map <String, Tab> tabs = new HashMap<String, Tab>();
   
   private Tuscedo() {
+    Thread t = new Thread(this, "commonticker");
+    t.setDaemon(true);
+    t.start();
   }
   
   public static Tuscedo inst() {
@@ -42,6 +47,18 @@ public class Tuscedo {
       inst = new Tuscedo();
     }
     return inst;
+  }
+  
+  public void registerTickable(Tickable t) {
+    synchronized (tickables) {
+      if (!tickables.contains(t)) tickables.add(t);
+    }
+  }
+  
+  public void deregisterTickable(Tickable t) {
+    synchronized (tickables) {
+      tickables.remove(t);
+    }
   }
   
   public void registerWindow(Window w) {
@@ -87,30 +104,33 @@ public class Tuscedo {
     f.setVisible(true);
   }
   
-  public void addWorkAreaTab(SimpleTabPane stp) {
+  public String addWorkAreaTab(SimpleTabPane stp) {
     WorkArea w = new WorkArea();
     w.build();
-    stp.selectTab(stp.createTab(Tuscedo.getTabID(), w));
+    String tabID = Tuscedo.getTabID();
+    Tab t = stp.createTab(tabID, w);
+    stp.selectTab(t);
     w.updateTitle();
     w.setStandardFocus();
+    tabs.put(tabID, t);
+    return tabID;
   }
   
-  public void addGraphTab(SimpleTabPane stp, String input) {
+  public String addGraphTab(SimpleTabPane stp, List<Float> vals) {
     GraphPanel gp = new GraphPanel();
-    stp.selectTab(stp.createTab(Tuscedo.getTabID(), gp));
-    BufferedReader reader = new BufferedReader(new StringReader(input));
-    String line;
-    try {
-      while ((line = reader.readLine()) != null) {
-        try {
-          double d = Double.parseDouble(line);
-          gp.addSample(d);
-        } catch (NumberFormatException nfe) {} 
-      }
-      gp.zoomAll(true, true, new Point());
-    } catch (IOException e) {
-      e.printStackTrace();
+    String tabID = Tuscedo.getTabID();
+    Tab t = stp.createTab(tabID, gp);
+    stp.selectTab(t);
+    if (vals != null) {
+      for (float s : vals) gp.addSample(s);
     }
+    gp.zoomAll(true, true, new Point());
+    tabs.put(tabID, t);
+    return tabID;
+  }
+  
+  public Tab getTab(String id) {
+    return tabs.get(id);
   }
   
   public class TuscedoTabPane extends SimpleTabPane implements SimpleTabPane.TabListener {
@@ -129,12 +149,16 @@ public class Tuscedo {
     }
     
     @Override
+    public void onEvacuationNewTab(Tab oldTab, Tab newTab) {
+      tabs.put(oldTab.id, newTab);
+    }
+
+    @Override
     public void tabRemoved(SimpleTabPane tp, Tab t, Component content) {
       if (content instanceof WorkArea) {
-        //Log.println("dispose workarea ..");
         ((WorkArea)content).dispose();
-        //Log.println("disposed workarea");
       }
+      tabs.remove(t.getID());
     }
     @Override
     public void tabPaneEmpty(SimpleTabPane pane) {
@@ -203,5 +227,20 @@ public class Tuscedo {
   public static String getTabID() {
     __tabId++;
     return "TAB" + __tabId;
+  }
+
+  @Override
+  public void run() {
+    while (running) {
+      int i = 0;
+      for (i = 0; i < tickables.size(); i++) {
+        try {
+          tickables.get(i).tick();
+        } catch (Throwable t) {
+          t.printStackTrace();
+        }
+      }
+      AppSystem.sleep(200);
+    }
   }
 }

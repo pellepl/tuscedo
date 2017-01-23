@@ -207,6 +207,7 @@ public class WorkArea extends JPanel implements Disposable {
     settings = Settings.inst();
     serial = new Serial(this);
     script = new OperandiScript();
+    Tuscedo.inst().registerTickable(serial);
   }
   
   public static void decorateFTP(FastTextPane ftp) {
@@ -1152,6 +1153,7 @@ public class WorkArea extends JPanel implements Disposable {
   public void dispose() {
     //Log.println("workarea close serial");
     serial.closeSerial();
+    Tuscedo.inst().deregisterTickable(serial);
     winSug.dispose();
     for (Bash b : bash) {
       //Log.println("workarea close bash " + b);
@@ -1420,11 +1422,6 @@ public class WorkArea extends JPanel implements Disposable {
     public void mousePressed(MouseEvent e) {
       if (SwingUtilities.isRightMouseButton(e)) {
         // TODO menuize
-        String input = ((FastTextPane)e.getSource()).getSelectedText();
-        if (input != null) {
-          Tuscedo.inst().addGraphTab(SimpleTabPane.getTabByComponent(WorkArea.this).getPane(),
-              input);
-        }
       }
     }
 

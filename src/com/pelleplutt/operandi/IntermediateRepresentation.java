@@ -10,7 +10,9 @@ import com.pelleplutt.operandi.ASTNode.ASTNodeSymbol;
 
 public class IntermediateRepresentation {
   private List<Module> modules = new ArrayList<Module>();
+  // module / symbol pairs from previous sources
   private Map<String, List<ASTNodeSymbol>> accGlobalVars = new HashMap<String, List<ASTNodeSymbol>>();
+  // module / symbol pairs from current sources
   private Map<String, List<ASTNodeSymbol>> curGlobalVars = new HashMap<String, List<ASTNodeSymbol>>();
   
   public void setModules(List<Module> modules) {
@@ -51,5 +53,15 @@ public class IntermediateRepresentation {
   
   public List<Module> getModules() {
     return modules;
+  }
+
+  public void injectGlobalVariable(String module, String varName) {
+    ASTNodeSymbol esym = new ASTNodeSymbol(varName);
+    List<ASTNodeSymbol> modGlobs = curGlobalVars.get(module);
+    if (modGlobs == null) {
+      modGlobs = new ArrayList<ASTNodeSymbol>(); 
+      curGlobalVars.put(module, modGlobs);
+    }
+    if (!modGlobs.contains(esym)) modGlobs.add(esym);
   }
 }
