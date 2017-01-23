@@ -18,11 +18,9 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JViewport;
-import javax.swing.WindowConstants;
 
 public class GraphPanel extends JPanel {
   public static final int GRAPH_LINE = 0;
@@ -79,6 +77,11 @@ public class GraphPanel extends JPanel {
         oldH = getHeight();
       }
     });
+  }
+  
+  public void setGraphType(int type) {
+    graphType = type;
+    repaint();
   }
   
   protected void addSampleInternal(double sample) {
@@ -155,6 +158,7 @@ public class GraphPanel extends JPanel {
       
       g.setColor(Color.darkGray);
       double y = (int)(minViewSample / unitStep) * unitStep;
+      int guard = 0;
       while (y <= maxViewSample) {
         int gy = hh - (int)(magVer * (y - minGSample)); 
         g.setColor(Color.darkGray);
@@ -170,6 +174,7 @@ public class GraphPanel extends JPanel {
           g.drawString(decFormat.format(y), vpx, gy);
         }
         y += unitStep;
+        if (guard++ > vph) return;
       }
       g.setColor(Color.gray);
       g.drawLine( 0, hh - origoY, ww, hh - origoY);

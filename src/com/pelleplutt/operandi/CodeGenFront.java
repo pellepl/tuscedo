@@ -406,7 +406,7 @@ public class CodeGenFront {
       info.trace.pop();
       return tderef;      
       
-    } else if (e.op == OP_SYMBOL || e.op == OP_ADECL || AST.isString(e.op)) {
+    } else if (e.op == OP_SYMBOL || e.op == OP_ADECL || e.op == OP_RANGE || AST.isString(e.op)) {
       
       TAC tsym = genIR(e, parentEblk, info);
       info.trace.pop();

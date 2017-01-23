@@ -69,64 +69,7 @@ public class OperandiScript {
         return null;
       }
     });
-    extDefs.put("graph", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        String name = "GRAPH";
-        List<Float> vals = null;
-        if (args != null && args.length > 0) {
-          name = args[0].asString();
-        }
-        if (args != null && args.length > 1 && args[1].type == Processor.TSET) {
-          vals = new ArrayList<Float>();
-          MSet set = args[1].ref;
-          for (int i = 0; i < set.size(); i++) {
-            M val = set.get(i);
-            vals.add(val.asFloat());
-          }
-        }
-        
-        String tabID = Tuscedo.inst().addGraphTab(SimpleTabPane.getTabByComponent(currentWA).getPane(), vals);
-        Tuscedo.inst().getTab(tabID).setText(name);
-        M graph = new Processor.M(new MListMap());
-        graph.ref.put("__id", new M(tabID));
-        M graphFunc;
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_add"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("add", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__zoom_all"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("zoom_all", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_close"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("close", graphFunc);
-        return graph;
-      }
-    });
-    extDefs.put("__graph_add", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0)  return null;
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
-        ((GraphPanel)tab.getContent()).addSample(args[0].asFloat());
-        return null;
-      }
-    });
-    extDefs.put("__zoom_all", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
-        ((GraphPanel)tab.getContent()).zoomAll(true, true, new Point());
-        return null;
-      }
-    });
-    extDefs.put("__graph_close", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
-        tab.getPane().removeTab(tab);
-        return null;
-      }
-    });
+    createGraphFunctions(extDefs);
     
     comp = new Compiler(extDefs, 0x4000, 0x0000);
     proc.reset();
@@ -185,4 +128,103 @@ public class OperandiScript {
       wa.appendViewText(view, err, WorkArea.STYLE_BASH_ERR);
     }
   }
+  
+  
+  
+  
+  
+  private void createGraphFunctions(Map<String, ExtCall> extDefs) {
+    extDefs.put("graph", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        String name = "GRAPH";
+        int type = GraphPanel.GRAPH_LINE;
+        List<Float> vals = null;
+        if (args != null) {
+          if (args.length > 0) {
+            name = args[0].asString();
+          }
+          for (int i = 1; i < args.length; i++) {
+            if (args[i].type == Processor.TSET) {
+              vals = new ArrayList<Float>();
+              MSet set = args[i].ref;
+              for (int x = 0; x < set.size(); x++) {
+                M val = set.get(x);
+                vals.add(val.asFloat());
+              }
+            }
+            else if (args[i].type == Processor.TSTR) {
+              type = parseGraphType(args[i]);
+            }
+          }
+        }
+        
+        String tabID = Tuscedo.inst().addGraphTab(SimpleTabPane.getTabByComponent(currentWA).getPane(), vals);
+        ((GraphPanel)Tuscedo.inst().getTab(tabID).getContent()).setGraphType(type);;
+        Tuscedo.inst().getTab(tabID).setText(name);
+        M graph = new Processor.M(new MListMap());
+        graph.ref.put("__id", new M(tabID));
+        M graphFunc;
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_add"));
+        graphFunc.type = Processor.TFUNC;
+        graph.ref.put("add", graphFunc);
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__zoom_all"));
+        graphFunc.type = Processor.TFUNC;
+        graph.ref.put("zoom_all", graphFunc);
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_close"));
+        graphFunc.type = Processor.TFUNC;
+        graph.ref.put("close", graphFunc);
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_type"));
+        graphFunc.type = Processor.TFUNC;
+        graph.ref.put("set_type", graphFunc);
+        return graph;
+      }
+    });
+    extDefs.put("__graph_add", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((GraphPanel)tab.getContent()).addSample(args[0].asFloat());
+        return null;
+      }
+    });
+    extDefs.put("__zoom_all", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((GraphPanel)tab.getContent()).zoomAll(true, true, new Point(0,0));
+        return null;
+      }
+    });
+    extDefs.put("__graph_close", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        tab.getPane().removeTab(tab);
+        return null;
+      }
+    });
+    extDefs.put("__graph_type", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((GraphPanel)tab.getContent()).setGraphType(parseGraphType(args[0]));
+        return null;
+      }
+    });
+  }
+  
+  int parseGraphType(M a) {
+    int type = GraphPanel.GRAPH_LINE;
+    if (a.asString().equalsIgnoreCase("plot")) {
+      type = GraphPanel.GRAPH_PLOT;
+    }
+    else if (a.asString().equalsIgnoreCase("bar")) {
+      type = GraphPanel.GRAPH_BAR;
+    }
+    return type;
+  }
+
+
 }

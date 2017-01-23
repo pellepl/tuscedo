@@ -127,4 +127,12 @@ public class MiscConstructs {
         "\n";
     assertEquals("OK", Processor.compileAndRun(false, false, sA).str); 
   }
+  @Test
+  public void testRangeMutator() {
+    String sA;
+    sA = 
+        "return (0#4)[{return $0*2;}];\n" +
+        "\n";
+    assertEquals("[0, 2, 4, 6, 8]", Processor.compileAndRun(true, false, sA).asString()); // TODO check stack!! 
+  }
 }

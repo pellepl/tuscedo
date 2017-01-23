@@ -1209,9 +1209,9 @@ public class Processor implements ByteCode {
   
   public void step() {
     try {
-      if (dbgRun)    stepInstr(System.out);
-      if (dbgRunSrc) stepSrc(System.out);
-      else           stepProc();
+      if (dbgRun)         stepInstr(System.out);
+      else if (dbgRunSrc) stepSrc(System.out);
+      else                stepProc();
     } catch (Throwable t) {
       if (t instanceof ProcessorError) throw t;
       else {
