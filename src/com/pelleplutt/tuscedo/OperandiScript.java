@@ -9,8 +9,10 @@ import java.util.Map;
 import com.pelleplutt.operandi.Compiler;
 import com.pelleplutt.operandi.CompilerError;
 import com.pelleplutt.operandi.Executable;
+import com.pelleplutt.operandi.Linker;
 import com.pelleplutt.operandi.Source;
 import com.pelleplutt.operandi.proc.ExtCall;
+import com.pelleplutt.operandi.proc.MListMap;
 import com.pelleplutt.operandi.proc.Processor;
 import com.pelleplutt.operandi.proc.Processor.M;
 import com.pelleplutt.operandi.proc.ProcessorError;
@@ -85,7 +87,12 @@ public class OperandiScript {
     }
     int i = 0;
     proc.setExe(exe);
-    proc.setMemory(fiskorvAddr, new Processor.M("fiskorven"));
+    M fiskorv = new Processor.M(new MListMap());
+    M fiskorvEntry = new Processor.M();
+    fiskorvEntry.type = Processor.TFUNC;
+    fiskorvEntry.i = comp.getLinker().lookupFunction("println");
+    fiskorv.ref.put("fu", fiskorvEntry);
+    proc.setMemory(fiskorvAddr, fiskorv);
     try {
       for (; i < 10000000; i++) {
         proc.step();

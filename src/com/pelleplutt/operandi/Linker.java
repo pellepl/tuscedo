@@ -65,7 +65,6 @@ public class Linker implements ByteCode {
     List<Module> modules = ir.getModules();
     
     fragments = new ArrayList<ModuleFragment>();
-    extCallsAddrLut = new HashMap<String, Integer>();
     this.extDefs = extDefs;
     
     int ocodeOffset = codeOffset;
@@ -120,6 +119,15 @@ public class Linker implements ByteCode {
       symAddr = globalAddrLUT.get(var);
     }
     return symAddr;
+  }
+
+  public int lookupFunction(String func) {
+    if (fragAddrLUT.containsKey(func)) {
+      return fragAddrLUT.get(func);
+    } else if (extDefs.containsKey(func)){
+      return getExtCallAddress(func);
+    }
+    throw new Error("function " + func + " not found");
   }
 
   /**
@@ -306,12 +314,13 @@ public class Linker implements ByteCode {
   int getExtCallAddress(String extCallId) {
     int codeOffset;
     if (extCallsAddrLut.containsKey(extCallId)) {
-      // already have a negative address for unresolved (external?) call
+      // already have a negative address for external call
       codeOffset = extCallsAddrLut.get(extCallId);
     } else {
-      // assign a new negative address for unresolved (external?) call
+      // assign a new negative address for external call
       codeOffset = extFunc--;
       extCallsAddrLut.put(extCallId, codeOffset);
+      extLinks.put(codeOffset, extDefs.get(extCallId));
     }
     return codeOffset;
   }
@@ -562,5 +571,4 @@ public class Linker implements ByteCode {
     }
     return null;
   }
-
 }

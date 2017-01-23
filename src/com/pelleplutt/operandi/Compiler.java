@@ -27,7 +27,7 @@ import com.pelleplutt.operandi.proc.ExtCall;
 // DONE:  "r = ['a':1,'b':2,'c':3];\n" +
 //        "r.b = r;\n" +
 //        "println(r.b.b['b'].c);\n" +
-// FIXME:  i = ["f":println]; // println external func
+// DONE:   i = ["f":println]; // println external func
 // FIXME:  goto
 // FIXME:  handle 'global' keyword
 // FIXME:  on $0..999, in StructAnalyser, replace these by internal variables so we do not need to check range all the time

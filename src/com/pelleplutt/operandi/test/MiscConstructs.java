@@ -125,9 +125,6 @@ public class MiscConstructs {
         "i = ['ext':println, 'inner':inner];\n" +
         "return 'OK';\n" +
         "\n";
-      CodeGenFront.dbg = true;
-      CodeGenBack.dbg = true;
-      Linker.dbg = true;
     assertEquals("OK", Processor.compileAndRun(false, false, sA).str); 
   }
 }
