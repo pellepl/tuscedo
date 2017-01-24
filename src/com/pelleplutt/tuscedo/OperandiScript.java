@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.pelleplutt.Essential;
 import com.pelleplutt.operandi.Compiler;
 import com.pelleplutt.operandi.CompilerError;
 import com.pelleplutt.operandi.Executable;
@@ -27,9 +28,15 @@ import com.pelleplutt.tuscedo.ui.SimpleTabPane.Tab;
 import com.pelleplutt.tuscedo.ui.WorkArea;
 import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.AppSystem.Disposable;
+import com.pelleplutt.util.io.Port;
 
 public class OperandiScript implements Runnable, Disposable {
-
+  public static final String FN_SERIAL_INFO = "__serial_info";
+  public static final String FN_SERIAL_DISCONNECT = "__serial_disconnect";
+  public static final String FN_SERIAL_CONNECT = "__serial_connect";
+  public static final String FN_SERIAL_TX = "__serial_tx";
+  public static final String FN_SERIAL_ON_RX = "__serial_on_rx";
+  public static final String FN_SERIAL_ON_RX_CLEAR = "__serial_on_rx_clear";
   Executable exe, pexe;
   Compiler comp;
   Processor proc;
@@ -42,8 +49,6 @@ public class OperandiScript implements Runnable, Disposable {
   List<RunRequest> q = new ArrayList<RunRequest>();
   String lastSrcDbg;
   
-//  // after reset, before compile
-//  comp.injectGlobalVariable(null, "fiskorv");
 //  // after compile and setExe
 //  M fiskorv = new Processor.M(new MListMap());
 //  M fiskorvEntry = new Processor.M(comp.getLinker().lookupFunctionAddress("println"));
@@ -52,6 +57,11 @@ public class OperandiScript implements Runnable, Disposable {
 //  int fiskorvAddr = comp.getLinker().lookupVariableAddress(null, "fiskorv");
 //  proc.setMemory(fiskorvAddr, fiskorv);
 
+  static Map<String, M> appVariables = new HashMap<String, M>();
+  
+  static {
+    populateAppVariables();
+  }
   
   public OperandiScript() {
     proc = new Processor(0x10000);
@@ -129,7 +139,13 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
+    extDefs.put("time", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        return new M((int)System.currentTimeMillis());
+      }
+    });
     createGraphFunctions(extDefs);
+    createSerialFunctions(extDefs);
     
     comp = new Compiler(extDefs, 0x4000, 0x0000);
     proc.reset();
@@ -169,6 +185,7 @@ public class OperandiScript implements Runnable, Disposable {
     currentWA = wa;
     currentView = wa.getCurrentView();
     proc.reset();
+    injectAppVariables(comp);
     try {
       exe = comp.compileIncrementally(src, pexe);
       pexe = exe;
@@ -182,11 +199,16 @@ public class OperandiScript implements Runnable, Disposable {
       return;
     }
     proc.setExe(exe);
+    injectAppVariablesValues(wa, comp, proc);
     runProcessor();
   }
   
   void doCallAddress(WorkArea wa, int addr, List<M> args) {
+    currentWA = wa;
+    currentView = wa.getCurrentView();
     proc.resetAndCallAddress(addr, args, null);
+    injectAppVariables(comp);
+    injectAppVariablesValues(wa, comp, proc);
     runProcessor();
   }
 
@@ -270,7 +292,89 @@ public class OperandiScript implements Runnable, Disposable {
     currentWA.appendViewText(currentView, bt, WorkArea.STYLE_BASH_INPUT);
   }
   
-  
+  private void createSerialFunctions(Map<String, ExtCall> extDefs) {
+    extDefs.put(FN_SERIAL_INFO, new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        return new M(currentWA.getConnectionInfo());
+      }
+    });
+    extDefs.put(FN_SERIAL_DISCONNECT, new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        String res = currentWA.getConnectionInfo();
+        currentWA.closeSerial();
+        return new M(res);
+      }
+    });
+    extDefs.put(FN_SERIAL_CONNECT, new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return new M(0);
+        String c = args[0].asString();
+        int atIx = c.indexOf('@');
+        int divIx = c.indexOf('/');
+        if (atIx > 0 && divIx > 0) {
+          String c2 = c.substring(0, atIx) + " ";
+          c2 += WorkArea.PORT_ARG_BAUD + c.substring(atIx+1, divIx) + " ";
+          c2 += WorkArea.PORT_ARG_DATABITS + c.charAt(divIx+1) + " "; 
+          c2 += WorkArea.PORT_ARG_STOPBITS + c.charAt(divIx+3) + " ";
+          if (c.charAt(divIx+2) == 'E') c2 += WorkArea.PORT_ARG_PARITY + Port.PARITY_EVEN_S.toLowerCase();
+          else if (c.charAt(divIx+2) == 'O') c2 += WorkArea.PORT_ARG_PARITY + Port.PARITY_ODD_S.toLowerCase();
+          else c2 += WorkArea.PORT_ARG_PARITY + Port.PARITY_NONE_S.toLowerCase();
+          c=c2;
+        }
+        boolean res = currentWA.handleOpenSerial(c);
+        return new M(res ? 1 : 0);
+      }
+    });
+    extDefs.put(FN_SERIAL_TX, new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0 || !currentWA.getSerial().isConnected()) return new M(0);
+        if (args[0].type == Processor.TSET) {
+          MSet set = args[0].ref;
+          boolean bytify = true;
+          ByteArrayOutputStream baos = new ByteArrayOutputStream(set.size());
+          for (int i = 0; i < set.size(); i++) {
+            M e = set.get(i);
+            if (e.type != Processor.TINT || e.type == Processor.TINT && (e.i < 0 || e.i > 255)) {
+              bytify = false;
+              break;
+            } else {
+              baos.write((byte)(e.i & 0xff));
+            }
+          }
+          if (bytify) {
+            currentWA.transmit(baos.toByteArray());
+          } else {
+            for (int i = 0; i < set.size(); i++) {
+              currentWA.transmit(set.get(i).asString());
+            }
+          }
+          AppSystem.closeSilently(baos);
+        } else if (args[0].type == Processor.TINT && args[0].i >= 0 && args[0].i < 255) {
+          currentWA.transmit(new byte[]{(byte)args[0].i});
+        } else {
+          currentWA.transmit(args[0].asString());
+        }
+        return new M(1);
+      }
+    });
+    extDefs.put(FN_SERIAL_ON_RX, new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 2) return null;
+        if (args[1].type != Processor.TFUNC && args[1].type != Processor.TANON) {
+          throw new ProcessorError("second argument must be function");
+        }
+        currentWA.registerSerialFilter(args[0].asString(), args[1].i);
+        return null;
+      }
+    });
+    extDefs.put(FN_SERIAL_ON_RX_CLEAR, new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        currentWA.clearSerialFilters();
+        return null;
+      }
+    });
+  }
+    
   private void createGraphFunctions(Map<String, ExtCall> extDefs) {
     extDefs.put("graph", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
@@ -503,4 +607,27 @@ public class OperandiScript implements Runnable, Disposable {
   public int lookupFunc(String f) {
     return comp.getLinker().lookupFunctionAddress(f);
   }
+  
+  static void populateAppVariables() {
+    appVariables.put("__version", new M(Essential.vMaj + "." + Essential.vMin + "." + Essential.vMic));
+    appVariables.put("ser", new M(null));
+  }
+  static void injectAppVariables(Compiler comp) {
+    for (String var : appVariables.keySet()) {
+      comp.injectGlobalVariable(null, var);
+    }
+  }
+  static void injectAppVariablesValues(WorkArea wa, Compiler comp, Processor proc) {
+    for (String var : appVariables.keySet()) {
+      int varAddr = comp.getLinker().lookupVariableAddress(null, var);
+      M val;
+      if (var.equals("ser")) {
+        val = new M(new MSerial(wa, comp));
+      } else {
+        val = appVariables.get(var);
+      }
+      proc.setMemory(varAddr, val);
+    }
+  }
+
 }

@@ -85,10 +85,10 @@ public class WorkArea extends JPanel implements Disposable {
   static final int ISTATE_SCRIPT = 6;
   static final int _ISTATE_NUM = 7;
   
-  static final String PORT_ARG_BAUD = "baud:";
-  static final String PORT_ARG_DATABITS = "databits:";
-  static final String PORT_ARG_PARITY = "parity:";
-  static final String PORT_ARG_STOPBITS = "stopbits:";
+  public static final String PORT_ARG_BAUD = "baud:";
+  public static final String PORT_ARG_DATABITS = "databits:";
+  public static final String PORT_ARG_PARITY = "parity:";
+  public static final String PORT_ARG_STOPBITS = "stopbits:";
   
   public static final Font COMMON_FONT = new Font(Font.MONOSPACED, Font.PLAIN, 11);
 
@@ -151,7 +151,12 @@ public class WorkArea extends JPanel implements Disposable {
   Settings settings;
   Serial serial;
   OperandiScript script;
-  
+  StringBuilder lineBuffer = new StringBuilder();
+  List<RxFilter> serialFilters = new ArrayList<RxFilter>();
+  List<M> filterCallArgs = new ArrayList<M>();
+  M filterCallArg0 = new M("");
+  M filterCallArg1 = new M("");
+
   static String[] prevSerialDevices;
   
   static final int[] baudRates = {
@@ -215,6 +220,8 @@ public class WorkArea extends JPanel implements Disposable {
     script = new OperandiScript();
     AppSystem.addDisposable(script);
     Tuscedo.inst().registerTickable(serial);
+    filterCallArgs.add(filterCallArg0);
+    filterCallArgs.add(filterCallArg1);
   }
   
   public static void decorateFTP(FastTextPane ftp) {
@@ -409,20 +416,37 @@ public class WorkArea extends JPanel implements Disposable {
     }
   }
   
+  public void transmit(String in) {
+    views[ISTATE_INPUT].ftp.addText(in, STYLE_CONN_IN);
+    serial.transmit(in);
+  }
+  
+  public void transmit(byte[] b) {
+    if (b != null && b.length > 0) {
+      String s = AppSystem.formatBytes(b);
+      views[ISTATE_INPUT].ftp.addText("[" + s + "]\n", STYLE_CONN_IN);
+      serial.transmit(b);
+    }
+  }
+  
+  public String getConnectionInfo() {
+    Port portSetting = serial.getSerialConfig();
+    if (portSetting != null) {
+      return portSetting.portName + "@" + portSetting.baud + "/" + 
+        portSetting.databits + Port.parityToString(portSetting.parity).charAt(0) + 
+        portSetting.stopbits;
+    } else {
+      return "";
+    }
+  }
+  
   String titleConn = "";
   String titlePwd = "";
   String titleCmd = "";
   public void updateTitle() {
     SwingUtilities.invokeLater(new Runnable() {
       public void run() {
-        Port portSetting = serial.getSerialConfig();
-        if (portSetting != null) {
-          titleConn = portSetting.portName + "@" + portSetting.baud + "/" + 
-            portSetting.databits + Port.parityToString(portSetting.parity).charAt(0) + 
-            portSetting.stopbits;
-        } else {
-          titleConn = "";
-        }
+        titleConn = getConnectionInfo();
         File pwd = bash[istate] != null ? bash[istate].pwd : null;
         if (pwd != null) {
           titlePwd = bash[istate].pwd.getAbsolutePath();
@@ -517,7 +541,8 @@ public class WorkArea extends JPanel implements Disposable {
     }
   }
   
-  public void handleOpenSerial(String s) {
+  public boolean handleOpenSerial(String s) {
+    boolean res = false;
     input[ISTATE_OPEN_SERIAL].setEnabled(false);
     try {
       serial.closeSerial();
@@ -546,13 +571,15 @@ public class WorkArea extends JPanel implements Disposable {
       serial.open(portSetting);
       
       views[ISTATE_INPUT].ftp.addText("Connected\n", STYLE_SERIAL_INFO);
-      enterInputState(ISTATE_INPUT);
+      if (istate == ISTATE_OPEN_SERIAL) enterInputState(ISTATE_INPUT);
+      res=true;
     } catch (Exception e) {
       views[ISTATE_INPUT].ftp.addText("Failed [" + e.getMessage() + "]\n", STYLE_SERIAL_ERR);
     } finally {
       input[ISTATE_OPEN_SERIAL].setEnabled(true);
       updateTitle();
     }
+    return res;
   }
 
   public void enterInputState(int istate) {
@@ -630,8 +657,7 @@ public class WorkArea extends JPanel implements Disposable {
           views[ISTATE_INPUT].ftp.addText(s + "\n", STYLE_BASH_INPUT);
           bash[istate].input(s);
         } else {
-          views[ISTATE_INPUT].ftp.addText(in + "\n", STYLE_CONN_IN);
-          serial.transmit(in + "\n");
+          transmit(in+"\n");
         }
       } else {
         input[istate].setFilterNewLine(false);
@@ -648,11 +674,7 @@ public class WorkArea extends JPanel implements Disposable {
     case ISTATE_HEX:
     {
       byte[] b = AppSystem.parseBytes(in);
-      if (b != null && b.length > 0) {
-        String s = AppSystem.formatBytes(b);
-        views[ISTATE_INPUT].ftp.addText("[" + s + "]\n", STYLE_CONN_IN);
-        serial.transmit(b);
-      }
+      transmit(b);
       break;
     }
     case ISTATE_OPEN_SERIAL:
@@ -1219,9 +1241,43 @@ public class WorkArea extends JPanel implements Disposable {
 
   public void onSerialData(String s) {
     views[ISTATE_INPUT].ftp.addText(s);
+    int nlix;
+    do {
+      nlix = s.indexOf('\n');
+      if (nlix >= 0) {
+        lineBuffer.append(s.substring(0, nlix));
+        s = s.substring(nlix+1);
+        handleSerialLine(lineBuffer.toString());
+        lineBuffer.delete(0, lineBuffer.length());
+      } else {
+        lineBuffer.append(s);
+      }
+    } while (nlix >= 0);
+  }
+  
+  void handleSerialLine(String s) {
+    filterCallArg0.str = s;
+    for (RxFilter f : serialFilters) {
+      if (s.contains(f.filter)) {
+        filterCallArg1.str = f.filter;
+        script.runFunc(this, f.addr, filterCallArgs);
+      }
+    }
+  }
+  
+  public void addSerialFilter(String filter, int address) {
+    RxFilter f = new RxFilter();
+    f.filter = filter;
+    f.addr = address;
+    serialFilters.add(f);
+  }
+  
+  public List<RxFilter> getSerialFilters() {
+    return serialFilters;
   }
   
   public void onSerialDisconnect() {
+    lineBuffer = new StringBuilder();
     views[ISTATE_INPUT].ftp.addText("Disconnected\n", STYLE_SERIAL_INFO);
     updateTitle();
   }
@@ -1501,8 +1557,37 @@ public class WorkArea extends JPanel implements Disposable {
     }
 
   } // class View
-
+  
+  class RxFilter {
+    String filter;
+    int addr;
+  }
+  /*
+  g_stack;
+  ser.clear_on_rx();
+  ser.on_rx("<SIMTRIG|graph:Stack usage,", {
+    line = $0;
+    if (g_stack == nil) {
+      g_stack = graph("STACK USAGE");
+    }
+    val = line[len($1)#len(line)-2];
+    println("captured stack value " val);
+    g_stack.add(int(val));
+    g_stack.zoom_all();
+  });
+  */
   public void setStandardFocus() {
     input[istate].requestFocus();
+  }
+
+  public Serial getSerial() {
+    return serial;
+  }
+
+  public void registerSerialFilter(String filter, int operandiAddress) {
+    addSerialFilter(filter, operandiAddress);
+  }
+  public void clearSerialFilters() {
+    serialFilters.clear();
   }
 }

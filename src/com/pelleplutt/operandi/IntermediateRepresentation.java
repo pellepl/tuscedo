@@ -57,10 +57,10 @@ public class IntermediateRepresentation {
 
   public void injectGlobalVariable(String module, String varName) {
     ASTNodeSymbol esym = new ASTNodeSymbol(varName);
-    List<ASTNodeSymbol> modGlobs = curGlobalVars.get(module);
+    List<ASTNodeSymbol> modGlobs = accGlobalVars.get(module);
     if (modGlobs == null) {
       modGlobs = new ArrayList<ASTNodeSymbol>(); 
-      curGlobalVars.put(module, modGlobs);
+      accGlobalVars.put(module, modGlobs);
     }
     if (!modGlobs.contains(esym)) modGlobs.add(esym);
   }
