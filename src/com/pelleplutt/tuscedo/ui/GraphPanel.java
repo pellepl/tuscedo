@@ -107,6 +107,20 @@ public class GraphPanel extends JPanel {
     sampleUpdate();
   }
   
+  public int getSampleCount() {
+    return samples.size();
+  }
+  
+  public double getSample(int ix) {
+    return samples.get(ix);
+  }
+  
+  public void scrollToSampleX(int splIx) {
+    int vpw = scrl.getViewport().getWidth();
+    double scrollVal = ((double)(splIx) * magHor - vpw/2);
+    scrl.getHorizontalScrollBar().setValue((int)(scrollVal));
+  }
+  
   class Renderer extends JPanel {
     Dimension __d = new Dimension();
     public void recalcSize() {
@@ -311,9 +325,9 @@ public class GraphPanel extends JPanel {
   void magResize(double newMagHor, double newMagVer, Point pivot) {
     if (newMagHor != magHor) {
       double rangeV = (double)getWidth() / magHor;
-      double mouseV = (double)pivot.getX() / magHor;
+      double pivotV = (double)pivot.getX() / magHor;
       double offsV = (double)scrl.getHorizontalScrollBar().getValue() / magHor;
-      double portionV = (mouseV - offsV) / rangeV;
+      double portionV = (pivotV - offsV) / rangeV;
       
       magHor = newMagHor;
       magHor = Math.min(magHor, MAG_HOR_MAX);
@@ -321,14 +335,14 @@ public class GraphPanel extends JPanel {
       renderer.recalcSize();
 
       double nrangeV = (double)getWidth() / magHor;
-      double noffsV = mouseV - portionV * nrangeV;
+      double noffsV = pivotV - portionV * nrangeV;
       scrl.getHorizontalScrollBar().setValue((int)(noffsV * magHor));
     }
     if (newMagVer != magVer) {
       double rangeV = (double)getHeight() / magVer;
-      double mouseV = (double)pivot.getY() / magVer;
+      double pivotV = (double)pivot.getY() / magVer;
       double offsV = (double)scrl.getVerticalScrollBar().getValue() / magVer;
-      double portionV = (mouseV - offsV) / rangeV;
+      double portionV = (pivotV - offsV) / rangeV;
 
       magVer = newMagVer;
       magVer = Math.min(magVer, MAG_VER_MAX);
@@ -336,7 +350,7 @@ public class GraphPanel extends JPanel {
       renderer.recalcSize();
 
       double nrangeV = (double)getHeight() / magVer;
-      double noffsV = mouseV - portionV * nrangeV;
+      double noffsV = pivotV - portionV * nrangeV;
       scrl.getVerticalScrollBar().setValue((int)(noffsV * magVer));
     }
   }

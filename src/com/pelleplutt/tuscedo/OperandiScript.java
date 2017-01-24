@@ -167,7 +167,7 @@ public class OperandiScript {
         graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_add"));
         graphFunc.type = Processor.TFUNC;
         graph.ref.put("add", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__zoom_all"));
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_zoom_all"));
         graphFunc.type = Processor.TFUNC;
         graph.ref.put("zoom_all", graphFunc);
         graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_close"));
@@ -176,6 +176,18 @@ public class OperandiScript {
         graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_type"));
         graphFunc.type = Processor.TFUNC;
         graph.ref.put("set_type", graphFunc);
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__tab_title"));
+        graphFunc.type = Processor.TFUNC;
+        graph.ref.put("set_title", graphFunc);
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_size"));
+        graphFunc.type = Processor.TFUNC;
+        graph.ref.put("size", graphFunc);
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_get"));
+        graphFunc.type = Processor.TFUNC;
+        graph.ref.put("get", graphFunc);
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_scroll_x"));
+        graphFunc.type = Processor.TFUNC;
+        graph.ref.put("scroll_x", graphFunc);
         return graph;
       }
     });
@@ -184,11 +196,18 @@ public class OperandiScript {
         if (args == null || args.length == 0)  return null;
         Tab tab = getTabByScriptId(p.getMe());
         if (tab == null) return null;
-        ((GraphPanel)tab.getContent()).addSample(args[0].asFloat());
+        if (args[0].type != Processor.TSET) {
+          ((GraphPanel)tab.getContent()).addSample(args[0].asFloat());
+        } else {
+          for (int i = 0; i < args[0].ref.size(); i++) {
+            ((GraphPanel)tab.getContent()).addSample(args[0].ref.get(i).asFloat());
+          }
+          
+        }
         return null;
       }
     });
-    extDefs.put("__zoom_all", new ExtCall() {
+    extDefs.put("__graph_zoom_all", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         Tab tab = getTabByScriptId(p.getMe());
         if (tab == null) return null;
@@ -210,6 +229,39 @@ public class OperandiScript {
         Tab tab = getTabByScriptId(p.getMe());
         if (tab == null) return null;
         ((GraphPanel)tab.getContent()).setGraphType(parseGraphType(args[0]));
+        return null;
+      }
+    });
+    extDefs.put("__graph_size", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        return new M(((GraphPanel)tab.getContent()).getSampleCount());
+      }
+    });
+    extDefs.put("__graph_get", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        return new M((float)((GraphPanel)tab.getContent()).getSample(args[0].asInt()));
+      }
+    });
+    extDefs.put("__graph_scroll_x", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((GraphPanel)tab.getContent()).scrollToSampleX(args[0].asInt());
+        return null;
+      }
+    });
+    extDefs.put("__tab_title", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        tab.getPane().setTabTitle(tab, args[0].asString());
         return null;
       }
     });
