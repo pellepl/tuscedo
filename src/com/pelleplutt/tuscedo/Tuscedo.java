@@ -19,13 +19,13 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 
+import purejavacomm.CommPortIdentifier;
+
 import com.pelleplutt.tuscedo.ui.GraphPanel;
 import com.pelleplutt.tuscedo.ui.SimpleTabPane;
 import com.pelleplutt.tuscedo.ui.SimpleTabPane.Tab;
 import com.pelleplutt.tuscedo.ui.WorkArea;
 import com.pelleplutt.util.AppSystem;
-
-import purejavacomm.CommPortIdentifier;
 
 public class Tuscedo implements Runnable {
   Container mainContainer;
@@ -156,7 +156,7 @@ public class Tuscedo implements Runnable {
     @Override
     public void tabRemoved(SimpleTabPane tp, Tab t, Component content) {
       if (content instanceof WorkArea) {
-        ((WorkArea)content).dispose();
+        AppSystem.dispose((WorkArea)content);
       }
       tabs.remove(t.getID());
     }

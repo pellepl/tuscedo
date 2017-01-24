@@ -2,6 +2,7 @@ package com.pelleplutt.tuscedo;
 
 import java.awt.Point;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -25,23 +26,73 @@ import com.pelleplutt.tuscedo.ui.SimpleTabPane;
 import com.pelleplutt.tuscedo.ui.SimpleTabPane.Tab;
 import com.pelleplutt.tuscedo.ui.WorkArea;
 import com.pelleplutt.util.AppSystem;
+import com.pelleplutt.util.AppSystem.Disposable;
 
-public class OperandiScript {
+public class OperandiScript implements Runnable, Disposable {
 
   Executable exe, pexe;
   Compiler comp;
   Processor proc;
   Map<String, ExtCall> extDefs = new HashMap<String, ExtCall>();
   volatile WorkArea currentWA;
-  WorkArea.View runningView;
+  WorkArea.View currentView;
+  volatile boolean running; 
+  volatile boolean killed;
+  volatile boolean halted;
+  List<RunRequest> q = new ArrayList<RunRequest>();
+  String lastSrcDbg;
+  
+//  // after reset, before compile
+//  comp.injectGlobalVariable(null, "fiskorv");
+//  // after compile and setExe
+//  M fiskorv = new Processor.M(new MListMap());
+//  M fiskorvEntry = new Processor.M(comp.getLinker().lookupFunctionAddress("println"));
+//  fiskorvEntry.type = Processor.TFUNC;
+//  fiskorv.ref.put("fu", fiskorvEntry);
+//  int fiskorvAddr = comp.getLinker().lookupVariableAddress(null, "fiskorv");
+//  proc.setMemory(fiskorvAddr, fiskorv);
 
+  
   public OperandiScript() {
     proc = new Processor(0x10000);
-    reset();
+    procReset();
+    Thread t = new Thread(this, "operandi");
+    t.setDaemon(true);
+    t.start();
+  }
+  
+  @Override
+  public void run() {
+    while (!killed) {
+      synchronized (q) {
+        if (q.isEmpty()) {
+          AppSystem.waitSilently(q, 0);
+        }
+        if (q.isEmpty() || running) continue;
+        
+        RunRequest rr = q.remove(0);
+        try {
+          rr.wa.onScriptStart(proc);
+          if (rr.src != null) {
+            doRunScript(rr.wa, rr.src);
+          } else {
+            doCallAddress(rr.wa, rr.callAddr, rr.args);
+          }
+        } catch (Throwable t) {
+          t.printStackTrace();
+        } finally {
+          rr.wa.onScriptStop(proc);
+        }
+      }
+    }
   }
 
-  public void reset() {
+
+  void procReset() {
     exe = pexe = null;
+    running = false;
+    halted = false;
+    lastSrcDbg = null;
     Processor.addCommonExtdefs(extDefs);
     extDefs.put("println", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
@@ -69,6 +120,15 @@ public class OperandiScript {
         return null;
       }
     });
+    extDefs.put("sleep", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+        } else {
+          AppSystem.sleep(args[0].asInt());
+        }
+        return null;
+      }
+    });
     createGraphFunctions(extDefs);
     
     comp = new Compiler(extDefs, 0x4000, 0x0000);
@@ -85,12 +145,31 @@ public class OperandiScript {
   }
 
   public void runScript(WorkArea wa, String s) {
+    synchronized (q) {
+      q.add(new RunRequest(wa, new Source.SourceString("cli", s)));
+      q.notifyAll();
+    }
+  }
+  
+  public void runScript(WorkArea wa, File f, String s) {
+    synchronized (q) {
+      q.add(new RunRequest(wa, new Source.SourceFile(f, s)));
+      q.notifyAll();
+    }
+  }
+  
+  public void runFunc(WorkArea wa, int addr, List<M> args) {
+    synchronized (q) {
+      q.add(new RunRequest(wa, addr, args));
+      q.notifyAll();
+    }
+  }
+  
+  void doRunScript(WorkArea wa, Source src) {
     currentWA = wa;
-    WorkArea.View view = wa.getCurrentView();
+    currentView = wa.getCurrentView();
     proc.reset();
-    comp.injectGlobalVariable(null, "fiskorv");
     try {
-      Source src = new Source.SourceString("cli", s);
       exe = comp.compileIncrementally(src, pexe);
       pexe = exe;
     } catch (CompilerError ce) {
@@ -99,25 +178,45 @@ public class OperandiScript {
       comp.printCompilerError(ps, Compiler.getSource(), ce);
       String err = new String(baos.toByteArray(), StandardCharsets.UTF_8);
       AppSystem.closeSilently(ps);
-      wa.appendViewText(view, err, WorkArea.STYLE_BASH_ERR);
+      wa.appendViewText(currentView, err, WorkArea.STYLE_BASH_ERR);
       return;
     }
-    int i = 0;
     proc.setExe(exe);
-    M fiskorv = new Processor.M(new MListMap());
-    M fiskorvEntry = new Processor.M(comp.getLinker().lookupFunctionAddress("println"));
-    fiskorvEntry.type = Processor.TFUNC;
-    fiskorv.ref.put("fu", fiskorvEntry);
-    int fiskorvAddr = comp.getLinker().lookupVariableAddress(null, "fiskorv");
-    proc.setMemory(fiskorvAddr, fiskorv);
+    runProcessor();
+  }
+  
+  void doCallAddress(WorkArea wa, int addr, List<M> args) {
+    proc.resetAndCallAddress(addr, args, null);
+    runProcessor();
+  }
+
+  void runProcessor() {
     try {
-      for (; i < 10000000; i++) {
-        proc.step();
+      running = true;
+      String dbg = null;
+      while (running) {
+        if (halted) {
+          currentWA.onScriptStart(proc);
+          while (dbg == null || dbg.equals(lastSrcDbg)) {
+            dbg = proc.stepSrc();
+            if (dbg == null) continue;
+          }
+          lastSrcDbg = dbg;
+          currentWA.onScriptStop(proc);
+          if (dbg != null) {
+            currentWA.appendViewText(currentView, dbg + "\n", WorkArea.STYLE_BASH_DBG);
+          }
+          synchronized (q) {
+            AppSystem.waitSilently(q, 0);
+          }
+        } else {
+          proc.step();
+        }
       }
     } catch (ProcessorFinishedError pfe) {
       M m = pfe.getRet();
       if (m != null && m.type != Processor.TNIL) {
-        wa.appendViewText(view, "script returned " + m.asString() + "\n", WorkArea.STYLE_BASH_OUT);
+        currentWA.appendViewText(currentView, "script returned " + m.asString() + "\n", WorkArea.STYLE_BASH_OUT);
       }
     } catch (ProcessorError pe) {
       ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -125,12 +224,51 @@ public class OperandiScript {
       proc.dumpError(pe, ps);
       String err = new String(baos.toByteArray(), StandardCharsets.UTF_8);
       AppSystem.closeSilently(ps);
-      wa.appendViewText(view, err, WorkArea.STYLE_BASH_ERR);
+      currentWA.appendViewText(currentView, err, WorkArea.STYLE_BASH_OUT);
+    }
+    finally {
+      running = false;
     }
   }
   
+  public void halt(boolean on) {
+    lastSrcDbg = null;
+    if (!running) return;
+    halted = on;
+    if (!halted) {
+      synchronized (q) {
+        q.notifyAll();
+      }
+    }
+  }
   
+  public void step() {
+    synchronized (q) {
+      q.notifyAll();
+    }
+  }
   
+  public void reset() {
+    if (running) {
+      running = false;
+      halted = false;
+      synchronized (q) {
+        q.notifyAll();
+      }
+      currentWA.appendViewText(currentView, "processor reset\n", WorkArea.STYLE_BASH_INPUT);
+      backtrace();
+      procReset();
+    }
+  }
+  
+  public void backtrace() {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    PrintStream ps = new PrintStream(baos);
+    proc.unwindStackTrace(ps);
+    String bt = new String(baos.toByteArray(), StandardCharsets.UTF_8);
+    AppSystem.closeSilently(ps);
+    currentWA.appendViewText(currentView, bt, WorkArea.STYLE_BASH_INPUT);
+  }
   
   
   private void createGraphFunctions(Map<String, ExtCall> extDefs) {
@@ -170,6 +308,15 @@ public class OperandiScript {
         graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_zoom_all"));
         graphFunc.type = Processor.TFUNC;
         graph.ref.put("zoom_all", graphFunc);
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_zoom"));
+        graphFunc.type = Processor.TFUNC;
+        graph.ref.put("zoom", graphFunc);
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_zoom_x"));
+        graphFunc.type = Processor.TFUNC;
+        graph.ref.put("zoom_x", graphFunc);
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_zoom_y"));
+        graphFunc.type = Processor.TFUNC;
+        graph.ref.put("zoom_y", graphFunc);
         graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_close"));
         graphFunc.type = Processor.TFUNC;
         graph.ref.put("close", graphFunc);
@@ -188,6 +335,12 @@ public class OperandiScript {
         graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_scroll_x"));
         graphFunc.type = Processor.TFUNC;
         graph.ref.put("scroll_x", graphFunc);
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_scroll_y"));
+        graphFunc.type = Processor.TFUNC;
+        graph.ref.put("scroll_y", graphFunc);
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_scroll_sample"));
+        graphFunc.type = Processor.TFUNC;
+        graph.ref.put("scroll_sample", graphFunc);
         return graph;
       }
     });
@@ -212,6 +365,33 @@ public class OperandiScript {
         Tab tab = getTabByScriptId(p.getMe());
         if (tab == null) return null;
         ((GraphPanel)tab.getContent()).zoomAll(true, true, new Point(0,0));
+        return null;
+      }
+    });
+    extDefs.put("__graph_zoom", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 2)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((GraphPanel)tab.getContent()).zoom(args[0].asFloat(), args[1].asFloat());
+        return null;
+      }
+    });
+    extDefs.put("__graph_zoom_x", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((GraphPanel)tab.getContent()).zoom(args[0].asFloat(), 0);
+        return null;
+      }
+    });
+    extDefs.put("__graph_zoom_y", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((GraphPanel)tab.getContent()).zoom(0, args[0].asFloat());
         return null;
       }
     });
@@ -256,6 +436,24 @@ public class OperandiScript {
         return null;
       }
     });
+    extDefs.put("__graph_scroll_y", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((GraphPanel)tab.getContent()).scrollToValY(args[0].asFloat());
+        return null;
+      }
+    });
+    extDefs.put("__graph_scroll_sample", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((GraphPanel)tab.getContent()).scrollToSample(args[0].asInt());
+        return null;
+      }
+    });
     extDefs.put("__tab_title", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -277,6 +475,32 @@ public class OperandiScript {
     }
     return type;
   }
+  
+  @Override
+  public void dispose() {
+    running = false;
+    synchronized (q) {
+      killed = true;
+      q.notifyAll();
+    }
+  }
+  class RunRequest {
+    public final WorkArea wa; 
+    public final Source src;
+    public final int callAddr;
+    public List<M> args;
+    public RunRequest(WorkArea wa, Source src) {
+      this.wa = wa; this.src = src; this.callAddr = 0; this.args = null;
+    }
+    public RunRequest(WorkArea wa, int addr, List<M> args) {
+      this.wa = wa; this.src = null; this.callAddr = addr; this.args = args;
+    }
+  }
+  public boolean isRunning() {
+    return running;
+  }
 
-
+  public int lookupFunc(String f) {
+    return comp.getLinker().lookupFunctionAddress(f);
+  }
 }

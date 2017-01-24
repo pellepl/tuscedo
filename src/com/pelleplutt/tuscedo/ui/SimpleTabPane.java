@@ -173,6 +173,10 @@ public class SimpleTabPane extends JPanel {
     return null;
   }
 
+  public Tab getTab(int i) {
+    return tabs.get(0);
+  }
+
   int getTabIndex(String id) {
     int i = 0;
     for (Tab t : tabs) {

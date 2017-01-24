@@ -349,12 +349,15 @@ public class Bash implements ProcessGroup.ProcessConsole {
     String stderrPath;
   }
 
-  List<String> bashCompletions = new ArrayList<String>(); 
   public List<String> suggestFileSystemCompletions(String prefix, String s, String cmd, boolean includeFiles, boolean includeDirs) {
+    return suggestFileSystemCompletions(prefix, s, cmd, includeFiles, includeDirs, pwd);
+  }
+     
+  public static List<String> suggestFileSystemCompletions(String prefix, String s, String cmd, boolean includeFiles, boolean includeDirs, File pwd) {
     if (s.startsWith(cmd + " ")) {
       final int cmdIx = cmd.length() + 1;
       final int sLen = s.length();
-      bashCompletions.clear();
+      List<String> bashCompletions = new ArrayList<String>();
       int lastFS = s.lastIndexOf(File.separator);
       int lastSep = s.lastIndexOf(' ');
       int endIx = Math.max(lastSep, lastFS);

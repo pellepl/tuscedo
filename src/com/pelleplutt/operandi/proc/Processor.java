@@ -112,6 +112,23 @@ public class Processor implements ByteCode {
     pc = exe == null ? 0 : exe.getPCStart();
   }
   
+  public void resetAndCallAddress(int addr, List<M> args, M me) {
+    sp = memory.length - 1;
+    if (args == null) args = new ArrayList<M>();
+    for (int i = args.size()-1; i >= 0; i--) {
+      push(args.get(i));
+    }
+    push(args.size());
+    push(me == null ? nilM : me); // me
+    push(0xffffffff); // pc
+    push(0xffffffff); // fp
+    fp = sp;
+    me = null;
+    zero = false;
+    minus = false;
+    pc = addr;
+  }
+  
   public void setExe(Executable exe, String ...args) {
     this.exe = exe;
     this.args = args;
@@ -1238,16 +1255,21 @@ public class Processor implements ByteCode {
   
   String lastSrcLine = null;
   
-  void stepSrc(PrintStream out) {
+  public void stepSrc(PrintStream out) {
     String d = exe.getSrcDebugInfoPrecise(pc);
     if (d != null) {
       lastSrcLine = d;
-      out.println(d);
+      if (out != null) out.println(d);
     }
     do {
       stepProc();
       d = exe.getSrcDebugInfoPrecise(pc);
     } while (d == null || lastSrcLine.equals(d));
+  }
+
+  public String stepSrc() {
+    stepProc();
+    return exe.getSrcDebugInfoPrecise(pc);
   }
 
   void stepProc() {

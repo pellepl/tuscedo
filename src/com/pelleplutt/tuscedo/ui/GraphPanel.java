@@ -115,10 +115,28 @@ public class GraphPanel extends JPanel {
     return samples.get(ix);
   }
   
+  public void scrollToSample(int splIx) {
+    scrollToSampleX(splIx);
+    scrollToSampleY(splIx);
+  }
   public void scrollToSampleX(int splIx) {
     int vpw = scrl.getViewport().getWidth();
     double scrollVal = ((double)(splIx) * magHor - vpw/2);
     scrl.getHorizontalScrollBar().setValue((int)(scrollVal));
+  }
+  
+  public void scrollToSampleY(int splIx) {
+    double splVal = 0;
+    if (splIx >= 0 && splIx < samples.size()) splVal = samples.get(splIx);
+    scrollToValY(splVal);
+  }
+  
+  public void scrollToValY(double val) {
+    double minGSample = Math.min(0, minSample);
+
+    int origoY = (int)(magVer * - minGSample);
+    double scrollVal = magVer * ( maxSample - minGSample ) - (origoY + val * magVer);
+    scrl.getVerticalScrollBar().setValue((int)(scrollVal - getHeight()/2));
   }
   
   class Renderer extends JPanel {
@@ -324,19 +342,19 @@ public class GraphPanel extends JPanel {
    */
   void magResize(double newMagHor, double newMagVer, Point pivot) {
     if (newMagHor != magHor) {
-      double rangeV = (double)getWidth() / magHor;
-      double pivotV = (double)pivot.getX() / magHor;
-      double offsV = (double)scrl.getHorizontalScrollBar().getValue() / magHor;
-      double portionV = (pivotV - offsV) / rangeV;
+      double rangeH = (double)getWidth() / magHor;
+      double pivotH = (double)pivot.getX() / magHor;
+      double offsH = (double)scrl.getHorizontalScrollBar().getValue() / magHor;
+      double portionV = (pivotH - offsH) / rangeH;
       
       magHor = newMagHor;
       magHor = Math.min(magHor, MAG_HOR_MAX);
       magHor = Math.max(magHor, MAG_HOR_MIN);
       renderer.recalcSize();
 
-      double nrangeV = (double)getWidth() / magHor;
-      double noffsV = pivotV - portionV * nrangeV;
-      scrl.getHorizontalScrollBar().setValue((int)(noffsV * magHor));
+      double nrangeH = (double)getWidth() / magHor;
+      double noffsH = pivotH - portionV * nrangeH;
+      scrl.getHorizontalScrollBar().setValue((int)(noffsH * magHor));
     }
     if (newMagVer != magVer) {
       double rangeV = (double)getHeight() / magVer;
@@ -359,9 +377,9 @@ public class GraphPanel extends JPanel {
     @Override
     public void mouseWheelMoved(MouseWheelEvent e) {
       double magFact = 1.0;
-      if (e.getWheelRotation() > 0) {
+      if (e.getWheelRotation() < 0) {
         magFact = 1.1;
-      } else if (e.getWheelRotation() < 0) {
+      } else if (e.getWheelRotation() > 0) {
         magFact = 0.9;
       }
       
@@ -424,8 +442,23 @@ public class GraphPanel extends JPanel {
         Math.max(MAG_VER_MIN, (double)scrl.getViewport().getHeight() / (maxSample - Math.min(0, minSample)));
     }
     if (hori) {
-    newMagHor = 
+      newMagHor = 
         Math.max(MAG_HOR_MIN, (double)scrl.getViewport().getWidth() / (double)samples.size());
+    }
+    magResize(newMagHor, newMagVer, pivot);
+    repaint();
+  }
+  public void zoom(double x, double y) {
+    Point pivot = new Point(
+        scrl.getHorizontalScrollBar().getValue() + scrl.getViewport().getWidth()/2, 
+        scrl.getVerticalScrollBar().getValue() + scrl.getViewport().getHeight()/2);
+    double newMagVer = magVer;
+    double newMagHor = magHor;
+    if (x > 0) {
+      newMagHor = x; 
+    }
+    if (y > 0) {
+      newMagVer = y; 
     }
     magResize(newMagHor, newMagVer, pivot);
     repaint();

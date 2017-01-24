@@ -49,6 +49,8 @@ import javax.swing.plaf.basic.BasicScrollBarUI;
 import javax.swing.text.BadLocationException;
 
 import com.pelleplutt.Essential;
+import com.pelleplutt.operandi.proc.Processor;
+import com.pelleplutt.operandi.proc.Processor.M;
 import com.pelleplutt.tuscedo.OperandiScript;
 import com.pelleplutt.tuscedo.ProcessGroup;
 import com.pelleplutt.tuscedo.ProcessGroupInfo;
@@ -107,6 +109,7 @@ public class WorkArea extends JPanel implements Disposable {
   public static final Color colInputBg = new Color(48, 48, 64);
   public static final Color colInputBashBg = new Color(64, 64, 64);
   public static final Color colBashFg = new Color(255, 255, 255);
+  public static final Color colBashDbgFg = new Color(192, 255, 192);
   public static final Color colProcessFg = new Color(192, 192, 192);
   public static final Color colProcessErrFg = new Color(192, 128, 128);
   public static final Color colFindFg = colInputBg;
@@ -118,6 +121,7 @@ public class WorkArea extends JPanel implements Disposable {
   public static final int STYLE_ID_BASH_OUT = 10;
   public static final int STYLE_ID_BASH_ERR = 11;
   public static final int STYLE_ID_BASH_INPUT = 12;
+  public static final int STYLE_ID_BASH_DBG = 13;
   public static final int STYLE_ID_SERIAL_INFO = 20;
   public static final int STYLE_ID_SERIAL_ERR = 21;
   public static final int STYLE_ID_FIND = 30;
@@ -130,6 +134,8 @@ public class WorkArea extends JPanel implements Disposable {
       new FastTextPane.Style(STYLE_ID_BASH_ERR, colProcessErrFg, null, false);
   public static final FastTextPane.Style STYLE_BASH_INPUT = 
       new FastTextPane.Style(STYLE_ID_BASH_INPUT, colBashFg, null, false);
+  public static final FastTextPane.Style STYLE_BASH_DBG = 
+      new FastTextPane.Style(STYLE_ID_BASH_DBG, colBashDbgFg, null, false);
   public static final FastTextPane.Style STYLE_FIND = 
       new FastTextPane.Style(STYLE_ID_FIND, colFindFg, colFindBg, true);
   public static final FastTextPane.Style STYLE_FIND_ALL = 
@@ -207,6 +213,7 @@ public class WorkArea extends JPanel implements Disposable {
     settings = Settings.inst();
     serial = new Serial(this);
     script = new OperandiScript();
+    AppSystem.addDisposable(script);
     Tuscedo.inst().registerTickable(serial);
   }
   
@@ -662,8 +669,52 @@ public class WorkArea extends JPanel implements Disposable {
       break;
     case ISTATE_SCRIPT:
       if (!shift) {
-        getCurrentView().ftp.addText(in + "\n", STYLE_BASH_INPUT);
-        script.runScript(this, in + "\n");
+        if (script.isRunning()) {
+          if (in.trim().length() > 0) {
+            lastDbgCmd = in;
+          } else {
+            in = lastDbgCmd;
+          }
+          if (in.equalsIgnoreCase("halt") || in.equalsIgnoreCase("h")) {
+            script.halt(true);
+          } else if (in.equalsIgnoreCase("cont") || in.equalsIgnoreCase("c")) {
+            script.halt(false);
+          } else if (in.equalsIgnoreCase("next") || in.equalsIgnoreCase("n")) {
+            script.step();
+          } else if (in.equalsIgnoreCase("backtrace") || in.equalsIgnoreCase("bt")) {
+            script.backtrace();
+          } else if (in.equalsIgnoreCase("reset") || in.equalsIgnoreCase("res")) {
+            script.reset();
+          }
+        } else {
+          if (in.startsWith("::")) {
+            // TODO remove, test only
+            List<M> args = new ArrayList<M>();
+            args.add(new M("it works"));
+            args.add(new M("goddamnit"));
+            System.out.println(script.lookupFunc(in.substring(2)));
+            script.runFunc(this, script.lookupFunc(in.substring(2)), args);
+          } else if (in.startsWith("#load ")) {
+            String fullpath = in.substring("#load ".length());
+            int pathDelim = fullpath.lastIndexOf(File.separator);
+            String path = pathDelim >= 0 ? fullpath.substring(0, pathDelim) : ".";
+            String file = pathDelim >= 0 ? fullpath.substring(pathDelim+1) : fullpath;
+            List<File> files = AppSystem.findFiles(path, file, false);
+            System.out.println(path + " " + file + " " + files);
+            for (File f : files) {
+              String s = AppSystem.readFile(f);
+              if (s == null) {
+                getCurrentView().ftp.addText("file " + f.getAbsolutePath() + " not found\n", STYLE_BASH_ERR);
+              } else {
+                getCurrentView().ftp.addText("loading file " + f.getAbsolutePath() + "\n", STYLE_BASH_INPUT);
+                script.runScript(this, f, s);
+              }
+            }
+          } else {
+            getCurrentView().ftp.addText(in + "\n", STYLE_BASH_INPUT);
+            script.runScript(this, in + "\n");
+          }
+        }
         input[istate].setText("");
       } else {
         input[istate].setFilterNewLine(false);
@@ -677,6 +728,7 @@ public class WorkArea extends JPanel implements Disposable {
       break;
     }
   }
+  String lastDbgCmd = "";
   
   public View getCurrentView() {
     return curView;
@@ -753,6 +805,7 @@ public class WorkArea extends JPanel implements Disposable {
   }
   
   List<String> giveInputBashSuggestions(final String userInput, final int istateNum) {
+    if (istate != ISTATE_BASH && istate != ISTATE_INPUT) return null;
     final String bashPrefix = istate != ISTATE_BASH ? 
         settings.string(Settings.BASH_PREFIX_STRING) :
           "";
@@ -1154,6 +1207,7 @@ public class WorkArea extends JPanel implements Disposable {
     //Log.println("workarea close serial");
     serial.closeSerial();
     Tuscedo.inst().deregisterTickable(serial);
+    AppSystem.dispose(script);
     winSug.dispose();
     for (Bash b : bash) {
       //Log.println("workarea close bash " + b);
@@ -1189,6 +1243,15 @@ public class WorkArea extends JPanel implements Disposable {
     tf.setBackground(WorkArea.colInputBg);
     updateTitle();
   }
+  
+  public void onScriptStart(Processor proc) {
+    input[ISTATE_SCRIPT].setBackground(WorkArea.colInputBashBg);
+  }
+
+  public void onScriptStop(Processor proc) {
+    input[ISTATE_SCRIPT].setBackground(WorkArea.colInputBg);
+  }
+
   
   public void onTabSelected(SimpleTabPane.Tab t) {
     setStandardFocus();

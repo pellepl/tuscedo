@@ -275,7 +275,7 @@ public class AST implements Lexer.Emitter {
         minOffs = Math.min(minOffs, ev.stroffset);
         maxOffs = Math.max(maxOffs, ev.stroffset + ev.strlen);
       }
-      if (ev.op == OP_CALL) {
+      if (ev.op == OP_CALL && ev instanceof ASTNodeFuncCall) {
         ASTNodeFuncCall evCall = (ASTNodeFuncCall)ev;
         rece.push(evCall.callByOperation ? evCall.callAddrOp : evCall.name);
       }
