@@ -133,6 +133,87 @@ public class MiscConstructs {
     sA = 
         "return (0#4)[{return $0*2;}];\n" +
         "\n";
-    assertEquals("[0, 2, 4, 6, 8]", Processor.compileAndRun(true, false, sA).asString()); // TODO check stack!! 
+    assertEquals("[0, 2, 4, 6, 8]", Processor.compileAndRun(false, false, sA).asString()); 
+  }
+  
+  @Test
+  public void testIfElse() {
+    String sA;
+    sA = 
+      "func nop() {}\n" +
+      "l = [1,2,nil,[5,4,3,2,1,0],5,'end'];\n" +
+      "s='';\n" +
+      "for (x in l) {\n" +
+      "  if (isset(x) & len(x) > 4)\n" +
+      "  {\n" +  
+      "    s += 'BIG'; \n" +
+      "  }\n" +
+      "  else if (!isnil(x))  \n" +
+      "  {\n" +
+      "    s += str(x);\n" +
+      "  }\n" +
+      "  else \n" +
+      "  {\n" +
+      "    nop();\n" +
+      "  }\n" +
+      "}\n" +
+      "return s;\n" +
+      "";
+    assertEquals("12BIG5end", Processor.compileAndRun(false, false, sA).asString()); 
+  }
+
+  @Test
+  public void testIfElse2() {
+    String sA;
+    sA = 
+      "func nop() {}\n" +
+      "l = [1,2,nil,[5,4,3,2,1,0],5,'end'];\n" +
+      "s='';\n" +
+      "for (x in l) {\n" +
+      "  if (isset(x) & len(x) > 4)\n" +
+      "    s += 'BIG'; \n" +
+      "  else if (!isnil(x))  \n" +
+      "    s += str(x);\n" +
+      "  else \n" +
+      "    nop();\n" +
+      "}\n" +
+      "return s;\n" +
+      "";
+    assertEquals("12BIG5end", Processor.compileAndRun(false, false, sA).asString()); 
+  }
+
+  @Test
+  public void testIfElse3() {
+    String sA;
+    sA = 
+      "l = 1#10;\n"+
+      "s = 0.0;\n"+
+      "for (a in l) {\n" +
+      "  if (a < 5) {\n"+
+      "    if (a > 1 & a <= 3) {\n"+
+      "      s += a*3;\n"+
+      "    } else if (a==4) {\n"+
+      "      s /= 2.0;\n"+
+      "    } else {\n"+
+      "      s -= a;\n"+
+      "    }\n"+
+      "  } else if (a == 10) {\n"+
+      "    s *= 3.14;\n"+
+      "  } else {\n"+
+      "    if (a in [5,7,9]) {\n"+
+      "      if (a == 7) {\n"+
+      "        s *= 100; \n"+
+      "      } else {\n" +
+      "        s += a*12.5;\n"+
+      "      }\n"+
+      "    } else {\n"+
+      "      b = a * 12 - s/2.0;\n"+
+      "      s += b / s;\n"+
+      "    }\n"+
+      "  }\n"+
+      "}\n" +
+      "return s;\n" +
+      "";
+    assertEquals(22343, Processor.compileAndRun(false, false, sA).asInt()); 
   }
 }

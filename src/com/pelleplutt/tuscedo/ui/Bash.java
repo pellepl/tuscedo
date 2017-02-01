@@ -17,6 +17,10 @@ import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.FastTextPane;
 import com.pelleplutt.util.Log;
 
+/**
+ * Starts processes and directs std err input and output to given console. 
+ * @author petera
+ */
 public class Bash implements ProcessGroup.ProcessConsole {
   ProcessHandler handler;
   File pwd;

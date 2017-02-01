@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import com.pelleplutt.operandi.ASTNode.ASTNodeBlok;
 import com.pelleplutt.operandi.ModuleFragment.Link;
@@ -122,6 +123,16 @@ public class Linker implements ByteCode {
       return getExtCallAddress(func);
     }
     throw new Error("function " + func + " not found");
+  }
+  
+  public String lookupAddressFunction(int addr) {
+    for (Entry<String, Integer> e : fragAddrLUT.entrySet()) {
+      if (e.getValue() == addr) return e.getKey(); 
+    }
+    for (Entry<String, Integer> e : extCallsAddrLut.entrySet()) {
+      if (e.getValue() == addr) return e.getKey(); 
+    }
+    return null;
   }
 
   public int lookupVariableAddress(String module, String var) {

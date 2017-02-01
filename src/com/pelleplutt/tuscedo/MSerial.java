@@ -22,6 +22,7 @@ public class MSerial implements MSet {
     addFunc("tx", OperandiScript.FN_SERIAL_TX, comp);
     addFunc("on_rx", OperandiScript.FN_SERIAL_ON_RX, comp);
     addFunc("clear_on_rx", OperandiScript.FN_SERIAL_ON_RX_CLEAR, comp);
+    addFunc("list_on_rx", OperandiScript.FN_SERIAL_ON_RX_LIST, comp);
   }
   
   void addFunc(String mapName, String funcName, com.pelleplutt.operandi.Compiler comp) {

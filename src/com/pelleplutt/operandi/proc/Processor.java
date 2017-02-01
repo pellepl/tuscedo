@@ -8,8 +8,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.SortedSet;
-import java.util.TreeSet;
 
 import com.pelleplutt.operandi.AST;
 import com.pelleplutt.operandi.CodeGenBack;
@@ -25,13 +23,15 @@ import com.pelleplutt.operandi.proc.ProcessorError.ProcessorBreakpointError;
 import com.pelleplutt.operandi.proc.ProcessorError.ProcessorFinishedError;
 
 public class Processor implements ByteCode {
+  public static final int VERSION = 0x00000001;
+  
   public static final int TNIL = 0;
   public static final int TINT = 1;
   public static final int TFLOAT = 2;
   public static final int TSTR = 3;
   public static final int TFUNC = 4;
   public static final int TANON = 5;
-  public static final int TSET = 6;
+  public static final int TSET = 6; // must be last, MSet.TYPES must be bigger than TSET 
   
   static final int TO_CHAR = -1;
   
@@ -853,7 +853,7 @@ public class Processor implements ByteCode {
       case TINT: break;
       case TFLOAT: m.i = (int)m.f; break;
       case TNIL: m.i = 0; break;
-      case TSTR: m.i = m.str.length() == 1 ? m.str.charAt(0) : Integer.parseInt(m.str); break;
+      case TSTR: m.i = m.str.length() == 1 ? m.str.charAt(0) : Integer.parseInt(m.str.trim()); break;
       case TSET: break;
       }
       break;
@@ -864,7 +864,7 @@ public class Processor implements ByteCode {
       case TANON:
       case TINT: m.f = m.i; break;
       case TNIL: m.f = 0; break;
-      case TSTR: m.f = Float.parseFloat(m.str); break;
+      case TSTR: m.f = Float.parseFloat(m.str.trim()); break;
       case TSET: break;
       }
       break;
@@ -1140,6 +1140,7 @@ public class Processor implements ByteCode {
   void in() {
     M mset = pop();
     M mval = pop();
+    zero = false;
     if (mset.type == TSET) {
       MSet set = mset.ref;
       int len = set.size();
@@ -1685,7 +1686,7 @@ public class Processor implements ByteCode {
       case TFLOAT:
         return f;
       case TSTR:
-        try { return Float.parseFloat(str); } catch (Throwable t) {}
+        try { return Float.parseFloat(str.trim()); } catch (Throwable t) {}
         return Float.NaN;
       default:
         return Float.NaN;
@@ -1699,7 +1700,7 @@ public class Processor implements ByteCode {
       case TFLOAT:
         return (int)f;
       case TSTR:
-        try { return Integer.parseInt(str); } catch (Throwable t) {}
+        try { return Integer.parseInt(str.trim()); } catch (Throwable t) {}
         return 0;
       default:
         return 0;
@@ -1751,8 +1752,26 @@ public class Processor implements ByteCode {
   
   String getStack() {
     StringBuilder sb = new StringBuilder("{ ");
-    for (int i = sp+1; i < memory.length; i++) {
-      sb.append(memory[i] + " ");
+    int ix = sp+1;
+    int fp = this.fp;
+    int argc = 0;
+    while (ix < memory.length) {
+      if (ix == fp+1) {
+        int args = memory[ix + FRAME_3_ARGC - 1].i;
+        M me = memory[ix + FRAME_2_ME - 1];
+        String meStr = me.type == TNIL ? "" : (" me:" + me.toString());
+        sb.append("<<<FRAME a" + args +  meStr + ">>>  ");
+        fp = memory[ix + FRAME_0_FP -1].i;
+        ix += FRAME_SIZE;
+        argc = args;
+      } else {
+        if (argc > 0) {
+          argc--;
+          sb.append('A');
+        }
+        sb.append(memory[ix] + "  ");
+        ix++;
+      }
     }
     sb.append('}');
     return sb.toString();
@@ -1829,9 +1848,9 @@ public class Processor implements ByteCode {
 
   static final String IFUNC_SET_VISITOR_ASM =
       //func setVisitor(set, visitor) {
-      //  res[];
+      //  res = (if isstr(set) nil else t[]);
       //  for (i in set) {
-      //    mutation = visitor(i);
+      //    mutation = visitor(i, <ix_nbr>);
       //    if (mutation != nil) res += mutation;
       //  }
       //  return res;
@@ -1861,13 +1880,14 @@ public class Processor implements ByteCode {
       "  set_sz                   \n"+
       "  cmp                      \n"+
       "  bra_ge L1_fexit          \n"+
+      "  load_fp $fp[3]           \n"+ // add ix_nbr
       "  load_fp $fp[4]           \n"+
       "  load_fp $fp[3]           \n"+
       "  set_rd                   \n"+
       "  dup                      \n"+
       "  stor_fp $fp[1]           \n"+
       "  udef_me                  \n"+
-      "  push_1                   \n"+
+      "  push_2                   \n"+ // 2 params: entry, ix_nbr
       "  load_fp $fp[-6]          \n"+
       "  call                     \n"+
       "  dup                      \n"+
@@ -1894,135 +1914,17 @@ public class Processor implements ByteCode {
     addCommonExtdefs(extDefs, System.in, System.out);
   }
   public static void addCommonExtdefs(Map<String, ExtCall> extDefs, final InputStream in, final PrintStream out) {
-    extDefs.put("__dbg", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0) {
-          out.println("  run : " + Processor.dbgRun);
-          out.println("  mem : " + Processor.dbgMem);
-          out.println("  ast : " + AST.dbg);
-          out.println("  gra : " + Grammar.dbg);
-          out.println("  str : " + StructAnalysis.dbg);
-          out.println("  fro : " + CodeGenFront.dbg);
-          out.println("  bak : " + CodeGenBack.dbg);
-          out.println("  lin : " + Linker.dbg);
-        } else {
-          List<String> areas = new ArrayList<String>();
-          for (M marg : args) {
-            String cmd = marg.str.toLowerCase();
-            if (marg.type == TSTR && (cmd.equals("on") || cmd.equals("1")) || marg.type == TINT && marg.i != 0) {
-              setDbg(areas, true);
-              areas.clear();
-            } else if (marg.type == TSTR && (cmd.equals("off") || cmd.equals("0")) || marg.type == TINT && marg.i == 0) {
-              setDbg(areas, false);
-              areas.clear();
-            } else {
-              areas.add(cmd);
-            }
-          }
-        }
-        return null;
-      }
-    });
-    extDefs.put("println", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0) {
-          out.println();
-        } else {
-          for (int i = 0; i < args.length; i++) {
-            out.print(args[i].asString() + (i < args.length-1 ? " " : ""));
-          }
-        }
-        out.println();
-        return null;
-      }
-    });
-    extDefs.put("print", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0) {
-        } else {
-          for (int i = 0; i < args.length; i++) {
-            out.print(args[i].asString() + (i < args.length-1 ? " " : ""));
-          }
-        }
-        return null;
-      }
-    });
-    extDefs.put("rand", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        return new M(calcRand());
-      }
-    });
-    extDefs.put("randseed", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0) {
-        } else {
-          randSeed(args[0].asInt());
-        }
-        return null;
-      }
-    });
-    extDefs.put("halt", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        throw new ProcessorError("halt");
-      }
-    });
-    extDefs.put("__const", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        SortedSet<Integer> asort = new TreeSet<Integer>();
-        asort.addAll(p.getExecutable().getConstants().keySet());
-        for (int addr : asort) {
-          out.println(String.format("  0x%06x  %s", addr, p.getExecutable().getConstants().get(addr).toString()));
-        }
-        return null;
-      }
-    });
-    extDefs.put("__stack", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0) {
-          for (int addr = p.getSP(); addr < p.getMemory().length; addr++) {
-            out.println(String.format("  0x%06x  %s", addr, p.getMemory()[addr].toString()));
-          }
-        } else {
-          for (int addr = p.getMemory().length - args[0].i; addr < p.getMemory().length; addr++) {
-            out.println(String.format("  0x%06x  %s", addr, p.getMemory()[addr].toString()));
-          }
-        }
-        return null;
-      }
-    });
-    extDefs.put("__mem", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0) {
-          out.println(String.format("  0x%06x--0x%06x", 0, p.getMemory().length));
-        } else {
-          int start = args[0].i;
-          int addr = start;
-          int len = args.length < 2 ? 1 : args[1].i;
-          while (addr < p.getMemory().length && addr < start + len) {
-            out.println(String.format("  0x%06x  %s", addr, p.getMemory()[addr].toString()));
-            addr++;
-          }
-        }
-        return null;
-      }
-    });
-    extDefs.put("cpy", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0) {
-          return null;
-        } else {
-          M res = new M();
-          M src = args[0];
-          if (src.type != TSET) {
-            res.copy(src);
-          } else {
-            res.type = TSET;
-            res.ref = src.ref.copyShallow();
-          }
-          return res;
-        }
-      }
-    });
+    extDefs.put("println", new EC_println(out));
+    extDefs.put("print", new EC_print(out));
+    extDefs.put("rand", new EC_rand());
+    extDefs.put("randseed", new EC_randseed());
+    extDefs.put("cpy", new EC_cpy());
+    extDefs.put("__dbg", new EC_dbg(out));
+    extDefs.put("__const", new EC_const());
+    extDefs.put("__mem", new EC_mem());
+    extDefs.put("__sp", new EC_sp());
+    extDefs.put("__fp", new EC_fp());
+    extDefs.put("__pc", new EC_pc());
   }
   
   static long regA = 0x20070515, regB = 0x20090129, regC = 0x20140315;
@@ -2052,6 +1954,139 @@ public class Processor implements ByteCode {
       if (s.equals("lin") || s.equals("*")) Linker.dbg = ena;
     }
   }
+  
+  static class EC_pc implements ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      return new M(p.oldpc);
+    }
+  }
+  static class EC_sp implements ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      return new M(p.sp);
+    }
+  }
+  static class EC_fp implements ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      return new M(p.fp);
+    }
+  }
+
+  static class EC_dbg implements ExtCall {
+    final PrintStream out;
+    public EC_dbg(PrintStream out) { this.out = out; }
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length == 0) {
+        out.println("  run : " + Processor.dbgRun);
+        out.println("  mem : " + Processor.dbgMem);
+        out.println("  ast : " + AST.dbg);
+        out.println("  gra : " + Grammar.dbg);
+        out.println("  str : " + StructAnalysis.dbg);
+        out.println("  fro : " + CodeGenFront.dbg);
+        out.println("  bak : " + CodeGenBack.dbg);
+        out.println("  lin : " + Linker.dbg);
+      } else {
+        List<String> areas = new ArrayList<String>();
+        for (M marg : args) {
+          String cmd = marg.str.toLowerCase();
+          if (marg.type == TSTR && (cmd.equals("on") || cmd.equals("1")) || marg.type == TINT && marg.i != 0) {
+            setDbg(areas, true);
+            areas.clear();
+          } else if (marg.type == TSTR && (cmd.equals("off") || cmd.equals("0")) || marg.type == TINT && marg.i == 0) {
+            setDbg(areas, false);
+            areas.clear();
+          } else {
+            areas.add(cmd);
+          }
+        }
+      }
+      return null;
+    }
+  } 
+  static class EC_const implements ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (p.exe.getConstants().keySet().isEmpty()) return null;
+      int min = Integer.MAX_VALUE;
+      int max = 0;
+      for (int a : p.exe.getConstants().keySet()) {
+        min = Math.min(a, min);
+        max = Math.max(a, max);
+      }
+      M m = new M();
+      m.ref = new MMemList(p.memory, min, max + 1);
+      m.type = TSET;
+      return m;
+    }
+  }
+  static class EC_mem implements ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      M m = new M();
+      m.ref = new MMemList(p.memory, 0, p.memory.length);
+      m.type = TSET;
+      return m;
+    }
+  }
+  static class EC_println implements ExtCall {
+    final PrintStream out;
+    public EC_println(PrintStream out) { this.out = out; }
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length == 0) {
+        out.println();
+      } else {
+        for (int i = 0; i < args.length; i++) {
+          out.print(args[i].asString() + (i < args.length-1 ? " " : ""));
+        }
+      }
+      out.println();
+      return null;
+    }
+  }
+  static class EC_print implements ExtCall {
+    final PrintStream out;
+    public EC_print(PrintStream out) { this.out = out; }
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length == 0) {
+      } else {
+        for (int i = 0; i < args.length; i++) {
+          out.print(args[i].asString() + (i < args.length-1 ? " " : ""));
+        }
+      }
+      return null;
+    }
+  }
+  static class EC_rand implements ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      return new M(calcRand());
+    }
+  }
+  static class EC_randseed implements ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length == 0) {
+      } else {
+        randSeed(args[0].asInt());
+      }
+      return null;
+    }
+  }
+  static class EC_cpy implements ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length == 0) {
+        return null;
+      } else {
+        M res = new M();
+        M src = args[0];
+        if (src.type != TSET) {
+          res.copy(src);
+        } else {
+          res.type = TSET;
+          res.ref = src.ref.copyShallow();
+        }
+        return res;
+      }
+    }
+  }
+
+  
+  
   public static M compileAndRun(String... sources) {
     return compileAndRun(0x0000, 0x4000, null, false, false, sources);
   }
@@ -2104,7 +2139,12 @@ public class Processor implements ByteCode {
       }
       throw pe;
     }
-    System.out.println(p.getSP()); // TODO remove
+    
+    
+    // TODO remove
+    System.out.println(p.getSP());
+    // TODO remove
+    
     return ret;
   }
 

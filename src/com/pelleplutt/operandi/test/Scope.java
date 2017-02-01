@@ -27,7 +27,7 @@ public class Scope {
     CodeGenFront.dbg = false;
     CodeGenBack.dbg = false;
     Linker.dbg = false;
-    Processor.silence = false;
+    Processor.silence = true;
   }
 
   @Test
@@ -182,5 +182,102 @@ public class Scope {
         "d = ['genericname':{return 1000;}];\n" +
         "func genericname() {return 10;}\n";
     assertEquals(1111, Processor.compileAndRun(sB, sA).i); 
+  }
+  @Test
+  public void testGlobalInner() {
+    String sA, sB;
+    sA = 
+        "module b;\n" +
+        "res = str(a.fglob);\n" +
+        "a.fn(123);\n" +
+        "res += a.fglob;\n" +
+        "return res;\n" +
+        "\n";
+    sB = 
+        "module a;\n" +
+        "func fn(x) {\n" +
+        "  global fglob;\n" +
+        "  fglob = x;\n" +
+        "}\n";
+    assertEquals("nil123", Processor.compileAndRun(sB, sA).str); 
+  }
+  @Test(expected=CompilerError.class)
+  public void testGlobalInnerErr1() {
+    String sA;
+    sA = 
+        "module b;\n" +
+        "res = 23;\n" +
+        "global qwe;" +
+        "return res;\n" +
+        "\n";
+    Processor.compileAndRun(sA); 
+  }
+  @Test(expected=CompilerError.class)
+  public void testGlobalInnerErr2() {
+    String sA;
+    sA = 
+        "module b;\n" +
+        "func fn() {\n" +
+        "  res = 23;\n" +
+        "  global qwe;" +
+        "  return res;\n" +
+        "}\n" +
+        "\n";
+    Processor.compileAndRun(sA); 
+  }
+  @Test(expected=CompilerError.class)
+  public void testGlobalInnerErr3() {
+    String sA;
+    sA = 
+        "module b;\n" +
+        "a = 0;\n" +
+        " if (a) {\n" +
+        "  res = 23;\n" +
+        "  global qwe;" +
+        "  return res;\n" +
+        "}\n" +
+        "\n";
+    Processor.compileAndRun(sA); 
+  }
+  @Test(expected=CompilerError.class)
+  public void testGlobalInnerErr4() {
+    String sA;
+    sA = 
+        "module b;\n" +
+        "q = {\n" +
+        "  res = 23;\n" +
+        "  global qwe;" +
+        "  return res;\n" +
+        "}\n" +
+        "\n";
+    Processor.compileAndRun(sA); 
+  }
+  @Test(expected=CompilerError.class)
+  public void testGlobalInnerErr5() {
+    String sA;
+    sA = 
+        "module b;\n" +
+        "q = [1,2,3,4][{\n" +
+        "  res = 23;\n" +
+        "  global qwe;" +
+        "  return res;\n" +
+        "}];\n" +
+        "\n";
+    Processor.compileAndRun(sA); 
+  }
+  @Test
+  public void testGlobalInnerMul() {
+    String sA;
+    sA = 
+        "module b;\n" +
+        "[1,2,3,4][{\n" +
+        "  global g1;" +
+        "  global g2;" +
+        "  g1 = $0;\n" +
+        "  g2 = $1*2;\n" +
+        "}];\n" +
+        "return g1 + ',' + g2;\n" +
+        "\n";
+    assertEquals("4,6", Processor.compileAndRun(sA).str); 
   }
 }

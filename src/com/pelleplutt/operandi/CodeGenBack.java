@@ -71,6 +71,8 @@ import com.pelleplutt.operandi.TAC.TACUnresolved;
 import com.pelleplutt.operandi.TAC.TACVar;
 import com.pelleplutt.operandi.proc.Assembler;
 import com.pelleplutt.operandi.proc.ByteCode;
+import com.pelleplutt.operandi.proc.MSet;
+import com.pelleplutt.operandi.proc.Processor;
 
 public class CodeGenBack implements ByteCode {
   public static boolean dbg = false;
@@ -152,25 +154,99 @@ public class CodeGenBack implements ByteCode {
     }
   }
   
+  void generateIsType(TACCall call, ModuleFragment frag, String type, int typeInt){
+    sp++;
+    addCode(frag, stackInfo() + "is" + type, IGET_TYP);
+    pushNumber(frag, typeInt, type + " type");
+    sp -= 2;
+    addCode(frag, stackInfo(), ICMP);
+    sp++;
+    if (typeInt == Processor.TSET) {
+      addCode(frag, stackInfo(), IPUSH_GT); // if stack type > TSET
+    } else {
+      addCode(frag, stackInfo(), IPUSH_EQ);
+    }
+  }
+  
   boolean generateInbuiltFunction(TACCall call, ModuleFragment frag) {
     if (dbg) System.out.println("    GEN_INBUILT_FUNC");
-    if (call.func.equals("str")) {
+    if (call.func.equals(INBUILTFN_TOSTR)) {
       if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
       addCode(frag, stackInfo() + "tostr", ICAST_S);
       return true;
-    } else if (call.func.equals("int")) {
+    } 
+    else if (call.func.equals(INBUILTFN_TOINT)) {
       if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
       addCode(frag, stackInfo() + "toint", ICAST_I);
       return true;
-    } else if (call.func.equals("float")) {
+    } 
+    else if (call.func.equals(INBUILTFN_TOFLOAT)) {
       if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
       addCode(frag, stackInfo() + "tofloat", ICAST_F);
       return true;
-    } else if (call.func.equals("char")) {
+    } 
+    else if (call.func.equals(INBUILTFN_TOCHAR)) {
       if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
       addCode(frag, stackInfo() + "tochar", ICAST_CH);
       return true;
-    } else if (call.func.equals("len")) {
+    }  
+    else if (call.func.equals(INBUILTFN_ISNIL)) {
+      if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
+      generateIsType(call, frag, "nil", Processor.TNIL);
+      return true;
+    }  
+    else if (call.func.equals(INBUILTFN_ISINT)) {
+      if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
+      generateIsType(call, frag, "int", Processor.TINT);
+      return true;
+    }  
+    else if (call.func.equals(INBUILTFN_ISFLOAT)) {
+      if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
+      generateIsType(call, frag, "float", Processor.TFLOAT);
+      return true;
+    }  
+    else if (call.func.equals(INBUILTFN_ISSTR)) {
+      if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
+      generateIsType(call, frag, "str", Processor.TSTR);
+      return true;
+    }  
+    else if (call.func.equals(INBUILTFN_ISFUNC)) {
+      if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
+      generateIsType(call, frag, "func", Processor.TFUNC);
+      return true;
+    }  
+    else if (call.func.equals(INBUILTFN_ISANON)) {
+      if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
+      generateIsType(call, frag, "anon", Processor.TANON);
+      return true;
+    }  
+    else if (call.func.equals(INBUILTFN_ISSET)) {
+      if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
+      generateIsType(call, frag, "set", Processor.TSET);
+      return true;
+    }  
+    else if (call.func.equals(INBUILTFN_ISMAP)) {
+      if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
+      generateIsType(call, frag, "map", MSet.TMAP);
+      return true;
+    }  
+    else if (call.func.equals(INBUILTFN_ISARR)) {
+      if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
+      generateIsType(call, frag, "arr", MSet.TARR);
+      return true;
+    }  
+    else if (call.func.equals(INBUILTFN_ISTUP)) {
+      if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
+      generateIsType(call, frag, "tup", MSet.TTUP);
+      return true;
+    }  
+    else if (call.func.equals(INBUILTFN_TYPEOF)) {
+      if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
+      sp = sp - 1 + 1;
+      addCode(frag, stackInfo() + "typeof", IGET_TYP);
+      return true;
+    }  
+    else if (call.func.equals(INBUILTFN_LEN)) {
       if (call.args != 1) throw new CompilerError("bad number of arguments", call.getNode());
       sp = sp - 1 + 1;
       addCode(frag, stackInfo() + "length", ISET_SZ);
@@ -395,6 +471,9 @@ public class CodeGenBack implements ByteCode {
     }
     else if (tac instanceof TACArgNbr) {
       pushValue(tac, frag);
+    }
+    else if (tac instanceof TACNil) {
+      if (tac.referenced) pushValue(tac, frag);
     }
     else if (tac instanceof TACDefineMe) {
       addCode(frag, stackInfo() + "define me (banked)", IDEF_ME);

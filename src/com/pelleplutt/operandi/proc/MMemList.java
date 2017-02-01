@@ -80,13 +80,9 @@ public class MMemList implements MSet {
   }
   
   public String toString() {
-    StringBuilder sb = new StringBuilder("[");
-    int len = size();
-    for (int i = 0; i < len; i++) {
-      sb.append(get(i));
-      if (i < len-1) sb.append(", ");
-    }
-    sb.append("]");
-    return sb.toString(); 
+    StringBuilder s = new StringBuilder();
+    MListMap.stringifyAppend(this, s, 0, 0);
+    return s.toString();
   }
+
 }

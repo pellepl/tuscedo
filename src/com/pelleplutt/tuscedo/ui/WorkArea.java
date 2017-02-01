@@ -373,7 +373,7 @@ public class WorkArea extends JPanel implements Disposable {
       inputPanel.add(ip[i], Integer.toString(i));
       
       if (i == ISTATE_INPUT || i == ISTATE_BASH) {
-        XtermConsole xc = new XtermConsole(view, input[i], "UTF-8"); 
+        XtermTerminal xc = new XtermTerminal(view.ftp, input[i], "UTF-8"); 
         bash[i] = new Bash(input[i], xc, serial, this);
       }
       
@@ -1269,7 +1269,17 @@ public class WorkArea extends JPanel implements Disposable {
     RxFilter f = new RxFilter();
     f.filter = filter;
     f.addr = address;
+    removeSerialFilter(filter);
     serialFilters.add(f);
+  }
+  
+  public void removeSerialFilter(String filter) {
+    for (RxFilter ef : serialFilters) {
+      if (ef.filter.equals(filter)) {
+        serialFilters.remove(ef);
+        break;
+      }
+    }
   }
   
   public List<RxFilter> getSerialFilters() {
@@ -1286,7 +1296,7 @@ public class WorkArea extends JPanel implements Disposable {
     Log.println("link process " + process.toString());
     tf.setBackground(WorkArea.colInputBashBg);
     Bash bash = ((ProcessGroupInfo)process.getUserData()).bash;
-    ((XtermConsole)bash.console).reviveScreenBuffer(process);
+    ((XtermTerminal)bash.console).reviveScreenBuffer(process);
     updateTitle();
   }
   
@@ -1294,7 +1304,7 @@ public class WorkArea extends JPanel implements Disposable {
     if (process != null) {
       Log.println("unlink process " + process.toString());
       Bash bash = ((ProcessGroupInfo)process.getUserData()).bash;
-      ((XtermConsole)bash.console).forceOriginalScreenBuffer();
+      ((XtermTerminal)bash.console).forceOriginalScreenBuffer();
     }
     tf.setBackground(WorkArea.colInputBg);
     updateTitle();
@@ -1558,9 +1568,9 @@ public class WorkArea extends JPanel implements Disposable {
 
   } // class View
   
-  class RxFilter {
-    String filter;
-    int addr;
+  public static class RxFilter {
+    public String filter;
+    public int addr;
   }
   /*
   g_stack;

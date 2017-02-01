@@ -28,13 +28,15 @@ import com.pelleplutt.operandi.proc.ExtCall;
 //        "r.b = r;\n" +
 //        "println(r.b.b['b'].c);\n" +
 // DONE:   i = ["f":println]; // println external func
+// DONE:   handle 'global' keyword
 // FIXME:  goto
-// FIXME:  handle 'global' keyword
 // FIXME:  on $0..999, in StructAnalyser, replace these by internal variables so we do not need to check range all the time
 
 
 
 public class Compiler {
+  static final int VERSION = 0x00000001;
+  
   static Source src;
   static int stringix = 0;
   Map<String, ExtCall> extDefs;

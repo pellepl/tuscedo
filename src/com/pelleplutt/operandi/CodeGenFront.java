@@ -16,6 +16,7 @@ import static com.pelleplutt.operandi.AST.OP_EQ;
 import static com.pelleplutt.operandi.AST.OP_FOR;
 import static com.pelleplutt.operandi.AST.OP_FUNCDEF;
 import static com.pelleplutt.operandi.AST.OP_GOTO;
+import static com.pelleplutt.operandi.AST.OP_GLOBAL;
 import static com.pelleplutt.operandi.AST.OP_IF;
 import static com.pelleplutt.operandi.AST.OP_MINUS;
 import static com.pelleplutt.operandi.AST.OP_MINUSEQ;
@@ -425,7 +426,8 @@ public class CodeGenFront {
     else if (assignee.op == OP_ADEREF || assignee.op == OP_DOT) {
       return genIRUnwindSymbol(assignee, parentEblk, new Info(OP_EQ));
     }
-    else if (AST.isNumber(assignee.op) || AST.isString(assignee.op)) {
+    else if (AST.isNumber(assignee.op) || AST.isString(assignee.op) ||
+        assignee.op == OP_CALL) {
       return null; // do nufin
     }
     else {
@@ -524,6 +526,10 @@ public class CodeGenFront {
         if (dbg) System.out.println("  sym " + e + " is unresolved");
         return new TACUnresolved((ASTNodeSymbol)e, parentEblk);
       }
+    }
+    
+    else if (e.op == OP_GLOBAL) {
+      return null;
     }
     
     else if (e.op == OP_ADEREF) {
@@ -848,6 +854,7 @@ public class CodeGenFront {
     }
     
     else if (e.op == OP_CALL) {
+      if (!(e instanceof ASTNodeFuncCall)) throw new CompilerError("bad call construct", e);
       ASTNodeFuncCall ecall = (ASTNodeFuncCall)e;
       String args[] = new String[e.operands.size()];
       for (int i = args.length-1; i >= 0; i--) {

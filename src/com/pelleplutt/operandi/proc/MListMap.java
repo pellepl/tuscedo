@@ -69,11 +69,7 @@ public class MListMap implements MSet {
   }
   public void set(M mix, M m) {
     if (size() == 0) {
-      if (mix.type == Processor.TINT) {
-        makeArr();
-      } else {
-        makeMap();
-      }
+      makeMap();
     }
     if (type == TARR) {
       arr.set(mix.asInt(), m);
@@ -206,57 +202,91 @@ public class MListMap implements MSet {
     return ml;
   }
   
-  protected void stringifyAppend(MListMap m, StringBuilder s, int depth) {
-    if (depth <= 3) {
-      if (m.type == Processor.TNIL) {
+  static final int MAX_DEPTH = 3;
+  static final int MAX_ELEMENTS = 1000;
+  static public int stringifyAppend(MSet m, StringBuilder s, int els, int depth) {
+    if (depth <= MAX_DEPTH && els < MAX_ELEMENTS) {
+      if (m.getType() == Processor.TNIL) {
         s.append("{[}]");
-      } else if (m.type == TMAP) {
-        Object keys[] = m.map.keySet().toArray();
+      } else if (m.getType() == TMAP) {
         s.append('{');
-        for (int i = 0; i < keys.length; i++) {
-          M v = m.map.get(keys[i]);
-          s.append(keys[i]);
+        for (int i = 0; els < MAX_ELEMENTS && i < m.size(); i++) {
+          els++;
+          M tup = m.getElement(i);
+          s.append(tup.ref.get(0));
+          M v = tup.ref.get(1);
           s.append(':');
-          if (v.type == Processor.TSET && v.ref instanceof MListMap) {
-            if (depth >= 3) {
+          if (v.type == Processor.TSET) {
+            if (depth >= MAX_DEPTH) {
               s.append("...");
               break;
             } else {
-              stringifyAppend((MListMap)v.ref, s, depth + 1);
+              els = stringifyAppend(v.ref, s, els, depth + 1);
             }
+          } else if (v.getRaw() == null) {
+            s.append("(nil)");
           } else {
-            s.append(v.getRaw());
+            s.append(v.getRaw().toString());
           }
-          if (i < keys.length - 1) s.append(", ");
+          if (i < m.size() - 1) s.append(", ");
         }
+        if (els >= MAX_ELEMENTS) s.append("...");
         s.append('}');
-      } else if (m.type == TARR) {
+      } else if (m.getType() == TARR) {
         s.append('[');
-        for (int i = 0; i < m.arr.size(); i++) {
-          M v = m.arr.get(i);
-          if (v.type == Processor.TSET && v.ref instanceof MListMap) {
-            if (depth >= 3) {
+        String lastApp = null; int iters = 0;
+        for (int i = 0; els < MAX_ELEMENTS && i < m.size(); i++) {
+          M v = m.get(i);
+          if (v.type == Processor.TSET) {
+            if (depth >= MAX_DEPTH) {
               s.append("...");
               break;
             } else {
-              stringifyAppend((MListMap)v.ref, s, depth + 1);
+              els = stringifyAppend(v.ref, s, els, depth + 1);
             }
           } else {
-            s.append(v.getRaw());
+            String append;
+            if (v.getRaw() == null) {
+              append = "(nil)";
+            } else {
+              append = v.getRaw().toString();
+            }
+            
+            if (append.equals(lastApp)) {
+              iters++;
+              if (iters > 2) {
+                continue;
+              }
+            } else {
+              if (iters > 2) {
+                s.append("(" + (iters - 2) + " more)");
+                if (i < m.size()- 1) s.append(", ");
+              }
+              iters = 0;
+            }
+            els++;
+            
+            s.append(append);
+            lastApp = append;
           }
-          if (i < m.arr.size()- 1) s.append(", ");
+          if (i < m.size()- 1) s.append(", ");
         }
+        if (iters > 2) {
+          s.append("(" + (iters - 2) + " more)");
+        }
+        if (els >= MAX_ELEMENTS) s.append("...");
         s.append(']');
-      } else if (m.type == TTUP) {
+      } else if (m.getType() == TTUP) {
+        els+=2;
         s.append('(');
-        M v = m.tup[1];
-        s.append(m.tup[0]);
+        M v = m.get(1);
+        s.append(m.get(0));
         s.append(':');
-        if (v.type == Processor.TSET && v.ref instanceof MListMap) {
-          if (depth >= 3) {
+        if (v.type == Processor.TSET) {
+          if (depth >= MAX_DEPTH) {
             s.append("...");
           } else {
-            stringifyAppend((MListMap)v.ref, s, depth + 1);
+            stringifyAppend(v.ref, s, els, depth + 1);
           }
         } else {
           s.append(v.getRaw());
@@ -264,11 +294,13 @@ public class MListMap implements MSet {
         s.append(')');
       }
     }
+    
+    return els;
   }
   
   public String toString() {
     StringBuilder s = new StringBuilder();
-    stringifyAppend(this, s, 0);
+    stringifyAppend(this, s, 0, 0);
     return s.toString();
   }
 }

@@ -37,6 +37,7 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_SERIAL_TX = "__serial_tx";
   public static final String FN_SERIAL_ON_RX = "__serial_on_rx";
   public static final String FN_SERIAL_ON_RX_CLEAR = "__serial_on_rx_clear";
+  public static final String FN_SERIAL_ON_RX_LIST = "__serial_on_rx_list";
   Executable exe, pexe;
   Compiler comp;
   Processor proc;
@@ -360,10 +361,14 @@ public class OperandiScript implements Runnable, Disposable {
     extDefs.put(FN_SERIAL_ON_RX, new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 2) return null;
-        if (args[1].type != Processor.TFUNC && args[1].type != Processor.TANON) {
-          throw new ProcessorError("second argument must be function");
+        if (args[1].type != Processor.TFUNC && args[1].type != Processor.TANON && args[1].type != Processor.TNIL) {
+          throw new ProcessorError("second argument must be function or nil");
         }
-        currentWA.registerSerialFilter(args[0].asString(), args[1].i);
+        if (args[1].type == Processor.TNIL) {
+          currentWA.removeSerialFilter(args[0].asString());
+        } else {
+          currentWA.registerSerialFilter(args[0].asString(), args[1].i);
+        }
         return null;
       }
     });
@@ -371,6 +376,20 @@ public class OperandiScript implements Runnable, Disposable {
       public Processor.M exe(Processor p, Processor.M[] args) {
         currentWA.clearSerialFilters();
         return null;
+      }
+    });
+    extDefs.put(FN_SERIAL_ON_RX_LIST, new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        List<WorkArea.RxFilter> filters = currentWA.getSerialFilters();
+        MListMap listMap = new MListMap();
+        for (WorkArea.RxFilter f :filters) {
+          String func = comp.getLinker().lookupAddressFunction(f.addr);
+          if (func == null) {
+            func = String.format("0x%08x", f.addr);
+          }
+          listMap.put(f.filter, new M(func));
+        }
+        return new M(listMap);
       }
     });
   }

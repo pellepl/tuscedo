@@ -1,6 +1,8 @@
 package com.pelleplutt.operandi.proc;
 
 public interface ByteCode {
+  static final int VERSION = 0x00000001;
+  
   static final int ICOND_AL = 0x0;
   static final int ICOND_EQ = 0x1;
   static final int ICOND_NE = 0x2;
@@ -202,6 +204,23 @@ public interface ByteCode {
   static final int FRAME_2_ME = 3;
   static final int FRAME_3_ARGC = 4;
   static final int FRAME_SIZE = 4;
+  
+  static final String INBUILTFN_TOSTR = "str";
+  static final String INBUILTFN_TOINT = "int";
+  static final String INBUILTFN_TOFLOAT = "float";
+  static final String INBUILTFN_TOCHAR = "char";
+  static final String INBUILTFN_ISNIL = "isnil";
+  static final String INBUILTFN_ISINT = "isint";
+  static final String INBUILTFN_ISFLOAT = "isfloat";
+  static final String INBUILTFN_ISSTR = "isstr";
+  static final String INBUILTFN_ISFUNC = "isfunc";
+  static final String INBUILTFN_ISANON = "isanon";
+  static final String INBUILTFN_ISSET = "isset";
+  static final String INBUILTFN_ISMAP = "ismap";
+  static final String INBUILTFN_ISARR = "isarr";
+  static final String INBUILTFN_ISTUP = "istup";
+  static final String INBUILTFN_TYPEOF = "type";
+  static final String INBUILTFN_LEN = "len";
   
   /*
   

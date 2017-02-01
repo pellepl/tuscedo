@@ -112,6 +112,7 @@ public class AST implements Lexer.Emitter {
   final static int OP_CALL         = -3;
   final static int OP_FOR_IN       = -4;
   final static int OP_RANGE        = -5;
+  final static int OP_INBUILT_FN   = -6;
   
   public final static Op[] OPS = {
       new Op("/\\**?\\*/", OP_COMMENTMULTI),
@@ -222,7 +223,7 @@ public class AST implements Lexer.Emitter {
     lexer = new Lexer(this, 65536);
     for (int i = 0; i < _OP_FINAL; i++) {
       if (i >= OP_FUNCDEF && i <= OP_GOTO ||
-          i == OP_GLOBAL) {
+          i == OP_GLOBAL || i == OP_ME || i == OP_MODULE) {
         lexer.addSymbolCompound(OPS[i].str, OPS[i].id);
       } else {
         lexer.addSymbol(OPS[i].str, OPS[i].id);
@@ -331,7 +332,9 @@ public class AST implements Lexer.Emitter {
       } catch (Throwable t) {t.printStackTrace();}
     } 
     
-    else if (tokix == OP_SYMBOL || tokix == OP_ARGC || tokix == OP_ARGV || tokix == OP_ARG || tokix == OP_ME) {
+    else if (tokix == OP_SYMBOL 
+        || tokix == OP_ARGC || tokix == OP_ARGV || tokix == OP_ARG 
+        || tokix == OP_ME) {
       onSymbol(new String(symdata, 0, len));
     }
     
@@ -642,11 +645,16 @@ public class AST implements Lexer.Emitter {
     if (!opers.isEmpty()) {
       if (opers.peek().id == OP_FOR || opers.peek().id == OP_WHILE || opers.peek().id == OP_IF ||
           opers.peek().id == OP_ELSE) {
+        if (dbg) System.out.println("      found control stmnt " + AST.opString(opers.peek().id) + ", collapse to this");
+        // if collapsing to "if", then check any preceding "else"
+        boolean isIf = opers.peek().id == OP_IF;
         collapseStack(opers.peek().id);
+        if (isIf && !opers.isEmpty() && opers.peek().id == OP_ELSE) {
+          collapseStack(opers.peek().id);
+        }
       } else if (opers.peek().id == OP_FUNCDEF) {
         opers.pop(); // pop off the "func"
         exprs.get(exprs.size()-2).operands.add(exprs.pop());
-        
       }
     }
   }

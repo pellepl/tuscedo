@@ -12,6 +12,7 @@ import static com.pelleplutt.operandi.AST.OP_EQ;
 import static com.pelleplutt.operandi.AST.OP_FOR;
 import static com.pelleplutt.operandi.AST.OP_FOR_IN;
 import static com.pelleplutt.operandi.AST.OP_FUNCDEF;
+import static com.pelleplutt.operandi.AST.OP_GLOBAL;
 import static com.pelleplutt.operandi.AST.OP_HASH;
 import static com.pelleplutt.operandi.AST.OP_IF;
 import static com.pelleplutt.operandi.AST.OP_IN;
@@ -42,12 +43,14 @@ public class StructAnalysis {
   public ScopeStack mainScopeStack;
   ScopeStack anonDefiningScopeStack = null;
   List<ASTNodeSymbol> anonDefLocals = new ArrayList<ASTNodeSymbol>();
+  int prevOp, prevPrevOp, _prevOp;
   
   String module = ".main";
   int blockId;
   IntermediateRepresentation irep;
   
   public StructAnalysis() {
+    prevOp = prevPrevOp = AST._OP_FINAL;
   }
   
   String getBlockId() {
@@ -59,8 +62,10 @@ public class StructAnalysis {
     analyseRecurse(e, mainScopeStack, null, false, false);
   }
   
-
   void analyseRecurse(ASTNode e, ScopeStack scopeStack, ASTNode parentNode, boolean operator, boolean loop) {
+    prevPrevOp = prevOp;
+    prevOp = _prevOp;
+    _prevOp = e.op;
     //System.out.println("*** anaylyseRec oper:" + operator + " loop:" + loop + "   " + e + ":" + AST.opString(e.op));
     //System.out.println("    scopeStack:" + scopeStack.id + " " + scopeStack);
     if (e.op == OP_MODULE) {
@@ -68,8 +73,7 @@ public class StructAnalysis {
       if (scopeStack.size() > 1) {
         throw new CompilerError("cannot declare module '"+module+"' within a scope", e);
       }
-      
-    } 
+    }
     else if (e.op == OP_BLOK) {
       ASTNodeBlok eblok = (ASTNodeBlok)e;
       Scope newScope = new Scope(eblok);
@@ -90,13 +94,25 @@ public class StructAnalysis {
       eblok.setAnnotation(scope.symVars, scopeStack.size(), blockId, module, ASTNodeBlok.TYPE_MAIN);
       if (dbg) System.out.println("LEAVE eblk " + eblok + " got symbols " + scope.symVars);
     }
+    else if (e.op == OP_GLOBAL) {
+      if (!(prevOp == OP_BLOK || prevOp == OP_FUNCDEF || prevPrevOp == OP_GLOBAL && prevOp == OP_SYMBOL)) {
+//        System.out.println(AST.opString(prevPrevOp) +  "  " 
+//            + AST.opString(prevOp) +  "  " +
+//            AST.opString(e.op)); 
+        throw new CompilerError("global only allowed in scope start", e);
+      }
+      analyseRecurse(e.operands.get(0), scopeStack, e, true, loop);
+    }
     else if (e.op == OP_SYMBOL && !operator) {
       if (((ASTNodeSymbol)e).symbol.charAt(0) != '$') {
         defVar(scopeStack, (ASTNodeSymbol)e, parentNode);
       }
     } 
     else if (e.op == OP_SYMBOL && operator) {
-      if (anonDefiningScopeStack != null && isLocalVarDef(anonDefiningScopeStack, (ASTNodeSymbol)e)) {
+      if (parentNode.op == OP_GLOBAL) {
+        defVarIfUndefGlobal(scopeStack, (ASTNodeSymbol)e, parentNode);
+      }
+      else if (anonDefiningScopeStack != null && isLocalVarDef(anonDefiningScopeStack, (ASTNodeSymbol)e)) {
         // within an anonymous block, so gather all references to external locals
         if (!anonDefLocals.contains((ASTNodeSymbol)e)) {
           anonDefLocals.add((ASTNodeSymbol)e);
@@ -267,6 +283,7 @@ public class StructAnalysis {
           }
         }
       }
+      if (!(e instanceof ASTNodeArrDecl)) throw new CompilerError("malformed array", e);
       ((ASTNodeArrDecl)e).onlyPrimitives = onlyPrimitives;
     }    
     else if (e.op == OP_TUPLE) {
@@ -322,6 +339,10 @@ public class StructAnalysis {
     if (anonDefiningScopeStack != null) {
       throw new CompilerError("cannot nest anonymous functions", parent);
     }
+    prevPrevOp = prevOp;
+    prevOp = _prevOp;
+    _prevOp = be.op;
+
     anonDefiningScopeStack = definingScopeStack;
     Scope globalScope = mainScopeStack.get(0);
     be.parentBlock = globalScope.block;
@@ -382,6 +403,19 @@ public class StructAnalysis {
     }
     scopeStack.peek().symVars.put(esym, esym.symNbr);
     if (dbg) System.out.println("  + '" + esym.symbol + "' " + (scopeStack.size() == 1 ? "GLOBAL" : "LOCAL") +
+        " in " + definer);
+    esym.declare = true;
+  }
+  
+  // define variable for global scope if not already defined
+  void defVarIfUndefGlobal(ScopeStack scopeStack, ASTNodeSymbol esym, ASTNode definer) {
+    if (esym == null) throw new CompilerError("fatal");
+    if (scopeStack.get(0).symVars.keySet().contains(esym)) {
+      // is defined already
+      return;
+    };
+    scopeStack.get(0).symVars.put(esym, esym.symNbr);
+    if (dbg) System.out.println("  + '" + esym.symbol + "' " + "GLOBAL" +
         " in " + definer);
     esym.declare = true;
   }
