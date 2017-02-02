@@ -12,6 +12,7 @@ import com.pelleplutt.operandi.CodeGenFront.FrontFragment;
 
 public abstract class TAC {
   private ASTNode e;
+  int op;
   boolean referenced;
   boolean added;
   FrontFragment ffrag; // only needed for debug when listing the IR
@@ -20,6 +21,7 @@ public abstract class TAC {
   
   TAC(ASTNode e) {
     this.e = e;
+    this.op = e.op;
   }
   
   public ASTNode getNode() {
@@ -41,7 +43,6 @@ public abstract class TAC {
   }
   
   public static class TACOp extends TAC {
-    int op;
     TAC left, right;
     public TACOp(ASTNode e, int op, TAC left, TAC right) {
       super(e); this.op = op; this.left = left; this.right = right;
@@ -50,7 +51,6 @@ public abstract class TAC {
   }
   
   public static class TACUnaryOp extends TAC {
-    int op;
     TAC operand;
     public TACUnaryOp(ASTNode e, int op, TAC operand) {
       super(e); this.op = op; this.operand = operand;
@@ -242,7 +242,7 @@ public abstract class TAC {
     TAC cond;
     boolean positive;
     public TACGotoCond(ASTNode e, TAC cond, TACLabel label, boolean condPositive) {
-      super(e); this.condOp = cond.getNode().op; this.cond = cond; this.label = label; this.positive = condPositive;
+      super(e); this.condOp = cond.op; this.cond = cond; this.label = label; this.positive = condPositive;
     }
     public String toString() {return (positive ? "IF " : "IFNOT ") + ref(cond) + " GOTO " + label.label;}
   }
@@ -258,10 +258,10 @@ public abstract class TAC {
   public static class TACAlloc extends TAC {
     public static final String varIterator = ".iter";
     public static final String varSet = ".set";
-    List<String> adsVars = new ArrayList<String>();
-    List<String> vars = new ArrayList<String>();
-    List<String> tvars = new ArrayList<String>();
-    List<String> args = new ArrayList<String>();
+    private List<String> adsVars = new ArrayList<String>();
+    private List<String> vars = new ArrayList<String>();
+    private List<String> tvars = new ArrayList<String>();
+    private List<String> args = new ArrayList<String>();
     String module, scope, tScope;
     boolean funcEntry;
     
@@ -317,15 +317,28 @@ public abstract class TAC {
       return adsVars.size();
     }
     
+    public List<String> getAnonymousDefinedScopeVariables() {
+      return adsVars;
+    }
+    public List<String> getLocalVariables() {
+      return vars;
+    }
+    public List<String> getInternalVariables() {
+      return tvars;
+    }
+    public List<String> getArguments() {
+      return args;
+    }
+    
     public String toString() {return "ALLO " + vars + (!tvars.isEmpty() ? " " + tvars : "") +
         (!adsVars.isEmpty() ? " ADS:" + adsVars : "") +
         (funcEntry ? " FUNC" + args : "");}
   }
 
   public static class TACFree extends TAC {
-    List<String> adsVars = new ArrayList<String>();
-    List<String> vars = new ArrayList<String>();
-    List<String> tvars = new ArrayList<String>();
+    private List<String> adsVars = new ArrayList<String>();
+    private List<String> vars = new ArrayList<String>();
+    private List<String> tvars = new ArrayList<String>();
     String module, scope, tScope;
     public TACFree(ASTNodeBlok e, String module, String scope) {
       super(e);
@@ -353,6 +366,15 @@ public abstract class TAC {
     }
     public int variablesOnStack() {
       return vars.size() + tvars.size() + adsVars.size();
+    }
+    public List<String> getAnonymousDefinedScopeVariables() {
+      return adsVars;
+    }
+    public List<String> getLocalVariables() {
+      return vars;
+    }
+    public List<String> getInternalVariables() {
+      return tvars;
     }
     public String toString() {return "FREE " + vars + (!tvars.isEmpty() ? " " + tvars : "")+ (!adsVars.isEmpty() ? " " + adsVars : "");}
   }

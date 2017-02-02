@@ -36,7 +36,7 @@ public class IntermediateRepresentation {
     return accGlobalVars.get(module);
   }
 
-  public void addGlobalVariables(String module, Set<ASTNodeSymbol> globals) {
+  public void addGlobalVariables(String module, List<ASTNodeSymbol> globals) {
     List<ASTNodeSymbol> modGlobs = curGlobalVars.get(module);
     if (modGlobs == null) {
       modGlobs = new ArrayList<ASTNodeSymbol>(); 

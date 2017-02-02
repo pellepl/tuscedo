@@ -275,9 +275,9 @@ public class CodeGenBack implements ByteCode {
 //      }
       
       // point out argument variables
-      if (!all.args.isEmpty()) {
+      if (!all.getArguments().isEmpty()) {
         int argix = 0;
-        for (String sym : all.args) {
+        for (String sym : all.getArguments()) {
           frag.locals.put(new TACVar(tac.getNode(), sym, all.module, null, all.scope), -argix-FRAME_SIZE-1);
           argix++;
         }
@@ -285,15 +285,15 @@ public class CodeGenBack implements ByteCode {
       // allocate stack variables
       if (all.variablesOnStack() + all.countADSVars() > 0) {
         int fpoffset = sp - fp;
-        for (String sym : all.adsVars) {
+        for (String sym : all.getAnonymousDefinedScopeVariables()) {
           TACVar v = new TACVar(tac.getNode(), sym, all.module, null, all.scope);
           frag.locals.put(v, fpoffset++);
         }
-        for (String sym : all.vars) {
+        for (String sym : all.getLocalVariables()) {
           TACVar v = new TACVar(tac.getNode(), sym, all.module, null, all.scope);
           frag.locals.put(v, fpoffset++);
         }
-        for (String sym : all.tvars) {
+        for (String sym : all.getInternalVariables()) {
           TACVar v = new TACVar(tac.getNode(), sym, all.module, null, all.scope + all.tScope);
           frag.locals.put(v, fpoffset++);
         }
@@ -308,13 +308,13 @@ public class CodeGenBack implements ByteCode {
       // free stack variables
       TACFree fre = (TACFree)tac;
       if (fre.variablesOnStack() > 0) {
-        for (String sym : fre.adsVars) {
+        for (String sym : fre.getAnonymousDefinedScopeVariables()) {
           frag.locals.remove(new TACVar(tac.getNode(), sym, fre.module, null, fre.scope));
         }
-        for (String esym : fre.vars) {
+        for (String esym : fre.getLocalVariables()) {
           frag.locals.remove(new TACVar(tac.getNode(), esym, fre.module, null, fre.scope));
         }
-        for (String esym : fre.tvars) {
+        for (String esym : fre.getInternalVariables()) {
           frag.locals.remove(new TACVar(tac.getNode(), esym, fre.module, null, fre.scope + fre.tScope));
         }
         sp -= fre.variablesOnStack();
@@ -654,13 +654,13 @@ public class CodeGenBack implements ByteCode {
         // push 1 if conditional is true, push 0 if conditional is false
         sp++;
         int instr = IPUSH_0;
-        if (tacop.getNode().op == OP_EQ2) instr = IPUSH_EQ;
-        else if (tacop.getNode().op == OP_NEQ) instr = IPUSH_NE;
-        else if (tacop.getNode().op == OP_GE) instr = IPUSH_GE;
-        else if (tacop.getNode().op == OP_LT) instr = IPUSH_LT;
-        else if (tacop.getNode().op == OP_GT) instr = IPUSH_GT;
-        else if (tacop.getNode().op == OP_LE) instr = IPUSH_LE;
-        else if (tacop.getNode().op == OP_IN) instr = IPUSH_EQ;
+        if (tacop.op == OP_EQ2) instr = IPUSH_EQ;
+        else if (tacop.op == OP_NEQ) instr = IPUSH_NE;
+        else if (tacop.op == OP_GE) instr = IPUSH_GE;
+        else if (tacop.op == OP_LT) instr = IPUSH_LT;
+        else if (tacop.op == OP_GT) instr = IPUSH_GT;
+        else if (tacop.op == OP_LE) instr = IPUSH_LE;
+        else if (tacop.op == OP_IN) instr = IPUSH_EQ;
         addCode(frag, stackInfo() + "push cond " + tac, instr);
       }
     }

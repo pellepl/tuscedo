@@ -93,9 +93,9 @@ public abstract class ASTNode {
   
   public static class ASTNodeBlok extends ASTNode {
     // map of symbols declared in this block, and at what index they are declared in this block
-    Map<ASTNodeSymbol, Integer> symList;
-    List<ASTNodeSymbol> argList;
-    List<ASTNodeSymbol> anonDefScopeSymList;
+    private Map<ASTNodeSymbol, Integer> symList;
+    private List<ASTNodeSymbol> argList;
+    private List<ASTNodeSymbol> anonDefScopeSymList;
     int scopeLevel;
     String id;
     String module;

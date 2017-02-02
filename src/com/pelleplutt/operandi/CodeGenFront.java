@@ -462,7 +462,7 @@ public class CodeGenFront {
       }
       
       if (eblk.getScopeLevel() == 0) {
-        irep.addGlobalVariables(eblk.module, eblk.symList.keySet());
+        irep.addGlobalVariables(eblk.module, eblk.getVariables());
       }
       
       boolean doStackAllocation = (eblk.gotUnhandledVariables() &&
@@ -493,7 +493,7 @@ public class CodeGenFront {
       if (eblk.type == ASTNodeBlok.TYPE_ANON) {
         // create external variable list that the anonymous scope reaches out to
         List<TACVar> adsVars = new ArrayList<TACVar>();
-        for (ASTNodeSymbol esym : eblk.anonDefScopeSymList) {
+        for (ASTNodeSymbol esym : eblk.getAnonymousDefinedScopeVariables()) {
           ASTNodeBlok declBlok = getScopeIfDef(parentEblk, esym);
           if (declBlok == null) throw new CompilerError("fatal", e);
           adsVars.add(new TACVar(esym, esym.symbol, declBlok.getModule(), null, declBlok.getScopeId()));
@@ -610,7 +610,7 @@ public class CodeGenFront {
       TACLabel lExit = new TACLabel(e, label+"_ifend");
       if (!hasElse) {
         TAC cond = genIR(e.operands.get(0), parentEblk, info);
-        if (AST.isUnaryOperator(cond.getNode().op)) setReferenced(cond);
+        if (AST.isUnaryOperator(cond.op)) setReferenced(cond);
         TAC iffalsegoto = new TACGotoCond(e, cond, lExit, false);
         add(iffalsegoto);
         newBlock();
@@ -625,7 +625,7 @@ public class CodeGenFront {
       } else {
         TACLabel lElse = new TACLabel(e, label+"_ifelse");
         TAC cond = genIR(e.operands.get(0), parentEblk, info);
-        if (AST.isUnaryOperator(cond.getNode().op)) setReferenced(cond);
+        if (AST.isUnaryOperator(cond.op)) setReferenced(cond);
         TAC iffalsegoto = new TACGotoCond(e, cond, lElse, false);
         add(iffalsegoto);
         newBlock();
@@ -676,7 +676,7 @@ public class CodeGenFront {
         add(lLoop);
         // conditional : y
         TAC cond = genIR(e.operands.get(1), parentEblk, info);
-        if (AST.isUnaryOperator(cond.getNode().op)) setReferenced(cond);
+        if (AST.isUnaryOperator(cond.op)) setReferenced(cond);
         TAC iffalsegoto = new TACGotoCond(e, cond, lExit, false);
         add(iffalsegoto);
         newBlock();
@@ -749,7 +749,7 @@ public class CodeGenFront {
         add(_len_set);
         setReferenced(_len_set);
         TAC cond = new TACOp(e, AST.OP_LT, _iter, _len_set);
-        if (AST.isUnaryOperator(cond.getNode().op)) setReferenced(cond);
+        if (AST.isUnaryOperator(cond.op)) setReferenced(cond);
         add(cond);
         TACGotoCond iffalsegoto = new TACGotoCond(e, cond, lExit, false);
         iffalsegoto.condOp = AST.OP_LT;
@@ -813,7 +813,7 @@ public class CodeGenFront {
       newBlock();
       add(lLoop);
       TAC cond = genIR(e.operands.get(0), parentEblk, info);
-      if (AST.isUnaryOperator(cond.getNode().op)) setReferenced(cond);
+      if (AST.isUnaryOperator(cond.op)) setReferenced(cond);
       TAC iffalsegoto = new TACGotoCond(e, cond, lExit, false);
       add(iffalsegoto);
       newBlock();
@@ -991,7 +991,7 @@ public class CodeGenFront {
     else {
       throw new CompilerError("not implemented " + AST.opString(e.op), e);
     }
-    // TODO moar
+    // TODO moar?
   }
   
   void add(TAC t) {
@@ -1040,7 +1040,7 @@ public class CodeGenFront {
     return ffrag.loopStack.peek().wasContinued;
   }
   
-  boolean loopWasBraked() {
+  boolean loopWasBroken() {
     return ffrag.loopStack.peek().wasBroken;
   }
   
