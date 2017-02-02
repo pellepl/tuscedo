@@ -822,7 +822,7 @@ public class CodeGenBack implements ByteCode {
     } else if (a instanceof TACCode) {
       TACCode tcode = (TACCode)a;
       if (tcode.type == ASTNodeBlok.TYPE_ANON) {
-        // adsVars into set
+        // copy the locals in this fragment referenced by the anonymous into a set
         for (int i = 0; i < tcode.adsVars.size(); i++) {
           TACVar adsVar = tcode.adsVars.get(i);
           if (frag.locals.containsKey(adsVar)) {

@@ -5,7 +5,6 @@ import java.util.List;
 
 import com.pelleplutt.operandi.ASTNode.ASTNodeArrDecl;
 import com.pelleplutt.operandi.ASTNode.ASTNodeBlok;
-import com.pelleplutt.operandi.ASTNode.ASTNodeCompoundSymbol;
 import com.pelleplutt.operandi.ASTNode.ASTNodeFuncCall;
 import com.pelleplutt.operandi.ASTNode.ASTNodeRange;
 import com.pelleplutt.operandi.ASTNode.ASTNodeSymbol;
@@ -396,15 +395,10 @@ public abstract class TAC {
       this.args = args; this.var = var; this.module = module; this.declaredModule = declaredModule;
       funcNameDefined = !e.callByOperation;
       funcAddrInVar = var != null;
-      if (e.name instanceof ASTNodeCompoundSymbol) {
-        ASTNodeCompoundSymbol ce = (ASTNodeCompoundSymbol)e.name;
-        this.func = ce.dots.get(1).symbol;  
+      if (e.name == null) {
+        // func address on stack
       } else {
-        if (e.name == null) {
-          // func address on stack
-        } else {
-          this.func = e.name.symbol;
-        }
+        this.func = e.name.symbol;
       }
     }
     public TACCall(ASTNode e, String funcName, int args, String module, String declaredModule) {

@@ -1,10 +1,8 @@
 package com.pelleplutt.operandi;
 
-import static com.pelleplutt.operandi.AST.OP_ADEREF;
 import static com.pelleplutt.operandi.AST.OP_AND;
 import static com.pelleplutt.operandi.AST.OP_BNOT;
 import static com.pelleplutt.operandi.AST.OP_DIV;
-import static com.pelleplutt.operandi.AST.OP_DOT;
 import static com.pelleplutt.operandi.AST.OP_EQ;
 import static com.pelleplutt.operandi.AST.OP_EQ2;
 import static com.pelleplutt.operandi.AST.OP_GE;
@@ -19,7 +17,6 @@ import static com.pelleplutt.operandi.AST.OP_PLUS;
 import static com.pelleplutt.operandi.AST.OP_RANGE;
 import static com.pelleplutt.operandi.AST.OP_SHLEFT;
 import static com.pelleplutt.operandi.AST.OP_SHRIGHT;
-import static com.pelleplutt.operandi.AST.OP_SYMBOL;
 import static com.pelleplutt.operandi.AST.OP_XOR;
 
 import java.util.ArrayList;
@@ -258,110 +255,6 @@ public abstract class ASTNode {
     }
   }
   
-  // TODO instead, make a ASTNodeDerefPathSymbol which can contain
-  // both dots and arrderefs, and not necessarily only symbols.
-  // More like <symbol> deref-arr <node> deref-dot <node>
-  // Special case is when path begins with
-  // (1) <symbol-a> deref-dot <symbol-b> or  
-  // (2) <symbol-a> deref-dot <symbol-b> deref-dot <symbol-c> 
-  //
-  // In both cases, the symbol-a may be a variable or a module definition
-  // depending on context, i.e. if symbol-a is a reachable scope variable or
-  // not. If not, symbol-a is a module specification.
-  //
-  // In case (1), if symbol-a is a known variable, symbol-a must be a map
-  // and symbol-b is a deref if this map. If symbol-a is an unknown, it is
-  // considered a module spec and symbol-b is thus a variable in that module.
-  //
-  // In case (2), if symbol-a is a known variable, symbol-a must be a map
-  // and symbols b and c are derefs of this map. If symbol-a is an 
-  // unknown, it is a module spec and symbol-b is thus a map in that module,
-  // where symbol-c is a deref value of that map.
-
-// TODO FIX THIS FOR THE SAKE OF GOD
-// remove?
-  public static class ASTNodeCompoundSymbol extends ASTNodeSymbol {
-    ASTNode e;
-    List<ASTNodeSymbol> dots = new ArrayList<ASTNodeSymbol>();
-
-    public ASTNodeCompoundSymbol(ASTNode e) {
-      super(null);
-      try {
-        op = OP_SYMBOL; // TODO
-        StringBuilder sb = new StringBuilder();
-        ASTNode de = e;
-        while (de != null) {
-          dots.add(0, ((ASTNodeSymbol)de.operands.get(1)));
-          sb.insert(0, "." + ((ASTNodeSymbol)de.operands.get(1)).symbol);
-          if (de.operands.get(0).op == OP_DOT) {
-            de = de.operands.get(0);
-          } else {
-            dots.add(0, ((ASTNodeSymbol)de.operands.get(0)));
-            sb.insert(0, ((ASTNodeSymbol)de.operands.get(0)).symbol);
-            de = null;
-          }
-        }
-        
-        symbol = sb.toString();
-      } catch (Throwable t) {
-        System.out.println(e);
-        t.printStackTrace(); // TODO
-        throw new CompilerError(t.getMessage(), e);
-      }
-    }
-
-    public String toString() {
-      return symbol;
-    }
-    
-    public boolean equals(Object o) {
-      throw new Error();
-    }
-    
-    public int hashCode() {
-      throw new Error();
-    }
-  }
-
-// TODO FIX THIS FOR THE SAKE OF GOD
-// remove?
-  public static class ASTNodeArrSymbol extends ASTNodeSymbol {
-    ASTNode e;
-    List<ASTNode> path = new ArrayList<ASTNode>();
-
-    public ASTNodeArrSymbol(ASTNode e) {
-      super(null);
-      op = OP_SYMBOL; // TODO
-      StringBuilder sb = new StringBuilder();
-      ASTNode de = e;
-      while (de != null) {
-        path.add(0, de.operands.get(1));
-        sb.insert(0, "." + (de.operands.get(1)).toString());
-        if (de.operands.get(0).op == OP_ADEREF) {
-          de = de.operands.get(0);
-        } else {
-          path.add(0, de.operands.get(0));
-          sb.insert(0, de.operands.get(0).toString());
-          de = null;
-        }
-      }
-      
-      symbol = sb.toString();
-    }
-
-    public String toString() {
-      return symbol;
-    }
-    
-    public boolean equals(Object o) {
-      throw new Error();
-    }
-    
-    public int hashCode() {
-      throw new Error();
-    }
-  }
-
   public static class ASTNodeFuncDef extends ASTNode {
     String name;
     public List<ASTNode> arguments;

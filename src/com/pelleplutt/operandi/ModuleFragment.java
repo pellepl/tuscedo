@@ -29,7 +29,7 @@ public class ModuleFragment {
   List<Link> links = new ArrayList<Link>();
   // ASTNode.ASTNodeBlok.TYPE_*
   int type;
-  // locals
+  // local variables defined in this fragment and their FP offset
   Map<TACVar, Integer> locals;
   // Linked fragment id
   public String fragId;

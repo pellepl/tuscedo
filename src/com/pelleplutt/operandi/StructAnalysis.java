@@ -40,8 +40,8 @@ import com.pelleplutt.operandi.ASTNode.ASTNodeSymbol;
 
 public class StructAnalysis {
   public static boolean dbg = false;
-  public ScopeStack mainScopeStack;
-  ScopeStack anonDefiningScopeStack = null;
+  public Stack<Scope> mainScopeStack;
+  Stack<Scope> anonDefiningScopeStack = null;
   List<ASTNodeSymbol> anonDefLocals = new ArrayList<ASTNodeSymbol>();
   int prevOp, prevPrevOp, _prevOp;
   
@@ -58,11 +58,11 @@ public class StructAnalysis {
   }
   
   void structAnalyse(ASTNodeBlok e) {
-    mainScopeStack = new ScopeStack();
+    mainScopeStack = new Stack<Scope>();
     analyseRecurse(e, mainScopeStack, null, false, false);
   }
   
-  void analyseRecurse(ASTNode e, ScopeStack scopeStack, ASTNode parentNode, boolean operator, boolean loop) {
+  void analyseRecurse(ASTNode e, Stack<Scope> scopeStack, ASTNode parentNode, boolean operator, boolean loop) {
     prevPrevOp = prevOp;
     prevOp = _prevOp;
     _prevOp = e.op;
@@ -137,7 +137,7 @@ public class StructAnalysis {
       be.parentBlock = globalScope.block;
       
       String blockId = "." + fe.name;
-      ScopeStack funcScopeStack = new ScopeStack();
+      Stack<Scope> funcScopeStack = new Stack<Scope>();
       funcScopeStack.push(globalScope);
       Scope funcScope = new Scope(be);
       funcScopeStack.push(funcScope);
@@ -335,20 +335,33 @@ public class StructAnalysis {
     }
   }
   
-  void newAnonymousScope(ASTNodeBlok be, ScopeStack definingScopeStack, ASTNode parent) {
+  void newAnonymousScope(ASTNodeBlok be, Stack<Scope> definingScopeStack, ASTNode parent) {
     if (anonDefiningScopeStack != null) {
       throw new CompilerError("cannot nest anonymous functions", parent);
     }
     prevPrevOp = prevOp;
     prevOp = _prevOp;
     _prevOp = be.op;
+    
+    // If 2nd level anon within a 1st level anon refers an outer variable not in the 1st level anon,
+    // this variable must be copied also to the 1st anon
+    // Ex:
+    // func outer(a1,b1) {
+    //   inner1 = {        // inner1 refers outer:a1 directly, and outer:b1 indirectly from inner2
+    //     println(a1);
+    //     inner2 = {      // inner2 refers outer:b1 via inner1:b1
+    //       println(b1);
+    //     };
+    //     return inner2;
+    //   };
+    // }
 
     anonDefiningScopeStack = definingScopeStack;
     Scope globalScope = mainScopeStack.get(0);
     be.parentBlock = globalScope.block;
     
     String blockId = getBlockId() + "A";
-    ScopeStack anonScopeStack = new ScopeStack();
+    Stack<Scope> anonScopeStack = new Stack<Scope>();
     anonScopeStack.push(globalScope);
     Scope anonScope = new Scope(be);
     anonScopeStack.push(anonScope);
@@ -382,7 +395,7 @@ public class StructAnalysis {
   }
 
   // define variable for scope if not already reachable
-  void defVarIfUndef(ScopeStack scopeStack, ASTNodeSymbol esym, ASTNode definer) {
+  void defVarIfUndef(Stack<Scope> scopeStack, ASTNodeSymbol esym, ASTNode definer) {
     if (esym == null) throw new CompilerError("fatal");
     for (int i = scopeStack.size()-1; i >= 0; i--) {
       Scope s = scopeStack.get(i);
@@ -408,7 +421,7 @@ public class StructAnalysis {
   }
   
   // define variable for global scope if not already defined
-  void defVarIfUndefGlobal(ScopeStack scopeStack, ASTNodeSymbol esym, ASTNode definer) {
+  void defVarIfUndefGlobal(Stack<Scope> scopeStack, ASTNodeSymbol esym, ASTNode definer) {
     if (esym == null) throw new CompilerError("fatal");
     if (scopeStack.get(0).symVars.keySet().contains(esym)) {
       // is defined already
@@ -421,7 +434,7 @@ public class StructAnalysis {
   }
   
   // define variable for scope, if same name already reachable this will shadow ancestor
-  void defVar(ScopeStack scopeStack, ASTNodeSymbol esym, ASTNode definer) {
+  void defVar(Stack<Scope> scopeStack, ASTNodeSymbol esym, ASTNode definer) {
     boolean shadow = isVarDefAbove(scopeStack, esym);
     if (scopeStack.peek().symVars.get(esym) == null) {
       scopeStack.peek().symVars.put(esym, esym.symNbr);
@@ -432,7 +445,7 @@ public class StructAnalysis {
   }
   
   // see if a variable is reachable from this scope and ancestors
-  boolean isVarDef(ScopeStack scopeStack, ASTNodeSymbol esym) {
+  boolean isVarDef(Stack<Scope> scopeStack, ASTNodeSymbol esym) {
     for (int i = scopeStack.size()-1; i >= 0; i--) {
       Scope s = scopeStack.get(i);
       if (s.symVars.keySet().contains(esym)) return true;
@@ -442,7 +455,7 @@ public class StructAnalysis {
   }
   
   // see if a variable is reachable from this scope and ancestors, but not global scope
-  boolean isLocalVarDef(ScopeStack scopeStack, ASTNodeSymbol esym) {
+  boolean isLocalVarDef(Stack<Scope> scopeStack, ASTNodeSymbol esym) {
     for (int i = scopeStack.size()-1; i > 0; i--) {
       Scope s = scopeStack.get(i);
       if (s.symVars.keySet().contains(esym)) return true;
@@ -452,7 +465,7 @@ public class StructAnalysis {
   }
   
   // see if a variable is reachable in ancestors only
-  boolean isVarDefAbove(ScopeStack scopeStack, ASTNodeSymbol sym) {
+  boolean isVarDefAbove(Stack<Scope> scopeStack, ASTNodeSymbol sym) {
     for (int i = scopeStack.size()-2; i >= 0; i--) {
       Scope s = scopeStack.get(i);
       if (s.symVars.keySet().contains(sym)) return true;
@@ -484,10 +497,5 @@ public class StructAnalysis {
       sb.append(')');
       return sb.toString();
     }
-  }
-  
-  static class ScopeStack extends Stack<Scope> {
-    static int __id = 0;
-    int id = __id++;
   }
 }
