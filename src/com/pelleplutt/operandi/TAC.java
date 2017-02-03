@@ -166,7 +166,9 @@ public abstract class TAC {
     public int hashCode() {
       return ffrag != null ? ffrag.module.hashCode() ^ ffrag.name.hashCode() : addr;
     }
-    public String toString() {return ffrag != null ? ffrag.module + ffrag.name : String.format("0x%06x", addr);}
+    public String toString() {return 
+        (ffrag != null ? ffrag.module + ffrag.name : String.format("0x%06x", addr)) +
+        (adsVars != null ? ("  extVars:"+adsVars) : "");}
   }
   
   public static class TACFloat extends TAC {

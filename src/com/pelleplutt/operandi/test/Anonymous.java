@@ -64,4 +64,30 @@ public class Anonymous {
       "";
     assertEquals("106 107 108 109 110 111 112 113 114 115 ", Processor.compileAndRun(false, false, sA).asString()); 
   }
+  @Test
+  public void testAnon3() {
+    String sA;
+    sA = 
+      "globoffs = 10;\n" +
+      "func create_anon_adder_gen(offset) {\n"+
+      "  fs = {\n"+
+      "    return {\n"+
+      "      return offset + $0 + globoffs;\n"+
+      "    };\n"+
+      "  };\n"+
+      "  return fs;\n"+
+      "}\n"+
+      "adder_gen100 = create_anon_adder_gen(100);\n"+
+      "adder_gen200 = create_anon_adder_gen(200);\n"+
+      "adder_100 = adder_gen100();\n"+
+      "adder_200 = adder_gen200();\n"+
+      "s = '';\n"+
+      "s += adder_100(1) + ' ' + adder_200(1) + ' ';\n"+
+      "globoffs = 20;\n" +
+      "s += adder_100(2) + ' ' + adder_200(2) + ' ';\n"+
+      "return s;\n" +
+      "";
+    Linker.dbg = true;
+    assertEquals("111 211 122 222 ", Processor.compileAndRun(false, false, sA).asString()); 
+  }
 }

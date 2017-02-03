@@ -38,11 +38,17 @@ import com.pelleplutt.operandi.ASTNode.ASTNodeRange;
 import com.pelleplutt.operandi.ASTNode.ASTNodeString;
 import com.pelleplutt.operandi.ASTNode.ASTNodeSymbol;
 
+/**
+ * Does a contextual analysis to find errors not covered in grammar 
+ * and collect variable information (e.g. scope information) for future 
+ * passes.
+ * @author petera
+ */
 public class StructAnalysis {
   public static boolean dbg = false;
-  public Stack<Scope> mainScopeStack;
-  Stack<Scope> anonDefiningScopeStack = null;
-  List<ASTNodeSymbol> anonDefLocals = new ArrayList<ASTNodeSymbol>();
+  Stack<Scope> mainScopeStack;
+  Stack<Fragment> fragmentStack;
+  
   int prevOp, prevPrevOp, _prevOp;
   
   String module = ".main";
@@ -59,6 +65,7 @@ public class StructAnalysis {
   
   void structAnalyse(ASTNodeBlok e) {
     mainScopeStack = new Stack<Scope>();
+    fragmentStack = new Stack<Fragment>(); 
     analyseRecurse(e, mainScopeStack, null, false, false);
   }
   
@@ -109,13 +116,17 @@ public class StructAnalysis {
       }
     } 
     else if (e.op == OP_SYMBOL && operator) {
+      ASTNodeSymbol esym = (ASTNodeSymbol)e;
       if (parentNode.op == OP_GLOBAL) {
-        defVarIfUndefGlobal(scopeStack, (ASTNodeSymbol)e, parentNode);
+        defVarIfUndefGlobal(scopeStack, esym, parentNode);
       }
-      else if (anonDefiningScopeStack != null && isLocalVarDef(anonDefiningScopeStack, (ASTNodeSymbol)e)) {
-        // within an anonymous block, so gather all references to external locals
-        if (!anonDefLocals.contains((ASTNodeSymbol)e)) {
-          anonDefLocals.add((ASTNodeSymbol)e);
+      else if (!fragmentStack.isEmpty()) {
+        // within an anonymous scope, check if this is a variable referring
+        // to outside
+        if (!fragmentStack.peek().anonDefLocals.contains(esym) &&
+            !isLocalVarDef(scopeStack, esym) &&
+            isExternalVarReachableDef(esym)) {
+          fragmentStack.peek().anonDefLocals.add(esym);
         }
       }
     }
@@ -336,9 +347,6 @@ public class StructAnalysis {
   }
   
   void newAnonymousScope(ASTNodeBlok be, Stack<Scope> definingScopeStack, ASTNode parent) {
-    if (anonDefiningScopeStack != null) {
-      throw new CompilerError("cannot nest anonymous functions", parent);
-    }
     prevPrevOp = prevOp;
     prevOp = _prevOp;
     _prevOp = be.op;
@@ -355,8 +363,9 @@ public class StructAnalysis {
     //     return inner2;
     //   };
     // }
+    
+    fragmentStack.push(new Fragment(definingScopeStack));
 
-    anonDefiningScopeStack = definingScopeStack;
     Scope globalScope = mainScopeStack.get(0);
     be.parentBlock = globalScope.block;
     
@@ -372,9 +381,8 @@ public class StructAnalysis {
         analyseRecurse(e2, anonScopeStack, parent, false, false);
       }
     }
-    be.setAnnotationAnonymous(anonScope.symVars, anonScopeStack.size(), blockId, module, anonDefLocals);
-    anonDefLocals.clear();
-    anonDefiningScopeStack = null;
+    Fragment f = fragmentStack.pop();
+    be.setAnnotationAnonymous(anonScope.symVars, anonScopeStack.size(), blockId, module, f.anonDefLocals);
     if (dbg) System.out.println("LEAVE anon eblk " + be + " got symbols " + anonScope.symVars);
   }
   
@@ -392,6 +400,30 @@ public class StructAnalysis {
       return getVariableName(e.operands.get(0));
     }
     return null;
+  }
+  
+  boolean isExternalVarReachableDef(ASTNodeSymbol esym) {
+    // structure: by logic, the first frag in fragmentStack must be
+    // the function or the main frag defining the chain of anonymous 
+    // functions. The first scope in all frags is the global scope.
+    
+    // first, try finding it in wrapping fragments
+    int fragDescIx;
+    boolean found = false;
+    for (fragDescIx = fragmentStack.size() - 1; !found && fragDescIx >= 0; fragDescIx--) {
+      Fragment f = fragmentStack.get(fragDescIx);
+      if (f.anonDefLocals.contains(esym) || isLocalVarDef(f.scopeStack, esym)) {
+        found = true;
+      }
+    }
+    if (!found) return false;
+    // secondly, populate the external reachable variable through all
+    // layers of fragments
+    for (int fragAscIx = fragDescIx+1; fragAscIx < fragmentStack.size()-1; fragAscIx++) {
+      Fragment f = fragmentStack.get(fragAscIx);
+      if (!f.anonDefLocals.contains(esym)) f.anonDefLocals.add(esym);
+    }
+    return true;
   }
 
   // define variable for scope if not already reachable
@@ -475,7 +507,9 @@ public class StructAnalysis {
   }
   
   class Scope {
+    // local variables of this scope / declaring symbol index
     Map<ASTNodeSymbol, Integer> symVars;
+    // function arguments
     List<ASTNodeSymbol> symArgs;
     ASTNodeBlok block;
     public Scope(ASTNodeBlok e) {
@@ -496,6 +530,16 @@ public class StructAnalysis {
       }
       sb.append(')');
       return sb.toString();
+    }
+  }
+  
+  class Fragment {
+    // scope stack of defining scope
+    Stack<Scope> scopeStack; 
+    // external referring variables in this anonymous scope
+    List<ASTNodeSymbol> anonDefLocals = new ArrayList<ASTNodeSymbol>();
+    public Fragment(Stack<Scope> definingScopeStack) {
+      scopeStack = definingScopeStack;
     }
   }
 }
