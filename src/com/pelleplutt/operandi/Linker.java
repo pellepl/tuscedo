@@ -28,19 +28,31 @@ import com.pelleplutt.operandi.proc.Processor;
 import com.pelleplutt.operandi.proc.Processor.M;
 
 public class Linker implements ByteCode {
-  public static boolean dbg =  false;
-  int extFunc = -1;
-  int codeOffset = 0;
   static int mainFragIx = 0;
+  public static boolean dbg =  false;
+
+  // external call phony address
+  int extFuncAddr = -1;
+  // current code address pointer
+  int codeOffset = 0;
   int ramOffset, constOffset;
   int symbolVarOffset = -1, symbolConstOffset = -1;
-  List<ModuleFragment> fragments;
-  Map<TAC, Integer> globalAddrLUT = new HashMap<TAC, Integer>();
-  Map<String, Integer> fragAddrLUT = new HashMap<String, Integer>();
-  Map<String, Integer> extCallsAddrLut = new HashMap<String, Integer>();
+
+  // all code
   List<Byte> code = new ArrayList<Byte>();
-  Map<String, ExtCall> extDefs;
+  // list of all fragments to be linked
+  List<ModuleFragment> fragments;
+  // global variable / memory address
+  Map<TAC, Integer> globalAddrLUT = new HashMap<TAC, Integer>();
+  // function name / memory address
+  Map<String, Integer> fragAddrLUT = new HashMap<String, Integer>();
+  // external call name / external phony address
+  Map<String, Integer> extCallsAddrLut = new HashMap<String, Integer>();
+  // external phony address / external call function
   Map<Integer, ExtCall> extLinks = new HashMap<Integer, ExtCall>();
+  // external call name / external call function
+  Map<String, ExtCall> extDefs;
+  // if linking incrementally, this is the executable from previous link
   Executable incrementalPreviousExe;
   
   public static Executable link(IntermediateRepresentation ir, int ramOffset, int constOffset) {
@@ -190,6 +202,7 @@ public class Linker implements ByteCode {
         frag.fragId = fragId;
         frag.executableOffset = codeOffset;
       } else {
+        // try get a proper reference of error
         int addr = fragAddrLUT.get(fragId);
         String otherplace = null;
         otherplace = Linker.getSrcDbgInfoNearest(addr, false, false, modules);
@@ -333,7 +346,7 @@ public class Linker implements ByteCode {
       codeOffset = extCallsAddrLut.get(extCallId);
     } else {
       // assign a new negative address for external call
-      codeOffset = extFunc--;
+      codeOffset = extFuncAddr--;
       extCallsAddrLut.put(extCallId, codeOffset);
       extLinks.put(codeOffset, extDefs.get(extCallId));
     }

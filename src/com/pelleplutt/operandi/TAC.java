@@ -21,7 +21,7 @@ public abstract class TAC {
   
   TAC(ASTNode e) {
     this.e = e;
-    this.op = e.op;
+    if (e != null) this.op = e.op;
   }
   
   public ASTNode getNode() {
