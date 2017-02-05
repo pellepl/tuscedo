@@ -26,11 +26,11 @@ public interface ByteCode {
   static final int INOT     = 0x0b; // not (binary)                  push(~pop())
   static final int INEG     = 0x0c; // negate                        push(-pop())
   static final int ILNOT    = 0x0d; // not (logical)                 push(pop() != 0 ? 1 : 0)
-  static final int ICMP     = 0x0e; // compare                       pop() - pop()
-  static final int ICMPN    = 0x0f; // compare neg                   -(pop() - pop())
+  static final int ICMP     = 0x0e; // compare                       pop() - pop()    [updates $zero and $minus]
+  static final int ICMPN    = 0x0f; // compare neg                   -(pop() - pop()) [updates $zero and $minus]
 
-  static final int ICMP_0   = 0x10; // compare 0                     pop() - 0
-  static final int ICMN_0   = 0x11; // compare neg 0                 0 - pop())
+  static final int ICMP_0   = 0x10; // compare 0                     pop() - 0        [updates $zero and $minus]
+  static final int ICMN_0   = 0x11; // compare neg 0                 0 - pop())       [updates $zero and $minus]
   static final int IADD_IM  = 0x12; // add immediate                 push(pop() + xx+1)
   static final int ISUB_IM  = 0x13; // sub immediate                 push(pop() - (xx+1))
   static final int IPUSH_S  = 0x14; // push signed immediate         push(ss)
@@ -55,10 +55,13 @@ public interface ByteCode {
   static final int ILOAD_IM = 0x27; // push from memory immediate    push(mem[xxxxxx])
   static final int ISTOR_FP = 0x28; // store to stack rel fp         $fp[ss]=pop()
   static final int ILOAD_FP = 0x29; // load from stack rel fp        push($fp[ss])
-
-  static final int ISP_INCR = 0x2c; // allocate on stack             $sp += xx+1
-  static final int ISP_DECR = 0x2d; // deallocate from stack         $sp -= xx+1
-
+  static final int ISP_INCR = 0x2a; // allocate on stack             $sp += xx+1
+  static final int ISP_DECR = 0x2b; // deallocate from stack         $sp -= xx+1
+  static final int IPUSH_PC = 0x2c; // push PC reg                   push($pc)
+  static final int IPUSH_SP = 0x2d; // push SP reg                   push($sp)
+  static final int IPUSH_FP = 0x2e; // push FP reg                   push($fp)
+  static final int IPUSH_SR = 0x2f; // push SR reg                   push($sr)  
+  
   static final int IADD_Q1  = 0x30; // add quick                     push(pop() + 1)
   static final int IADD_Q2  = 0x31; // add quick                     push(pop() + 2)
   static final int IADD_Q3  = 0x32; // add quick                     push(pop() + 3)
@@ -81,7 +84,7 @@ public interface ByteCode {
   static final int ICAST_S  = 0x42; // cast to string
   static final int ICAST_CH = 0x43; // cast to char
 
-  static final int IGET_TYP = 0x48; // get top stack element type
+  static final int IGET_TYP = 0x48; // get top stack element type    push(typeof(pop()))
   
   static final int ISET_CRE = 0x50; // create set                    sz=pop(); while(sz--){l.add($sp[-sz]);};push(l);
   static final int IARR_CRE = 0x51; // create array                  addr=xxxxxx; sz=pop(); while(sz--){l.add(mem[addr++]);};push(l);
@@ -96,37 +99,37 @@ public interface ByteCode {
   static final int IRNG2    = 0x5a; // range(from,to)                push(range(pop(to), pop(from));
   static final int IRNG3    = 0x5b; // range(from,step,to)           push(range(pop(to), pop(step), pop(from));
   static final int ITUP_CRE = 0x5c; // create tuple                  push(tuple(pop(),pop()));
+  static final int IIN      = 0x5d; // check if x in y               set=pop(); elem=pop(); $zero=(elem in set); [updates $zero]
 
-  static final int ICALL    = 0xe0; // call function                 (argc on stack) a=pop(); push($pc+3); push($fp); $fp=sp; $pc=a
-  static final int ICALL_IM = 0xe1; // call function immediate       (argc on stack) push($pc+3); push($fp); $fp=sp; $pc=xxxxxx
-  static final int IANO_CRE = 0xe2; // create anonymous function     locals=pop(); addr=pop(); push(anon{addr, locals});
-  static final int IRET     = 0xe6; // return                        $sp=$fp; $fp=pop(); $pc=pop(); argc=pop(); $sp-=argc;
-  static final int IRETV    = 0xe7; // return val                    t=pop(); $sp=$fp; $fp=pop(); $pc=pop(); argc=pop(); $sp-=argc; push(t);
+  static final int ICALL    = 0x60; // call function                 (argc on stack) a=pop(); push($pc); push($fp); $fp=sp; $pc=a
+  static final int ICALL_IM = 0x61; // call function immediate       (argc on stack) push($pc+3); push($fp); $fp=sp; $pc=xxxxxx
+  static final int ICALL_R  = 0x62; // call function relative pc     (argc on stack) push($pc+3); push($fp); $fp=sp; $pc=$pc+ssssss
+  static final int IANO_CRE = 0x63; // create anonymous function     locals=pop(); addr=pop(); push(anon{addr, locals});
+  static final int IRET     = 0x66; // return                        $sp=$fp; $fp=pop(); $pc=pop(); argc=pop(); $sp-=argc;
+  static final int IRETV    = 0x67; // return val                    t=pop(); $sp=$fp; $fp=pop(); $pc=pop(); argc=pop(); $sp-=argc; push(t);
   
-  static final int IPUSH_EQ = 0xe9; // push condition                if (cond) push(1) else push(0); 
-  static final int IPUSH_NE = 0xea; 
-  static final int IPUSH_GT = 0xeb; 
-  static final int IPUSH_GE = 0xec; 
-  static final int IPUSH_LT = 0xed; 
-  static final int IPUSH_LE = 0xee; 
+  static final int IPUSH_EQ = 0x69; // push condition                if ($zero) push(1) else push(0); 
+  static final int IPUSH_NE = 0x6a; 
+  static final int IPUSH_GT = 0x6b; 
+  static final int IPUSH_GE = 0x6c; 
+  static final int IPUSH_LT = 0x6d; 
+  static final int IPUSH_LE = 0x6e; 
 
-  static final int IIN      = 0xef; 
-
-  static final int IJUMP    = 0xf0; // jump                          $pc = xxxxxx 
-  static final int IJUMP_EQ = 0xf1; 
-  static final int IJUMP_NE = 0xf2; 
-  static final int IJUMP_GT = 0xf3; 
-  static final int IJUMP_GE = 0xf4; 
-  static final int IJUMP_LT = 0xf5; 
-  static final int IJUMP_LE = 0xf6; 
-  static final int IBRA     = 0xf8; // branch                        $pc = $pc + ssssss  
-  static final int IBRA_EQ  = 0xf9; 
-  static final int IBRA_NE  = 0xfa; 
-  static final int IBRA_GT  = 0xfb; 
-  static final int IBRA_GE  = 0xfc; 
-  static final int IBRA_LT  = 0xfd; 
-  static final int IBRA_LE  = 0xfe; 
-  static final int IBKPT    = 0xff; // breakpoint 
+  static final int IJUMP    = 0x70; // jump                          $pc = xxxxxx 
+  static final int IJUMP_EQ = 0x71; 
+  static final int IJUMP_NE = 0x72; 
+  static final int IJUMP_GT = 0x73; 
+  static final int IJUMP_GE = 0x74; 
+  static final int IJUMP_LT = 0x75; 
+  static final int IJUMP_LE = 0x76; 
+  static final int IBRA     = 0x78; // branch                        $pc = $pc + ssssss  
+  static final int IBRA_EQ  = 0x79; 
+  static final int IBRA_NE  = 0x7a; 
+  static final int IBRA_GT  = 0x7b; 
+  static final int IBRA_GE  = 0x7c; 
+  static final int IBRA_LT  = 0x7d; 
+  static final int IBRA_LE  = 0x7e; 
+  static final int IBKPT    = 0x7f; // breakpoint 
   
   
   static final int UD = -1;  
@@ -134,20 +137,20 @@ public interface ByteCode {
     // x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 xa xb xc xd xe xf
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, //0x
         1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1,UD, //1x
-        1, 1, 1, 2, 1, 4, 1, 4, 2, 2,UD,UD, 2, 2,UD,UD, //2x
+        1, 1, 1, 2, 1, 4, 1, 4, 2, 2, 2, 2, 1, 1, 1, 1, //2x
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, //3x
         1, 1, 1, 1,UD,UD,UD,UD, 1,UD,UD,UD,UD,UD,UD,UD, //4x
-        1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,UD,UD,UD, //5x
-       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //6x
-       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //7x
+        1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,UD,UD, //5x
+        1, 4, 4, 1,UD,UD, 1, 1,UD, 1, 1, 1, 1, 1, 1,UD, //6x
+        4, 4, 4, 4, 4, 4, 4,UD, 4, 4, 4, 4, 4, 4, 4, 1, //7x
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //8x
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //9x
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //ax
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //bx
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //cx
        UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //dx
-        1, 4, 1,UD,UD,UD, 1, 1,UD, 1, 1, 1, 1, 1, 1, 1, //ex
-        4, 4, 4, 4, 4, 4, 4,UD, 4, 4, 4, 4, 4, 4, 4, 0, //fx
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //ex
+       UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD,UD, //fx
   };
   
 

@@ -157,6 +157,7 @@ public class ModuleFragment {
   }
   
   public static  abstract class Link {
+    /** This is the local offset of link in the fragment (not yet layed out)*/
     int pc;
     public Link(int pc) {this.pc = pc;};
   }

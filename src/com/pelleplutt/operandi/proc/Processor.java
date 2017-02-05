@@ -314,6 +314,22 @@ public class Processor implements ByteCode {
     sp += m;
   }
   
+  void push_pc() {
+    push(oldpc);
+  }
+  
+  void push_sp() {
+    push(sp);
+  }
+  
+  void push_fp() {
+    push(fp);
+  }
+  
+  void push_sr() {
+    push( (zero ? (1<<0) : 0) | (minus ? (1<<1) : 0) );
+  }
+  
   void set_cre() {
     int elements = pop().asInt();
     if (elements == -1) {
@@ -1094,7 +1110,7 @@ public class Processor implements ByteCode {
     push(fp);
     int args = peek(sp+FRAME_3_ARGC).i;
     fp = sp;
-    pc = pcodetos( pc, 3);
+    pc = pcodetos(pc, 3);
     me = me_banked;
     if ((pc & 0x800000) == 0x800000) {
       ExtCall ec = extLinks.get(pc);
@@ -1103,6 +1119,16 @@ public class Processor implements ByteCode {
       push(ret == null ? nilM : ret);
       retv();
     }
+  }
+  
+  void call_pc() {
+    push(me);
+    push(pc+3);
+    push(fp);
+    fp = sp;
+    int rel = pcodetos(pc, 3) - 1;
+    pc += rel;
+    me = me_banked;
   }
   
   void ano_cre() {
@@ -1487,6 +1513,20 @@ public class Processor implements ByteCode {
       sp_decr();
       break;
 
+    case IPUSH_PC:
+      push_pc();
+      break;
+    case IPUSH_SP:
+      push_sp();
+      break;
+    case IPUSH_FP:
+      push_fp();
+      break;
+    case IPUSH_SR:
+      push_sr();
+      break;
+      
+      
     case ISET_CRE:
       set_cre();
       break;
@@ -1508,8 +1548,10 @@ public class Processor implements ByteCode {
       map_add();
       break;
     case ISET_DEL:
+      // TODO
       break;
     case IARR_INS:
+      // TODO
       break;
     case ISET_SZ:
       set_sz();
@@ -1529,6 +1571,9 @@ public class Processor implements ByteCode {
       break;
     case ICALL_IM: 
       call_im();
+      break;
+    case ICALL_R: 
+      call_pc();
       break;
     case IANO_CRE: 
       ano_cre();
@@ -1602,8 +1647,10 @@ public class Processor implements ByteCode {
     case IBRA_LT: 
       bra(ICOND_LT);
       break;
+      
     case IBKPT: 
       throw new ProcessorBreakpointError();
+      
     default:
       throw new Error(String.format("unknown instruction 0x%02x", instr));
     }

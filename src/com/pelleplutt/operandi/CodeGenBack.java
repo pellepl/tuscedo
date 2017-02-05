@@ -752,7 +752,7 @@ public class CodeGenBack implements ByteCode {
       sp = sp 
           - 1 - call.args  // return, pop args and argc
           + 1;             // retval
-      addCode(frag, stackInfo() + "<" + call.func + ", " + call.args + " args>", ICALL_IM, 0x03,0x00,0x00);
+      addCode(frag, stackInfo() + "<" + call.func + ", " + call.args + " args>", ICALL_R, 0x03,0x00,0x00);
     }
     if (!call.referenced) {
       sp--;

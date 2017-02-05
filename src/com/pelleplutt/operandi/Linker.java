@@ -329,10 +329,13 @@ public class Linker implements ByteCode {
         if (fragAddrLUT.containsKey(funcFragName)) {
           // got a defined address for this function
           int codeOffset = fragAddrLUT.get(funcFragName);
-          frag.write(srcvar + 1, codeOffset, 3);
+          int fragOffset = frag.executableOffset;
+          frag.write(srcvar, ICALL_R, 1);
+          frag.write(srcvar + 1, codeOffset - (srcvar + fragOffset), 3);
         } else {
           String extCallId = (lc.call.declaredModule == null ? "" : (lc.call.declaredModule + ".")) + lc.call.func;
           int codeOffset = getExtCallAddress(extCallId);
+          frag.write(srcvar, ICALL_IM, 1);
           frag.write(srcvar + 1, codeOffset, 3);
         }
       } 

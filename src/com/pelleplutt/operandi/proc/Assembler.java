@@ -53,7 +53,7 @@ public class Assembler implements ByteCode {
       String label = labelRefs.get(labelInstrAddr);
       int jmp = 0;
       int instr = (int)(d[labelInstrAddr] & 0xff); 
-      if (instr >= IBRA && instr <= IBRA_LE) {
+      if (instr >= IBRA && instr <= IBRA_LE || instr == ICALL_R) {
         // branch, relative
         jmp = labels.get(label) - labelInstrAddr;
       } else if (instr >= IJUMP && instr <= IJUMP_LE ||
@@ -282,6 +282,18 @@ public class Assembler implements ByteCode {
 	  		baos.write(ISP_DECR);
 	  		baos.write(stobytes(tokens[1], 1, 1));
 	  	}
+      else if (op.equals("push_pc")) {
+        baos.write(IPUSH_PC);
+      }
+      else if (op.equals("push_sp")) {
+        baos.write(IPUSH_SP);
+      }
+      else if (op.equals("push_fp")) {
+        baos.write(IPUSH_FP);
+      }
+      else if (op.equals("push_sr")) {
+        baos.write(IPUSH_SR);
+      }
 	  	else if (op.equals("set_cre")) {
 	  		baos.write(ISET_CRE);
 	  	}
@@ -325,10 +337,14 @@ public class Assembler implements ByteCode {
 	  	else if (op.equals("call")) {
 	  		baos.write(ICALL);
 	  	}
-	  	else if (op.equals("call_im")) {
-	  		baos.write(ICALL_IM);
-	  		baos.write(utobytesl(tokens[1], 3, addr, labelRefs));
-	  	}
+      else if (op.equals("call_im")) {
+        baos.write(ICALL_IM);
+        baos.write(utobytesl(tokens[1], 3, addr, labelRefs));
+      }
+      else if (op.equals("call_r ")) {
+        baos.write(ICALL_R);
+        baos.write(stobytesl(tokens[1], 3, addr, labelRefs));
+      }
 	  	else if (op.equals("ano_cre")) {
 	  		baos.write(IANO_CRE);
 	  	}
@@ -717,6 +733,20 @@ public class Assembler implements ByteCode {
       sb.append(String.format("%d", Processor.codetoi(code, pc, 1) + 1));
       break;
 
+    case IPUSH_PC:
+      sb.append("push_pc ");
+      break;
+    case IPUSH_SP:
+      sb.append("push_sp ");
+      break;
+    case IPUSH_FP:
+      sb.append("push_fp ");
+      break;
+    case IPUSH_SR:
+      sb.append("push_sr ");
+      break;
+      
+      
     case ISET_CRE:
       sb.append("set_cre ");
       break;
@@ -764,6 +794,10 @@ public class Assembler implements ByteCode {
     case ICALL_IM: 
       sb.append("call_im ");
       sb.append(String.format("0x%06x", Processor.codetoi(code, pc, 3)));
+      break;
+    case ICALL_R: 
+      sb.append("call_r  ");
+      sb.append(String.format("%d (0x%06x)", Processor.codetos(code, pc, 3), pc + Processor.codetos(code, pc, 3)-1));
       break;
     case IANO_CRE: 
       sb.append("ano_cre ");

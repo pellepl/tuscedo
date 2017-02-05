@@ -15,7 +15,7 @@ import com.pelleplutt.operandi.proc.Processor;
 import com.pelleplutt.operandi.proc.Processor.M;
 
 public class Executable {
-  public static final int OPERANDI_EXE = 0x76070914;
+  public static final int OPERANDI_ID = 0x76070914;
   int vByteCode;
   int vProcessor;
   int vCompiler;
@@ -24,7 +24,7 @@ public class Executable {
   Map<Integer, ExtCall> extLinks;
   List<Module> dbgModules;
   int pcStart;
-  int stackTop;
+  int stackTop; // or, address of last global varriable
   
   private Executable() {
   }
@@ -102,7 +102,7 @@ public class Executable {
   }
   
   public void write(OutputStream o) throws IOException {
-    write32(o, OPERANDI_EXE);
+    write32(o, OPERANDI_ID);
     write32(o, this.vByteCode);
     write32(o, this.vProcessor);
     write32(o, this.vCompiler);
@@ -126,8 +126,8 @@ public class Executable {
   public static Executable read(InputStream i, Collection<ExtCall> extCalls) throws IOException {
     Executable e = new Executable();
     int id = read32(i);
-    if (id != OPERANDI_EXE) {
-      throw new Error("not an Operandi executable");
+    if (id != OPERANDI_ID) {
+      throw new Error("not an operandi file");
     }
     e.vByteCode = read32(i);
     e.vProcessor = read32(i);
