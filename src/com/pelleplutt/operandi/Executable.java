@@ -81,6 +81,17 @@ public class Executable {
     }
     return null;
   }
+  public int getAddressOfFunction(String func) {
+    if (dbgModules == null) return -1;
+    for (Module m : dbgModules) {
+      for (ModuleFragment frag : m.frags) {
+        if (func.equals(frag.modname + frag.fragname)) {
+          return frag.executableOffset;
+        }
+      }
+    }
+    return -1;
+  }
   public String getInstrDebugInfo(int pc) {
     if (dbgModules == null) return null;
     for (Module m : dbgModules) {
@@ -253,4 +264,5 @@ public class Executable {
         ((i.read() & 0xff));
     return x;
   }
+
 }

@@ -26,11 +26,11 @@ public interface ByteCode {
   static final int INOT     = 0x0b; // not (binary)                  push(~pop())
   static final int INEG     = 0x0c; // negate                        push(-pop())
   static final int ILNOT    = 0x0d; // not (logical)                 push(pop() != 0 ? 1 : 0)
-  static final int ICMP     = 0x0e; // compare                       pop() - pop()    [updates $zero and $minus]
-  static final int ICMPN    = 0x0f; // compare neg                   -(pop() - pop()) [updates $zero and $minus]
+  static final int ICMP     = 0x0e; // compare                       pop() - pop()    [updates $sr_zero and $sr_minus]
+  static final int ICMPN    = 0x0f; // compare neg                   -(pop() - pop()) [updates $sr_zero and $sr_minus]
 
-  static final int ICMP_0   = 0x10; // compare 0                     pop() - 0        [updates $zero and $minus]
-  static final int ICMN_0   = 0x11; // compare neg 0                 0 - pop())       [updates $zero and $minus]
+  static final int ICMP_0   = 0x10; // compare 0                     pop() - 0        [updates $sr_zero and $sr_minus]
+  static final int ICMN_0   = 0x11; // compare neg 0                 0 - pop())       [updates $sr_zero and $sr_minus]
   static final int IADD_IM  = 0x12; // add immediate                 push(pop() + xx+1)
   static final int ISUB_IM  = 0x13; // sub immediate                 push(pop() - (xx+1))
   static final int IPUSH_S  = 0x14; // push signed immediate         push(ss)
@@ -99,7 +99,7 @@ public interface ByteCode {
   static final int IRNG2    = 0x5a; // range(from,to)                push(range(pop(to), pop(from));
   static final int IRNG3    = 0x5b; // range(from,step,to)           push(range(pop(to), pop(step), pop(from));
   static final int ITUP_CRE = 0x5c; // create tuple                  push(tuple(pop(),pop()));
-  static final int IIN      = 0x5d; // check if x in y               set=pop(); elem=pop(); $zero=(elem in set); [updates $zero]
+  static final int IIN      = 0x5d; // check if x in y               set=pop(); elem=pop(); $sr_zero=(elem in set); [updates $sr_zero]
 
   static final int ICALL    = 0x60; // call function                 (argc on stack) a=pop(); push($pc); push($fp); $fp=sp; $pc=a
   static final int ICALL_IM = 0x61; // call function immediate       (argc on stack) push($pc+3); push($fp); $fp=sp; $pc=xxxxxx
@@ -108,7 +108,7 @@ public interface ByteCode {
   static final int IRET     = 0x66; // return                        $sp=$fp; $fp=pop(); $pc=pop(); argc=pop(); $sp-=argc;
   static final int IRETV    = 0x67; // return val                    t=pop(); $sp=$fp; $fp=pop(); $pc=pop(); argc=pop(); $sp-=argc; push(t);
   
-  static final int IPUSH_EQ = 0x69; // push condition                if ($zero) push(1) else push(0); 
+  static final int IPUSH_EQ = 0x69; // push condition                if ($sr_zero) push(1) else push(0); 
   static final int IPUSH_NE = 0x6a; 
   static final int IPUSH_GT = 0x6b; 
   static final int IPUSH_GE = 0x6c; 

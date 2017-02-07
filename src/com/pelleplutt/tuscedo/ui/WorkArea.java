@@ -703,20 +703,27 @@ public class WorkArea extends JPanel implements Disposable {
             script.halt(false);
           } else if (in.equalsIgnoreCase("next") || in.equalsIgnoreCase("n")) {
             script.step();
+          } else if (in.equalsIgnoreCase("step") || in.equalsIgnoreCase("s")) {
+            script.stepInstr();
           } else if (in.equalsIgnoreCase("backtrace") || in.equalsIgnoreCase("bt")) {
             script.backtrace();
+          } else if (in.startsWith("interrupt ") || in.startsWith("int ")) {
+            script.interrupt(script.lookupFunc(in.split("\\s")[1]));
+          } else if (in.equalsIgnoreCase("pc")) {
+            script.dumpPC();
+          } else if (in.equalsIgnoreCase("fp")) {
+            script.dumpFP();
+          } else if (in.equalsIgnoreCase("sp")) {
+            script.dumpSP();
+          } else if (in.equalsIgnoreCase("me")) {
+            script.dumpMe();
+          } else if (in.equalsIgnoreCase("sr")) {
+            script.dumpSR();
           } else if (in.equalsIgnoreCase("reset") || in.equalsIgnoreCase("res")) {
             script.reset();
           }
         } else {
-          if (in.startsWith("::")) {
-            // TODO remove, test only
-            List<M> args = new ArrayList<M>();
-            args.add(new M("it works"));
-            args.add(new M("goddamnit"));
-            System.out.println(script.lookupFunc(in.substring(2)));
-            script.runFunc(this, script.lookupFunc(in.substring(2)), args);
-          } else if (in.startsWith("#load ")) {
+          if (in.startsWith("#load ")) {
             String fullpath = in.substring("#load ".length());
             int pathDelim = fullpath.lastIndexOf(File.separator);
             String path = pathDelim >= 0 ? fullpath.substring(0, pathDelim) : ".";

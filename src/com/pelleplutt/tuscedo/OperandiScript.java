@@ -22,6 +22,7 @@ import com.pelleplutt.operandi.proc.Processor;
 import com.pelleplutt.operandi.proc.Processor.M;
 import com.pelleplutt.operandi.proc.ProcessorError;
 import com.pelleplutt.operandi.proc.ProcessorError.ProcessorFinishedError;
+import com.pelleplutt.tuscedo.ui.DrawPanel;
 import com.pelleplutt.tuscedo.ui.GraphPanel;
 import com.pelleplutt.tuscedo.ui.SimpleTabPane;
 import com.pelleplutt.tuscedo.ui.SimpleTabPane.Tab;
@@ -146,6 +147,7 @@ public class OperandiScript implements Runnable, Disposable {
       }
     });
     createGraphFunctions(extDefs);
+    createCanvasFunctions(extDefs);
     createSerialFunctions(extDefs);
     
     comp = new Compiler(extDefs, 0x4000, 0x0000);
@@ -154,7 +156,7 @@ public class OperandiScript implements Runnable, Disposable {
   
   Tab getTabByScriptId(M me) {
     if (me == null || me.type != Processor.TSET) return null;
-    M mtabId = me.ref.get(new M("__id"));
+    M mtabId = me.ref.get(new M(".tid"));
     if (mtabId == null || mtabId.type != Processor.TSTR) return null;
     Tab tab = Tuscedo.inst().getTab(mtabId.str);
     if (tab == null) return null;
@@ -213,6 +215,7 @@ public class OperandiScript implements Runnable, Disposable {
     runProcessor();
   }
 
+  boolean stepInstr = false;
   void runProcessor() {
     try {
       running = true;
@@ -221,13 +224,16 @@ public class OperandiScript implements Runnable, Disposable {
         if (halted) {
           currentWA.onScriptStart(proc);
           while (dbg == null || dbg.equals(lastSrcDbg)) {
-            dbg = proc.stepSrc();
+            dbg = stepInstr ? proc.stepInstr() : proc.stepSrc();
             if (dbg == null) continue;
           }
+          stepInstr = false;
           lastSrcDbg = dbg;
           currentWA.onScriptStop(proc);
           if (dbg != null) {
-            currentWA.appendViewText(currentView, dbg + "\n", WorkArea.STYLE_BASH_DBG);
+            int nestedIRQ = proc.getNestedIRQ();
+            String irqInfo = nestedIRQ > 0 ? "[IRQ"+nestedIRQ+"] " : "";
+            currentWA.appendViewText(currentView, irqInfo + dbg + "\n", WorkArea.STYLE_BASH_DBG);
           }
           synchronized (q) {
             AppSystem.waitSilently(q, 0);
@@ -271,6 +277,18 @@ public class OperandiScript implements Runnable, Disposable {
     }
   }
   
+  public void stepInstr() {
+    synchronized (q) {
+      stepInstr = true;
+      q.notifyAll();
+    }
+  }
+  
+  public void interrupt(int addr) {
+    currentWA.appendViewText(currentView, String.format("interrupt -> 0x%08x\n", addr), WorkArea.STYLE_BASH_INPUT);
+    proc.raiseInterrupt(addr);
+  }
+  
   public void reset() {
     if (running) {
       running = false;
@@ -282,6 +300,26 @@ public class OperandiScript implements Runnable, Disposable {
       backtrace();
       procReset();
     }
+  }
+  
+  public void dumpPC() {
+    currentWA.appendViewText(currentView, String.format("PC:0x%08x\n", proc.getPC()), WorkArea.STYLE_BASH_INPUT);
+  }
+  
+  public void dumpFP() {
+    currentWA.appendViewText(currentView, String.format("FP:0x%08x\n", proc.getFP()), WorkArea.STYLE_BASH_INPUT);
+  }
+  
+  public void dumpSP() {
+    currentWA.appendViewText(currentView, String.format("SP:0x%08x\n", proc.getSP()), WorkArea.STYLE_BASH_INPUT);
+  }
+  
+  public void dumpSR() {
+    currentWA.appendViewText(currentView, String.format("SR:0x%08x\n", proc.getSR()), WorkArea.STYLE_BASH_INPUT);
+  }
+  
+  public void dumpMe() {
+    currentWA.appendViewText(currentView, String.format("me:%s\n", proc.getMe().asString()), WorkArea.STYLE_BASH_INPUT);
   }
   
   public void backtrace() {
@@ -423,7 +461,7 @@ public class OperandiScript implements Runnable, Disposable {
         ((GraphPanel)Tuscedo.inst().getTab(tabID).getContent()).setGraphType(type);;
         Tuscedo.inst().getTab(tabID).setText(name);
         M graph = new Processor.M(new MListMap());
-        graph.ref.put("__id", new M(tabID));
+        graph.ref.put(".tid", new M(tabID));
         M graphFunc;
         graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_add"));
         graphFunc.type = Processor.TFUNC;
@@ -440,7 +478,7 @@ public class OperandiScript implements Runnable, Disposable {
         graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_zoom_y"));
         graphFunc.type = Processor.TFUNC;
         graph.ref.put("zoom_y", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_close"));
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__tab_close"));
         graphFunc.type = Processor.TFUNC;
         graph.ref.put("close", graphFunc);
         graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_type"));
@@ -518,14 +556,6 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__graph_close", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
-        tab.getPane().removeTab(tab);
-        return null;
-      }
-    });
     extDefs.put("__graph_type", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -577,6 +607,14 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
+    extDefs.put("__tab_close", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        tab.getPane().removeTab(tab);
+        return null;
+      }
+    });
     extDefs.put("__tab_title", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -599,6 +637,159 @@ public class OperandiScript implements Runnable, Disposable {
     return type;
   }
   
+  private void createCanvasFunctions(Map<String, ExtCall> extDefs) {
+    extDefs.put("canvas", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        String name = "CANVAS";
+        int w = 300;
+        int h = 200;
+        if (args != null && args.length > 0) {
+          if (args[0].type == Processor.TSTR) {
+            name = args[0].asString();
+          } else {
+            w = args[0].asInt();
+            if (args.length > 1) {
+              h = args[1].asInt();
+            }
+          }
+        }
+        
+        String tabID = Tuscedo.inst().addCanvasTab(SimpleTabPane.getTabByComponent(currentWA).getPane(), w, h);
+        Tuscedo.inst().getTab(tabID).setText(name);
+        M canvas = new Processor.M(new MListMap());
+        canvas.ref.put(".tid", new M(tabID));
+        M canvasFunc;
+        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_set_color"));
+        canvasFunc.type = Processor.TFUNC;
+        canvas.ref.put("set_color", canvasFunc);
+        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_draw_line"));
+        canvasFunc.type = Processor.TFUNC;
+        canvas.ref.put("draw_line", canvasFunc);
+        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_draw_rect"));
+        canvasFunc.type = Processor.TFUNC;
+        canvas.ref.put("draw_rect", canvasFunc);
+        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_fill_rect"));
+        canvasFunc.type = Processor.TFUNC;
+        canvas.ref.put("fill_rect", canvasFunc);
+        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_draw_oval"));
+        canvasFunc.type = Processor.TFUNC;
+        canvas.ref.put("draw_oval", canvasFunc);
+        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_fill_oval"));
+        canvasFunc.type = Processor.TFUNC;
+        canvas.ref.put("fill_oval", canvasFunc);
+        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_draw_text"));
+        canvasFunc.type = Processor.TFUNC;
+        canvas.ref.put("draw_text", canvasFunc);
+        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_width"));
+        canvasFunc.type = Processor.TFUNC;
+        canvas.ref.put("get_width", canvasFunc);
+        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_height"));
+        canvasFunc.type = Processor.TFUNC;
+        canvas.ref.put("get_height", canvasFunc);
+        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_blit"));
+        canvasFunc.type = Processor.TFUNC;
+        canvas.ref.put("blit", canvasFunc);
+
+        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__tab_title"));
+        canvasFunc.type = Processor.TFUNC;
+        canvas.ref.put("set_title", canvasFunc);
+        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__tab_close"));
+        canvasFunc.type = Processor.TFUNC;
+        canvas.ref.put("close", canvasFunc);
+        return canvas;
+      }
+    });
+    extDefs.put("__canvas_set_color", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((DrawPanel)tab.getContent()).setColor(args[0].asInt());
+        return null;
+      }
+    });
+    extDefs.put("__canvas_draw_line", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 4)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((DrawPanel)tab.getContent()).drawLine(args[0].asInt(), args[1].asInt(), args[2].asInt(),args[3].asInt());
+        return null;
+      }
+    });
+    extDefs.put("__canvas_draw_rect", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 4)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((DrawPanel)tab.getContent()).drawRect(args[0].asInt(), args[1].asInt(), args[2].asInt(),args[3].asInt());
+        return null;
+      }
+    });
+    extDefs.put("__canvas_fill_rect", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || (args.length != 0 && args.length != 4))  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        if (args.length == 4) {
+          ((DrawPanel)tab.getContent()).fillRect(args[0].asInt(), args[1].asInt(), args[2].asInt(),args[3].asInt());
+        } else {
+          ((DrawPanel)tab.getContent()).fillRect();
+        }
+        return null;
+      }
+    });
+    extDefs.put("__canvas_draw_oval", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 4)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((DrawPanel)tab.getContent()).drawOval(args[0].asInt(), args[1].asInt(), args[2].asInt(),args[3].asInt());
+        return null;
+      }
+    });
+    extDefs.put("__canvas_fill_oval", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 4)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((DrawPanel)tab.getContent()).fillOval(args[0].asInt(), args[1].asInt(), args[2].asInt(),args[3].asInt());
+        return null;
+      }
+    });
+    extDefs.put("__canvas_draw_text", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 3)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((DrawPanel)tab.getContent()).drawText(args[0].asInt(), args[1].asInt(), args[2].asString());
+        return null;
+      }
+    });
+    extDefs.put("__canvas_width", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        return new Processor.M(((DrawPanel)tab.getContent()).getWidth());
+      }
+    });
+    extDefs.put("__canvas_height", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        return new Processor.M(((DrawPanel)tab.getContent()).getHeight());
+      }
+    });
+    extDefs.put("__canvas_blit", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        ((DrawPanel)tab.getContent()).blit();
+        return null;
+      }
+    });
+  }
+
   @Override
   public void dispose() {
     running = false;

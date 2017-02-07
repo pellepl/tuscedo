@@ -64,6 +64,7 @@ public class Processor implements ByteCode {
   M nilM = new M();
   M zeroM = new M(0);
   String[] args;
+  int nestedIRQ;
   
   public Processor(int memorySize) {
     nilM.type = TNIL;
@@ -110,6 +111,7 @@ public class Processor implements ByteCode {
     zero = false;
     minus = false;
     pc = exe == null ? 0 : exe.getPCStart();
+    nestedIRQ = 0;
   }
   
   public void resetAndCallAddress(int addr, List<M> args, M me) {
@@ -147,6 +149,209 @@ public class Processor implements ByteCode {
   public void setMemory(int addr, M m) {
     poke(addr, m);
   }
+  
+  
+  public void step() {
+    try {
+      if (dbgRun)         stepInstr(System.out);
+      else if (dbgRunSrc) stepSrc(System.out);
+      else                stepProc();
+    } catch (Throwable t) {
+      if (t instanceof ProcessorError) throw t;
+      else {
+        t.printStackTrace();
+        throw new ProcessorError(t.getMessage());
+      }
+    }
+  }
+  
+  public void stepInstr(PrintStream out) {
+    String procInfo = getProcInfo();
+    String disasm;
+    if ((pc & 0xff800000) != 0) {
+      disasm = Assembler.disasm(code_internal_funcs, pc - 0xff000000);
+    } else {
+      disasm = Assembler.disasm(code, pc);
+    }
+    String dbgComment = exe.getInstrDebugInfo(pc);
+    out.println(String.format("%s      %-32s  %s", procInfo, disasm, (dbgComment == null ? "" : ("; " + dbgComment))));
+    stepProc();
+    String stack = getStack();
+    out.println(stack);
+  }
+  
+  public String stepInstr() {
+    stepProc();
+    String procInfo = getProcInfo();
+    String disasm;
+    if ((pc & 0xff800000) != 0) {
+      disasm = Assembler.disasm(code_internal_funcs, pc - 0xff000000);
+    } else {
+      disasm = Assembler.disasm(code, pc);
+    }
+    String dbgComment = exe.getInstrDebugInfo(pc);
+    String dbgRes = String.format("%s      %-32s  %s", procInfo, disasm, (dbgComment == null ? "" : ("; " + dbgComment)));
+    return dbgRes;
+  }
+  
+  String lastSrcLine = null;
+  
+  public void stepSrc(PrintStream out) {
+    String d = exe.getSrcDebugInfoPrecise(pc);
+    if (d != null) {
+      lastSrcLine = d;
+      if (out != null) out.println(d);
+    }
+    do {
+      stepProc();
+      d = exe.getSrcDebugInfoPrecise(pc);
+    } while (d == null || lastSrcLine.equals(d));
+  }
+
+  public String stepSrc() {
+    stepProc();
+    return exe.getSrcDebugInfoPrecise(pc);
+  }
+  
+  public void raiseInterrupt(int newPC) {
+    push(getSR());
+    pushFrameAndJump(newPC, true);
+    if ((newPC & 0x800000) == 0x800000) {
+      ExtCall ec = extLinks.get(pc);
+      if (ec == null) throw new ProcessorError(String.format("bad external call 0x%06x", pc));
+      ec.doexe(this, null); 
+    }
+  }
+  
+  public void dumpError(ProcessorError pe, PrintStream out) {
+    out.println("**********************************************");
+    out.println(String.format("Exception at pc 0x%06x", getPC()));
+    out.println(getProcInfo());
+    out.println(pe.getMessage());
+    out.println("**********************************************");
+    String func = getExecutable().getFunctionName(getPC());
+    if (func != null) {
+      out.println("in context " + func);
+    }
+    String dbg = getExecutable().getSrcDebugInfoNearest(getPC());
+    if (dbg != null) {
+      out.println(dbg);
+    }
+    unwindStackTrace(out);
+    out.println("DISASM");
+    Assembler.disasm(out, "   ", getExecutable().getMachineCode(), getPC(), 8);
+    out.println("STACK");
+    printStack(out, "   ", 16);
+  }
+  
+
+  public static void addCommonExtdefs(Map<String, ExtCall> extDefs) {
+    addCommonExtdefs(extDefs, System.in, System.out);
+  }
+  public static void addCommonExtdefs(Map<String, ExtCall> extDefs, final InputStream in, final PrintStream out) {
+    extDefs.put("println", new EC_println(out));
+    extDefs.put("print", new EC_print(out));
+    extDefs.put("rand", new EC_rand());
+    extDefs.put("randseed", new EC_randseed());
+    extDefs.put("cpy", new EC_cpy());
+    extDefs.put("__dbg", new EC_dbg(out));
+    extDefs.put("__const", new EC_const());
+    extDefs.put("__mem", new EC_mem());
+    extDefs.put("__sp", new EC_sp());
+    extDefs.put("__fp", new EC_fp());
+    extDefs.put("__pc", new EC_pc());
+  }
+  
+  public void printStack(PrintStream out, String pre, int maxEntries) {
+    for (int i = sp-1; i < sp+maxEntries; i++) {
+      if (i >= memory.length) break;
+      if (pre != null) out.print(pre);
+      out.println(String.format("0x%06x %-8s %s", i, TNAME[memory[i].type], memory[i].asString()));
+    }
+  }
+  
+  public String getProcInfo() {
+    boolean irq = fp != 0xffffffff && ((fp & 0x80000000) != 0);
+    return String.format("pc:0x%06x  sp:0x%06x  fp:0x%06x%c sr:", pc, sp, fp & ~0x80000000, irq?'I':' ') + 
+        (zero ? "Z" : "z") + (minus ? "M" : "m");
+  }
+
+  public int getPC() {
+    return oldpc;
+  }
+  public int getSP() {
+    return sp;
+  }
+  public int getFP() {
+    return fp;
+  }
+  public int getSR() {
+    return (zero ? (1<<0) : 0) | (minus ? (1<<1) : 0);
+  }
+  public void setSR(int x) {
+    zero = (x & (1<<0)) != 0;
+    minus = (x & (1<<1)) != 0;
+  }
+  public M getMe() {
+    return me;
+  }
+  public int getNestedIRQ() {
+    return nestedIRQ;
+  }
+
+
+  public void unwindStackTrace(PrintStream out) {
+    int fp = this.fp;
+    int pc = this.oldpc;
+    int sp = this.sp;
+    M me = this.me;
+    int maxHops = 40;
+    boolean irq = false;
+    while(pc != 0xffffffff && fp != 0xffffffff) {
+      int nxtFP = fp != 0xffffffff ? peek((fp&~0x80000000)+FRAME_0_FP).i : 0;
+      irq = nxtFP != 0xffffffff && (nxtFP & 0x80000000) != 0;
+      out.println(String.format("PC:0x%08x FP:0x%08x SP:0x%08x%s", 
+          pc, fp, sp, irq ? " IRQ":""));
+      fp &= ~0x80000000;
+      int argc = peek(fp + FRAME_3_ARGC).i;
+      String func = exe.getFunctionName(pc);
+      if (func != null) {
+        out.print(func);
+      } else {
+        out.print(String.format("@ 0x%08x", pc));
+      }
+      if (!irq) {
+        out.print("( ");
+        for (int a = 0; a < argc; a++) {
+          M arg = peek(fp + FRAME_SIZE + 1 + a);
+          out.print(arg.asString() + " ");
+        }
+        out.println(") me:" + (me != null ? me.asString() : ""));
+      } else {
+        out.println();
+      }
+      String dbg = exe.getSrcDebugInfoNearest(pc, false);
+      if (dbg != null) {
+        out.println(dbg);
+      }
+      sp = fp;
+      if (sp == 0xffffffff) break;
+      fp = peek(sp+FRAME_0_FP).i;
+      pc = peek(sp+FRAME_1_PC).i;
+      me = peek(sp+FRAME_2_ME);
+      out.println();
+      if (maxHops-- == 0) {
+        out.println("*** stacktrace abort, too long ***");
+        break;
+      }
+    }
+  }
+
+
+  
+  
+  
+  
   
   M pop() {
     sp++;
@@ -256,7 +461,7 @@ public class Processor implements ByteCode {
   }
   
   void cpy() {
-    push(peekStack(pcodetos( pc++, 1)));
+    push(peekStack(pcodetos(pc++, 1)));
   }
   
   void stor() {
@@ -271,7 +476,7 @@ public class Processor implements ByteCode {
   
   void stor_im() {
     M m = pop();
-    int addr = pcodetoi( pc, 3);
+    int addr = pcodetoi(pc, 3);
     pc += 3;
     poke(addr, m);
   }
@@ -286,28 +491,28 @@ public class Processor implements ByteCode {
   }
   
   void load_im() {
-    int addr = pcodetoi( pc, 3);
+    int addr = pcodetoi(pc, 3);
     pc += 3;
     push(peek(addr));
   }
   
   void stor_fp() {
-    int rel = pcodetos( pc++, 1);
-    poke(fp - rel, pop());
+    int rel = pcodetos(pc++, 1);
+    poke((fp & ~0x80000000) - rel, pop());
   }
   
   void load_fp() {
-    int rel = pcodetos( pc++, 1);
-    push(peek(fp - rel));
+    int rel = pcodetos(pc++, 1);
+    push(peek((fp & ~0x80000000) - rel));
   }
   
   void sp_incr() {
-    int m = pcodetoi( pc++, 1) + 1;
+    int m = pcodetoi(pc++, 1) + 1;
     sp -= m;
   }
   
   void sp_decr() {
-    int m = pcodetoi( pc++, 1) + 1;
+    int m = pcodetoi(pc++, 1) + 1;
     for (int i = 0; i < m; i++) {
       poke(sp + i, nilM);
     }
@@ -322,18 +527,32 @@ public class Processor implements ByteCode {
     push(sp);
   }
   
-  void push_fp() {
-    push(fp);
+  void push_fp(boolean interrupt) {
+    if (interrupt) {
+      nestedIRQ++;
+      push(fp | 0x80000000);
+    } else {
+      push(fp);
+    }
+  }
+  
+  void pop_fp() {
+    fp = pop().i;
   }
   
   void push_sr() {
-    push( (zero ? (1<<0) : 0) | (minus ? (1<<1) : 0) );
+    push( getSR() );
+  }
+  
+  void pop_sr() {
+    setSR( pop().i );
   }
   
   void set_cre() {
     int elements = pop().asInt();
     if (elements == -1) {
       // create arg array
+      int fp = this.fp & ~0x80000000;
       MMemList list = new MMemList(memory, 
           fp+FRAME_SIZE+1, fp+FRAME_SIZE+1+memory[fp+FRAME_3_ARGC].asInt());
       push(list);
@@ -1071,29 +1290,19 @@ public class Processor implements ByteCode {
       throw new ProcessorError("calling bad type " + TNAME[addr.type]);
     }
     if (addr.type == TFUNC || addr.type == TINT) {
-      int a = addr.i;
-      push(me);
-      push(pc);
-      push(fp);
-      int args = peek(sp+FRAME_3_ARGC).i;
-      fp = sp;
-      pc = a;
+      int newPC = addr.i;
+      pushFrameAndJump(newPC, false);
       me = me_banked;
-      if ((pc & 0x800000) == 0x800000) {
+      int argc = peek(sp+FRAME_3_ARGC).i;
+      if ((newPC & 0x800000) == 0x800000) {
         ExtCall ec = extLinks.get(pc);
         if (ec == null) throw new ProcessorError(String.format("bad external call 0x%06x", pc));
-        M ret = ec.exe(this, getArgs(fp, args)); 
-        push(ret == null ? nilM : ret);
-        retv();
+        ec.doexe(this, getArgs(fp, argc)); 
       }
     } else if (addr.type == TANON) {
       MSet vars = addr.ref;
-      int a = addr.i;
-      push(me);
-      push(pc);
-      push(fp);
-      fp = sp;
-      pc = a;
+      int newPC = addr.i;
+      pushFrameAndJump(newPC, false);
       me = me_banked;
       
       // put ((MSet)addr.ref) on stack (adsVars)
@@ -1105,30 +1314,31 @@ public class Processor implements ByteCode {
   }
   
   void call_im() {
-    push(me);
-    push(pc+3);
-    push(fp);
-    int args = peek(sp+FRAME_3_ARGC).i;
-    fp = sp;
-    pc = pcodetos(pc, 3);
+    int newPC = pcodetos(pc, 3);
+    pc += 3;
+    pushFrameAndJump(newPC, false);
     me = me_banked;
-    if ((pc & 0x800000) == 0x800000) {
+    int argc = peek(sp+FRAME_3_ARGC).i;
+    if ((newPC & 0x800000) == 0x800000) {
       ExtCall ec = extLinks.get(pc);
       if (ec == null) throw new ProcessorError(String.format("bad external call 0x%06x", pc));
-      M ret = ec.exe(this, getArgs(fp, args)); 
-      push(ret == null ? nilM : ret);
-      retv();
+      ec.doexe(this, getArgs(fp, argc)); 
     }
   }
   
-  void call_pc() {
-    push(me);
-    push(pc+3);
-    push(fp);
-    fp = sp;
-    int rel = pcodetos(pc, 3) - 1;
-    pc += rel;
+  void call_r() {
+    int rel = pcodetos(pc, 3) - 4;
+    pc += 3;
+    pushFrameAndJump(pc + rel, false);
     me = me_banked;
+  }
+  
+  void pushFrameAndJump(int newPC, boolean interrupt) {
+    push(me);
+    push(pc);
+    push_fp(interrupt);
+    fp = sp;
+    pc = newPC;
   }
   
   void ano_cre() {
@@ -1140,27 +1350,44 @@ public class Processor implements ByteCode {
   }
   
   void ret() {
-    sp = fp;
     if (fp == 0xffffffff) throw new ProcessorError.ProcessorStackError();
-    fp = pop().i;
-    pc = pop().i;
-    me = pop();
+    boolean leftInterrupt = popFrame();
     if (pc == 0xffffffff) throw new ProcessorError.ProcessorFinishedError(nilM);
-    int argc = pop().i;
-    sp += argc;
+    if (!leftInterrupt) {
+      int argc = pop().i;
+      sp += argc;
+    }
   }
   
   void retv() {
     M t = new M().copy(pop());
-    sp = fp;
     if (fp == 0xffffffff) throw new ProcessorError.ProcessorStackError();
-    fp = pop().i;
+    boolean leftInterrupt = popFrame();
+    if (pc == 0xffffffff) throw new ProcessorError.ProcessorFinishedError(t);
+    if (!leftInterrupt) {
+      int argc = pop().i;
+      sp += argc;
+      push(t);
+    }
+  }
+  
+  boolean popFrame() {
+    if (fp == 0xffffffff) throw new ProcessorError.ProcessorStackError();
+    boolean leftInterrupt = (fp & 0x80000000) == 0; 
+    sp = fp & ~0x80000000;
+    pop_fp();
     pc = pop().i;
     me = pop();
-    if (pc == 0xffffffff) throw new ProcessorError.ProcessorFinishedError(t);
-    int argc = pop().i;
-    sp += argc;
-    push(t);
+    if (leftInterrupt) {
+      leftInterrupt = (fp & 0x80000000) != 0;
+      if (leftInterrupt) {
+        fp &= ~0x80000000;
+        pop_sr();
+        nestedIRQ--;
+      }
+    }
+
+    return leftInterrupt;
   }
   
   void in() {
@@ -1249,54 +1476,6 @@ public class Processor implements ByteCode {
     case ICOND_LT:
       if (!zero && minus) pc += rel; break;
     }
-  }
-  
-  public void step() {
-    try {
-      if (dbgRun)         stepInstr(System.out);
-      else if (dbgRunSrc) stepSrc(System.out);
-      else                stepProc();
-    } catch (Throwable t) {
-      if (t instanceof ProcessorError) throw t;
-      else {
-        t.printStackTrace();
-        throw new ProcessorError(t.getMessage());
-      }
-    }
-  }
-  
-  void stepInstr(PrintStream out) {
-    String procInfo = getProcInfo();
-    String disasm;
-    if ((pc & 0xff800000) != 0) {
-      disasm = Assembler.disasm(code_internal_funcs, pc - 0xff000000);
-    } else {
-      disasm = Assembler.disasm(code, pc);
-    }
-    String dbgComment = exe.getInstrDebugInfo(pc);
-    out.println(String.format("%s      %-32s  %s", procInfo, disasm, (dbgComment == null ? "" : ("; " + dbgComment))));
-    stepProc();
-    String stack = getStack();
-    out.println(stack);
-  }
-  
-  String lastSrcLine = null;
-  
-  public void stepSrc(PrintStream out) {
-    String d = exe.getSrcDebugInfoPrecise(pc);
-    if (d != null) {
-      lastSrcLine = d;
-      if (out != null) out.println(d);
-    }
-    do {
-      stepProc();
-      d = exe.getSrcDebugInfoPrecise(pc);
-    } while (d == null || lastSrcLine.equals(d));
-  }
-
-  public String stepSrc() {
-    stepProc();
-    return exe.getSrcDebugInfoPrecise(pc);
   }
 
   void stepProc() {
@@ -1520,7 +1699,7 @@ public class Processor implements ByteCode {
       push_sp();
       break;
     case IPUSH_FP:
-      push_fp();
+      push_fp(false);
       break;
     case IPUSH_SR:
       push_sr();
@@ -1573,7 +1752,7 @@ public class Processor implements ByteCode {
       call_im();
       break;
     case ICALL_R: 
-      call_pc();
+      call_r();
       break;
     case IANO_CRE: 
       ano_cre();
@@ -1657,6 +1836,7 @@ public class Processor implements ByteCode {
   }
   
   M[] getArgs(int fp, int args) {
+    fp &= ~0x80000000;
     M argv[] = new M[args];
     for (int i = 0; i < args; i++) {
       argv[args - i - 1] = memory[fp+FRAME_SIZE+(args - i)];
@@ -1769,7 +1949,7 @@ public class Processor implements ByteCode {
       case TANON:
         return "C" + asString();
       case TSET:
-        return "a" + asString();
+        return "t" + asString();
       default:
         return "?" + type;
       }
@@ -1824,75 +2004,10 @@ public class Processor implements ByteCode {
     return sb.toString();
   }
   
-  public void printStack(PrintStream out, String pre, int maxEntries) {
-    for (int i = sp-1; i < sp+maxEntries; i++) {
-      if (i >= memory.length) break;
-      if (pre != null) out.print(pre);
-      out.println(String.format("0x%06x %-8s %s", i, TNAME[memory[i].type], memory[i].asString()));
-    }
-  }
-  
-  public String getProcInfo() {
-    return String.format("pc:0x%06x  sp:0x%06x  fp:0x%06x  sr:", pc, sp, fp) + 
-        (zero ? "Z" : "z") + (minus ? "M" : "m");
-  }
-
-  public int getPC() {
-    return oldpc;
-  }
-  public int getSP() {
-    return sp;
-  }
-  public int getFP() {
-    return fp;
-  }
-  public M getMe() {
-    return me;
-  }
-  
   static byte[] assemble(String s) {
     return Assembler.assemble(s);
   }
-
-  public void unwindStackTrace(PrintStream out) {
-    int fp = this.fp;
-    int pc = this.oldpc;
-    int sp = this.sp;
-    M me = this.me;
-    int maxHops = 40;
-    while(pc != 0xffffffff && fp != 0xffffffff) {
-      int argc = peek(fp + FRAME_3_ARGC).i;
-      out.println(String.format("PC:0x%08x FP:0x%08x SP:0x%08x", 
-          pc, fp, sp));
-      String func = exe.getFunctionName(pc);
-      if (func != null) {
-        out.print(func);
-      } else {
-        out.print(String.format("@ 0x%08x", pc));
-      }
-      out.print("( ");
-      for (int a = 0; a < argc; a++) {
-        M arg = peek(fp + FRAME_SIZE + 1 + a);
-        out.print(arg.asString() + " ");
-      }
-      out.println(") me:" + (me != null ? me.asString() : ""));
-      String dbg = exe.getSrcDebugInfoNearest(pc, false);
-      if (dbg != null) {
-        out.println(dbg);
-      }
-      sp = fp;
-      if (sp == 0xffffffff) break;
-      fp = peek(sp+1).i;
-      pc = peek(sp+2).i;
-      me = peek(sp+3);
-      out.println();
-      if (maxHops-- == 0) {
-        out.println("*** stacktrace abort, too long ***");
-        break;
-      }
-    }
-  }
-
+  
   static final String IFUNC_SET_VISITOR_ASM =
       //func setVisitor(set, visitor) {
       //  res = (if isstr(set) nil else t[]);
@@ -1957,23 +2072,6 @@ public class Processor implements ByteCode {
       "  retv                     \n"+
       "  "  ;
 
-  public static void addCommonExtdefs(Map<String, ExtCall> extDefs) {
-    addCommonExtdefs(extDefs, System.in, System.out);
-  }
-  public static void addCommonExtdefs(Map<String, ExtCall> extDefs, final InputStream in, final PrintStream out) {
-    extDefs.put("println", new EC_println(out));
-    extDefs.put("print", new EC_print(out));
-    extDefs.put("rand", new EC_rand());
-    extDefs.put("randseed", new EC_randseed());
-    extDefs.put("cpy", new EC_cpy());
-    extDefs.put("__dbg", new EC_dbg(out));
-    extDefs.put("__const", new EC_const());
-    extDefs.put("__mem", new EC_mem());
-    extDefs.put("__sp", new EC_sp());
-    extDefs.put("__fp", new EC_fp());
-    extDefs.put("__pc", new EC_pc());
-  }
-  
   static long regA = 0x20070515, regB = 0x20090129, regC = 0x20140315;
   static int calcRand() {
     // https://www.schneier.com/academic/archives/1994/09/pseudo-random_sequen.html
@@ -2002,23 +2100,23 @@ public class Processor implements ByteCode {
     }
   }
   
-  static class EC_pc implements ExtCall {
+  static class EC_pc extends ExtCall {
     public Processor.M exe(Processor p, Processor.M[] args) {
       return new M(p.oldpc);
     }
   }
-  static class EC_sp implements ExtCall {
+  static class EC_sp extends ExtCall {
     public Processor.M exe(Processor p, Processor.M[] args) {
       return new M(p.sp);
     }
   }
-  static class EC_fp implements ExtCall {
+  static class EC_fp extends ExtCall {
     public Processor.M exe(Processor p, Processor.M[] args) {
       return new M(p.fp);
     }
   }
 
-  static class EC_dbg implements ExtCall {
+  static class EC_dbg extends ExtCall {
     final PrintStream out;
     public EC_dbg(PrintStream out) { this.out = out; }
     public Processor.M exe(Processor p, Processor.M[] args) {
@@ -2049,7 +2147,7 @@ public class Processor implements ByteCode {
       return null;
     }
   } 
-  static class EC_const implements ExtCall {
+  static class EC_const extends ExtCall {
     public Processor.M exe(Processor p, Processor.M[] args) {
       if (p.exe.getConstants().keySet().isEmpty()) return null;
       int min = Integer.MAX_VALUE;
@@ -2064,7 +2162,7 @@ public class Processor implements ByteCode {
       return m;
     }
   }
-  static class EC_mem implements ExtCall {
+  static class EC_mem extends ExtCall {
     public Processor.M exe(Processor p, Processor.M[] args) {
       M m = new M();
       m.ref = new MMemList(p.memory, 0, p.memory.length);
@@ -2072,7 +2170,7 @@ public class Processor implements ByteCode {
       return m;
     }
   }
-  static class EC_println implements ExtCall {
+  static class EC_println extends ExtCall {
     final PrintStream out;
     public EC_println(PrintStream out) { this.out = out; }
     public Processor.M exe(Processor p, Processor.M[] args) {
@@ -2087,7 +2185,7 @@ public class Processor implements ByteCode {
       return null;
     }
   }
-  static class EC_print implements ExtCall {
+  static class EC_print extends ExtCall {
     final PrintStream out;
     public EC_print(PrintStream out) { this.out = out; }
     public Processor.M exe(Processor p, Processor.M[] args) {
@@ -2100,12 +2198,12 @@ public class Processor implements ByteCode {
       return null;
     }
   }
-  static class EC_rand implements ExtCall {
+  static class EC_rand extends ExtCall {
     public Processor.M exe(Processor p, Processor.M[] args) {
       return new M(calcRand());
     }
   }
-  static class EC_randseed implements ExtCall {
+  static class EC_randseed extends ExtCall {
     public Processor.M exe(Processor p, Processor.M[] args) {
       if (args == null || args.length == 0) {
       } else {
@@ -2114,7 +2212,7 @@ public class Processor implements ByteCode {
       return null;
     }
   }
-  static class EC_cpy implements ExtCall {
+  static class EC_cpy extends ExtCall {
     public Processor.M exe(Processor p, Processor.M[] args) {
       if (args == null || args.length == 0) {
         return null;
@@ -2131,7 +2229,6 @@ public class Processor implements ByteCode {
       }
     }
   }
-
   
   
   public static M compileAndRun(String... sources) {
@@ -2193,26 +2290,5 @@ public class Processor implements ByteCode {
     // TODO remove
     
     return ret;
-  }
-
-  public void dumpError(ProcessorError pe, PrintStream out) {
-    out.println("**********************************************");
-    out.println(String.format("Exception at pc 0x%06x", getPC()));
-    out.println(getProcInfo());
-    out.println(pe.getMessage());
-    out.println("**********************************************");
-    String func = getExecutable().getFunctionName(getPC());
-    if (func != null) {
-      out.println("in context " + func);
-    }
-    String dbg = getExecutable().getSrcDebugInfoNearest(getPC());
-    if (dbg != null) {
-      out.println(dbg);
-    }
-    unwindStackTrace(out);
-    out.println("DISASM");
-    Assembler.disasm(out, "   ", getExecutable().getMachineCode(), getPC(), 8);
-    out.println("STACK");
-    printStack(out, "   ", 16);
   }
 }

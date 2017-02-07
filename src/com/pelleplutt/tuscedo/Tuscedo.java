@@ -21,6 +21,7 @@ import javax.swing.WindowConstants;
 
 import purejavacomm.CommPortIdentifier;
 
+import com.pelleplutt.tuscedo.ui.DrawPanel;
 import com.pelleplutt.tuscedo.ui.GraphPanel;
 import com.pelleplutt.tuscedo.ui.SimpleTabPane;
 import com.pelleplutt.tuscedo.ui.SimpleTabPane.Tab;
@@ -125,6 +126,15 @@ public class Tuscedo implements Runnable {
       for (float s : vals) gp.addSample(s);
     }
     gp.zoomAll(true, true, new Point());
+    tabs.put(tabID, t);
+    return tabID;
+  }
+  
+  public String addCanvasTab(SimpleTabPane stp, int w, int h) {
+    DrawPanel gp = new DrawPanel(w, h);
+    String tabID = Tuscedo.getTabID();
+    Tab t = stp.createTab(tabID, gp);
+    stp.selectTab(t);
     tabs.put(tabID, t);
     return tabID;
   }
