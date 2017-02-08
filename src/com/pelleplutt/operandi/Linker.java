@@ -80,9 +80,16 @@ public class Linker implements ByteCode {
     fragments = new ArrayList<ModuleFragment>();
     this.extDefs = extDefs;
     
+    int oextFuncAddr = extFuncAddr;
     int ocodeOffset = codeOffset;
     int osymbolVarOffset = symbolVarOffset;
     int osymbolConstOffset = symbolConstOffset;
+    List<Byte> ocode = new ArrayList<Byte>(code);
+    Map<TAC, Integer> oglobalAddrLUT = new HashMap<TAC, Integer>(globalAddrLUT);
+    Map<String, Integer> ofragAddrLUT = new HashMap<String, Integer>(fragAddrLUT);
+    Map<String, Integer> oextCallsAddrLut = new HashMap<String, Integer>(extCallsAddrLut);
+    Map<Integer, ExtCall> oextLinks = new HashMap<Integer, ExtCall>(extLinks);
+
     this.incrementalPreviousExe = incrementalPreviousExe;
 
     try {
@@ -99,9 +106,15 @@ public class Linker implements ByteCode {
       
       return exe; 
     } catch (Throwable t) {
+      extFuncAddr = oextFuncAddr;
       codeOffset = ocodeOffset;
       symbolVarOffset = osymbolVarOffset;
       symbolConstOffset = osymbolConstOffset;
+      code = ocode;
+      globalAddrLUT = oglobalAddrLUT;
+      fragAddrLUT = ofragAddrLUT;
+      extCallsAddrLut = oextCallsAddrLut;
+      extLinks = oextLinks;
       throw t;
     }
   }

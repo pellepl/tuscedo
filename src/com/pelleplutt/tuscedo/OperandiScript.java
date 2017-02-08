@@ -146,6 +146,23 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((int)System.currentTimeMillis());
       }
     });
+    extDefs.put("__tab_close", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        tab.getPane().removeTab(tab);
+        return null;
+      }
+    });
+    extDefs.put("__tab_title", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        Tab tab = getTabByScriptId(p.getMe());
+        if (tab == null) return null;
+        tab.getPane().setTabTitle(tab, args[0].asString());
+        return null;
+      }
+    });
     createGraphFunctions(extDefs);
     createCanvasFunctions(extDefs);
     createSerialFunctions(extDefs);
@@ -604,23 +621,6 @@ public class OperandiScript implements Runnable, Disposable {
         Tab tab = getTabByScriptId(p.getMe());
         if (tab == null) return null;
         ((GraphPanel)tab.getContent()).scrollToSample(args[0].asInt());
-        return null;
-      }
-    });
-    extDefs.put("__tab_close", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
-        tab.getPane().removeTab(tab);
-        return null;
-      }
-    });
-    extDefs.put("__tab_title", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0)  return null;
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
-        tab.getPane().setTabTitle(tab, args[0].asString());
         return null;
       }
     });

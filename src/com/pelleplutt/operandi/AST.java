@@ -452,7 +452,7 @@ public class AST implements Lexer.Emitter {
   }
   
   void onParenthesisOpen(int tokix) {
-    if (!exprs.isEmpty() && prevTokix != OP_FOR && prevTokix != OP_IF && 
+    if (!exprs.isEmpty() && prevTokix != OP_FOR && prevTokix != OP_IF && prevTokix != OP_RETURN && 
           (exprs.peek().op == OP_ADEREF && prevTokix == OP_BRACKETC ||
           exprs.peek().op == OP_CALL && opers.peek().id != OP_CALL || 
           prevPrevTokix == OP_DOT)) {
