@@ -250,7 +250,8 @@ public class OperandiScript implements Runnable, Disposable {
           if (dbg != null) {
             int nestedIRQ = proc.getNestedIRQ();
             String irqInfo = nestedIRQ > 0 ? "[IRQ"+nestedIRQ+"] " : "";
-            currentWA.appendViewText(currentView, irqInfo + dbg + "\n", WorkArea.STYLE_BASH_DBG);
+            currentWA.appendViewText(currentView, irqInfo + dbg + "\n", 
+                WorkArea.STYLE_BASH_DBG);
           }
           synchronized (q) {
             AppSystem.waitSilently(q, 0);
@@ -262,7 +263,8 @@ public class OperandiScript implements Runnable, Disposable {
     } catch (ProcessorFinishedError pfe) {
       M m = pfe.getRet();
       if (m != null && m.type != Processor.TNIL) {
-        currentWA.appendViewText(currentView, "script returned " + m.asString() + "\n", WorkArea.STYLE_BASH_OUT);
+        currentWA.appendViewText(currentView, "script returned " + m.asString() + "\n", 
+            WorkArea.STYLE_BASH_OUT);
       }
     } catch (ProcessorError pe) {
       ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -302,7 +304,8 @@ public class OperandiScript implements Runnable, Disposable {
   }
   
   public void interrupt(int addr) {
-    currentWA.appendViewText(currentView, String.format("interrupt -> 0x%08x\n", addr), WorkArea.STYLE_BASH_INPUT);
+    currentWA.appendViewText(currentView, String.format("interrupt -> 0x%08x\n", addr), 
+        WorkArea.STYLE_BASH_INPUT);
     proc.raiseInterrupt(addr);
   }
   
@@ -320,23 +323,29 @@ public class OperandiScript implements Runnable, Disposable {
   }
   
   public void dumpPC() {
-    currentWA.appendViewText(currentView, String.format("PC:0x%08x\n", proc.getPC()), WorkArea.STYLE_BASH_INPUT);
+    currentWA.appendViewText(currentView, String.format("PC:0x%08x\n", proc.getPC()), 
+        WorkArea.STYLE_BASH_INPUT);
   }
   
   public void dumpFP() {
-    currentWA.appendViewText(currentView, String.format("FP:0x%08x\n", proc.getFP()), WorkArea.STYLE_BASH_INPUT);
+    currentWA.appendViewText(currentView, String.format("FP:0x%08x\n", proc.getFP()), 
+        WorkArea.STYLE_BASH_INPUT);
   }
   
   public void dumpSP() {
-    currentWA.appendViewText(currentView, String.format("SP:0x%08x\n", proc.getSP()), WorkArea.STYLE_BASH_INPUT);
+    currentWA.appendViewText(currentView, String.format("SP:0x%08x\n", proc.getSP()), 
+        WorkArea.STYLE_BASH_INPUT);
   }
   
   public void dumpSR() {
-    currentWA.appendViewText(currentView, String.format("SR:0x%08x\n", proc.getSR()), WorkArea.STYLE_BASH_INPUT);
+    currentWA.appendViewText(currentView, String.format("SR:0x%08x\n", proc.getSR()), 
+        WorkArea.STYLE_BASH_INPUT);
   }
   
   public void dumpMe() {
-    currentWA.appendViewText(currentView, String.format("me:%s\n", proc.getMe().asString()), WorkArea.STYLE_BASH_INPUT);
+    M me = proc.getMe();
+    currentWA.appendViewText(currentView, String.format("me:%s\n", me == null ? "nil" : me.asString()), 
+        WorkArea.STYLE_BASH_INPUT);
   }
   
   public void backtrace() {
@@ -519,6 +528,9 @@ public class OperandiScript implements Runnable, Disposable {
         graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_scroll_sample"));
         graphFunc.type = Processor.TFUNC;
         graph.ref.put("scroll_sample", graphFunc);
+        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_merge"));
+        graphFunc.type = Processor.TFUNC;
+        graph.ref.put("merge", graphFunc);
         return graph;
       }
     });
@@ -624,6 +636,20 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
+    extDefs.put("__graph_merge", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        Tab tabSrc = getTabByScriptId(p.getMe());
+        if (tabSrc == null) return null;
+        for (int i = 0; i < args.length; i++) {
+          Tab tabOver = getTabByScriptId(args[i]);
+          if (tabOver == null) continue;
+          tabOver.getPane().removeTab(tabOver);
+          ((GraphPanel)tabSrc.getContent()).addOverlayGraphObject(tabOver);
+        }
+        return null;
+      }
+    });
   }
   
   int parseGraphType(M a) {
@@ -646,6 +672,12 @@ public class OperandiScript implements Runnable, Disposable {
         if (args != null && args.length > 0) {
           if (args[0].type == Processor.TSTR) {
             name = args[0].asString();
+            if (args.length > 1) {
+              w = args[1].asInt();
+            }
+            if (args.length > 2) {
+              h = args[2].asInt();
+            }
           } else {
             w = args[0].asInt();
             if (args.length > 1) {

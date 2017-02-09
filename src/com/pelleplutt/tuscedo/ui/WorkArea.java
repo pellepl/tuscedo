@@ -52,6 +52,7 @@ import com.pelleplutt.Essential;
 import com.pelleplutt.operandi.proc.Processor;
 import com.pelleplutt.operandi.proc.Processor.M;
 import com.pelleplutt.tuscedo.OperandiScript;
+import com.pelleplutt.tuscedo.Ownable;
 import com.pelleplutt.tuscedo.ProcessGroup;
 import com.pelleplutt.tuscedo.ProcessGroupInfo;
 import com.pelleplutt.tuscedo.Serial;
@@ -75,7 +76,7 @@ import com.pelleplutt.util.io.Port;
  *  
  * @author petera
  */
-public class WorkArea extends JPanel implements Disposable {
+public class WorkArea extends JPanel implements Disposable, Ownable {
   static final int ISTATE_INPUT = 0;
   static final int ISTATE_FIND = 1;
   static final int ISTATE_FIND_REGEX = 2;
@@ -212,6 +213,9 @@ public class WorkArea extends JPanel implements Disposable {
   
   JWindow winSug;
   JList<String> winSugList;
+  public Object owner;
+  public Object getOwner() {return owner;}
+  public void setOwner(Object o) {owner = o;}
 
 
   public WorkArea() {

@@ -223,7 +223,7 @@ public class SimpleTabPane extends JPanel {
       fireTabPaneEmpty(this);
     }
   }
-  
+
   public void removeAllTabs() {
     while (!tabs.isEmpty()) {
       removeTab(tabs.get(0), true, false);
@@ -587,6 +587,10 @@ public class SimpleTabPane extends JPanel {
       }
     }
 
+    @Override
+    public String toString() {
+      return getText();
+    }
   } // class Tab
   
   public interface TabListener {

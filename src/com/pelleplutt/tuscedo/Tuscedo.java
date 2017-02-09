@@ -33,9 +33,11 @@ public class Tuscedo implements Runnable {
   static Tuscedo inst;
   static List<Window> windows = new ArrayList<Window>();
   static volatile int __tabId;
+  static volatile int __ownableId;
   volatile boolean running = true;
   List <Tickable> tickables = new ArrayList<Tickable>();
   Map <String, Tab> tabs = new HashMap<String, Tab>();
+  Map <String, Ownable> ownables = new HashMap<String, Ownable>();
   
   private Tuscedo() {
     Thread t = new Thread(this, "commonticker");
@@ -109,33 +111,48 @@ public class Tuscedo implements Runnable {
     WorkArea w = new WorkArea();
     w.build();
     String tabID = Tuscedo.getTabID();
+    String oID = Tuscedo.getOwnableID();
     Tab t = stp.createTab(tabID, w);
+    w.setOwner(t);
     stp.selectTab(t);
     w.updateTitle();
     w.setStandardFocus();
     tabs.put(tabID, t);
+    ownables.put(oID, w);
     return tabID;
   }
   
   public String addGraphTab(SimpleTabPane stp, List<Float> vals) {
-    GraphPanel gp = new GraphPanel();
+    GraphPanel gp = new GraphPanel() {
+      @Override
+      public GraphPanel getGraphPanelFromOverlayObject(Object o) {
+        Tab t = (Tab)o;
+        return (GraphPanel)t.content;
+      }
+    };
     String tabID = Tuscedo.getTabID();
+    String oID = Tuscedo.getOwnableID();
     Tab t = stp.createTab(tabID, gp);
+    gp.setOwner(t);
     stp.selectTab(t);
     if (vals != null) {
       for (float s : vals) gp.addSample(s);
     }
     gp.zoomAll(true, true, new Point());
     tabs.put(tabID, t);
+    ownables.put(oID, gp);
     return tabID;
   }
   
   public String addCanvasTab(SimpleTabPane stp, int w, int h) {
     DrawPanel gp = new DrawPanel(w, h);
     String tabID = Tuscedo.getTabID();
+    String oID = Tuscedo.getOwnableID();
     Tab t = stp.createTab(tabID, gp);
+    gp.setOwner(t);
     stp.selectTab(t);
     tabs.put(tabID, t);
+    ownables.put(oID, gp);
     return tabID;
   }
   
@@ -237,6 +254,11 @@ public class Tuscedo implements Runnable {
   public static String getTabID() {
     __tabId++;
     return "TAB" + __tabId;
+  }
+
+  public static String getOwnableID() {
+    __ownableId++;
+    return "o" + __ownableId;
   }
 
   @Override

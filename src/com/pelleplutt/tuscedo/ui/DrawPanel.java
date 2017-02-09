@@ -13,13 +13,18 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JViewport;
 
-public class DrawPanel extends JPanel {
+import com.pelleplutt.tuscedo.Ownable;
+
+public class DrawPanel extends JPanel implements Ownable {
   volatile BufferedImage pri, sec;
   JScrollPane scrl;
   Renderer renderer;
   Graphics2D g;
   Color color = Color.black;
-  
+  public Object owner;
+  public Object getOwner() {return owner;}
+  public void setOwner(Object o) {owner = o;}
+
   public DrawPanel(int w, int h) {
     pri = new BufferedImage(w, h, BufferedImage.TYPE_4BYTE_ABGR);
     sec = new BufferedImage(w, h, BufferedImage.TYPE_4BYTE_ABGR);
