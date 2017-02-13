@@ -23,14 +23,12 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JViewport;
 
-public abstract class GraphPanel extends JPanel {
+import com.pelleplutt.tuscedo.ui.UIInfo.UIListener;
+
+public class UIGraphPanel extends JPanel implements UIO, UIListener {
   public static final int GRAPH_LINE = 0;
   public static final int GRAPH_BAR = 1;
   public static final int GRAPH_PLOT = 2;
-  List<Double> samples;
-  double minSample = 0;
-  double maxSample = 0;
-  double sum = 0;
   double magHor = 2.0;
   double magVer = 100.0;
   Renderer renderer;
@@ -45,8 +43,12 @@ public abstract class GraphPanel extends JPanel {
   boolean dragging;
   int selAnchorX, selAnchorY;
   int selEndX, selEndY;
-  List<Object> overlayedGraphs = new ArrayList<Object>();
-  
+  List<SampleSet> sets = new ArrayList<SampleSet>();
+  static int __id = 0;
+  final UIInfo uiinfo;
+  public UIInfo getUIInfo() {return uiinfo;}
+
+
   static final Color colGraph[] = {
       new Color(255,255, 64, 192),
       new Color(255, 64,255, 192),
@@ -71,10 +73,75 @@ public abstract class GraphPanel extends JPanel {
   Color colSelEdge = new Color(0,255,255,128);
   Color colSelArea = new Color(0,255,255,64);
 
-  int graphType = GRAPH_LINE;
+  public static class SampleSet implements UIO {
+    List<Double> samples = new ArrayList<Double>();
+    double minSample = 0;
+    double maxSample = 0;
+    double sum = 0;
+    int graphType = GRAPH_LINE;
+    static int __id = 0;
+    final UIInfo uiinfo;
+    public UIInfo getUIInfo() {return uiinfo;}
+    
+    public SampleSet(String name) {
+      uiinfo = new UIInfo(this, "samples" + __id, name);
+      UIInfo.fireEventOnCreated(uiinfo);
+      __id++;
+    }
+    
+    
+    public void setGraphType(int type) {
+      graphType = type;
+    }
+    
+    public void addSample(double sample)  {
+      addSampleInternal(sample);
+      UIO anc = uiinfo.getAncestorUI();
+      if (anc != null && anc instanceof UIGraphPanel) {
+        ((UIGraphPanel)anc).sampleUpdate();
+      }
+    }
+
+    public void addSamples(List<Double> samples) {
+      for (double d : samples) {
+        addSampleInternal(d);
+      }
+      UIO anc = uiinfo.getAncestorUI();
+      if (anc != null && anc instanceof UIGraphPanel) {
+        ((UIGraphPanel)anc).sampleUpdate();
+      }
+    }
+
+    protected void addSampleInternal(double sample) {
+      minSample = sample < minSample ? sample : minSample; 
+      maxSample = sample > maxSample ? sample : maxSample; 
+      samples.add(sample);
+    }
+
+    public int getSampleCount() {
+      return samples.size();
+    }
+
+    public double getSample(int ix) {
+      return samples.get(ix);
+    }
+
+    @Override
+    public void repaint() {
+      UIInfo par = getUIInfo().getParent();
+      if (par != null) {
+        par.getUI().repaint();
+      }
+    }
+  }
   
-  public GraphPanel() {
-    samples = new ArrayList<Double>();
+  public UIGraphPanel(String name) {
+    uiinfo = new UIInfo(this, "graph" + __id, null);
+    UIInfo.fireEventOnCreated(uiinfo);
+
+    __id++;
+    addSampleSet(new SampleSet(name));
+
     renderer = new Renderer();
     scrl = new JScrollPane(renderer, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, 
         JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
@@ -101,90 +168,70 @@ public abstract class GraphPanel extends JPanel {
     });
   }
   
-  public void addOverlayGraphObject(Object o) {
-    if (!overlayedGraphs.contains(o)) {
-      overlayedGraphs.add(o);
+  public SampleSet getSampleSet(int i) {
+    return sets.get(i);
+  }
+
+  public void addSampleSet(SampleSet set) {
+    if (!sets.contains(set)) {
+      sets.add(set);
+      set.getUIInfo().addListener(UIGraphPanel.this);
+      getUIInfo().addChild(set);
     }
+    repaint();
   }
   
-  public void removeOverlayGraphObject(Object o) {
-    if (overlayedGraphs.contains(o)) {
-      overlayedGraphs.remove(o);
+  public void removeSampleSet(SampleSet set) {
+    if (sets.contains(set)) {
+      sets.remove(set);
+      getUIInfo().removeChild(set);
     }
-  }
-  
-  public abstract GraphPanel getGraphPanelFromOverlayObject(Object o);
-  
-  GraphPanel getGraphPanelFromOverlayObjectInternal(Object o) {
-    return getGraphPanelFromOverlayObject(o);
-  }
-  
-  public void setGraphType(int type) {
-    graphType = type;
-    invokeRepaint();
-  }
-  
-  protected void addSampleInternal(double sample) {
-    minSample = sample < minSample ? sample : minSample; 
-    maxSample = sample > maxSample ? sample : maxSample; 
-    samples.add(sample);
+    repaint();
   }
   
   protected void sampleUpdate() {
-    renderer.recalcSize(maxSample, minSample, magHor, magVer, samples.size());
-    invokeRepaint();
+    renderer.recalcSize(getMaxSample(), getMinSample(), magHor, magVer, getSampleCount());
+    repaint();
   }
   
   public void addSample(double sample)  {
-    addSampleInternal(sample);
-    invokeSampleUpdate();
+    sets.get(0).addSampleInternal(sample);
+    sampleUpdate();
   }
   
   public void addSamples(List<Double> samples) {
     for (double d : samples) {
-      addSampleInternal(d);
+      sets.get(0).addSampleInternal(d);
     }
-    invokeSampleUpdate();
+    sampleUpdate();
   }
   
   public int getSampleCount() {
-    if (overlayedGraphs.isEmpty())
-      return samples.size();
-    else {
-      int max = samples.size();
-      for (Object o : overlayedGraphs) {
-        max = Math.max(max, getGraphPanelFromOverlayObjectInternal(o).getSampleCount());
-      }
-      return max;
+    int max = 0;
+    for (SampleSet set : sets) {
+      max = Math.max(max, set.samples.size());
     }
+    return max;
   }
   
   public double getMaxSample() {
-    if (overlayedGraphs.isEmpty())
-      return maxSample;
-    else {
-      double max = maxSample;
-      for (Object o : overlayedGraphs) {
-        max = Math.max(max, getGraphPanelFromOverlayObjectInternal(o).getMaxSample());
-      }
-      return max;
+    double max = 0;
+    for (SampleSet set : sets) {
+      max = Math.max(max, set.maxSample);
     }
+    return max;
   }
   
   public double getMinSample() {
-    if (overlayedGraphs.isEmpty())
-      return minSample;
-    else {
-      double min = minSample;
-      for (Object o : overlayedGraphs) {
-        min = Math.min(min, getGraphPanelFromOverlayObjectInternal(o).getMinSample());
-      }
-      return min;
+    double min = 0;
+    for (SampleSet set : sets) {
+      min = Math.min(min, set.minSample);
     }
+    return min;
   }
   
   public double getSample(int ix) {
-    return samples.get(ix);
+    return sets.get(0).samples.get(ix);
   }
   
   public void scrollToSample(int splIx) {
@@ -199,15 +246,15 @@ public abstract class GraphPanel extends JPanel {
   
   public void scrollToSampleY(int splIx) {
     double splVal = 0;
-    if (splIx >= 0 && splIx < samples.size()) splVal = samples.get(splIx);
+    if (splIx >= 0 && splIx < sets.get(0).samples.size()) splVal = sets.get(0).samples.get(splIx);
     scrollToValY(splVal);
   }
   
   public void scrollToValY(double val) {
-    double minGSample = Math.min(0, minSample);
+    double minGSample = Math.min(0, getMinSample());
 
     int origoY = (int)(magVer * - minGSample);
-    double scrollVal = magVer * ( maxSample - minGSample ) - (origoY + val * magVer);
+    double scrollVal = magVer * ( getMaxSample() - minGSample ) - (origoY + val * magVer);
     scrl.getVerticalScrollBar().setValue((int)(scrollVal - getHeight()/2));
   }
   
@@ -298,7 +345,7 @@ public abstract class GraphPanel extends JPanel {
       }
     }
     
-    @ Override
+    @Override
     public void paint(Graphics og) {
       Graphics2D g = (Graphics2D)og;
       g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
@@ -313,22 +360,14 @@ public abstract class GraphPanel extends JPanel {
       double maxSample = getMaxSample();
       double minSample = getMinSample();
 
-      paint(g, samples, graphType,
-          true, true,
-          ww, hh, vpw, vph, vpx, vpy,
-          minSample, maxSample, magHor, magVer,
-          0);
-      if (!overlayedGraphs.isEmpty()) {
-        int c = 1;
-        for (Object o : overlayedGraphs) {
-          GraphPanel gp = getGraphPanelFromOverlayObjectInternal(o);
-          paint(g, gp.samples, gp.graphType,
-              false, false,  
-              ww, hh, vpw, vph, vpx, vpy,
-              minSample, maxSample, magHor, magVer,
-              c % colGraph.length);
-          c++;
-        }
+      int c = 0;
+      for (SampleSet set : sets) {
+        paint(g, set.samples, set.graphType,
+            c == 0, c == 0,  
+            ww, hh, vpw, vph, vpx, vpy,
+            minSample, maxSample, magHor, magVer,
+            c % colGraph.length);
+        c++;
       }
       
       if (dragging) {
@@ -342,22 +381,21 @@ public abstract class GraphPanel extends JPanel {
         g.drawRect(sx, sy, ex-sx, ey-sy);
       }
       
-      if (!overlayedGraphs.isEmpty()) {
+      if (sets.size() > 1) {
         int wwv = Math.max(vpw / 8, 40);
         int hhv = g.getFont().getSize() + 4;
         int xv = vpx + vpw - wwv - 2;
         int yv = vpy + 2;
-          paintLegend(g, "main", xv, yv, wwv, hhv, 0); //TODO
-        int c = 1;
-        for (Object o : overlayedGraphs) {
+        c = 0;
+        for (SampleSet set : sets) {
+          paintLegend(g, set.getUIInfo().getName(), 
+              xv, yv, wwv, hhv, 
+              c % colGraph.length);
           xv -= wwv + 2;
           if (xv < vpx + 100) {
             xv = vpx + vpw - wwv - 2;
             yv += hhv + 2;
           }
-          paintLegend(g, o.toString(), 
-              xv, yv, wwv, hhv, 
-              c % colGraph.length);
           c++;
         }
       }
@@ -589,8 +627,8 @@ public abstract class GraphPanel extends JPanel {
       newMagHor = 
         Math.max(MAG_HOR_MIN, (double)scrl.getViewport().getWidth() / (double)getSampleCount());
     }
-    invokeMagResize(newMagHor, newMagVer, pivot);
-    invokeRepaint();
+    magResize(newMagHor, newMagVer, pivot);
+    repaint();
   }
   public void zoom(double x, double y) {
     Point pivot = new Point(
@@ -604,19 +642,34 @@ public abstract class GraphPanel extends JPanel {
     if (y > 0) {
       newMagVer = y; 
     }
-    invokeMagResize(newMagHor, newMagVer, pivot);
-    invokeRepaint();
-  }
-  
-  void invokeRepaint() {
+    magResize(newMagHor, newMagVer, pivot);
     repaint();
   }
-  
-  void invokeSampleUpdate() {
-    sampleUpdate();
+
+  @Override
+  public void onRemoved(UIO parent, UIO child) {
+    if (child instanceof SampleSet) {
+      removeSampleSet((SampleSet)child);
+    }
+    if (sets.isEmpty()) {
+      child.getUIInfo().removeListener(UIGraphPanel.this);
+      getUIInfo().close();
+    }
   }
-  
-  void invokeMagResize(double newMagHor, double newMagVer, Point pivot) {
-    magResize(newMagHor, newMagVer, pivot);
+
+  @Override
+  public void onAdded(UIO parent, UIO child) {
+  }
+
+  @Override
+  public void onClosed(UIO parent, UIO child) {
+  }
+
+  @Override
+  public void onCreated(UIInfo obj) {
+  }
+
+  @Override
+  public void onEvent(UIO obj, Object event) {
   }
 }

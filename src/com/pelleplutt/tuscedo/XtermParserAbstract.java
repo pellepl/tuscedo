@@ -1043,7 +1043,7 @@ public abstract class XtermParserAbstract implements Lexer.Emitter {
       }
       model.compile();
       model.defineUserSet("0123456789;", 0);
-      model.printTree();
+      //model.printTree();
     }
     term = x;
     lexer = new Lexer(this, 256);

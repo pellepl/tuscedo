@@ -29,9 +29,9 @@ public class ProcessACTextField extends ACTextField implements ProcessHandler {
   Object stdEnterKeyAction;
   Object stdTabKeyAction;
   Object stdEscKeyAction;
-  WorkArea workarea;
+  UIWorkArea workarea;
   
-  public ProcessACTextField(WorkArea workarea) {
+  public ProcessACTextField(UIWorkArea workarea) {
     this.workarea = workarea;
     
     stdUpKeyAction = getInputMap().get(upKey);

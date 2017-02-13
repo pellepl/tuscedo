@@ -13,6 +13,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
@@ -21,28 +22,30 @@ import javax.swing.WindowConstants;
 
 import purejavacomm.CommPortIdentifier;
 
-import com.pelleplutt.tuscedo.ui.DrawPanel;
-import com.pelleplutt.tuscedo.ui.GraphPanel;
-import com.pelleplutt.tuscedo.ui.SimpleTabPane;
-import com.pelleplutt.tuscedo.ui.SimpleTabPane.Tab;
-import com.pelleplutt.tuscedo.ui.WorkArea;
+import com.pelleplutt.tuscedo.ui.UICanvasPanel;
+import com.pelleplutt.tuscedo.ui.UIGraphPanel;
+import com.pelleplutt.tuscedo.ui.UIInfo;
+import com.pelleplutt.tuscedo.ui.UIO;
+import com.pelleplutt.tuscedo.ui.UISimpleTabPane;
+import com.pelleplutt.tuscedo.ui.UISimpleTabPane.Tab;
+import com.pelleplutt.tuscedo.ui.UIWorkArea;
 import com.pelleplutt.util.AppSystem;
 
-public class Tuscedo implements Runnable {
+public class Tuscedo implements Runnable, UIInfo.UIListener {
   Container mainContainer;
   static Tuscedo inst;
   static List<Window> windows = new ArrayList<Window>();
   static volatile int __tabId;
-  static volatile int __ownableId;
+  static volatile int __elementId;
   volatile boolean running = true;
   List <Tickable> tickables = new ArrayList<Tickable>();
-  Map <String, Tab> tabs = new HashMap<String, Tab>();
-  Map <String, Ownable> ownables = new HashMap<String, Ownable>();
+  Map <String, UIInfo> uiobjects = new HashMap<String, UIInfo>();
   
   private Tuscedo() {
     Thread t = new Thread(this, "commonticker");
     t.setDaemon(true);
     t.start();
+    UIInfo.addGlobalListener(this);
   }
   
   public static Tuscedo inst() {
@@ -90,7 +93,7 @@ public class Tuscedo implements Runnable {
     JFrame f = new JFrame();
     f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
     f.getContentPane().setLayout(new BorderLayout());
-    f.getContentPane().setBackground(WorkArea.colGenericBg);
+    f.getContentPane().setBackground(UIWorkArea.colGenericBg);
     f.setSize(600, 400);
     //f.setLocationByPlatform(true); // cannot use this - windows x&y will report 0 until moved
     f.setLocation(100, 100);
@@ -98,7 +101,7 @@ public class Tuscedo implements Runnable {
     
     mainContainer = f.getContentPane();
     TuscedoTabPane tabs = new TuscedoTabPane();
-    tabs.setFont(WorkArea.COMMON_FONT);
+    tabs.setFont(UIWorkArea.COMMON_FONT);
 
     addWorkAreaTab(tabs);
     mainContainer.add(tabs);
@@ -107,65 +110,48 @@ public class Tuscedo implements Runnable {
     f.setVisible(true);
   }
   
-  public String addWorkAreaTab(SimpleTabPane stp) {
-    WorkArea w = new WorkArea();
+  public String addWorkAreaTab(UISimpleTabPane stp) {
+    UIWorkArea w = new UIWorkArea();
     w.build();
-    String tabID = Tuscedo.getTabID();
-    String oID = Tuscedo.getOwnableID();
-    Tab t = stp.createTab(tabID, w);
-    w.setOwner(t);
+    Tab t = stp.createTab("", w);
     stp.selectTab(t);
     w.updateTitle();
     w.setStandardFocus();
-    tabs.put(tabID, t);
-    ownables.put(oID, w);
-    return tabID;
+    return w.getUIInfo().getId();
   }
   
-  public String addGraphTab(SimpleTabPane stp, List<Float> vals) {
-    GraphPanel gp = new GraphPanel() {
-      @Override
-      public GraphPanel getGraphPanelFromOverlayObject(Object o) {
-        Tab t = (Tab)o;
-        return (GraphPanel)t.content;
-      }
-    };
-    String tabID = Tuscedo.getTabID();
-    String oID = Tuscedo.getOwnableID();
-    Tab t = stp.createTab(tabID, gp);
-    gp.setOwner(t);
+  public String addGraphTab(UISimpleTabPane stp) {
+    return addGraphTab(stp, null);
+  }
+  public String addGraphTab(UISimpleTabPane stp, List<Float> vals) {
+    UIGraphPanel gp = new UIGraphPanel("");
+    Tab t = stp.createTab(null, gp);
     stp.selectTab(t);
     if (vals != null) {
       for (float s : vals) gp.addSample(s);
     }
     gp.zoomAll(true, true, new Point());
-    tabs.put(tabID, t);
-    ownables.put(oID, gp);
-    return tabID;
+    return gp.getSampleSet(0).getUIInfo().getId();
   }
   
-  public String addCanvasTab(SimpleTabPane stp, int w, int h) {
-    DrawPanel gp = new DrawPanel(w, h);
-    String tabID = Tuscedo.getTabID();
-    String oID = Tuscedo.getOwnableID();
-    Tab t = stp.createTab(tabID, gp);
-    gp.setOwner(t);
+  public String addCanvasTab(UISimpleTabPane stp, int w, int h) {
+    UICanvasPanel cp = new UICanvasPanel(w, h);
+    Tab t = stp.createTab("CANVAS", cp);
     stp.selectTab(t);
-    tabs.put(tabID, t);
-    ownables.put(oID, gp);
-    return tabID;
+    return cp.getUIInfo().getId();
   }
   
-  public Tab getTab(String id) {
-    return tabs.get(id);
+  public UIInfo getUIObject(String id) {
+    return uiobjects.get(id);
   }
   
-  public class TuscedoTabPane extends SimpleTabPane implements SimpleTabPane.TabListener {
+  public class TuscedoTabPane extends UISimpleTabPane implements UISimpleTabPane.TabListener {
     public TuscedoTabPane() {
+      super();
       this.addTabListener(this);
     }
     @Override
-    public SimpleTabPane onEvacuationCreateTabPane() {
+    public UISimpleTabPane onEvacuationCreateTabPane() {
       TuscedoTabPane ttp = new TuscedoTabPane();
       return ttp;
     }
@@ -176,19 +162,13 @@ public class Tuscedo implements Runnable {
     }
     
     @Override
-    public void onEvacuationNewTab(Tab oldTab, Tab newTab) {
-      tabs.put(oldTab.id, newTab);
-    }
-
-    @Override
-    public void tabRemoved(SimpleTabPane tp, Tab t, Component content) {
-      if (content instanceof WorkArea) {
-        AppSystem.dispose((WorkArea)content);
+    public void tabRemoved(UISimpleTabPane tp, Tab t, Component content) {
+      if (content instanceof UIWorkArea) {
+        AppSystem.dispose((UIWorkArea)content);
       }
-      tabs.remove(t.getID());
     }
     @Override
-    public void tabPaneEmpty(SimpleTabPane pane) {
+    public void tabPaneEmpty(UISimpleTabPane pane) {
       pane.removeTabListener(this);
       Window w = SwingUtilities.getWindowAncestor(pane);
       if (w != null && w.isVisible()) {
@@ -196,10 +176,10 @@ public class Tuscedo implements Runnable {
       }
     }
     @Override
-    public void tabSelected(SimpleTabPane pane, Tab t) {
+    public void tabSelected(UISimpleTabPane pane, Tab t) {
       Component c = t.getContent();
-      if (c instanceof WorkArea) {
-        ((WorkArea)c).onTabSelected(t);
+      if (c instanceof UIWorkArea) {
+        ((UIWorkArea)c).onTabSelected(t);
       }
     }
   }
@@ -251,16 +231,6 @@ public class Tuscedo implements Runnable {
     });
   }
 
-  public static String getTabID() {
-    __tabId++;
-    return "TAB" + __tabId;
-  }
-
-  public static String getOwnableID() {
-    __ownableId++;
-    return "o" + __ownableId;
-  }
-
   @Override
   public void run() {
     while (running) {
@@ -274,5 +244,53 @@ public class Tuscedo implements Runnable {
       }
       AppSystem.sleep(200);
     }
+  }
+
+  @Override
+  public void onRemoved(UIO parent, UIO child) {
+    System.out.println("onRemoved  " + stringify(child.getUIInfo(), 0) + " from " + stringify(parent.getUIInfo(), 0));
+  }
+
+  @Override
+  public void onAdded(UIO parent, UIO child) {
+    System.out.println("onAdded    " + stringify(child.getUIInfo(), 0) + "  to  " + stringify(parent.getUIInfo(), 0));
+  }
+
+  @Override
+  public void onClosed(UIO parent, UIO child) {
+    System.out.println("onClosed   " + 
+      stringify(child.getUIInfo(), 0) + 
+      "  in  " + 
+      (parent == null ? "null":stringify(parent.getUIInfo(), 0)));
+    uiobjects.remove(child.getUIInfo().getId());
+  }
+
+  @Override
+  public void onCreated(UIInfo i) {
+    uiobjects.put(i.getId(), i);
+    System.out.println("onCreated  " + stringify(i, 0));
+  }
+
+  @Override
+  public void onEvent(UIO obj, Object event) {
+  }
+  
+  private String stringify(UIInfo i, int level) {
+    String s ="";
+    while(level-- > 0) s+="  ";
+    return s + i.asString();
+  }
+  private void recurse(UIInfo i, StringBuilder sb, int level) {
+    sb.append(stringify(i, level) + "\n");
+    for (UIInfo c : i.children) recurse(c,sb,level+1);
+  }
+  public String dumpUITree() {
+    StringBuilder sb = new StringBuilder();
+    for (Entry<String, UIInfo> e : uiobjects.entrySet()) {
+      if (e.getValue().getParent() == null) {
+        recurse(e.getValue(), sb, 0);
+      }
+    }
+    return sb.toString();
   }
 }

@@ -32,7 +32,9 @@ import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
-public class SimpleTabPane extends JPanel {
+import com.pelleplutt.tuscedo.ui.UIInfo.UIListener;
+
+public class UISimpleTabPane extends JPanel implements UIO {
   JPanel tabPanel;
   JPanel contentPanel;
   Tab selectedTab;
@@ -43,16 +45,21 @@ public class SimpleTabPane extends JPanel {
   Window dragGhost;
   Window cursorOwner;
 
-  static int __id = 0;
-  final int id;
+  static int __paneid = 0;
   List<Tab> tabs = new ArrayList<Tab>();
   
   List<TabListener> listeners = new ArrayList<TabListener>();
   
-  final static List<SimpleTabPane> panes = new ArrayList<SimpleTabPane>();
+  final static List<UISimpleTabPane> panes = new ArrayList<UISimpleTabPane>();
+  final UIInfo uiinfo;
+  @Override
+  public UIInfo getUIInfo() { return uiinfo; }
 
-  public SimpleTabPane() {
-    id = __id++;
+  public UISimpleTabPane() {
+    uiinfo = new UIInfo(this, "tabpane" + __paneid, "");
+    UIInfo.fireEventOnCreated(uiinfo);
+
+    __paneid++;
     setLayout(new BorderLayout());
     grid = new GridBagLayout();
     tabPanel = new JPanel(grid);
@@ -66,9 +73,9 @@ public class SimpleTabPane extends JPanel {
     add(tabPanel, BorderLayout.NORTH);
     add(contentPanel, BorderLayout.CENTER);
     
-    if (!panes.contains(SimpleTabPane.this)) {
+    if (!panes.contains(UISimpleTabPane.this)) {
       //System.out.println("register tabpane " + id);
-      panes.add(SimpleTabPane.this);
+      panes.add(UISimpleTabPane.this);
     }
   }
   
@@ -84,7 +91,7 @@ public class SimpleTabPane extends JPanel {
     }
   }
   
-  void fireTabRemoved(SimpleTabPane tp, Tab t, Component content) {
+  void fireTabRemoved(UISimpleTabPane tp, Tab t, Component content) {
     List<TabListener> localListeners;
     synchronized (listeners) {
       localListeners = new ArrayList<TabListener>(this.listeners);
@@ -94,7 +101,7 @@ public class SimpleTabPane extends JPanel {
     }
   }
   
-  void fireTabSelected(SimpleTabPane tp, Tab t) {
+  void fireTabSelected(UISimpleTabPane tp, Tab t) {
     List<TabListener> localListeners;
     synchronized (listeners) {
       localListeners = new ArrayList<TabListener>(this.listeners);
@@ -104,7 +111,7 @@ public class SimpleTabPane extends JPanel {
     }
   }
   
-  void fireTabPaneEmpty(SimpleTabPane tp) {
+  void fireTabPaneEmpty(UISimpleTabPane tp) {
     List<TabListener> localListeners;
     synchronized (listeners) {
       localListeners = new ArrayList<TabListener>(this.listeners);
@@ -116,7 +123,7 @@ public class SimpleTabPane extends JPanel {
   
   public static Tab getTabByComponent(Component c) {
     synchronized (panes) {
-      for (SimpleTabPane stp : panes) {
+      for (UISimpleTabPane stp : panes) {
         for (Tab tab : stp.tabs) {
           //System.out.println("check " + tab.id + " in pane " + stp.id);
           if (tab.content == c) {
@@ -138,21 +145,26 @@ public class SimpleTabPane extends JPanel {
     tab.setFont(getFont());
   }
 
-  public Tab createTab(String idAndName, Component c) {
-    contentPanel.add(c, idAndName);
-    Tab tab = new Tab(idAndName);
+  public Tab createTab(String name, Component c) {
+    Tab tab = new Tab(name);
+    contentPanel.add(c, tab.getID());
     decorateTabLabel(tab);
     tabPanel.add(tab);
 
     tab.content = c;
     tabs.add(tab);
+    getUIInfo().addChild(tab);
     tab.owner = this;
+    if (c instanceof UIO) {
+      tab.getUIInfo().addChild(((UIO)c).getUIInfo());
+      (((UIO)c).getUIInfo()).addListener(tab);
+    }
 
     tab.addMouseListener(tabMouseListener);
     tab.addMouseMotionListener(tabMouseListener);
 
     if (selectedTab == null) {
-      selectTab(idAndName);
+      selectTab(tab.getID());
     } else {
       computeLayout();
     }
@@ -166,7 +178,7 @@ public class SimpleTabPane extends JPanel {
   
   Tab getTab(String id) {
     for (Tab t : tabs) {
-      if (t.id.equals(id)) {
+      if (t.getID().equals(id)) {
         return t;
       }
     }
@@ -180,7 +192,7 @@ public class SimpleTabPane extends JPanel {
   int getTabIndex(String id) {
     int i = 0;
     for (Tab t : tabs) {
-      if (t.id.equals(id)) {
+      if (t.getID().equals(id)) {
         return i;
       }
       i++;
@@ -200,7 +212,7 @@ public class SimpleTabPane extends JPanel {
   }
   
   void removeTab(Tab t, boolean fireTab, boolean firePane) {
-    int ix = getTabIndex(t.id);
+    int ix = getTabIndex(t.uiinfo.id);
     if (ix > 0) {
       selectTab(ix - 1);
     } else if (ix < tabs.size()-2) {
@@ -210,6 +222,7 @@ public class SimpleTabPane extends JPanel {
     }
     tabPanel.remove(t);
     tabs.remove(t);
+    t.getUIInfo().close();
     t.owner = null;
 
     if (selectedTab != null) {
@@ -274,7 +287,7 @@ public class SimpleTabPane extends JPanel {
   }
 
   public void selectTab(Tab t) {
-    ((CardLayout) contentPanel.getLayout()).show(contentPanel, t.id);
+    ((CardLayout) contentPanel.getLayout()).show(contentPanel, t.getID());
     if (selectedTab != null) {
       selectedTab.setBackground(Color.darkGray);
       selectedTab.closeButton.setVisible(false);
@@ -297,7 +310,7 @@ public class SimpleTabPane extends JPanel {
     t.setText(title);
   }
 
-  static final Insets __i = new Insets(0, 0, 0, 1);
+  final Insets __i = new Insets(0, 0, 0, 1);
 
   void computeLayout() {
     int gridx = 1;
@@ -312,7 +325,8 @@ public class SimpleTabPane extends JPanel {
       boolean sel = t == selectedTab;
       gridc.gridx = gridx;
       if (sel) {
-        gridc.ipadx = getFontMetrics(getFont()).stringWidth(t.text);
+        String text = t.getText();
+        gridc.ipadx = text == null ? 8 : getFontMetrics(getFont()).stringWidth(text);
       } else {
         gridc.ipadx = 0;
       }
@@ -323,8 +337,8 @@ public class SimpleTabPane extends JPanel {
     tabPanel.revalidate();
   }
   
-  public SimpleTabPane onEvacuationCreateTabPane() {
-    return new SimpleTabPane();
+  public UISimpleTabPane onEvacuationCreateTabPane() {
+    return new UISimpleTabPane();
   }
   
   public void onEvacuationNewWindow(Window w) {
@@ -339,17 +353,30 @@ public class SimpleTabPane extends JPanel {
       w.setLocation(location);
       return;
     }
-    SimpleTabPane newPane = onEvacuationCreateTabPane();
+    
+    List<UIInfo> children = new ArrayList<UIInfo>(tab.getUIInfo().children);
+    for (UIInfo cuio : children) {
+      tab.getUIInfo().removeChild(cuio);
+      cuio.removeListener(tab);
+    }
+
+    UISimpleTabPane.this.removeTab(tab, false, true);
+
+    UISimpleTabPane newPane = onEvacuationCreateTabPane();
     newPane.setFont(getFont());
-    SimpleTabPane.this.removeTab(tab, false, true);
-    Tab newTab = newPane.createTab(tab.id, tab.content);
-    newTab.setText(tab.getText());
+    
+    Tab newTab = newPane.createTab(null, tab.content);
+    for (UIInfo cuio : children) {
+      newTab.getUIInfo().addChild(cuio);
+      cuio.addListener(newTab);
+    }
+    newTab.setText(tab.getUIInfo().getName());
     onEvacuationNewTab(tab, newTab);
     createNewWindow(newPane, SwingUtilities.getWindowAncestor(this).getSize(), 
         location);
   }
   
-  protected void createNewWindow(final SimpleTabPane newPane, Dimension size, Point location) {
+  protected void createNewWindow(final UISimpleTabPane newPane, Dimension size, Point location) {
     JFrame w = new JFrame();//SwingUtilities.getWindowAncestor(this));
     onEvacuationNewWindow(w);
     w.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
@@ -365,7 +392,7 @@ public class SimpleTabPane extends JPanel {
     w.setVisible(true);
   }
   
-  public void addWindowListener(final SimpleTabPane stp, Window w) {
+  public void addWindowListener(final UISimpleTabPane stp, Window w) {
     w.addWindowListener(new WindowAdapter() {
       @Override
       public void windowClosing(WindowEvent e) {
@@ -411,7 +438,7 @@ public class SimpleTabPane extends JPanel {
           }
           
           synchronized (panes) {
-            for (SimpleTabPane pane : panes) {
+            for (UISimpleTabPane pane : panes) {
               Window w = SwingUtilities.getWindowAncestor(pane);
               if (w == null) continue;
               Point p = SwingUtilities.convertPoint(me.getComponent(), me.getPoint(), w);
@@ -452,7 +479,7 @@ public class SimpleTabPane extends JPanel {
           synchronized (panes) {
             boolean relocated = false;
             //System.out.println("relocating tab " + dragSource.id);
-            for (SimpleTabPane pane : panes) {
+            for (UISimpleTabPane pane : panes) {
               //System.out.println("try pane " + pane.id);
               Window w = SwingUtilities.getWindowAncestor(pane);
               if (w == null) continue;
@@ -466,21 +493,35 @@ public class SimpleTabPane extends JPanel {
                   // move within same window
                   if (moveBeforeElseAfter(me, t)) {
                     //System.out.println("move "+dragSource.id+" bef " + t.id);
-                    moveTabBefore(dragSource.id, getTabIndex(t.id));
+                    moveTabBefore(dragSource.uiinfo.id, getTabIndex(t.uiinfo.id));
                   } else {
                     //System.out.println("move "+dragSource.id+" aft " + t.id);
-                    moveTabAfter(dragSource.id, getTabIndex(t.id));
+                    moveTabAfter(dragSource.uiinfo.id, getTabIndex(t.uiinfo.id));
                   }
                 } else {
                   // move to other window
                   //System.out.println("move from pane " + dragSource.owner.id + " to " + t.owner.id);
-                  dragSource.owner.removeTab(dragSource, false, true);
-                  Tab evaTab = t.owner.createTab(dragSource.id, dragSource.content);
-                  evaTab.setText(dragSource.getText());
+                  List<UIInfo> children = new ArrayList<UIInfo>(dragSource.getUIInfo().children);
+
+                  UISimpleTabPane srcowner = dragSource.owner;
+                  
+                  for (UIInfo cuio : children) {
+                    dragSource.getUIInfo().removeChild(cuio);
+                    cuio.removeListener(dragSource);
+                  }
+                  
+                  srcowner.removeTab(dragSource, false, true);
+                  
+                  Tab evaTab = t.owner.createTab(null, dragSource.content);
+                  for (UIInfo cuio : children) {
+                    evaTab.getUIInfo().addChild(cuio);
+                    cuio.addListener(evaTab);
+                  }
+                  evaTab.setText(dragSource.getUIInfo().getName());
                   if (moveBeforeElseAfter(me, t)) {
-                    t.owner.moveTabBefore(evaTab.id, t.owner.getTabIndex(t.id));
+                    t.owner.moveTabBefore(evaTab.uiinfo.id, t.owner.getTabIndex(t.uiinfo.id));
                   } else {
-                    t.owner.moveTabAfter(evaTab.id, t.owner.getTabIndex(t.id));
+                    t.owner.moveTabAfter(evaTab.uiinfo.id, t.owner.getTabIndex(t.uiinfo.id));
                   }
                   t.owner.selectTab(evaTab);
                 }
@@ -499,23 +540,27 @@ public class SimpleTabPane extends JPanel {
     }
   };
 
-  public static class Tab extends JPanel {
+  public static class Tab extends JPanel implements UIO, UIListener {
     public Component content;
-    public SimpleTabPane owner;
-    String text;
-    final public String id;
+    public UISimpleTabPane owner;
     JButton closeButton;
     private int markDrop;
     final static Color colMarkDrop = new Color(255,255,255,64);
+    static int __tabid = 0;
+    final UIInfo uiinfo;
+    @Override
+    public UIInfo getUIInfo() { return uiinfo; }
 
     public Tab(final String n) {
-      text = n;
-      id = n;
+      uiinfo = new UIInfo(this, "tab" + __paneid + "_" + __tabid, n);
+      __tabid++;
+      UIInfo.fireEventOnCreated(uiinfo);
+
       setLayout(new BorderLayout());
       JButton b = new JButton(new AbstractAction("x") {
         @Override
         public void actionPerformed(ActionEvent e) {
-          Tab.this.owner.removeTab(id);
+          Tab.this.owner.removeTab(uiinfo.id);
         }
       });
       b.setContentAreaFilled(false);
@@ -542,11 +587,11 @@ public class SimpleTabPane extends JPanel {
     }
 
     public String getText() {
-      return text;
+      return uiinfo.getFirstName();
     }
     
     public void setText(String t) {
-      text = t;
+      uiinfo.name = t;
       if (owner != null) {
         owner.computeLayout();
       }
@@ -554,14 +599,14 @@ public class SimpleTabPane extends JPanel {
     }
     
     public String getID() {
-      return id;
+      return uiinfo.id;
     }
     
     public Component getContent() {
       return content;
     }
     
-    public SimpleTabPane getPane() {
+    public UISimpleTabPane getPane() {
       return owner;
     }
     
@@ -575,9 +620,15 @@ public class SimpleTabPane extends JPanel {
           RenderingHints.VALUE_ANTIALIAS_ON);
       g.setColor(getForeground());
       g.setFont(getFont());
-      int w = g.getFontMetrics().stringWidth(getText());
-      g.drawString(getText(), Math.max(0, (getWidth() - w) / 2),
-          getFont().getSize());
+      String t = getText();
+      int w;
+      if (t == null) {
+        w = 8;
+      } else {
+        w = g.getFontMetrics().stringWidth(t);
+        g.drawString(t, Math.max(0, (getWidth() - w) / 2),
+            getFont().getSize());
+      }
       paintComponents(g);
       g.setColor(colMarkDrop);
       if (markDrop == 1) {
@@ -591,11 +642,35 @@ public class SimpleTabPane extends JPanel {
     public String toString() {
       return getText();
     }
+
+    @Override
+    public void onRemoved(UIO parent, UIO child) {
+      this.getPane().removeTab(parent.getUIInfo().getId());
+      child.getUIInfo().removeListener(Tab.this);
+    }
+
+    @Override
+    public void onAdded(UIO parent, UIO child) {
+    }
+
+    @Override
+    public void onClosed(UIO parent, UIO child) {
+      this.getPane().removeTab(parent.getUIInfo().getId());
+      child.getUIInfo().removeListener(Tab.this);
+    }
+
+    @Override
+    public void onCreated(UIInfo obj) {
+    }
+
+    @Override
+    public void onEvent(UIO obj, Object event) {
+    }
   } // class Tab
   
   public interface TabListener {
-    public void tabRemoved(SimpleTabPane tp, Tab t, Component content);
-    public void tabPaneEmpty(SimpleTabPane pane);
-    public void tabSelected(SimpleTabPane pane, Tab t);
+    public void tabRemoved(UISimpleTabPane tp, Tab t, Component content);
+    public void tabPaneEmpty(UISimpleTabPane pane);
+    public void tabSelected(UISimpleTabPane pane, Tab t);
   }
 }

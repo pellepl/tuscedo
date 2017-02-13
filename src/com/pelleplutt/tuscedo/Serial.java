@@ -11,7 +11,7 @@ import java.util.List;
 
 import javax.swing.SwingUtilities;
 
-import com.pelleplutt.tuscedo.ui.WorkArea;
+import com.pelleplutt.tuscedo.ui.UIWorkArea;
 import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.io.Port;
 import com.pelleplutt.util.io.PortConnector;
@@ -31,9 +31,9 @@ public class Serial implements SerialStreamProvider, Tickable {
   byte serialBuf[] = new byte[256*64];
   volatile int serialBufIx = 0;
   
-  WorkArea area;
+  UIWorkArea area;
   
-  public Serial(WorkArea area) {
+  public Serial(UIWorkArea area) {
     this.area = area;
     serial = PortConnector.getPortConnector();
   }

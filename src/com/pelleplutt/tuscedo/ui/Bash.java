@@ -32,9 +32,9 @@ public class Bash implements ProcessGroup.ProcessConsole {
   SerialStreamProvider serialProvider;
   int lastReturnCode = 0;
   List<ProcessGroup> activeProcessGroups = new ArrayList<ProcessGroup>();
-  WorkArea area;
+  UIWorkArea area;
 
-  public Bash(ProcessHandler ph, Console c, SerialStreamProvider ssp, WorkArea area) {
+  public Bash(ProcessHandler ph, Console c, SerialStreamProvider ssp, UIWorkArea area) {
     handler = ph;
     console = c;
     pwd = new File(".");

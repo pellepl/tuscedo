@@ -52,7 +52,6 @@ import com.pelleplutt.Essential;
 import com.pelleplutt.operandi.proc.Processor;
 import com.pelleplutt.operandi.proc.Processor.M;
 import com.pelleplutt.tuscedo.OperandiScript;
-import com.pelleplutt.tuscedo.Ownable;
 import com.pelleplutt.tuscedo.ProcessGroup;
 import com.pelleplutt.tuscedo.ProcessGroupInfo;
 import com.pelleplutt.tuscedo.Serial;
@@ -76,7 +75,7 @@ import com.pelleplutt.util.io.Port;
  *  
  * @author petera
  */
-public class WorkArea extends JPanel implements Disposable, Ownable {
+public class UIWorkArea extends JPanel implements Disposable, UIO {
   static final int ISTATE_INPUT = 0;
   static final int ISTATE_FIND = 1;
   static final int ISTATE_FIND_REGEX = 2;
@@ -213,12 +212,18 @@ public class WorkArea extends JPanel implements Disposable, Ownable {
   
   JWindow winSug;
   JList<String> winSugList;
-  public Object owner;
-  public Object getOwner() {return owner;}
-  public void setOwner(Object o) {owner = o;}
+  final UIInfo uiinfo;
+  static int __id = 0;
+  
+  public UIInfo getUIInfo() {
+    return uiinfo;
+  }
+  
+  public UIWorkArea() {
+    uiinfo = new UIInfo(this, "workarea" + __id, "");
+    UIInfo.fireEventOnCreated(uiinfo);
 
-
-  public WorkArea() {
+    __id++;
     settings = Settings.inst();
     serial = new Serial(this);
     script = new OperandiScript();
@@ -475,7 +480,7 @@ public class WorkArea extends JPanel implements Disposable, Ownable {
         title = titleConn.length() > 0 ? titleConn + "|" : ""; 
         title += titlePwd;
         title += titleCmd.length() > 0 ? ":" + titleCmd : "";
-        SimpleTabPane.Tab t = SimpleTabPane.getTabByComponent(WorkArea.this);
+        UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent(UIWorkArea.this);
         if (t != null) {
           if (istate == ISTATE_BASH) {
             title = "[BASH] " + title;
@@ -863,9 +868,9 @@ public class WorkArea extends JPanel implements Disposable, Ownable {
 
   void actionFind(boolean shift, boolean regex) {
     if (istate != ISTATE_FIND && !regex) {
-      WorkArea.this.enterInputState(ISTATE_FIND);
+      UIWorkArea.this.enterInputState(ISTATE_FIND);
     } else if (istate != ISTATE_FIND_REGEX && regex) {
-      WorkArea.this.enterInputState(ISTATE_FIND_REGEX);
+      UIWorkArea.this.enterInputState(ISTATE_FIND_REGEX);
     } else {
       handleFind(input[istate].getText(), shift, regex);
     }
@@ -873,18 +878,18 @@ public class WorkArea extends JPanel implements Disposable, Ownable {
   
   void actionHex(boolean shift) {
     if (istate != ISTATE_HEX) {
-      WorkArea.this.enterInputState(ISTATE_HEX);
+      UIWorkArea.this.enterInputState(ISTATE_HEX);
     }
   }
   
   void actionScript(boolean shift) {
     if (istate != ISTATE_HEX) {
-      WorkArea.this.enterInputState(ISTATE_SCRIPT);
+      UIWorkArea.this.enterInputState(ISTATE_SCRIPT);
     }
   }
   
   void actionBash() {
-    WorkArea.this.enterInputState(ISTATE_BASH);
+    UIWorkArea.this.enterInputState(ISTATE_BASH);
   }
   
   
@@ -977,8 +982,8 @@ public class WorkArea extends JPanel implements Disposable, Ownable {
   }
   
   void closeTab() {
-    SimpleTabPane.Tab t = SimpleTabPane.getTabByComponent(this); 
-    SimpleTabPane stp = t.getPane();
+    UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent(this); 
+    UISimpleTabPane stp = t.getPane();
     stp.removeTab(t);
   }
   
@@ -1099,7 +1104,7 @@ public class WorkArea extends JPanel implements Disposable, Ownable {
         input[istate].setText("");
         input[istate].resetLastSuggestionIndex();
       } else {
-        WorkArea.this.enterInputState(ISTATE_INPUT);
+        UIWorkArea.this.enterInputState(ISTATE_INPUT);
       }
       onKeyEsc(e);
     }
@@ -1159,7 +1164,7 @@ public class WorkArea extends JPanel implements Disposable, Ownable {
     @Override
     public void actionPerformed(ActionEvent e) {
       Tuscedo.inst().addWorkAreaTab(
-          SimpleTabPane.getTabByComponent(WorkArea.this).getPane());
+          UISimpleTabPane.getTabByComponent(UIWorkArea.this).getPane());
     }
   };
 
@@ -1305,7 +1310,7 @@ public class WorkArea extends JPanel implements Disposable, Ownable {
   
   public void onLinkedProcess(ProcessACTextField tf, ProcessGroup process) {
     Log.println("link process " + process.toString());
-    tf.setBackground(WorkArea.colInputBashBg);
+    tf.setBackground(UIWorkArea.colInputBashBg);
     Bash bash = ((ProcessGroupInfo)process.getUserData()).bash;
     ((XtermTerminal)bash.console).reviveScreenBuffer(process);
     updateTitle();
@@ -1317,20 +1322,20 @@ public class WorkArea extends JPanel implements Disposable, Ownable {
       Bash bash = ((ProcessGroupInfo)process.getUserData()).bash;
       ((XtermTerminal)bash.console).forceOriginalScreenBuffer();
     }
-    tf.setBackground(WorkArea.colInputBg);
+    tf.setBackground(UIWorkArea.colInputBg);
     updateTitle();
   }
   
   public void onScriptStart(Processor proc) {
-    input[ISTATE_SCRIPT].setBackground(WorkArea.colInputBashBg);
+    input[ISTATE_SCRIPT].setBackground(UIWorkArea.colInputBashBg);
   }
 
   public void onScriptStop(Processor proc) {
-    input[ISTATE_SCRIPT].setBackground(WorkArea.colInputBg);
+    input[ISTATE_SCRIPT].setBackground(UIWorkArea.colInputBg);
   }
 
   
-  public void onTabSelected(SimpleTabPane.Tab t) {
+  public void onTabSelected(UISimpleTabPane.Tab t) {
     setStandardFocus();
   }
   

@@ -1,11 +1,11 @@
 package com.pelleplutt.tuscedo.model;
 
-import com.pelleplutt.tuscedo.ui.WorkArea;
+import com.pelleplutt.tuscedo.ui.UIWorkArea;
 
 public class WorkAreaVariable extends Variable {
-  WorkArea area;
+  UIWorkArea area;
 
-  public WorkAreaVariable(String name, WorkArea value) {
+  public WorkAreaVariable(String name, UIWorkArea value) {
     super(name, value);
     this.area = value;
   }

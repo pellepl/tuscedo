@@ -13,19 +13,24 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JViewport;
 
-import com.pelleplutt.tuscedo.Ownable;
-
-public class DrawPanel extends JPanel implements Ownable {
+public class UICanvasPanel extends JPanel implements UIO {
   volatile BufferedImage pri, sec;
   JScrollPane scrl;
   Renderer renderer;
   Graphics2D g;
   Color color = Color.black;
-  public Object owner;
-  public Object getOwner() {return owner;}
-  public void setOwner(Object o) {owner = o;}
+  final UIInfo uiinfo;
+  static int __id = 0;
+  
+  public UIInfo getUIInfo() {
+    return uiinfo;
+  }
+  
+  public UICanvasPanel(int w, int h) {
+    uiinfo = new UIInfo(this, "canvas" + __id, "");
+    UIInfo.fireEventOnCreated(uiinfo);
 
-  public DrawPanel(int w, int h) {
+    __id++;
     pri = new BufferedImage(w, h, BufferedImage.TYPE_4BYTE_ABGR);
     sec = new BufferedImage(w, h, BufferedImage.TYPE_4BYTE_ABGR);
     Renderer renderer = new Renderer();
@@ -36,11 +41,12 @@ public class DrawPanel extends JPanel implements Ownable {
     scrl = new JScrollPane(renderer, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, 
         JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
     scrl.getViewport().setScrollMode(JViewport.SIMPLE_SCROLL_MODE); // fix artefacts 
-    WorkArea.decorateScrollPane(scrl);
+    UIWorkArea.decorateScrollPane(scrl);
     setLayout(new BorderLayout());
     add(scrl, BorderLayout.CENTER);
   }
-  
+
+
   Graphics2D _g;
   private Graphics2D getSecGraphics() {
     if (_g == null) {

@@ -8,13 +8,13 @@ import com.pelleplutt.operandi.proc.MSet;
 import com.pelleplutt.operandi.proc.Processor;
 import com.pelleplutt.operandi.proc.Processor.M;
 import com.pelleplutt.operandi.proc.ProcessorError;
-import com.pelleplutt.tuscedo.ui.WorkArea;
+import com.pelleplutt.tuscedo.ui.UIWorkArea;
 
 public class MSerial implements MSet {
-  WorkArea workarea;
+  UIWorkArea workarea;
   Map<String, M> map = new HashMap<String, M>();
   
-  public MSerial(WorkArea wa, com.pelleplutt.operandi.Compiler comp) {
+  public MSerial(UIWorkArea wa, com.pelleplutt.operandi.Compiler comp) {
     this.workarea = wa;
     addFunc("info", OperandiScript.FN_SERIAL_INFO, comp);
     addFunc("disconnect", OperandiScript.FN_SERIAL_DISCONNECT, comp);
