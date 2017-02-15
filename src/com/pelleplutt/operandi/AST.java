@@ -454,7 +454,7 @@ public class AST implements Lexer.Emitter {
   void onParenthesisOpen(int tokix) {
     if (!exprs.isEmpty() && prevTokix != OP_FOR && prevTokix != OP_IF && prevTokix != OP_RETURN && 
           (exprs.peek().op == OP_ADEREF && prevTokix == OP_BRACKETC ||
-          exprs.peek().op == OP_CALL && opers.peek().id != OP_CALL || 
+          exprs.peek().op == OP_CALL && !opers.isEmpty() && opers.peek().id != OP_CALL || 
           prevPrevTokix == OP_DOT)) {
       if (prevPrevTokix == OP_DOT) collapseStack(OP_DOT);
 
@@ -519,7 +519,7 @@ public class AST implements Lexer.Emitter {
         }
       }
       if (!checkFuncFound) {
-        throw new CompilerError("fatal, collected args but no func");
+        throw new CompilerError("fatal, collected args but no func", exprs.isEmpty()? null : exprs.peek());
       }
     } else if (endedAtTokix == OP_FUNCDEF) {
       // collect arguments to func def
@@ -537,10 +537,10 @@ public class AST implements Lexer.Emitter {
         }
       }
       if (!checkFuncFound) {
-        throw new CompilerError("fatal, collected args but no func def");
+        throw new CompilerError("fatal, collected args but no func def", exprs.isEmpty()? null : exprs.peek());
       }
     } else {
-      throw new CompilerError("missing left parenthesis");
+      throw new CompilerError("missing left parenthesis", exprs.isEmpty()? null : exprs.peek());
     }
   }
   

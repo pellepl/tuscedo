@@ -65,6 +65,7 @@ public class Processor implements ByteCode {
   M zeroM = new M(0);
   String[] args;
   int nestedIRQ;
+  IRQHandler irqHandler;
   
   public Processor(int memorySize) {
     nilM.type = TNIL;
@@ -86,6 +87,10 @@ public class Processor implements ByteCode {
   public Processor(int memorySize, Executable exe) {
     this(memorySize);
     setExe(exe);
+  }
+  
+  public void setIRQHandler(IRQHandler l) {
+    irqHandler = l;
   }
   
   public Executable getExecutable() {
@@ -1384,6 +1389,7 @@ public class Processor implements ByteCode {
         fp &= ~0x80000000;
         pop_sr();
         nestedIRQ--;
+        if (irqHandler != null) irqHandler.leftIRQ(oldpc);
       }
     }
 
@@ -1479,6 +1485,7 @@ public class Processor implements ByteCode {
   }
 
   void stepProc() {
+    if (irqHandler != null) irqHandler.step(pc);
     oldpc = pc;
     int instr;
     if (sp < exe.getStackTop()) {

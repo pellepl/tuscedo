@@ -35,7 +35,7 @@ import com.pelleplutt.operandi.proc.ExtCall;
 
 
 public class Compiler {
-  static final int VERSION = 0x00000001;
+  public static final int VERSION = 0x00000001;
   
   static Source src;
   static int stringix = 0;

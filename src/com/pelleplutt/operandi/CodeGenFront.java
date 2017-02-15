@@ -561,7 +561,7 @@ public class CodeGenFront {
     
     else if (AST.isOperator(e.op)) {
       if (!AST.isAssignOperator(e.op)) {
-        if (AST.isUnaryOperator(e.op)) {
+        if (AST.isUnaryOperator(e.op) || e.op == OP_CALL) {
           genIRAssignment(e.operands.get(0), parentEblk, info);
           TAC operand = genIR(e.operands.get(0), parentEblk, info);  
           setReferenced(operand);
@@ -610,7 +610,7 @@ public class CodeGenFront {
       TACLabel lExit = new TACLabel(e, label+"_ifend");
       if (!hasElse) {
         TAC cond = genIR(e.operands.get(0), parentEblk, info);
-        if (AST.isUnaryOperator(cond.op)) setReferenced(cond);
+        if (AST.isUnaryOperator(cond.op) || cond.op == OP_CALL) setReferenced(cond);
         TAC iffalsegoto = new TACGotoCond(e, cond, lExit, false);
         add(iffalsegoto);
         newBlock();
@@ -625,7 +625,7 @@ public class CodeGenFront {
       } else {
         TACLabel lElse = new TACLabel(e, label+"_ifelse");
         TAC cond = genIR(e.operands.get(0), parentEblk, info);
-        if (AST.isUnaryOperator(cond.op)) setReferenced(cond);
+        if (AST.isUnaryOperator(cond.op) || cond.op == OP_CALL) setReferenced(cond);
         TAC iffalsegoto = new TACGotoCond(e, cond, lElse, false);
         add(iffalsegoto);
         newBlock();
@@ -676,7 +676,7 @@ public class CodeGenFront {
         add(lLoop);
         // conditional : y
         TAC cond = genIR(e.operands.get(1), parentEblk, info);
-        if (AST.isUnaryOperator(cond.op)) setReferenced(cond);
+        if (AST.isUnaryOperator(cond.op) || cond.op == OP_CALL) setReferenced(cond);
         TAC iffalsegoto = new TACGotoCond(e, cond, lExit, false);
         add(iffalsegoto);
         newBlock();
@@ -749,7 +749,7 @@ public class CodeGenFront {
         add(_len_set);
         setReferenced(_len_set);
         TAC cond = new TACOp(e, AST.OP_LT, _iter, _len_set);
-        if (AST.isUnaryOperator(cond.op)) setReferenced(cond);
+        if (AST.isUnaryOperator(cond.op) || cond.op == OP_CALL) setReferenced(cond);
         add(cond);
         TACGotoCond iffalsegoto = new TACGotoCond(e, cond, lExit, false);
         iffalsegoto.condOp = AST.OP_LT;
@@ -813,7 +813,7 @@ public class CodeGenFront {
       newBlock();
       add(lLoop);
       TAC cond = genIR(e.operands.get(0), parentEblk, info);
-      if (AST.isUnaryOperator(cond.op)) setReferenced(cond);
+      if (AST.isUnaryOperator(cond.op) || cond.op == OP_CALL) setReferenced(cond);
       TAC iffalsegoto = new TACGotoCond(e, cond, lExit, false);
       add(iffalsegoto);
       newBlock();

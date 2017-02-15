@@ -87,7 +87,6 @@ public class Anonymous {
       "s += adder_100(2) + ' ' + adder_200(2) + ' ';\n"+
       "return s;\n" +
       "";
-    Linker.dbg = true;
     assertEquals("111 211 122 222 ", Processor.compileAndRun(false, false, sA).asString()); 
   }
 }

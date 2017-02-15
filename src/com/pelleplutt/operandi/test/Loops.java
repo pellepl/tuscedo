@@ -170,4 +170,24 @@ public class Loops {
         "";
     assertEquals("[0, 0, 16, 32, 48, 1, 0, 16, 32, 48, 2, 0, 16, 32, 48, 3, 4, 5]", Processor.compileAndRun(false, false, sA).str); 
   }
+  @Test
+  public void testWhileFunc() {
+    String sA;
+    sA = 
+        "a = 10;\n" +
+        "func have_more() {\n" +
+        "  return a > 0;" +
+        "}\n" +
+        "func get_next() {\n" +
+        "  return a--;" +
+        "}\n" +
+        "s;\n" +
+        "while(have_more()) {\n" +
+        "  s += get_next() + ' ';\n" +
+        "}\n" +
+        "return s;\n" + 
+        "";
+    CodeGenBack.dbg = true;
+    assertEquals("10 9 8 7 6 5 4 3 2 1 ", Processor.compileAndRun(false, false, sA).str); 
+  }
 }
