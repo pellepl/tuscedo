@@ -755,6 +755,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
         }
         input[istate].setText("");
       } else {
+        // shift + enter
         input[istate].setFilterNewLine(false);
         try {
           input[istate].getDocument().insertString(input[istate].getCaretPosition(), "\n", null);
@@ -982,9 +983,11 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   }
   
   void closeTab() {
-    UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent(this); 
-    UISimpleTabPane stp = t.getPane();
-    stp.removeTab(t);
+    if (input[istate].getText().equals("")) {
+      UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent(this); 
+      UISimpleTabPane stp = t.getPane();
+      stp.removeTab(t);
+    }
   }
   
   void openSerialConfig() {
@@ -1347,6 +1350,9 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       winSugList.setSelectedIndex(winSugList.getSelectedIndex()-1);
       winSugList.ensureIndexIsVisible(winSugList.getSelectedIndex());
       return false;
+    } else if (istate == ISTATE_SCRIPT && input[istate].getText().contains("\n")) {
+      input[istate].generateOriginalUpKeyPress(e);
+      return false;
     }
     return true;
   }
@@ -1355,6 +1361,9 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     if (winSug.isVisible()) {
       winSugList.setSelectedIndex(winSugList.getSelectedIndex()+1);
       winSugList.ensureIndexIsVisible(winSugList.getSelectedIndex());
+      return false;
+    } else if (istate == ISTATE_SCRIPT && input[istate].getText().contains("\n")) {
+      input[istate].generateOriginalDownKeyPress(e);
       return false;
     }
     return true;

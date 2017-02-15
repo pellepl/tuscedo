@@ -52,6 +52,14 @@ public class ACTextField extends JTextPane implements CaretListener {
   
   volatile boolean filterNewLine;
   
+  Object stdUpKeyAction;
+  Object stdDownKeyAction;
+  Object stdTabKeyAction;
+
+  static final KeyStroke upKey = KeyStroke.getKeyStroke(KeyEvent.VK_UP, 0);
+  static final KeyStroke downKey = KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0);
+  static final KeyStroke tabKey = KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0);
+  
   public ACTextField() {
     setDocument(new DefaultStyledDocument());
     ((AbstractDocument)getDocument()).setDocumentFilter(filter);
@@ -60,9 +68,13 @@ public class ACTextField extends JTextPane implements CaretListener {
     
     addCaretListener(this);
     
-    getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_UP, 0), "prevsug");
-    getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0), "nextsug");
-    getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0), "acceptsug");
+    stdUpKeyAction = getInputMap().get(upKey);
+    stdDownKeyAction = getInputMap().get(downKey);
+    stdTabKeyAction = getInputMap().get(tabKey);
+
+    getInputMap().put(upKey, "prevsug");
+    getInputMap().put(downKey, "nextsug");
+    getInputMap().put(tabKey, "acceptsug");
 
     ActionMap actionMap = getActionMap();
     actionMap.put("prevsug", actionPrevSuggestion);
@@ -78,6 +90,16 @@ public class ACTextField extends JTextPane implements CaretListener {
     userModel = new Model();
     userModel.index = -1;
     filterNewLine = true;
+  }
+  
+  public void generateOriginalUpKeyPress(ActionEvent e) {
+    getActionMap().get(stdUpKeyAction).actionPerformed(e);
+  }
+  public void generateOriginalDownKeyPress(ActionEvent e) {
+    getActionMap().get(stdDownKeyAction).actionPerformed(e);
+  }
+  public void generateOriginalTabKeyPress(ActionEvent e) {
+    getActionMap().get(stdTabKeyAction).actionPerformed(e);
   }
   
   /**

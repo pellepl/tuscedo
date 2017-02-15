@@ -82,6 +82,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     static int __id = 0;
     final UIInfo uiinfo;
     public UIInfo getUIInfo() {return uiinfo;}
+    double mul = 1.0;
     
     public SampleSet(String name) {
       uiinfo = new UIInfo(this, "samples" + __id, name);
@@ -96,9 +97,9 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     
     public void addSample(double sample)  {
       addSampleInternal(sample);
-      UIO anc = uiinfo.getAncestorUI();
-      if (anc != null && anc instanceof UIGraphPanel) {
-        ((UIGraphPanel)anc).sampleUpdate();
+      UIInfo par = getUIInfo().getParent();
+      if (par != null && par.getUI() instanceof UIGraphPanel) {
+        ((UIGraphPanel)par.getUI()).sampleUpdate();
       }
     }
 
@@ -106,9 +107,9 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       for (double d : samples) {
         addSampleInternal(d);
       }
-      UIO anc = uiinfo.getAncestorUI();
-      if (anc != null && anc instanceof UIGraphPanel) {
-        ((UIGraphPanel)anc).sampleUpdate();
+      UIInfo par = getUIInfo().getParent();
+      if (par != null && par.getUI() instanceof UIGraphPanel) {
+        ((UIGraphPanel)par.getUI()).sampleUpdate();
       }
     }
 
@@ -125,12 +126,46 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     public double getSample(int ix) {
       return samples.get(ix);
     }
+    
+    public double getMin() {
+      return minSample;
+    }
+
+    public double getMax() {
+      return maxSample;
+    }
+    
+    public void scrollToSample(int splIx) {
+      UIInfo par = getUIInfo().getParent();
+      if (par != null && par.getUI() instanceof UIGraphPanel) {
+        ((UIGraphPanel)par.getUI()).scrollToSampleX(splIx);
+        scrollToSampleY(splIx);
+      }
+    }
+    
+    public void scrollToSampleY(int splIx) {
+      UIInfo par = getUIInfo().getParent();
+      if (par != null && par.getUI() instanceof UIGraphPanel) {
+        double splVal = 0;
+        if (splIx >= 0 && splIx < samples.size()) splVal = samples.get(splIx);
+        ((UIGraphPanel)par.getUI()).scrollToValY(splVal);
+      }
+    }
+    
 
     @Override
     public void repaint() {
       UIInfo par = getUIInfo().getParent();
       if (par != null) {
         par.getUI().repaint();
+      }
+    }
+
+    public void setMultiplier(double mul) {
+      this.mul = mul;
+      UIInfo par = getUIInfo().getParent();
+      if (par != null && par.getUI() instanceof UIGraphPanel) {
+        ((UIGraphPanel)par.getUI()).sampleUpdate();
       }
     }
   }
@@ -217,7 +252,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   public double getMaxSample() {
     double max = 0;
     for (SampleSet set : sets) {
-      max = Math.max(max, set.maxSample);
+      max = Math.max(max, set.maxSample * set.mul);
     }
     return max;
   }
@@ -225,29 +260,15 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   public double getMinSample() {
     double min = 0;
     for (SampleSet set : sets) {
-      min = Math.min(min, set.minSample);
+      min = Math.min(min, set.minSample * set.mul);
     }
     return min;
   }
   
-  public double getSample(int ix) {
-    return sets.get(0).samples.get(ix);
-  }
-  
-  public void scrollToSample(int splIx) {
-    scrollToSampleX(splIx);
-    scrollToSampleY(splIx);
-  }
   public void scrollToSampleX(int splIx) {
     int vpw = scrl.getViewport().getWidth();
     double scrollVal = ((double)(splIx) * magHor - vpw/2);
     scrl.getHorizontalScrollBar().setValue((int)(scrollVal));
-  }
-  
-  public void scrollToSampleY(int splIx) {
-    double splVal = 0;
-    if (splIx >= 0 && splIx < sets.get(0).samples.size()) splVal = sets.get(0).samples.get(splIx);
-    scrollToValY(splVal);
   }
   
   public void scrollToValY(double val) {
@@ -271,7 +292,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     }
     
     public void paint(Graphics2D g,
-        List<Double> samples, int graphType,
+        List<Double> samples, double mul, int graphType,
         boolean paintClear, boolean paintGrid,
         int ww, int hh, int vpw, int vph, int vpx, int vpy,
         double minSample, double maxSample, double magHor, double magVer,
@@ -334,13 +355,13 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       g.setColor(colGraph[colIx]);
       switch (graphType) {
       case GRAPH_BAR:
-        paintGraphBar(g, samples, minGSample, origoY, startSample, endSample, vpx, vpw, hh, colIx);
+        paintGraphBar(g, samples, mul, minGSample, origoY, startSample, endSample, vpx, vpw, hh, colIx);
         break;
       case GRAPH_LINE:
-        paintGraphLine(g, samples, minGSample, origoY, startSample, endSample, vpx, vpw, hh, colIx);
+        paintGraphLine(g, samples, mul, minGSample, origoY, startSample, endSample, vpx, vpw, hh, colIx);
         break;
       case GRAPH_PLOT:
-        paintGraphPlot(g, samples, minGSample, origoY, startSample, endSample, vpx, vpw, hh, colIx);
+        paintGraphPlot(g, samples, mul, minGSample, origoY, startSample, endSample, vpx, vpw, hh, colIx);
         break;
       }
     }
@@ -362,7 +383,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
 
       int c = 0;
       for (SampleSet set : sets) {
-        paint(g, set.samples, set.graphType,
+        paint(g, set.samples, set.mul, set.graphType,
             c == 0, c == 0,  
             ww, hh, vpw, vph, vpx, vpy,
             minSample, maxSample, magHor, magVer,
@@ -414,12 +435,12 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       g.setClip(_clipR);
     }
     
-    void paintGraphBar(Graphics2D g, List<Double> samples, double minGSample, int origoY, int startSample, int endSample, 
+    void paintGraphBar(Graphics2D g, List<Double> samples, double mul, double minGSample, int origoY, int startSample, int endSample, 
         int vpx, int vpw, int hh, int colIx) {
       int gw = (int)(magHor);
       for (int i = startSample; i <= endSample; i++) {
         int gx = (int)(i * magHor);
-        int gy = hh - (int)(magVer * (samples.get(i) - minGSample));
+        int gy = hh - (int)(magVer * (samples.get(i) * mul - minGSample));
         int ymin = hh - origoY;
         int ymax = gy;
         if (ymax < ymin) {
@@ -440,10 +461,10 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     
     int fillPX[] = new int[4];
     int fillPY[] = new int[4];
-    void paintGraphLine(Graphics2D g, List<Double> samples, double minGSample, int origoY, int startSample, int endSample, 
+    void paintGraphLine(Graphics2D g, List<Double> samples, double mul, double minGSample, int origoY, int startSample, int endSample, 
         int vpx, int vpw, int hh, int colIx) {
       if (startSample >= samples.size()) return;
-      int prevGAvgY = hh - (int)(magVer * (samples.get(Math.max(0, startSample-1)) - minGSample));
+      int prevGAvgY = hh - (int)(magVer * (samples.get(Math.max(0, startSample-1)) * mul - minGSample));
       int prevGMinY = prevGAvgY;
       int prevGMaxY = prevGAvgY;
       int prevGX = (int)(startSample * magHor);
@@ -455,7 +476,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       
       for (int i = startSample; i <= endSample; i++) {
         gx = (int)(i * magHor);
-        double s = samples.get(i);
+        double s = samples.get(i) * mul;
         vmin = s < vmin ? s : vmin;
         vmax = s > vmax ? s : vmax;
         vsum += s;
@@ -484,11 +505,11 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       }
     }
     
-    void paintGraphPlot(Graphics2D g, List<Double> samples, double minGSample, int origoY, int startSample, int endSample, 
+    void paintGraphPlot(Graphics2D g, List<Double> samples, double mul, double minGSample, int origoY, int startSample, int endSample, 
         int vpx, int vpw, int hh, int colIx) {
       for (int i = startSample; i <= endSample; i++) {
         int gx = (int)(i * magHor);
-        int gy = hh - (int)(magVer * (samples.get(i) - minGSample));
+        int gy = hh - (int)(magVer * (samples.get(i) * mul - minGSample));
         g.fillRect(gx-1, gy-1, 3,3);
       }
     }

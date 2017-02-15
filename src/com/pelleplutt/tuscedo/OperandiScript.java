@@ -1,6 +1,7 @@
 package com.pelleplutt.tuscedo;
 
 import java.awt.Point;
+import java.awt.Window;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
@@ -10,11 +11,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.swing.SwingUtilities;
+
 import com.pelleplutt.Essential;
 import com.pelleplutt.operandi.Compiler;
 import com.pelleplutt.operandi.CompilerError;
 import com.pelleplutt.operandi.Executable;
 import com.pelleplutt.operandi.Source;
+import com.pelleplutt.operandi.proc.ByteCode;
 import com.pelleplutt.operandi.proc.ExtCall;
 import com.pelleplutt.operandi.proc.MListMap;
 import com.pelleplutt.operandi.proc.MSet;
@@ -22,7 +26,8 @@ import com.pelleplutt.operandi.proc.Processor;
 import com.pelleplutt.operandi.proc.Processor.M;
 import com.pelleplutt.operandi.proc.ProcessorError;
 import com.pelleplutt.operandi.proc.ProcessorError.ProcessorFinishedError;
-import com.pelleplutt.tuscedo.ui.GraphPanel;
+import com.pelleplutt.tuscedo.Tuscedo.TuscedoTabPane;
+import com.pelleplutt.tuscedo.ui.UICanvasPanel;
 import com.pelleplutt.tuscedo.ui.UIGraphPanel;
 import com.pelleplutt.tuscedo.ui.UIGraphPanel.SampleSet;
 import com.pelleplutt.tuscedo.ui.UIInfo;
@@ -41,6 +46,16 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_SERIAL_ON_RX = "__serial_on_rx";
   public static final String FN_SERIAL_ON_RX_CLEAR = "__serial_on_rx_clear";
   public static final String FN_SERIAL_ON_RX_LIST = "__serial_on_rx_list";
+  
+  public static final String KEY_UI_ID = ".uio_id";
+  public static final String FN_UI_CLOSE = "__ui_close";
+  public static final String FN_UI_GET_NAME = "__ui_get_name";
+  public static final String FN_UI_SET_NAME = "__ui_set_name";
+  public static final String FN_UI_GET_ID = "__ui_get_id";
+  public static final String FN_UI_GET_ANCESTOR = "__ui_ancestor";
+  public static final String FN_UI_GET_PARENT = "__ui_parent";
+  public static final String FN_UI_GET_CHILDREN = "__ui_children";
+
   Executable exe, pexe;
   Compiler comp;
   Processor proc;
@@ -52,27 +67,23 @@ public class OperandiScript implements Runnable, Disposable {
   volatile boolean halted;
   List<RunRequest> q = new ArrayList<RunRequest>();
   String lastSrcDbg;
-  
-//  // after compile and setExe
-//  M fiskorv = new Processor.M(new MListMap());
-//  M fiskorvEntry = new Processor.M(comp.getLinker().lookupFunctionAddress("println"));
-//  fiskorvEntry.type = Processor.TFUNC;
-//  fiskorv.ref.put("fu", fiskorvEntry);
-//  int fiskorvAddr = comp.getLinker().lookupVariableAddress(null, "fiskorv");
-//  proc.setMemory(fiskorvAddr, fiskorv);
+  OperandiIRQHandler irqHandler;
 
   static Map<String, M> appVariables = new HashMap<String, M>();
   
   static {
     populateAppVariables();
   }
-  
+
   public OperandiScript() {
     proc = new Processor(0x10000);
+    irqHandler = new OperandiIRQHandler(this, proc);
+    proc.setIRQHandler(irqHandler);
     procReset();
     Thread t = new Thread(this, "operandi");
     t.setDaemon(true);
     t.start();
+    irqHandler.installIRQHandlers(this);;
   }
   
   @Override
@@ -101,7 +112,10 @@ public class OperandiScript implements Runnable, Disposable {
     }
   }
 
-
+  public OperandiIRQHandler getIRQHandler() {
+    return irqHandler;
+  }
+  
   void procReset() {
     exe = pexe = null;
     running = false;
@@ -134,12 +148,32 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
+    extDefs.put("__IRQ_consume_timer", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        Integer addr = irqHandler.consumeTimerIRQ(); 
+        return addr == null ? null : new M(addr.intValue());
+      }
+    });
+    extDefs.put("__IRQ_timer", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        return new M(irqHandler.hasTimerIRQ());
+      }
+    });
     extDefs.put("sleep", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
-        } else {
-          AppSystem.sleep(args[0].asInt());
-        }
+          return null;
+        } 
+        AppSystem.sleep(args[0].asInt());
+        return null;
+      }
+    });
+    extDefs.put("sleep", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        } 
+        AppSystem.sleep(args[0].asInt());
         return null;
       }
     });
@@ -155,14 +189,59 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__ui_close", new ExtCall() {
+    extDefs.put("timer_start", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length != 3) {
+          return null;
+        } 
+        final int timerAddr = args[2].asInt();
+        Tuscedo.inst.getTimer().addTask(new Runnable() {
+          @Override
+          public void run() {
+            if (running) getIRQHandler().callTimerIRQ(timerAddr);
+          }
+        }, args[0].asInt(), args[1].asInt());
+        return null;
+      }
+    });
+    extDefs.put(FN_UI_CLOSE, new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO uio = getUIOByScriptId(p.getMe());
         if (uio != null) uio.getUIInfo().close();
         return null;
       }
     });
-    extDefs.put("__ui_title", new ExtCall() {
+    extDefs.put(FN_UI_GET_ANCESTOR, new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO uio = getUIOByScriptId(p.getMe());
+        if (uio == null) return null;
+        UIInfo parenInf = uio.getUIInfo().getAncestor();
+        if (parenInf == null) return null;
+        return createGenericMUIObj(parenInf.getUI());
+      }
+    });
+    extDefs.put(FN_UI_GET_PARENT, new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO uio = getUIOByScriptId(p.getMe());
+        if (uio == null) return null;
+        UIInfo parenInf = uio.getUIInfo().getParent();
+        if (parenInf == null) return null;
+        return createGenericMUIObj(parenInf.getUI());
+      }
+    });
+    extDefs.put(FN_UI_GET_CHILDREN, new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO uio = getUIOByScriptId(p.getMe());
+        if (uio == null) return null;
+        UIInfo uii = uio.getUIInfo();
+        MSet msetc = new MListMap();
+        for (UIInfo cuii : uii.children) {
+          msetc.add(createGenericMUIObj(cuii.getUI()));
+        }
+        return new M(msetc);
+      }
+    });
+    extDefs.put(FN_UI_SET_NAME, new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
         UIO uio = getUIOByScriptId(p.getMe());
@@ -173,28 +252,45 @@ public class OperandiScript implements Runnable, Disposable {
             anc.getUI().repaint();
           }
         }
-        
+        return null;
+      }
+    });
+    extDefs.put(FN_UI_GET_NAME, new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO uio = getUIOByScriptId(p.getMe());
+        if (uio != null) {
+          return new M(uio.getUIInfo().getName());
+        }
+        return null;
+      }
+    });
+    extDefs.put(FN_UI_GET_ID, new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO uio = getUIOByScriptId(p.getMe());
+        if (uio != null) {
+          return new M(uio.getUIInfo().id);
+        }
         return null;
       }
     });
     createGraphFunctions(extDefs);
     createCanvasFunctions(extDefs);
+    createTuscedoTabPaneFunctions(extDefs);
     createSerialFunctions(extDefs);
     
     comp = new Compiler(extDefs, 0x4000, 0x0000);
     proc.reset();
+    irqHandler.reset();
   }
   
   UIO getUIOByScriptId(M me) {
     if (me == null || me.type != Processor.TSET) return null;
-    M uioId = me.ref.get(new M(".uio_id"));
+    M uioId = me.ref.get(new M(KEY_UI_ID));
     if (uioId == null || uioId.type != Processor.TSTR) return null;
     UIInfo inf = Tuscedo.inst().getUIObject(uioId.str); 
     UIO uio = inf == null ? null : inf.getUI();
     return uio;
   }
-
-
   
   public void runScript(UIWorkArea wa, String s) {
     synchronized (q) {
@@ -219,7 +315,7 @@ public class OperandiScript implements Runnable, Disposable {
   
   void doRunScript(UIWorkArea wa, Source src) {
     currentWA = wa;
-    currentView = wa.getCurrentView();
+    currentView = wa == null ? null : wa.getCurrentView();
     proc.reset();
     injectAppVariables(comp);
     try {
@@ -231,7 +327,11 @@ public class OperandiScript implements Runnable, Disposable {
       comp.printCompilerError(ps, Compiler.getSource(), ce);
       String err = new String(baos.toByteArray(), StandardCharsets.UTF_8);
       AppSystem.closeSilently(ps);
-      wa.appendViewText(currentView, err, UIWorkArea.STYLE_BASH_ERR);
+      if (wa != null) {
+        wa.appendViewText(currentView, err, UIWorkArea.STYLE_BASH_ERR);
+      } else {
+        System.out.println(err);
+      }
       return;
     }
     proc.setExe(exe);
@@ -373,6 +473,10 @@ public class OperandiScript implements Runnable, Disposable {
     currentWA.appendViewText(currentView, bt, UIWorkArea.STYLE_BASH_INPUT);
   }
   
+  //
+  // specific functions
+  //
+  
   private void createSerialFunctions(Map<String, ExtCall> extDefs) {
     extDefs.put(FN_SERIAL_INFO, new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
@@ -473,12 +577,81 @@ public class OperandiScript implements Runnable, Disposable {
       }
     });
   }
+
+  private void addUIMembers(MObj mobj, UIO uio) {
+    mobj.putIntern(KEY_UI_ID, new M(uio.getUIInfo().getId()));
+    M f;
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_GET_ID));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("get_id", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_SET_NAME));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("set_name", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_GET_NAME));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("get_name", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_GET_PARENT));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("get_parent", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_GET_CHILDREN));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("get_children", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_GET_ANCESTOR));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("get_ancestor", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_CLOSE));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("close", f);
+  }
+
+  private M createGenericMUIObj(UIO uio) {
+    if (uio == null) return null;
+    MObj mobj;
+    if (uio instanceof SampleSet) {
+      mobj = createGraphMUIO();
+    } else if (uio instanceof UICanvasPanel) {
+      mobj = createCanvasMUIO();
+    } else if (uio instanceof TuscedoTabPane) {
+      mobj = createTuscedoTabPaneMUIO();
+    } else {
+      mobj = new MObj(currentWA, comp, "uiobject") {
+        @Override
+        public void init(UIWorkArea wa, Compiler comp) {
+        }
+      };
+    }
+    M mui = new M(mobj);
+    addUIMembers(mobj, uio);
+    return mui;
+  }
     
+  private MObj createGraphMUIO() {
+    return new MObj(currentWA, comp, "graph") {
+      @Override
+      public void init(UIWorkArea wa, Compiler comp) {
+        addFunc("add", "__graph_add", comp);
+        addFunc("zoom_all", "__graph_zoom_all", comp);
+        addFunc("zoom", "__graph_zoom", comp);
+        addFunc("zoom_x", "__graph_zoom_x", comp);
+        addFunc("zoom_y", "__graph_zoom_y", comp);
+        addFunc("set_type", "__graph_type", comp);
+        addFunc("count", "__graph_count", comp);
+        addFunc("scroll_x", "__graph_scroll_x", comp);
+        addFunc("scroll_y", "__graph_scroll_y", comp);
+        addFunc("scroll_sample", "__graph_scroll_sample", comp);
+        addFunc("set_mul", "__graph_set_mul", comp);
+        addFunc("min", "__graph_min", comp);
+        addFunc("max", "__graph_max", comp);
+        addFunc("merge", "__graph_merge", comp);
+      }
+    };
+  }
+  
   private void createGraphFunctions(Map<String, ExtCall> extDefs) {
     extDefs.put("graph", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         String name = "GRAPH";
-        int type = GraphPanel.GRAPH_LINE;
+        int type = UIGraphPanel.GRAPH_LINE;
         List<Float> vals = null;
         if (args != null) {
           if (args.length > 0) {
@@ -499,56 +672,14 @@ public class OperandiScript implements Runnable, Disposable {
           }
         }
         
-        String graphID = Tuscedo.inst().addGraphTab(UISimpleTabPane.getTabByComponent(currentWA).getPane(), vals);
-        SampleSet set = ((SampleSet)Tuscedo.inst().getUIObject(graphID).getUI()); 
-        set.setGraphType(type);;
-        set.getUIInfo().setName(name);
-        M graph = new Processor.M(new MListMap());
-        graph.ref.put(".uio_id", new M(set.getUIInfo().getId()));
-        M graphFunc;
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_add"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("add", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_zoom_all"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("zoom_all", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_zoom"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("zoom", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_zoom_x"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("zoom_x", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_zoom_y"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("zoom_y", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__ui_close"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("close", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_type"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("set_type", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__ui_title"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("set_title", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_size"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("size", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_get"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("get", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_scroll_x"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("scroll_x", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_scroll_y"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("scroll_y", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_scroll_sample"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("scroll_sample", graphFunc);
-        graphFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__graph_merge"));
-        graphFunc.type = Processor.TFUNC;
-        graph.ref.put("merge", graphFunc);
-        return graph;
+        String id = Tuscedo.inst().addGraphTab(UISimpleTabPane.getTabByComponent(currentWA).getPane(), vals);
+        SampleSet ui = ((SampleSet)Tuscedo.inst().getUIObject(id).getUI()); 
+        ui.setGraphType(type);
+        ui.getUIInfo().setName(name);
+        MObj mobj = createGraphMUIO();
+        M mui = new M(mobj);
+        addUIMembers(mobj, ui);
+        return mui;
       }
     });
     extDefs.put("__graph_add", new ExtCall() {
@@ -562,7 +693,6 @@ public class OperandiScript implements Runnable, Disposable {
           for (int i = 0; i < args[0].ref.size(); i++) {
             ss.addSample(args[0].ref.get(i).asFloat());
           }
-          
         }
         return null;
       }
@@ -611,7 +741,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__graph_size", new ExtCall() {
+    extDefs.put("__graph_count", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
         if (ss == null) return null;
@@ -649,8 +779,32 @@ public class OperandiScript implements Runnable, Disposable {
         if (args == null || args.length == 0)  return null;
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
         if (ss == null) return null;
-        ((UIGraphPanel)ss.getUIInfo().getParent().getUI()).scrollToSample(args[0].asInt());
+        ss.scrollToSample(args[0].asInt());
         return null;
+      }
+    });
+    extDefs.put("__graph_set_mul", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
+        if (ss == null) return null;
+        ss.setMultiplier(args[0].asFloat());
+        ss.repaint();
+        return null;
+      }
+    });
+    extDefs.put("__graph_min", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
+        if (ss == null) return null;
+        return new M((float)ss.getMin());
+      }
+    });
+    extDefs.put("__graph_max", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
+        if (ss == null) return null;
+        return new M((float)ss.getMax());
       }
     });
     extDefs.put("__graph_merge", new ExtCall() {
@@ -675,18 +829,35 @@ public class OperandiScript implements Runnable, Disposable {
   }
   
   int parseGraphType(M a) {
-    int type = GraphPanel.GRAPH_LINE;
+    int type = UIGraphPanel.GRAPH_LINE;
     if (a.asString().equalsIgnoreCase("plot")) {
-      type = GraphPanel.GRAPH_PLOT;
+      type = UIGraphPanel.GRAPH_PLOT;
     }
     else if (a.asString().equalsIgnoreCase("bar")) {
-      type = GraphPanel.GRAPH_BAR;
+      type = UIGraphPanel.GRAPH_BAR;
     }
     return type;
   }
   
+  private MObj createCanvasMUIO() {
+    return new MObj(currentWA, comp, "canvas") {
+      @Override
+      public void init(UIWorkArea wa, Compiler comp) {
+        addFunc("set_color", "__canvas_set_color", comp);
+        addFunc("draw_line", "__canvas_draw_line", comp);
+        addFunc("draw_rect", "__canvas_draw_rect", comp);
+        addFunc("fill_rect", "__canvas_fill_rect", comp);
+        addFunc("draw_oval", "__canvas_draw_oval", comp);
+        addFunc("fill_oval", "__canvas_fill_oval", comp);
+        addFunc("draw_text", "__canvas_draw_text", comp);
+        addFunc("get_width", "__canvas_width", comp);
+        addFunc("get_height", "__canvas_height", comp);
+        addFunc("blit", "__canvas_blit", comp);
+      }
+    };
+  }
+  
   private void createCanvasFunctions(Map<String, ExtCall> extDefs) {
-    /* TODO
     extDefs.put("canvas", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         String name = "CANVAS";
@@ -709,87 +880,52 @@ public class OperandiScript implements Runnable, Disposable {
           }
         }
         
-        String tabID = Tuscedo.inst().addCanvasTab(UISimpleTabPane.getTabByComponent(currentWA).getPane(), w, h);
-        Tuscedo.inst().getTab(tabID).setText(name);
-        M canvas = new Processor.M(new MListMap());
-        canvas.ref.put(".uio_id", new M(tabID));
-        M canvasFunc;
-        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_set_color"));
-        canvasFunc.type = Processor.TFUNC;
-        canvas.ref.put("set_color", canvasFunc);
-        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_draw_line"));
-        canvasFunc.type = Processor.TFUNC;
-        canvas.ref.put("draw_line", canvasFunc);
-        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_draw_rect"));
-        canvasFunc.type = Processor.TFUNC;
-        canvas.ref.put("draw_rect", canvasFunc);
-        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_fill_rect"));
-        canvasFunc.type = Processor.TFUNC;
-        canvas.ref.put("fill_rect", canvasFunc);
-        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_draw_oval"));
-        canvasFunc.type = Processor.TFUNC;
-        canvas.ref.put("draw_oval", canvasFunc);
-        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_fill_oval"));
-        canvasFunc.type = Processor.TFUNC;
-        canvas.ref.put("fill_oval", canvasFunc);
-        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_draw_text"));
-        canvasFunc.type = Processor.TFUNC;
-        canvas.ref.put("draw_text", canvasFunc);
-        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_width"));
-        canvasFunc.type = Processor.TFUNC;
-        canvas.ref.put("get_width", canvasFunc);
-        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_height"));
-        canvasFunc.type = Processor.TFUNC;
-        canvas.ref.put("get_height", canvasFunc);
-        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__canvas_blit"));
-        canvasFunc.type = Processor.TFUNC;
-        canvas.ref.put("blit", canvasFunc);
-
-        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__ui_title"));
-        canvasFunc.type = Processor.TFUNC;
-        canvas.ref.put("set_title", canvasFunc);
-        canvasFunc = new Processor.M(comp.getLinker().lookupFunctionAddress("__ui_close"));
-        canvasFunc.type = Processor.TFUNC;
-        canvas.ref.put("close", canvasFunc);
-        return canvas;
+        String id = Tuscedo.inst().addCanvasTab(UISimpleTabPane.getTabByComponent(currentWA).getPane(), w, h);
+        UICanvasPanel ui = ((UICanvasPanel)Tuscedo.inst().getUIObject(id).getUI()); 
+        ui.getUIInfo().setName(name);
+        
+        MObj mobj = createCanvasMUIO();
+        M mui = new M(mobj);
+        addUIMembers(mobj, ui);
+        return mui;
       }
     });
     extDefs.put("__canvas_set_color", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
-        ((UICanvasPanel)tab.getContent()).setColor(args[0].asInt());
+        UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.setColor(args[0].asInt());
         return null;
       }
     });
     extDefs.put("__canvas_draw_line", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 4)  return null;
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
-        ((UICanvasPanel)tab.getContent()).drawLine(args[0].asInt(), args[1].asInt(), args[2].asInt(),args[3].asInt());
+        UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.drawLine(args[0].asInt(), args[1].asInt(), args[2].asInt(),args[3].asInt());
         return null;
       }
     });
     extDefs.put("__canvas_draw_rect", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 4)  return null;
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
-        ((UICanvasPanel)tab.getContent()).drawRect(args[0].asInt(), args[1].asInt(), args[2].asInt(),args[3].asInt());
+        UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.drawRect(args[0].asInt(), args[1].asInt(), args[2].asInt(),args[3].asInt());
         return null;
       }
     });
     extDefs.put("__canvas_fill_rect", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || (args.length != 0 && args.length != 4))  return null;
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
+        if (args == null)  return null;
+        UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
         if (args.length == 4) {
-          ((UICanvasPanel)tab.getContent()).fillRect(args[0].asInt(), args[1].asInt(), args[2].asInt(),args[3].asInt());
+          cp.fillRect(args[0].asInt(), args[1].asInt(), args[2].asInt(),args[3].asInt());
         } else {
-          ((UICanvasPanel)tab.getContent()).fillRect();
+          cp.fillRect();
         }
         return null;
       }
@@ -797,53 +933,109 @@ public class OperandiScript implements Runnable, Disposable {
     extDefs.put("__canvas_draw_oval", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 4)  return null;
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
-        ((UICanvasPanel)tab.getContent()).drawOval(args[0].asInt(), args[1].asInt(), args[2].asInt(),args[3].asInt());
+        UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.drawOval(args[0].asInt(), args[1].asInt(), args[2].asInt(),args[3].asInt());
         return null;
       }
     });
     extDefs.put("__canvas_fill_oval", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 4)  return null;
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
-        ((UICanvasPanel)tab.getContent()).fillOval(args[0].asInt(), args[1].asInt(), args[2].asInt(),args[3].asInt());
+        UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.fillOval(args[0].asInt(), args[1].asInt(), args[2].asInt(),args[3].asInt());
         return null;
       }
     });
     extDefs.put("__canvas_draw_text", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 3)  return null;
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
-        ((UICanvasPanel)tab.getContent()).drawText(args[0].asInt(), args[1].asInt(), args[2].asString());
+        UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.drawText(args[0].asInt(), args[1].asInt(), args[2].asString());
         return null;
       }
     });
     extDefs.put("__canvas_width", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
-        return new Processor.M(((UICanvasPanel)tab.getContent()).getWidth());
+        UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        return new Processor.M(cp.getWidth());
       }
     });
     extDefs.put("__canvas_height", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
-        return new Processor.M(((UICanvasPanel)tab.getContent()).getHeight());
+        UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        return new Processor.M(cp.getHeight());
       }
     });
     extDefs.put("__canvas_blit", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        Tab tab = getTabByScriptId(p.getMe());
-        if (tab == null) return null;
-        ((UICanvasPanel)tab.getContent()).blit();
+        UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.blit();
         return null;
       }
     });
-    */
+  }
+
+  private MObj createTuscedoTabPaneMUIO() {
+    return new MObj(currentWA, comp, "pane") {
+      @Override
+      public void init(UIWorkArea wa, Compiler comp) {
+        addFunc("set_pos", "__pane_set_pos", comp);
+        addFunc("get_pos", "__pane_get_pos", comp);
+        addFunc("set_size", "__pane_set_size", comp);
+        addFunc("get_size", "__pane_get_size", comp);
+      }
+    };
+  }
+  
+  private void createTuscedoTabPaneFunctions(Map<String, ExtCall> extDefs) {
+    extDefs.put("__pane_set_pos", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 2)  return null;
+        TuscedoTabPane tp= (TuscedoTabPane)getUIOByScriptId(p.getMe());
+        if (tp == null) return null;
+        Window w = SwingUtilities.getWindowAncestor(tp);
+        w.setLocation(args[0].asInt(), args[1].asInt());
+        return null;
+      }
+    });
+    extDefs.put("__pane_get_pos", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        TuscedoTabPane tp= (TuscedoTabPane)getUIOByScriptId(p.getMe());
+        if (tp == null) return null;
+        Window w = SwingUtilities.getWindowAncestor(tp);
+        MListMap l = new MListMap();
+        l.add(new M(w.getLocation().x));
+        l.add(new M(w.getLocation().y));
+        return new M(l);
+      }
+    });
+    extDefs.put("__pane_set_size", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 2)  return null;
+        TuscedoTabPane tp= (TuscedoTabPane)getUIOByScriptId(p.getMe());
+        if (tp == null) return null;
+        Window w = SwingUtilities.getWindowAncestor(tp);
+        w.setSize(args[0].asInt(), args[1].asInt());
+        return null;
+      }
+    });
+    extDefs.put("__pane_get_size", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        TuscedoTabPane tp= (TuscedoTabPane)getUIOByScriptId(p.getMe());
+        if (tp == null) return null;
+        Window w = SwingUtilities.getWindowAncestor(tp);
+        MListMap l = new MListMap();
+        l.add(new M(w.getSize().width));
+        l.add(new M(w.getSize().height));
+        return new M(l);
+      }
+    });
   }
 
   @Override
@@ -875,7 +1067,11 @@ public class OperandiScript implements Runnable, Disposable {
   }
   
   static void populateAppVariables() {
-    appVariables.put("__version", new M(Essential.vMaj + "." + Essential.vMin + "." + Essential.vMic));
+    appVariables.put("__appversion", new M(Essential.vMaj + "." + Essential.vMin + "." + Essential.vMic));
+    appVariables.put("__appname", new M(Essential.name));
+    appVariables.put("__compilerversion", new M(Compiler.VERSION));
+    appVariables.put("__bcversion", new M(ByteCode.VERSION));
+    appVariables.put("__processorversion", new M(Processor.VERSION));
     appVariables.put("ser", new M(null));
   }
   static void injectAppVariables(Compiler comp) {
@@ -895,5 +1091,4 @@ public class OperandiScript implements Runnable, Disposable {
       proc.setMemory(varAddr, val);
     }
   }
-
 }

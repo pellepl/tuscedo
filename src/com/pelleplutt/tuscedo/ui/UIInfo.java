@@ -59,7 +59,7 @@ public class UIInfo {
     if (!closed) {
       closed = true;
       fireEventOnClosed(parent != null ? parent.ui : null, ui);
-      parent.removeChild(this);
+      if (parent != null) parent.removeChild(this);
       this.listeners.clear();
     }
   }

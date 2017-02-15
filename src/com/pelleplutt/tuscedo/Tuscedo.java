@@ -40,12 +40,15 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   volatile boolean running = true;
   List <Tickable> tickables = new ArrayList<Tickable>();
   Map <String, UIInfo> uiobjects = new HashMap<String, UIInfo>();
+  Timer timer;
   
   private Tuscedo() {
     Thread t = new Thread(this, "commonticker");
     t.setDaemon(true);
     t.start();
     UIInfo.addGlobalListener(this);
+    timer = new Timer();
+    AppSystem.addDisposable(timer);
   }
   
   public static Tuscedo inst() {
@@ -53,6 +56,10 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       inst = new Tuscedo();
     }
     return inst;
+  }
+  
+  public Timer getTimer() {
+    return timer;
   }
   
   public void registerTickable(Tickable t) {
@@ -136,7 +143,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   
   public String addCanvasTab(UISimpleTabPane stp, int w, int h) {
     UICanvasPanel cp = new UICanvasPanel(w, h);
-    Tab t = stp.createTab("CANVAS", cp);
+    Tab t = stp.createTab(null, cp);
     stp.selectTab(t);
     return cp.getUIInfo().getId();
   }
