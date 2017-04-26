@@ -36,6 +36,7 @@ import com.pelleplutt.tuscedo.ui.UISimpleTabPane;
 import com.pelleplutt.tuscedo.ui.UIWorkArea;
 import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.AppSystem.Disposable;
+import com.pelleplutt.util.Log;
 import com.pelleplutt.util.io.Port;
 
 public class OperandiScript implements Runnable, Disposable {
@@ -194,7 +195,7 @@ public class OperandiScript implements Runnable, Disposable {
         if (args == null || args.length != 3) {
           return null;
         } 
-        final int timerAddr = args[2].asInt();
+        final int timerAddr = args[2].i;
         Tuscedo.inst.getTimer().addTask(new Runnable() {
           @Override
           public void run() {
@@ -468,6 +469,15 @@ public class OperandiScript implements Runnable, Disposable {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     PrintStream ps = new PrintStream(baos);
     proc.unwindStackTrace(ps);
+    String bt = new String(baos.toByteArray(), StandardCharsets.UTF_8);
+    AppSystem.closeSilently(ps);
+    currentWA.appendViewText(currentView, bt, UIWorkArea.STYLE_BASH_INPUT);
+  }
+  
+  public void dumpStack() {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    PrintStream ps = new PrintStream(baos);
+    proc.printStack(ps, "  ", 50);
     String bt = new String(baos.toByteArray(), StandardCharsets.UTF_8);
     AppSystem.closeSilently(ps);
     currentWA.appendViewText(currentView, bt, UIWorkArea.STYLE_BASH_INPUT);

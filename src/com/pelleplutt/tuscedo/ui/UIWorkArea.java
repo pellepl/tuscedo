@@ -716,6 +716,8 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
             script.stepInstr();
           } else if (in.equalsIgnoreCase("backtrace") || in.equalsIgnoreCase("bt")) {
             script.backtrace();
+          } else if (in.equalsIgnoreCase("stack") || in.equalsIgnoreCase("st")) {
+            script.dumpStack();
           } else if (in.startsWith("interrupt ") || in.startsWith("int ")) {
             script.interrupt(script.lookupFunc(in.split("\\s")[1]));
           } else if (in.equalsIgnoreCase("pc")) {

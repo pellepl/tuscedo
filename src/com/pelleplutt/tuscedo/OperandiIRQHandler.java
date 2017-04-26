@@ -3,8 +3,6 @@ package com.pelleplutt.tuscedo;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.pelleplutt.operandi.CodeGenFront;
-import com.pelleplutt.operandi.Linker;
 import com.pelleplutt.operandi.Source;
 import com.pelleplutt.operandi.proc.IRQHandler;
 import com.pelleplutt.operandi.proc.Processor;
@@ -67,6 +65,7 @@ public class OperandiIRQHandler implements IRQHandler {
         for (int i = 0; i < 32; i++) {
           int mask = 1<<i;
           if ((irqHandling[block] & mask) !=0) {
+            //System.out.println("    left irq blk" + block + " level" + i);
             irqHandling[block] &= ~mask;
             break loop;
           }
@@ -83,12 +82,14 @@ public class OperandiIRQHandler implements IRQHandler {
         for (int i = 0; i < 32; i++) {
           int mask = 1<<i;
           if ((irqHandling[block] & mask)!=0) {
+            //System.out.println("handling irq blk" + block + " level" + i);
             break loop; // higher interrupts ongoing
           }
           if ((irqPending[block] & mask)!=0 && irqFunctions[block * 32 + i] != 0x8f8f8f8f) {
             irqHandling[block] |= mask;
             irqPending[block] &= ~mask;
             proc.raiseInterrupt(irqFunctions[block * 32 + i]);
+            //System.out.println("!raising irq blk" + block + " level" + i + ", handler " + irqFunctions[block * 32 + i]);
             break loop;
           }
         }
@@ -99,7 +100,7 @@ public class OperandiIRQHandler implements IRQHandler {
 
   public void callTimerIRQ(int timerFunctionAddress) {
     synchronized (timerIRQs) {
-      Log.println("trig timerirq: addr " + timerFunctionAddress + ", got " + timerIRQs.size() + " reqs");
+      //Log.println("trig timerirq: addr " + timerFunctionAddress + ", got " + timerIRQs.size() + " reqs");
       timerIRQs.add(timerFunctionAddress);
     }
     triggerIRQ(IRQ_BLOCK_SYSTEM, IRQ_SYSTEM_TIMER);
@@ -107,7 +108,7 @@ public class OperandiIRQHandler implements IRQHandler {
   
   public int hasTimerIRQ() {
     synchronized (timerIRQs) {
-      Log.println("has " + timerIRQs.size());
+      //Log.println("has " + timerIRQs.size());
       return timerIRQs.isEmpty() ? 0 : 1;
     }
   }
@@ -118,26 +119,19 @@ public class OperandiIRQHandler implements IRQHandler {
         Log.println("ERROR: queue empty");
         return null;
       }
-      Log.println("consuming " + timerIRQs.get(0) + " of " + timerIRQs.size());
+      //Log.println("consuming " + timerIRQs.get(0) + " of " + timerIRQs.size());
       return timerIRQs.remove(0);
     }
   }
   
-  // TODO why not while(__IRQ_timer()) FIX
   public void installIRQHandlers(OperandiScript op) {
-    Linker.dbg = true;
-    CodeGenFront.dbg = true;
     op.doRunScript(null, new Source.SourceString("irqhandlers",  
     "module irq;\n" +
     "func __IRQ_timer_handler() {\n" +
-    "  println('entering IRQ_TIMER_HANDLER');\n"+
-    //"  while (1) {\n" +
-    //"    if (!__IRQ_timer()) break;\n" +
-    "    timer = __IRQ_consume_timer();\n"+
-    "    println('calling' timer);\n"+
-    "    if (timer != nil) timer();\n" +
-    //"  }\n" +
-    "  println('exiting IRQ_TIMER_HANDLER');\n"+
+    "  while __IRQ_timer() {\n" +
+    "    timer_f = __IRQ_consume_timer();\n"+
+    "    timer_f();\n" +
+    "  }\n" +
     "}\n"));
     registerIRQ(IRQ_BLOCK_SYSTEM, IRQ_SYSTEM_TIMER, op.lookupFunc("irq.func.__IRQ_timer_handler"));
   }

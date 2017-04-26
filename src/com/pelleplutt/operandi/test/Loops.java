@@ -183,7 +183,8 @@ public class Loops {
         "}\n" +
         "s;\n" +
         "while(have_more()) {\n" +
-        "  s += get_next() + ' ';\n" +
+        "  q = get_next();\n" +
+        "  s += q + ' ';\n" +
         "}\n" +
         "return s;\n" + 
         "";
