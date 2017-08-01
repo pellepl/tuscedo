@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project default="deploy" name="Create Runnable Jar for Project tuscedo">
+    <target name="deploy">
+        <jar destfile="deploy/tuscedo.jar" filesetmanifest="mergewithoutmain">
+            <manifest>
+                <attribute name="Main-Class" value="com.pelleplutt.tuscedo.Tuscedo"/>
+                <attribute name="Class-Path" value="."/>
+            </manifest>
+            <fileset dir="./bin"/>
+            <zipfileset excludes="META-INF/*.SF" src="./lib/purejavacomm-1.0.0.jar"/>
+            <zipfileset excludes="META-INF/*.SF" src="./lib/jna-4.0.0.jar"/>
+        </jar>
+    </target>
+</project>
