@@ -77,33 +77,33 @@ public abstract class MObj implements MSet {
 
   @Override
   public void put(Object key, M m) {
-    throw new ProcessorError(type + " object cannot be modified (put)");
+    throw new ProcessorError(type + " object cannot be modified");
   }
 
   @Override
   public void remove(M m) {
-    throw new ProcessorError(type + " object cannot be modified (remove)");
+    throw new ProcessorError(type + " object cannot be modified");
   }
 
   @Override
   public MSet copyShallow() {
-    throw new ProcessorError(type + " object cannot be copied (copyShallow)");
+    throw new ProcessorError(type + " object cannot be copied");
   }
 
   @Override
   public void insert(int ix, M m) {
-    throw new ProcessorError(type + " object cannot be modified (insert)");
+    throw new ProcessorError(type + " object cannot be modified");
     
   }
 
   @Override
   public void add(M m) {
-    throw new ProcessorError(type + " object cannot be modified (add)");
+    throw new ProcessorError(type + " object cannot be modified");
   }
 
   @Override
   public void set(M mix, M m) {
-    throw new ProcessorError(type + " object cannot be modified (set)");
+    throw new ProcessorError(type + " object cannot be modified");
   }
   
   @Override

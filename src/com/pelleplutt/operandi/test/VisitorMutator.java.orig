@@ -78,8 +78,8 @@ public class VisitorMutator {
     String sA;
     sA = 
         "s = 'pelleplutt';\n"+
-        "lower2upper = byte('A')-byte('a');\n" +
-        "s = s[return char(byte($0)+lower2upper)];\n" +
+        "lower2upper = int('A')-int('a');\n" +
+        "s = s[return char(int($0)+lower2upper)];\n" +
         "return s;\n";
     assertEquals("PELLEPLUTT", Processor.compileAndRun(sA).str); 
   }

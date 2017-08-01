@@ -75,7 +75,7 @@ public class Algo {
     "  i = 0;\n" +
     "  crc = crc ^ ~0;\n" +
     "  while (size--) {\n" +
-    "    crc = crc32_tab[(crc ^ byte(buf[i++])) & 0xff] ^ (crc >> 8);\n"+
+    "    crc = crc32_tab[(crc ^ int(buf[i++])) & 0xff] ^ (crc >> 8);\n"+
     "  }\n" +
     "  return crc ^ ~0;\n" +
     "}\n" +

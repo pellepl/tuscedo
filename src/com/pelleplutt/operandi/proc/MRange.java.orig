@@ -14,10 +14,13 @@ public class MRange implements MSet {
     type = checkType(start, null, end);
     this.start = start.asFloat();
     this.end = end.asFloat();
-    if (this.start <= this.end) {
+    if (this.start < this.end) {
       this.step = 1.0f;
     } else {
       this.step = -1.0f;
+    }
+    if (this.start == this.end) {
+      throw new CompilerError("zero range");
     }
     this.m.type = type;
   }
@@ -27,11 +30,13 @@ public class MRange implements MSet {
     this.start = start.asFloat();
     this.step = step.asFloat();
     this.end = end.asFloat();
-    if (this.start != this.end && this.step == 0) {
+    if (this.start == this.end) {
+      throw new CompilerError("zero range");
+    }
+    if (this.step == 0) {
       throw new CompilerError("range step cannot be zero");
     }
-    if (this.start != this.end &&
-        this.start < this.end && this.step < 0 ||
+    if (this.start < this.end && this.step < 0 ||
         this.start > this.end && this.step > 0) {
       throw new CompilerError("range step sign is invalid");
     }

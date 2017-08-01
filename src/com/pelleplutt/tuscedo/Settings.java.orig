@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 
 import com.pelleplutt.Essential;
 import com.pelleplutt.util.Log;
@@ -18,8 +17,6 @@ public class Settings {
   public final static String EX_LIST = "foo.list";
   public final static String EX_INT = "another.int";
   
-  public final static String SERIAL_NEWLINE_STRING = "serialnl.string";
-  public final static String SCRIPT_PREFIX_STRING = "scriptprefix.string";
   public final static String BASH_PREFIX_STRING = "bashprefix.string";
   public final static String BASH_CHAIN_STRING = "bashchain.string";
   public final static String BASH_OUTPUT_STRING = "bashoutput.string";
@@ -50,7 +47,6 @@ public class Settings {
     props.setProperty(EX_LIST+".0", "def");
     props.setProperty(EX_INT, "0");
     
-    props.setProperty(SCRIPT_PREFIX_STRING, "@");
     props.setProperty(BASH_PREFIX_STRING, "$");
     props.setProperty(BASH_CHAIN_STRING, "&&");
     props.setProperty(BASH_OUTPUT_STRING, ">");
@@ -62,7 +58,6 @@ public class Settings {
     props.setProperty(BASH_CONNECTION_STREAM_STRING, "@CONN");
     props.setProperty(BASH_LAST_RET_STRING, "$?");
     props.setProperty(BASH_BACKGROUND_STRING, "&");
-    props.setProperty(SERIAL_NEWLINE_STRING, "\n");
   }
   
   public void saveSettings() {
@@ -150,60 +145,5 @@ public class Settings {
     }
     
     return vals.size() == 0 ? new String[0] : vals.toArray(new String[vals.size()]);
-  }
-
-  public String[] getKeys() {
-    Set<Object> keys = props.keySet();
-    String[] s = new String[keys.size()];
-    int i = 0;
-    for (Object o : keys) {
-      String tkey = o.toString();
-      String type = tkey.substring(tkey.lastIndexOf("."));
-      if (type.charAt(0) >= '0' && type.charAt(0) <= '9') {
-        continue;
-      }
-      String key = tkey.substring(0, tkey.lastIndexOf("."));
-      s[i++] = key;
-    }
-    return s;
-  }
-  
-  public Object keyValue(String key) {
-    Object o = null;
-    Set<Object> keys = props.keySet();
-    for (Object k : keys) {
-      String tkey = k.toString();
-      if (key.equals(tkey.substring(0, tkey.lastIndexOf(".")))) {
-        if (tkey.endsWith(".string")) {
-          o = (String)props.getProperty(tkey, "");
-        } else if (tkey.endsWith(".int")) {
-          o = new Integer(Integer.parseInt(props.getProperty(tkey, "0")));
-        } else if (tkey.endsWith(".list")) {
-          // TODO
-          throw new Error("not implemented");
-        }
-        break;
-      }
-    }
-    return o;
-  }
-
-  public void setKeyValue(String key, String val) {
-    Set<Object> keys = props.keySet();
-    for (Object k : keys) {
-      String tkey = k.toString();
-      if (key.equals(tkey.substring(0, tkey.lastIndexOf(".")))) {
-        if (tkey.endsWith(".string")) {
-          setString(tkey, val);
-        } else if (tkey.endsWith(".int")) {
-          setInt(tkey, Integer.parseInt(val));
-        } else if (tkey.endsWith(".list")) {
-          // TODO
-          throw new Error("not implemented");
-        }
-        return;
-      }
-    }
-    props.put(key + ".string", val);
   }
 }

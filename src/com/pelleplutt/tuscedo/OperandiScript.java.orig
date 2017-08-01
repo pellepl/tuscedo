@@ -206,14 +206,6 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("sqrt", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0) {
-          return null;
-        } 
-        return new M((float)Math.sqrt(args[0].asFloat()));
-      }
-    });
     extDefs.put("sleep", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
@@ -222,7 +214,8 @@ public class OperandiScript implements Runnable, Disposable {
         AppSystem.sleep(args[0].asInt());
         return null;
       }
-    });    extDefs.put("sin", new ExtCall() {
+    });
+    extDefs.put("sin", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
@@ -1324,13 +1317,10 @@ public class OperandiScript implements Runnable, Disposable {
     appVariables.put("__compilerversion", new M(Compiler.VERSION));
     appVariables.put("__bcversion", new M(ByteCode.VERSION));
     appVariables.put("__processorversion", new M(Processor.VERSION));
-    M m = new M();
-    m.type = Processor.TSET;
-    appVariables.put("ser", m);
-    appVariables.put("net", m);
-    appVariables.put("sys", m);
-    appVariables.put("conf", m);
-    appVariables.put("disk", m);
+    appVariables.put("ser", new M());
+    appVariables.put("net", new M());
+    appVariables.put("sys", new M());
+    appVariables.put("disk", new M());
   }
   static void injectAppVariables(Compiler comp) {
     for (String var : appVariables.keySet()) {
@@ -1347,8 +1337,6 @@ public class OperandiScript implements Runnable, Disposable {
         val = new M(new MNet(wa, comp));
       } else if (var.equals("sys")) {
         val = new M(new MSys(wa, comp));
-      } else if (var.equals("conf")) {
-        val = new M(new MConf(wa, comp));
       } else if (var.equals("disk")) {
         val = new M(new MDisk(wa, comp));
       } else {

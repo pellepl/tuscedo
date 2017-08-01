@@ -37,18 +37,16 @@ public class XtermTerminal implements Console, XConsole, Disposable, Runnable {
     this.ph = ph;
     originalDoc = ftp.getDocument();
     alternateDoc = new FastTextPane.Doc();
-    if (ph != null) {
-      ftp.setKeyListener(new XtermKeyListener() {
-        @Override
-        public void sendVT(byte[] b) {
-          XtermTerminal.this.ph.sendToStdIn(b);
-        }
-        @Override
-        public void sendVT(byte b) {
-          XtermTerminal.this.ph.sendToStdIn(b);
-        }
-      });
-    }
+    ftp.setKeyListener(new XtermKeyListener() {
+      @Override
+      public void sendVT(byte[] b) {
+        XtermTerminal.this.ph.sendToStdIn(b);
+      }
+      @Override
+      public void sendVT(byte b) {
+        XtermTerminal.this.ph.sendToStdIn(b);
+      }
+    });
     xstd = new XtermParserTerminal(ftp, this, UIWorkArea.STYLE_BASH_OUT, textEncoding);
     xerr = new XtermParserTerminal(ftp, this, UIWorkArea.STYLE_BASH_ERR, textEncoding);
     AppSystem.addDisposable(this);
@@ -126,7 +124,7 @@ public class XtermTerminal implements Console, XConsole, Disposable, Runnable {
   @Override
   public void setAlternateScreenBuffer(FastTermPane ftp, boolean b) {
     FastTextPane.Doc alt = alternateDoc;
-    ProcessGroup pg = ph == null ? null : ph.getLinkedProcess();
+    ProcessGroup pg = ph.getLinkedProcess();
     Log.println("set alt screen for " + (pg == null ? "null" : pg.toString()) + " : " + b);
     if (pg != null) {
       ProcessGroupInfo pgi = (ProcessGroupInfo)pg.getUserData();

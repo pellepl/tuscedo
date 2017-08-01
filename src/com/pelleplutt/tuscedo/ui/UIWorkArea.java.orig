@@ -359,7 +359,6 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       defineAction(input[i], "log.input.scrollright", "alt+right", actionLogRight);
       defineAction(input[i], "log.input.home", "ctrl+home", actionLogHome);
       defineAction(input[i], "log.input.end", "ctrl+end", actionLogEnd);
-      defineAction(input[i], "log.input.xtermtoggle", "ctrl+shift+x", actionLogXtermToggle);
 
       inputLabel[i] = new JLabel();
       inputLabel[i].setFont(COMMON_FONT);
@@ -386,8 +385,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       inputPanel.add(ip[i], Integer.toString(i));
       
       if (i == ISTATE_INPUT || i == ISTATE_BASH) {
-        XtermTerminal xc = new XtermTerminal(view.ftp, input[i], "UTF-8"); // TODO here
-        view.xterm = xc;
+        XtermTerminal xc = new XtermTerminal(view.ftp, input[i], "UTF-8"); 
         bash[i] = new Bash(input[i], xc, serial, this);
       }
       
@@ -664,19 +662,14 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     input[istate].resetLastSuggestionIndex();
     switch (istate) {
     case ISTATE_INPUT:
-      setInfo("");
       if (!shift) {
         input[istate].setText("");
         if (in.startsWith(settings.string(Settings.BASH_PREFIX_STRING))) {
           String s = in.substring(settings.string(Settings.BASH_PREFIX_STRING).length()); 
           views[ISTATE_INPUT].ftp.addText(s + "\n", STYLE_BASH_INPUT);
           bash[istate].input(s);
-        } else if (in.startsWith(Settings.SCRIPT_PREFIX_STRING)) {
-          String s = in.substring(settings.string(Settings.SCRIPT_PREFIX_STRING).length()); 
-          getCurrentView().ftp.addText(s + "\n", STYLE_BASH_INPUT);
-          script.runScript(this, in + "\n");
         } else {
-          transmit(in + Settings.inst().string(Settings.SERIAL_NEWLINE_STRING));
+          transmit(in+"\n");
         }
       } else {
         input[istate].setFilterNewLine(false);
@@ -1246,14 +1239,6 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     }
   };
 
-  AbstractAction actionLogXtermToggle = new AbstractAction() {
-    @Override
-    public void actionPerformed(ActionEvent e) {
-      views[ISTATE_INPUT].rawMode = !views[ISTATE_INPUT].rawMode;
-      setInfo("XTERM " + (views[ISTATE_INPUT].rawMode ? "OFF":"ON"));
-    }
-  };
-
   private static JButton createZeroButton() {
     JButton jbutton = new JButton();
     jbutton.setPreferredSize(new Dimension(0, 0));
@@ -1279,12 +1264,8 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   }
 
   public void onSerialData(byte[] b) {
-    String s = new String(b); // TODO here
-    if (views[ISTATE_INPUT].rawMode) {
-      views[ISTATE_INPUT].ftp.addText(s);
-    } else {
-      views[ISTATE_INPUT].xterm.stdout(b, b.length);
-    }
+    String s = new String(b);
+    views[ISTATE_INPUT].ftp.addText(s);
     final UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent(UIWorkArea.this);
     if (!t.isNotified()) {
       t.markNotified(true);
@@ -1295,6 +1276,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
         }
       }, 1000);
     }
+
     int nlix;
     processSerialNotifiers(b);
     do {
@@ -1568,14 +1550,12 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   } // class AutoAdjustmentListener
 
   public class View extends JPanel implements MouseListener {
-    public XtermTerminal xterm;
     FastTermPane ftp;
     FastTextPane ftpSec;
     JSplitPane splitVer, splitHor;
     JScrollPane mainScrollPane;
     JScrollPane secScrollPane;
     JComponent curSplit;
-    boolean rawMode = true;
     
     public View() {
       ftp = new FastTermPane();
@@ -1671,7 +1651,20 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     public String filter;
     public int addr;
   }
-
+  /*
+  g_stack;
+  ser.clear_on_rx();
+  ser.on_rx("<SIMTRIG|graph:Stack usage,", {
+    line = $0;
+    if (g_stack == nil) {
+      g_stack = graph("STACK USAGE");
+    }
+    val = line[len($1)#len(line)-2];
+    println("captured stack value " val);
+    g_stack.add(int(val));
+    g_stack.zoom_all();
+  });
+  */
   public void setStandardFocus() {
     input[istate].requestFocus();
   }
