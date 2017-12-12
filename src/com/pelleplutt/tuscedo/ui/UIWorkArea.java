@@ -671,7 +671,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
           String s = in.substring(settings.string(Settings.BASH_PREFIX_STRING).length()); 
           views[ISTATE_INPUT].ftp.addText(s + "\n", STYLE_BASH_INPUT);
           bash[istate].input(s);
-        } else if (in.startsWith(Settings.SCRIPT_PREFIX_STRING)) {
+        } else if (in.startsWith(settings.string(Settings.SCRIPT_PREFIX_STRING))) {
           String s = in.substring(settings.string(Settings.SCRIPT_PREFIX_STRING).length()); 
           getCurrentView().ftp.addText(s + "\n", STYLE_BASH_INPUT);
           script.runScript(this, in + "\n");
