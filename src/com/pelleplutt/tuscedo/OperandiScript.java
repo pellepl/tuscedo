@@ -214,15 +214,7 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)Math.sqrt(args[0].asFloat()));
       }
     });
-    extDefs.put("sleep", new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0) {
-          return null;
-        } 
-        AppSystem.sleep(args[0].asInt());
-        return null;
-      }
-    });    extDefs.put("sin", new ExtCall() {
+    extDefs.put("sin", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
@@ -281,6 +273,14 @@ public class OperandiScript implements Runnable, Disposable {
     extDefs.put("time", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         return new M((int)System.currentTimeMillis());
+      }
+    });
+    extDefs.put("base", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length <= 1) {
+          return null;
+        } 
+        return new M(Integer.toString(args[0].asInt(),args[1].asInt()));
       }
     });
     extDefs.put("uitree", new ExtCall() {
