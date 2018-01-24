@@ -1,10 +1,22 @@
 package com.pelleplutt.tuscedo.ui;
 
+import java.applet.AppletStub;
 import java.awt.Color;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FilenameFilter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.logging.FileHandler;
+import java.util.logging.Formatter;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import javax.swing.AbstractAction;
 import javax.swing.ActionMap;
@@ -18,6 +30,9 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultStyledDocument;
 import javax.swing.text.DocumentFilter;
 import javax.swing.text.DocumentFilter.FilterBypass;
+
+import com.pelleplutt.util.AppSystem;
+
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyleContext;
 
@@ -26,7 +41,7 @@ public class ACTextField extends JTextPane implements CaretListener {
   String userString = "";
   /** If user input is suggested from empty string */
   boolean userStringFullySuggested;
-  /** Suggestion model */
+  /** Suggestion model (~= unique strings of history)*/
   Model model;
   /** History */
   Model history;
@@ -59,6 +74,8 @@ public class ACTextField extends JTextPane implements CaretListener {
   static final KeyStroke upKey = KeyStroke.getKeyStroke(KeyEvent.VK_UP, 0);
   static final KeyStroke downKey = KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0);
   static final KeyStroke tabKey = KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0);
+  
+  Logger logger = null;
   
   public ACTextField() {
     setDocument(new DefaultStyledDocument());
@@ -144,12 +161,15 @@ public class ACTextField extends JTextPane implements CaretListener {
   }
   
   /**
-   * Adds a suggestion to the suggestion model
+   * Adds a text to the history. The text is also added to suggestion model.
    * @param text
    */
-  public void addSuggestion(String text) {
+  public void addHistory(String text) {
     if (history.size() == 0 || !history.get(history.size()-1).equals(text)) {
       history.add(text);
+      if (logger != null) {
+        logger.log(Level.INFO, text);
+      }
     }
     if (!model.suggestions.contains(text)) {
       model.add(text);
@@ -545,6 +565,74 @@ public class ACTextField extends JTextPane implements CaretListener {
     }
   }
   
+  void readHistory(File f) {
+    BufferedReader br = null;
+    try {
+      int len = -1;
+      br = new BufferedReader(new FileReader(f));
+      String entry = "";
+      for (String line; (line = br.readLine()) != null; ) {
+        if (len < 0) {
+          if (entry.length() > 0) {
+            addHistory(entry);
+          }
+          len = Integer.parseInt(line);
+          entry = "";
+        } else {
+          entry += line;
+          len -= line.length() + 1;
+          if (len > 0) entry += "\n";
+        }
+      }
+      if (entry.length() > 0) {
+        addHistory(entry);
+      }
+    } catch (Throwable t) {
+      t.printStackTrace();
+    } finally {
+      AppSystem.closeSilently(br);
+    }
+  }
+  
+  public void setupHistory(String path, int maxSize, int maxFiles) {
+    // read previous logs and populate history and suggestions
+    File dir = new File(path);
+    final String filter = dir.getName();
+    dir = dir.getParentFile();
+    File[] files = dir.listFiles(new FilenameFilter() {
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.startsWith(filter);
+      }
+    });
+    Arrays.sort(files, new Comparator<File>() {
+      public int compare(File f1, File f2)
+      {
+        return Long.valueOf(f1.lastModified()).compareTo(f2.lastModified());
+      }
+    });
+    for (File f : files) {
+      if (f.getName().endsWith(".lck")) continue;
+      readHistory(f);
+    }
+    // setup logger
+    try {
+      FileHandler fh = new FileHandler(path, maxSize, maxFiles, true);
+      fh.setFormatter(new ACTFFormatter());
+  
+      logger = Logger.getLogger("tusc.logger."+path);
+      logger.setUseParentHandlers(false);
+      logger.addHandler(fh);
+    } catch (Throwable t) {
+      logger = null;
+      t.printStackTrace();
+    }
+  }
+  
+  public void disableHistory() {
+    logger = null;
+  }
+  
   /**
    * Sets a suggestion listener. This listener will be called with list of suggestions, or with
    * null if there are no suggestions.
@@ -573,6 +661,13 @@ public class ACTextField extends JTextPane implements CaretListener {
         suggestions = new ArrayList<String>();
       }
       suggestions.add(t);
+    }
+  }
+  
+  class ACTFFormatter extends Formatter {
+    @Override
+    public String format(LogRecord record) {
+      return record.getMessage().length() + "\n" + record.getMessage() + "\n";
     }
   }
 }

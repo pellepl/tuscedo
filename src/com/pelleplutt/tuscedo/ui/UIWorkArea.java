@@ -333,6 +333,9 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
           return sugs;
         }
       });
+      String histPath = System.getProperty("user.home") + File.separator + 
+          Essential.userSettingPath + File.separator + Essential.historyFile + i;
+      input[i].setupHistory(histPath, 4096, 1024); // TODO configurable
       defineAction(input[i], "input.find", "ctrl+f", actionOpenFind);
       defineAction(input[i], "input.findback", "ctrl+shift+f", actionOpenFindBack);
       defineAction(input[i], "input.findregx", "alt+f", actionOpenFindRegex);
@@ -659,7 +662,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     }
     String in = input[istate].getText(); 
     if (!input[istate].isForcedModel() && in.length() > 0 && !shift) {
-      input[istate].addSuggestion(in);
+      input[istate].addHistory(in);
     }
     input[istate].resetLastSuggestionIndex();
     switch (istate) {
