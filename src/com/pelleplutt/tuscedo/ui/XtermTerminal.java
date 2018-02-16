@@ -1,6 +1,7 @@
 package com.pelleplutt.tuscedo.ui;
 
 import com.pelleplutt.tuscedo.Console;
+import com.pelleplutt.tuscedo.InputCapable;
 import com.pelleplutt.tuscedo.ProcessGroup;
 import com.pelleplutt.tuscedo.ProcessGroupInfo;
 import com.pelleplutt.tuscedo.ProcessHandler;
@@ -24,7 +25,7 @@ import com.pelleplutt.util.Log;
  */
 public class XtermTerminal implements Console, XConsole, Disposable, Runnable {
   FastTermPane ftp;
-  ProcessHandler ph;
+  InputCapable input;
   XtermParserTerminal xstd, xerr;
   volatile boolean running = true;
   long tick = 50;
@@ -32,20 +33,20 @@ public class XtermTerminal implements Console, XConsole, Disposable, Runnable {
   FastTextPane.Doc alternateDoc;
   boolean alternateScreenBuffer;
   
-  public XtermTerminal(FastTermPane ftp, ProcessHandler ph, String textEncoding) {
+  public XtermTerminal(FastTermPane ftp, InputCapable input, String textEncoding) {
     this.ftp = ftp;
-    this.ph = ph;
+    this.input = input;
     originalDoc = ftp.getDocument();
     alternateDoc = new FastTextPane.Doc();
-    if (ph != null) {
+    if (input != null) {
       ftp.setKeyListener(new XtermKeyListener() {
         @Override
         public void sendVT(byte[] b) {
-          XtermTerminal.this.ph.sendToStdIn(b);
+          XtermTerminal.this.input.sendToStdIn(b);
         }
         @Override
         public void sendVT(byte b) {
-          XtermTerminal.this.ph.sendToStdIn(b);
+          XtermTerminal.this.input.sendToStdIn(b);
         }
       });
     }
@@ -126,7 +127,10 @@ public class XtermTerminal implements Console, XConsole, Disposable, Runnable {
   @Override
   public void setAlternateScreenBuffer(FastTermPane ftp, boolean b) {
     FastTextPane.Doc alt = alternateDoc;
-    ProcessGroup pg = ph == null ? null : ph.getLinkedProcess();
+    ProcessGroup pg = null;
+    if (input != null && input instanceof ProcessHandler) {
+      pg = ((ProcessHandler)input).getLinkedProcess();
+    }
     Log.println("set alt screen for " + (pg == null ? "null" : pg.toString()) + " : " + b);
     if (pg != null) {
       ProcessGroupInfo pgi = (ProcessGroupInfo)pg.getUserData();
