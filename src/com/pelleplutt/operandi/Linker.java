@@ -465,7 +465,7 @@ public class Linker implements ByteCode {
       m = new M(((TACFloat)t).x);
     }
     else if (t instanceof TACString) {
-      m = new M(((TACString)t).x);
+      m = new M(Compiler.stringify(((TACString)t).x));
     }
     else if (t instanceof TACCode) {
       if (((TACCode)t).ffrag != null) {
