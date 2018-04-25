@@ -350,6 +350,16 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       defineAction(input[i], "input.help", "f1", actionShowHelp);
       defineAction(input[i], "input.addtab", "ctrl+shift+t", actionAddTab);
       defineAction(input[i], "input.closetab", "ctrl+d", actionCloseTab);
+      defineAction(input[i], "input.seltab1", "ctrl+shift+1", actionSelTab1);
+      defineAction(input[i], "input.seltab2", "ctrl+shift+2", actionSelTab2);
+      defineAction(input[i], "input.seltab3", "ctrl+shift+3", actionSelTab3);
+      defineAction(input[i], "input.seltab4", "ctrl+shift+4", actionSelTab4);
+      defineAction(input[i], "input.seltab5", "ctrl+shift+5", actionSelTab5);
+      defineAction(input[i], "input.seltab6", "ctrl+shift+6", actionSelTab6);
+      defineAction(input[i], "input.seltab7", "ctrl+shift+7", actionSelTab7);
+      defineAction(input[i], "input.seltab8", "ctrl+shift+8", actionSelTab8);
+      defineAction(input[i], "input.seltab9", "ctrl+shift+9", actionSelTab9);
+      defineAction(input[i], "input.seltab10", "ctrl+shift+0", actionSelTab10);
       defineAction(input[i], "input.bash", "ctrl+b", actionOpenBash);
       defineAction(input[i], "input.complete", "ctrl+space", actionOpenCompletion);
       defineAction(input[i], "log.input.split", "ctrl+w", actionSplit);
@@ -652,6 +662,10 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     }
   }
   
+  public OperandiScript getScript() {
+    return script;
+  }
+  
   void actionInputEnter(boolean shift) {
     if (winSug.isVisible()) {
       input[istate].setFilterNewLine(false);
@@ -789,7 +803,11 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   }
   
   public void appendViewText(View view, String text, FastTextPane.Style style) {
-    view.ftp.addText(text, style);
+    if (getParent() == null || !isVisible()) {
+      System.out.print(text);
+    } else {
+      view.ftp.addText(text, style);
+    }
   }
   
   String serialMatch(final String prefix, final String in, final String[] defs, 
@@ -1005,6 +1023,12 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     }
   }
   
+  void selectTab(int ix) {
+    UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent(this); 
+    UISimpleTabPane stp = t.getPane();
+    stp.selectTab(ix);
+  }
+  
   void openSerialConfig() {
     String[] prevDev = prevSerialDevices;
     String[] devices = serial.getDevices();
@@ -1182,7 +1206,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     @Override
     public void actionPerformed(ActionEvent e) {
       Tuscedo.inst().addWorkAreaTab(
-          UISimpleTabPane.getTabByComponent(UIWorkArea.this).getPane());
+          UISimpleTabPane.getTabByComponent(UIWorkArea.this).getPane(), null);
     }
   };
 
@@ -1190,6 +1214,67 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     @Override
     public void actionPerformed(ActionEvent e) {
       closeTab();
+    }
+  };
+
+  AbstractAction actionSelTab1 = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      selectTab(0);
+    }
+  };
+  AbstractAction actionSelTab2 = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      selectTab(1);
+    }
+  };
+  AbstractAction actionSelTab3 = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      selectTab(2);
+    }
+  };
+  AbstractAction actionSelTab4 = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      selectTab(3);
+    }
+  };
+  AbstractAction actionSelTab5 = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      selectTab(4);
+    }
+  };
+  AbstractAction actionSelTab6 = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      selectTab(5);
+    }
+  };
+  AbstractAction actionSelTab7 = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      selectTab(6);
+    }
+  };
+  AbstractAction actionSelTab8 = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      selectTab(7);
+    }
+  };
+  AbstractAction actionSelTab9 = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      selectTab(8);
+    }
+  };
+  AbstractAction actionSelTab10 = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      selectTab(9);
     }
   };
 

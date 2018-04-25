@@ -8,8 +8,8 @@ import java.awt.Point;
 import java.awt.Window;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.File;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,8 +19,6 @@ import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
-
-import purejavacomm.CommPortIdentifier;
 
 import com.pelleplutt.tuscedo.ui.UICanvasPanel;
 import com.pelleplutt.tuscedo.ui.UIGraphPanel;
@@ -96,7 +94,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     }
   }
 
-  public void create() {
+  public void create(UIWorkArea uiw) {
     JFrame f = new JFrame();
     f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
     f.getContentPane().setLayout(new BorderLayout());
@@ -110,15 +108,16 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     TuscedoTabPane tabs = new TuscedoTabPane();
     tabs.setFont(UIWorkArea.COMMON_FONT);
 
-    addWorkAreaTab(tabs);
+    addWorkAreaTab(tabs, uiw);
+
     mainContainer.add(tabs);
     tabs.addWindowListener(tabs, f);
     
     f.setVisible(true);
   }
   
-  public String addWorkAreaTab(UISimpleTabPane stp) {
-    UIWorkArea w = new UIWorkArea();
+  public String addWorkAreaTab(UISimpleTabPane stp, UIWorkArea w) {
+    if (w == null) w = new UIWorkArea();
     w.build();
     Tab t = stp.createTab("", w);
     stp.selectTab(t);
@@ -197,14 +196,14 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     } catch (Throwable ignore) {
     }
     
-    @SuppressWarnings("rawtypes")
-    Enumeration e = purejavacomm.CommPortIdentifier.getPortIdentifiers();
-    while (e.hasMoreElements()) {
-      CommPortIdentifier portId = (CommPortIdentifier) e.nextElement();
-      if (portId.getPortType() == CommPortIdentifier.PORT_SERIAL) {
-        System.out.println(portId.getName());
-      }
-    }
+//    @SuppressWarnings("rawtypes")
+//    Enumeration e = purejavacomm.CommPortIdentifier.getPortIdentifiers();
+//    while (e.hasMoreElements()) {
+//      CommPortIdentifier portId = (CommPortIdentifier) e.nextElement();
+//      if (portId.getPortType() == CommPortIdentifier.PORT_SERIAL) {
+//        System.out.println(portId.getName());
+//      }
+//    }
     
 /*    SerialPort port;
     try {
@@ -230,12 +229,18 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       // TODO Auto-generated catch block
       e1.printStackTrace();
     }
-  */  
-    EventQueue.invokeLater(new Runnable() {
-      public void run() {
-        Tuscedo.inst().create();
-      }
-    });
+  */
+    if (args.length > 0 && args[0].endsWith(".op")) {
+      UIWorkArea wa = new UIWorkArea();
+      wa.build();
+      wa.getScript().runScript(wa, new File(args[0]), args[0]);
+    } else {
+      EventQueue.invokeLater(new Runnable() {
+        public void run() {
+          Tuscedo.inst().create(null);
+        }
+      });
+    }
   }
 
   @Override
@@ -255,27 +260,27 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
 
   @Override
   public void onRemoved(UIO parent, UIO child) {
-    System.out.println("onRemoved  " + stringify(child.getUIInfo(), 0) + " from " + stringify(parent.getUIInfo(), 0));
+    //System.out.println("onRemoved  " + stringify(child.getUIInfo(), 0) + " from " + stringify(parent.getUIInfo(), 0));
   }
 
   @Override
   public void onAdded(UIO parent, UIO child) {
-    System.out.println("onAdded    " + stringify(child.getUIInfo(), 0) + "  to  " + stringify(parent.getUIInfo(), 0));
+    //System.out.println("onAdded    " + stringify(child.getUIInfo(), 0) + "  to  " + stringify(parent.getUIInfo(), 0));
   }
 
   @Override
   public void onClosed(UIO parent, UIO child) {
-    System.out.println("onClosed   " + 
-      stringify(child.getUIInfo(), 0) + 
-      "  in  " + 
-      (parent == null ? "null":stringify(parent.getUIInfo(), 0)));
+//    System.out.println("onClosed   " + 
+//      stringify(child.getUIInfo(), 0) + 
+//      "  in  " + 
+//      (parent == null ? "null":stringify(parent.getUIInfo(), 0)));
     uiobjects.remove(child.getUIInfo().getId());
   }
 
   @Override
   public void onCreated(UIInfo i) {
     uiobjects.put(i.getId(), i);
-    System.out.println("onCreated  " + stringify(i, 0));
+//    System.out.println("onCreated  " + stringify(i, 0));
   }
 
   @Override

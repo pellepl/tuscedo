@@ -7,14 +7,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
-import java.net.InetAddress;
-import java.net.InterfaceAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,10 +35,10 @@ import com.pelleplutt.tuscedo.ui.UIGraphPanel.SampleSet;
 import com.pelleplutt.tuscedo.ui.UIInfo;
 import com.pelleplutt.tuscedo.ui.UIO;
 import com.pelleplutt.tuscedo.ui.UISimpleTabPane;
+import com.pelleplutt.tuscedo.ui.UISimpleTabPane.Tab;
 import com.pelleplutt.tuscedo.ui.UIWorkArea;
 import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.AppSystem.Disposable;
-import com.pelleplutt.util.AppSystem.ProcessResult;
 import com.pelleplutt.util.Log;
 import com.pelleplutt.util.io.Port;
 
@@ -924,7 +918,12 @@ public class OperandiScript implements Runnable, Disposable {
           }
         }
         
-        String id = Tuscedo.inst().addGraphTab(UISimpleTabPane.getTabByComponent(currentWA).getPane(), vals);
+        Tab t = UISimpleTabPane.getTabByComponent(currentWA);
+        if (t == null) {
+          Tuscedo.inst().create(currentWA);
+          t = UISimpleTabPane.getTabByComponent(currentWA);
+        }
+        String id = Tuscedo.inst().addGraphTab(t.getPane(), vals);
         SampleSet ui = ((SampleSet)Tuscedo.inst().getUIObject(id).getUI()); 
         ui.setGraphType(type);
         ui.getUIInfo().setName(name);
