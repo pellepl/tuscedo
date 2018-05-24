@@ -32,7 +32,9 @@ import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
+import com.pelleplutt.Essential;
 import com.pelleplutt.tuscedo.ui.UIInfo.UIListener;
+import com.pelleplutt.util.AppSystem;
 
 public class UISimpleTabPane extends JPanel implements UIO {
   JPanel tabPanel;
@@ -400,6 +402,11 @@ public class UISimpleTabPane extends JPanel implements UIO {
       w.setLocation(location);
     }
     addWindowListener(newPane, w);
+    try {
+      w.setIconImage(AppSystem.loadImage("tuscedo.png"));
+      w.setTitle(Essential.name + " " + Essential.vMaj + "." + Essential.vMin + "." + Essential.vMic);
+    } catch (Throwable t) {}
+
     w.setVisible(true);
   }
   

@@ -21,6 +21,13 @@
             </fileset>
         </copy>
         <copy includeemptydirs="false" todir="bin">
+            <fileset dir="res">
+                <exclude name="**/*.launch"/>
+                <exclude name="**/*.java"/>
+                <exclude name="**/test/**" />
+            </fileset>
+        </copy>
+        <copy includeemptydirs="false" todir="bin">
             <fileset dir="java-utils/res">
                 <exclude name="**/*.launch"/>
                 <exclude name="**/*.java"/>

@@ -20,6 +20,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 
+import com.pelleplutt.Essential;
 import com.pelleplutt.tuscedo.ui.UICanvasPanel;
 import com.pelleplutt.tuscedo.ui.UIGraphPanel;
 import com.pelleplutt.tuscedo.ui.UIInfo;
@@ -112,6 +113,11 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
 
     mainContainer.add(tabs);
     tabs.addWindowListener(tabs, f);
+    
+    try {
+      f.setIconImage(AppSystem.loadImage("tuscedo.png"));
+      f.setTitle(Essential.name + " " + Essential.vMaj + "." + Essential.vMin + "." + Essential.vMic);
+    } catch (Throwable t) {}
     
     f.setVisible(true);
   }
