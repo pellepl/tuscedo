@@ -12,10 +12,15 @@ import java.awt.Paint;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.Toolkit;
 import java.awt.Window;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.ActionEvent;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
+import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.io.File;
@@ -333,6 +338,49 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
           return sugs;
         }
       });
+      final int curi = i;
+      input[i].addMouseListener(new MouseAdapter() {
+        String __str = null;
+        int __ix;
+        @Override
+        public void mousePressed(MouseEvent e) {
+          if (e.getButton() == MouseEvent.BUTTON2) {
+            String s = views[curi].ftp.getSelectedText();
+            if (s != null) {
+              int start_ix = input[curi].getCaretPosition();
+              int end_ix = start_ix;
+              String curs = input[curi].getText();
+              if (input[curi].getSelectionStart() != end_ix) {
+                start_ix = input[curi].getSelectionStart();
+                end_ix = input[curi].getSelectionEnd();
+              }
+              try {
+                __str = curs.substring(0, start_ix) + s + curs.substring(end_ix);
+                __ix = start_ix + s.length();
+                input[curi].setText(__str);
+                input[curi].setCaretPosition(__ix);
+                
+              } catch (Exception ignore) {}
+            } else {
+              __str = null;
+            }
+          }
+        }
+        public void mouseClicked(MouseEvent e) {
+          // super duper ugly work around for linux's middle button text paster
+          // which is not accessible from java
+          if (e.getButton() == MouseEvent.BUTTON2) {
+            if (__str != null) {
+              try {
+                input[curi].setText(__str);
+                input[curi].setCaretPosition(__ix);
+              } catch (Exception ignore) {}
+              __str = null;
+            }
+          }
+        }
+      });
+      
       String histPath = System.getProperty("user.home") + File.separator + 
           Essential.userSettingPath + File.separator + Essential.historyFile + i;
       input[i].setupHistory(histPath, 4096, 1024); // TODO configurable

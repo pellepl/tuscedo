@@ -1,0 +1,2 @@
+#!/bin/bash
+java -jar /home/petera/proj/tuscedo/deploy/tuscedo.jar "$@"

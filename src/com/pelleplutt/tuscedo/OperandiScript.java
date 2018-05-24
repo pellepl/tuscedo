@@ -369,6 +369,19 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
+    extDefs.put("__help", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        for (String k : extDefs.keySet()) {
+          if (k.startsWith("__")) continue;
+          currentWA.appendViewText(currentWA.getCurrentView(), k + "\n", UIWorkArea.STYLE_SERIAL_INFO);
+        }
+        for (String k : extDefs.keySet()) {
+          if (!k.startsWith("__")) continue;
+          currentWA.appendViewText(currentWA.getCurrentView(), k + "\n", UIWorkArea.STYLE_SERIAL_INFO);
+        }
+        return null;
+      }
+    });
     createGraphFunctions(extDefs);
     createCanvasFunctions(extDefs);
     createTuscedoTabPaneFunctions(extDefs);
@@ -740,14 +753,16 @@ public class OperandiScript implements Runnable, Disposable {
     });
     extDefs.put(FN_SERIAL_LOG_STOP, new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
+        String s = null;
         synchronized (logLock) {
+          s = log == null ? "" : log.toString();
           logThread = null;
           AppSystem.closeSilently(log);
           log = null;
           AppSystem.closeSilently(login);
           logLock.notifyAll();
         }
-        return null;
+        return new M(s);
       }
     });
     extDefs.put(FN_SERIAL_LOG_AWAIT, new ExtCall() {
@@ -787,7 +802,7 @@ public class OperandiScript implements Runnable, Disposable {
             // timeout
             logMatchIx = 0;
             logMatch = null;
-            return new M(0);
+            return new M(-1);
           }
         } // synchro
       }

@@ -1,9 +1,11 @@
 package com.pelleplutt.operandi.proc;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,10 +21,8 @@ import com.pelleplutt.operandi.Grammar;
 import com.pelleplutt.operandi.Linker;
 import com.pelleplutt.operandi.Source;
 import com.pelleplutt.operandi.StructAnalysis;
-import com.pelleplutt.operandi.proc.Processor.M;
 import com.pelleplutt.operandi.proc.ProcessorError.ProcessorBreakpointError;
 import com.pelleplutt.operandi.proc.ProcessorError.ProcessorFinishedError;
-import com.pelleplutt.util.Log;
 
 public class Processor implements ByteCode {
   public static final int VERSION = 0x00000001;
@@ -262,6 +262,9 @@ public class Processor implements ByteCode {
     extDefs.put("randseed", new EC_randseed());
     extDefs.put("cpy", new EC_cpy());
     extDefs.put("byte", new EC_byte());
+    extDefs.put("strstr", new EC_strstr());
+    extDefs.put("strstrr", new EC_strstrr());
+    extDefs.put("lines", new EC_lines());
     extDefs.put("__dbg", new EC_dbg(out));
     extDefs.put("__const", new EC_const());
     extDefs.put("__mem", new EC_mem());
@@ -2266,8 +2269,71 @@ public class Processor implements ByteCode {
       }
     }
   }
+  static class EC_strstr extends ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length < 2 || args.length > 3) {
+        return null;
+      } else {
+        M res = new M();
+        res.type = TINT;
+        M str = args[0];
+        M pat = args[1];
+        int from = 0;
+        if (args.length == 3) {
+          from = args[2].asInt();
+        }
+        if (str.type == TSTR) {
+          res.i = str.asString().indexOf(pat.asString(), from);
+        } else {
+          res.i = -1;
+        }
+        return res;
+      }
+    }
+  }
+  static class EC_strstrr extends ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length < 2 || args.length > 3) {
+        return null;
+      } else {
+        M res = new M();
+        res.type = TINT;
+        M str = args[0];
+        M pat = args[1];
+        int from = 0;
+        if (args.length == 3) {
+          from = args[2].asInt();
+        }
+        if (str.type == TSTR) {
+          res.i = str.asString().lastIndexOf(pat.asString(), from);
+        } else {
+          res.i = -1;
+        }
+        return res;
+      }
+    }
+  }
   
-  
+  static class EC_lines extends ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length != 1) {
+        return null;
+      } else {
+        MListMap mlist = new MListMap();
+        mlist.makeArr();
+        String str = args[0].asString();
+        BufferedReader bufReader = new BufferedReader(new StringReader(str));
+        String line;
+        try {
+          while((line = bufReader.readLine()) != null) {
+            mlist.add(new M(line));
+          }
+        } catch (IOException ignore) {}
+        return new M(mlist);
+      }
+    }
+  }
+
   public static M compileAndRun(String... sources) {
     return compileAndRun(0x0000, 0x4000, null, false, false, sources);
   }
