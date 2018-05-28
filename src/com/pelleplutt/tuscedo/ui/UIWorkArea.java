@@ -345,9 +345,10 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
         @Override
         public void mousePressed(MouseEvent e) {
           if (e.getButton() == MouseEvent.BUTTON2) {
+            View view = getCurrentView();
             String s = null;
-            if (views[curi] != null && views[curi].ftp != null) {
-              s = views[curi].ftp.getSelectedText();
+            if (view != null && view.ftp != null) {
+              s = view.ftp.getSelectedText();
             }
             if (s != null) {
               int start_ix = input[curi].getCaretPosition();

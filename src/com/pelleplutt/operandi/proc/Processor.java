@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -266,6 +267,7 @@ public class Processor implements ByteCode {
     extDefs.put("strstrr", new EC_strstrr());
     extDefs.put("lines", new EC_lines());
     extDefs.put("__dbg", new EC_dbg(out));
+    extDefs.put("__dumpstack", new EC_dumpstack());
     extDefs.put("__const", new EC_const());
     extDefs.put("__mem", new EC_mem());
     extDefs.put("__sp", new EC_sp());
@@ -2168,6 +2170,19 @@ public class Processor implements ByteCode {
         }
       }
       return null;
+    }
+  } 
+  static class EC_dumpstack extends ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      String data = null;
+      try {
+        PrintStream ps = new PrintStream(baos, true, "UTF-8");
+        p.unwindStackTrace(ps);
+        data = new String(baos.toByteArray(), StandardCharsets.UTF_8);
+        ps.close();
+      } catch (Exception e) {}
+      return new M(data);
     }
   } 
   static class EC_const extends ExtCall {
