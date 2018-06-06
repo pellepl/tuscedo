@@ -1118,6 +1118,7 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("draw_text", "__canvas_draw_text", comp);
         addFunc("get_width", "__canvas_width", comp);
         addFunc("get_height", "__canvas_height", comp);
+        addFunc("__test", "__canvas_test", comp);
         addFunc("blit", "__canvas_blit", comp);
       }
     };
@@ -1242,6 +1243,14 @@ public class OperandiScript implements Runnable, Disposable {
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
         if (cp == null) return null;
         cp.blit();
+        return null;
+      }
+    });
+    extDefs.put("__canvas_test", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.__test();
         return null;
       }
     });

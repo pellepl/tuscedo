@@ -21,6 +21,7 @@ import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 
 import com.pelleplutt.Essential;
+import com.pelleplutt.tuscedo.ui.Scene3D;
 import com.pelleplutt.tuscedo.ui.UICanvasPanel;
 import com.pelleplutt.tuscedo.ui.UIGraphPanel;
 import com.pelleplutt.tuscedo.ui.UIInfo;
@@ -87,6 +88,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
             windows.remove(w);
             //Log.println("window deregistered " + windows.size());
             if (windows.isEmpty()) {
+              Tuscedo.onExit();
               AppSystem.disposeAll();
             }
           }
@@ -196,11 +198,25 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     }
   }
   
+  public static Scene3D test3d = new Scene3D();
+  
   public static void main(String[] args) {
     try {
       UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
     } catch (Throwable ignore) {
     }
+    
+    // lwjgl3 scene to bufferedimage
+    
+//    ByteBuffer nativeBuffer = BufferUtils.createByteBuffer(w*h*3);
+//    BufferedImage image = new BufferedImage(w, h, BufferedImage.TYPE_3BYTE_BGR);
+//    GL11.glReadPixels(0, 0, w, h, GL12.GL_BGR, GL11.GL_UNSIGNED_BYTE, nativeBuffer);
+//    byte[] imgData = ((DataBufferByte)image.getRaster().getDataBuffer()).getData();
+//    nativeBuffer.get(imgData);
+
+
+    
+    // purejavacomm
     
 //    @SuppressWarnings("rawtypes")
 //    Enumeration e = purejavacomm.CommPortIdentifier.getPortIdentifiers();
@@ -246,6 +262,53 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
           Tuscedo.inst().create(null);
         }
       });
+      test3d.init();
+      test3d.render();
+      render3dloop();
+    }
+  } // main
+  
+  static final Object renderLock = new Object();
+  static boolean rendering = false;
+  
+  static void render3dloop() {
+    // start render loop, must be in the main thread
+    synchronized (test3d) {
+      while (inst.running) {
+        try {
+          test3d.wait();
+        } catch (InterruptedException ignore) {}
+        synchronized(renderLock) {
+          if (inst.running) {
+            test3d.render();
+          }
+          rendering = false;
+          renderLock.notifyAll();
+        }
+      }
+    }
+  }
+  
+  // called from another thread, commence 3d rendering and wait until finished
+  public void render3d() {
+    synchronized (test3d) {
+      test3d.notifyAll();
+    }
+    synchronized(renderLock) {
+      rendering = true;
+      while (running && rendering) {
+        try {
+          renderLock.wait(100);
+        } catch (InterruptedException ignore) {}
+      }
+    }
+  }
+  
+  static void onExit() {
+    inst.running = false;
+    test3d.destroy();
+    synchronized (test3d) {
+      test3d.notifyAll();
     }
   }
 

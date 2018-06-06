@@ -13,6 +13,8 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JViewport;
 
+import com.pelleplutt.tuscedo.Tuscedo;
+
 public class UICanvasPanel extends JPanel implements UIO {
   volatile BufferedImage pri, sec;
   JScrollPane scrl;
@@ -120,5 +122,12 @@ public class UICanvasPanel extends JPanel implements UIO {
           RenderingHints.VALUE_ANTIALIAS_ON);
       g.drawImage(pri,0,0,this);
     }
+  }
+
+  public void __test() {
+    Graphics2D g = getSecGraphics();
+    Tuscedo.inst().render3d();
+    BufferedImage bi = Tuscedo.test3d.getImage();
+    g.drawImage(bi, 0, 0, null);
   }
 }
