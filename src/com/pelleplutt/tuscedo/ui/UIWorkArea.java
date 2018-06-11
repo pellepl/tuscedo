@@ -161,9 +161,6 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   StringBuilder lineBuffer = new StringBuilder();
   List<RxFilter> serialFilters = new ArrayList<RxFilter>();
   Map<String, SerialNotifierInfo> serialNotifiers = new HashMap<String, SerialNotifierInfo>();
-  List<M> filterCallArgs = new ArrayList<M>();
-  M filterCallArg0 = new M("");
-  M filterCallArg1 = new M("");
 
   static String[] prevSerialDevices;
   
@@ -237,8 +234,6 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     script = new OperandiScript();
     AppSystem.addDisposable(script);
     Tuscedo.inst().registerTickable(serial);
-    filterCallArgs.add(filterCallArg0);
-    filterCallArgs.add(filterCallArg1);
   }
   
   public static void decorateFTP(FastTextPane ftp) {
@@ -1426,12 +1421,12 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       views[ISTATE_INPUT].xterm.stdout(b, b.length);
     }
     final UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent(UIWorkArea.this);
-    if (!t.isNotified()) {
-      t.markNotified(true);
+    if (t.isNotified() != 1) {
+      t.markNotified(1);
       Tuscedo.inst().getTimer().addTask(new Runnable() {
         @Override
         public void run() {
-          t.markNotified(false);
+          t.markNotified(2);
         }
       }, 1000);
     }
@@ -1451,11 +1446,12 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   }
   
   void handleSerialLine(String s) {
-    filterCallArg0.str = s;
     for (RxFilter f : serialFilters) {
       if (s.contains(f.filter)) {
-        filterCallArg1.str = f.filter;
-        script.runFunc(this, f.addr, filterCallArgs);
+        List<M> umargs = new ArrayList<M>();
+        umargs.add(new M(s));
+        umargs.add(new M(f.filter));
+        script.runFunc(this, f.addr, umargs);
       }
     }
   }

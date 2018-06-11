@@ -1,6 +1,5 @@
 package com.pelleplutt.tuscedo.ui;
 
-import java.applet.AppletStub;
 import java.awt.Color;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
@@ -567,17 +566,29 @@ public class ACTextField extends JTextPane implements CaretListener {
   
   void readHistory(File f) {
     BufferedReader br = null;
+    int lnbr = 0;
     try {
       int len = -1;
       br = new BufferedReader(new FileReader(f));
       String entry = "";
       for (String line; (line = br.readLine()) != null; ) {
-        if (len < 0) {
+        lnbr++;
+        if (len <= 0) {
           if (entry.length() > 0) {
             addHistory(entry);
           }
-          len = Integer.parseInt(line);
           entry = "";
+          if (!line.trim().isEmpty()) {
+            try {
+              len = Integer.parseInt(line);
+            } catch (NumberFormatException nfe) {
+              System.err.println("error reading history " + f.getAbsolutePath() + " @ line " + lnbr);
+              nfe.printStackTrace();
+              len = -1;
+            }
+          } else {
+            len = -1;
+          }
         } else {
           entry += line;
           len -= line.length() + 1;

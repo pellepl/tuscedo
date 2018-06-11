@@ -967,7 +967,9 @@ public class OperandiScript implements Runnable, Disposable {
       public Processor.M exe(Processor p, Processor.M[] args) {
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
         if (ss == null) return null;
-        ((UIGraphPanel)ss.getUIInfo().getParent().getUI()).zoomAll(true, true, new Point(0,0));
+        if (!((UIGraphPanel)ss.getUIInfo().getParent().getUI()).isUserZoomed()) {
+          ((UIGraphPanel)ss.getUIInfo().getParent().getUI()).zoomAll(true, true, new Point(0,0));
+        }
         return null;
       }
     });

@@ -266,6 +266,7 @@ public class Processor implements ByteCode {
     extDefs.put("strstr", new EC_strstr());
     extDefs.put("strstrr", new EC_strstrr());
     extDefs.put("lines", new EC_lines());
+    extDefs.put("atoi", new EC_atoi());
     extDefs.put("__dbg", new EC_dbg(out));
     extDefs.put("__dumpstack", new EC_dumpstack());
     extDefs.put("__const", new EC_const());
@@ -2345,6 +2346,24 @@ public class Processor implements ByteCode {
           }
         } catch (IOException ignore) {}
         return new M(mlist);
+      }
+    }
+  }
+
+  static class EC_atoi extends ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length < 1) {
+        return null;
+      } else {
+        float res = 0;
+        try {
+          if (args.length == 1) {
+            res = Float.parseFloat(args[0].asString());
+          } else {
+            res = Integer.parseInt(args[0].asString(), args[1].asInt());
+          }
+        } catch (Exception ignore) {}
+        return new M(res);
       }
     }
   }

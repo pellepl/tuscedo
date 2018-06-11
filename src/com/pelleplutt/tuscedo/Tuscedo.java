@@ -198,7 +198,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     }
   }
   
-  public static Scene3D test3d = new Scene3D();
+  public static Scene3D test3d = null; //new Scene3D();
   
   public static void main(String[] args) {
     try {
@@ -262,9 +262,9 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
           Tuscedo.inst().create(null);
         }
       });
-      test3d.init();
-      test3d.render();
-      render3dloop();
+//      test3d.init();
+//      test3d.render();
+//      render3dloop();
     }
   } // main
   
@@ -306,10 +306,10 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   
   static void onExit() {
     inst.running = false;
-    test3d.destroy();
-    synchronized (test3d) {
-      test3d.notifyAll();
-    }
+//    test3d.destroy();
+//    synchronized (test3d) {
+//      test3d.notifyAll();
+//    }
   }
 
   @Override

@@ -40,13 +40,18 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   static DecimalFormat decFormat = new DecimalFormat("#.##");
   int oldW, oldH;
   boolean draggingTriggered;
-  boolean dragging;
+  boolean dragging, dragVeri, dragHori;
   int selAnchorX, selAnchorY;
   int selEndX, selEndY;
   List<SampleSet> sets = new ArrayList<SampleSet>();
   static int __id = 0;
   final UIInfo uiinfo;
   public UIInfo getUIInfo() {return uiinfo;}
+  boolean userZoomed = false;
+  
+  boolean selActive, selAllX, selAllY;
+  double selMinYSample, selMaxYSample;
+  int selMinXSample, selMaxXSample;
 
 
   static final Color colGraph[] = {
@@ -70,6 +75,17 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       colGraphFade[i] = new Color(colGraph[i].getRed(), colGraph[i].getGreen(), colGraph[i].getBlue(), 98);
     }
   }
+  static final Color colGraphMark[];
+  static {
+    colGraphMark = new Color[colGraph.length];
+    for (int i = 0; i < colGraph.length; i++) {
+      colGraphMark[i] = new Color(
+          Math.min(255, 64 + colGraph[i].getRed()), 
+          Math.min(255, 64 + colGraph[i].getGreen()), 
+          Math.min(255, 64 + colGraph[i].getBlue()), 
+          240);
+    }
+  }
   Color colSelEdge = new Color(0,255,255,128);
   Color colSelArea = new Color(0,255,255,64);
 
@@ -83,14 +99,14 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     final UIInfo uiinfo;
     public UIInfo getUIInfo() {return uiinfo;}
     double mul = 1.0;
-    
+    boolean detail;
+
     public SampleSet(String name) {
       uiinfo = new UIInfo(this, "samples" + __id, name);
       UIInfo.fireEventOnCreated(uiinfo);
       __id++;
     }
-    
-    
+
     public void setGraphType(int type) {
       graphType = type;
     }
@@ -114,9 +130,15 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     }
 
     protected void addSampleInternal(double sample) {
-      minSample = sample < minSample ? sample : minSample; 
-      maxSample = sample > maxSample ? sample : maxSample; 
+      if (samples.isEmpty()) {
+        minSample = sample; 
+        maxSample = sample;
+      } else {
+        minSample = sample < minSample ? sample : minSample; 
+        maxSample = sample > maxSample ? sample : maxSample;
+      }
       samples.add(sample);
+      sum += sample;
     }
 
     public int getSampleCount() {
@@ -168,7 +190,15 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         ((UIGraphPanel)par.getUI()).sampleUpdate();
       }
     }
-  }
+    
+    public boolean isDetailed() {
+      return detail;
+    }
+    
+    public void setDetailed(boolean d) {
+      detail = d;
+    }
+  } // class SampleSet
   
   public UIGraphPanel(String name) {
     uiinfo = new UIInfo(this, "graph" + __id, null);
@@ -187,7 +217,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     renderer.addMouseWheelListener(mouseHandler);
     renderer.addMouseListener(mouseHandler);
     renderer.addMouseMotionListener(mouseHandler);
-    renderer.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 8));
+    renderer.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 9));
     addComponentListener(new ComponentAdapter() {
       @Override
       public void componentResized(ComponentEvent e) {
@@ -277,6 +307,31 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     int origoY = (int)(magVer * - minGSample);
     double scrollVal = magVer * ( getMaxSample() - minGSample ) - (origoY + val * magVer);
     scrl.getVerticalScrollBar().setValue((int)(scrollVal - getHeight()/2));
+  }
+  
+  public boolean isUserZoomed() {
+    return userZoomed;
+  }
+  
+  public void select(boolean allY, boolean allX, int sx, int sy, int ex, int ey) {
+    double maxSample = getMaxSample();
+    if (sy < ey) {
+      int tmp = sy;
+      sy = ey;
+      ey = tmp;
+    }
+    if (sx > ex) {
+      int tmp = sx;
+      sx = ex;
+      ex = tmp;
+    }
+    selAllY = allY;
+    selAllX = allX;
+    selMinYSample = maxSample - sy / magVer;
+    selMaxYSample = maxSample - ey / magVer;
+    selMinXSample = (int)(sx / magHor);
+    selMaxXSample = (int)((ex / magHor) + 1);
+    selActive = true;
   }
   
   class Renderer extends JPanel {
@@ -397,6 +452,12 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         int sy = Math.min(selAnchorY, selEndY);
         int ex = Math.max(selAnchorX, selEndX);
         int ey = Math.max(selAnchorY, selEndY);
+        if (dragHori) {
+          sx = -1; ex = ww + 1;
+        }
+        if (dragVeri) {
+          sy = -1; ey = hh + 1;
+        }
         g.fillRect(sx+1, sy+1, ex-sx, ey-sy);
         g.setColor(colSelEdge);
         g.drawRect(sx, sy, ex-sx, ey-sy);
@@ -408,14 +469,19 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         int xv = vpx + vpw - wwv - 2;
         int yv = vpy + 2;
         c = 0;
+        int hhv_inc = hhv;
         for (SampleSet set : sets) {
-          paintLegend(g, set.getUIInfo().getName(), 
+          if (set.isDetailed()) {
+            hhv_inc = hhv * 5;
+          }
+          paintLegend(g, set, 
               xv, yv, wwv, hhv, 
               c % colGraph.length);
           xv -= wwv + 2;
           if (xv < vpx + 100) {
             xv = vpx + vpw - wwv - 2;
-            yv += hhv + 2;
+            yv += hhv_inc + 2;
+            hhv_inc = hhv;
           }
           c++;
         }
@@ -423,15 +489,22 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     }
     
     Rectangle _clipR = new Rectangle();
-    void paintLegend(Graphics2D g, String txt, int x, int y, int w, int h, int c) {
+    void paintLegend(Graphics2D g, SampleSet set, int x, int y, int w, int h, int c) {
+      int bh = set.isDetailed() ? h*5 : h; 
       g.setColor(colGraphFade[c]);
-      g.fillRect(x, y, w, h);
+      g.fillRect(x, y, w, bh);
       g.setColor(colGraph[c]);
-      g.drawRect(x, y, w, h);
+      g.drawRect(x, y, w, bh);
       g.getClipBounds(_clipR);
-      g.setClip(x, y, w, h);
+      g.setClip(x, y, w, bh);
       g.setColor(Color.black);
-      g.drawString(txt, x+2, y + h - 2);
+      g.drawString(set.getUIInfo().getName(), x+2, y + h - 2);
+      if (set.isDetailed()) {
+        g.drawString(" <:" + set.getMin(), x+2, y + h*2 - 2);
+        g.drawString(" >:" + set.getMax(), x+2, y + h*3 - 2);
+        g.drawString(" ~:" + set.sum / set.getSampleCount(), x+2, y + h*4 - 2);
+        g.drawString(" #:" + set.getSampleCount(), x+2, y + h*5 - 2);
+      }
       g.setClip(_clipR);
     }
     
@@ -440,7 +513,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       int gw = (int)(magHor);
       for (int i = startSample; i <= endSample; i++) {
         int gx = (int)(i * magHor);
-        int gy = hh - (int)(magVer * (samples.get(i) * mul - minGSample));
+        double s = samples.get(i) * mul;
+        int gy = hh - (int)(magVer * (s - minGSample));
         int ymin = hh - origoY;
         int ymax = gy;
         if (ymax < ymin) {
@@ -448,13 +522,29 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
           ymin = ymax;
           ymax = t;
         }
-        if (gw < 3) {
-          g.drawLine(gx, ymin, gx, ymax);
+        boolean sel = selActive &&
+            (selAllX || (i > selMinXSample && i < selMaxXSample)) &&
+            (selAllY || (s > selMinYSample && s < selMaxYSample));
+        if (sel) {
+          g.setColor(colGraphMark[colIx]);
+          if (gw < 3) {
+            g.drawLine(gx-1, ymin, gx-1, ymax);
+            g.drawLine(gx, ymin, gx, ymax);
+            g.drawLine(gx+1, ymin, gx+1, ymax);
+          } else {
+            g.drawRect(gx, ymin, gw, ymax-ymin);
+            g.setColor(colGraph[colIx]);
+            g.fillRect(gx+1, ymin+1, gw-1, ymax-ymin-1);
+          }
         } else {
           g.setColor(colGraph[colIx]);
-          g.drawRect(gx, ymin, gw, ymax-ymin);
-          g.setColor(colGraphFade[colIx]);
-          g.fillRect(gx+1, ymin+1, gw-1, ymax-ymin-1);
+          if (gw < 3) {
+            g.drawLine(gx, ymin, gx, ymax);
+          } else {
+            g.drawRect(gx, ymin, gw, ymax-ymin);
+            g.setColor(colGraphFade[colIx]);
+            g.fillRect(gx+1, ymin+1, gw-1, ymax-ymin-1);
+          }
         }
       }
     }
@@ -491,7 +581,15 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
           fillPX[3] = prevGX; fillPY[3] = prevGMaxY;
           g.setColor(colGraphFade[colIx]);
           g.fillPolygon(fillPX, fillPY, 4);
-          g.setColor(colGraph[colIx]);
+          if (selActive &&
+              (selAllX || (i > selMinXSample && i < selMaxXSample)) &&
+              (selAllY || (s > selMinYSample && s < selMaxYSample))) {
+            g.setColor(colGraphMark[colIx]);
+            g.drawLine(prevGX, prevGAvgY-1, gx, gAvgY-1);
+            g.drawLine(prevGX, prevGAvgY+1, gx, gAvgY+1);
+          } else {
+            g.setColor(colGraph[colIx]);
+          }
           g.drawLine(prevGX, prevGAvgY, gx, gAvgY);
           prevGX = gx;
           prevGAvgY = gAvgY;
@@ -508,9 +606,18 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     void paintGraphPlot(Graphics2D g, List<Double> samples, double mul, double minGSample, int origoY, int startSample, int endSample, 
         int vpx, int vpw, int hh, int colIx) {
       for (int i = startSample; i <= endSample; i++) {
+        double s = samples.get(i) * mul;
         int gx = (int)(i * magHor);
-        int gy = hh - (int)(magVer * (samples.get(i) * mul - minGSample));
-        g.fillRect(gx-1, gy-1, 3,3);
+        int gy = hh - (int)(magVer * (s - minGSample));
+        if (selActive &&
+            (selAllX || (i > selMinXSample && i < selMaxXSample)) &&
+            (selAllY || (s > selMinYSample && s < selMaxYSample))) {
+          g.setColor(colGraphMark[colIx]);
+          g.fillRect(gx-2, gy-2, 5,5);
+        } else {
+          g.setColor(colGraph[colIx]);
+          g.fillRect(gx-1, gy-1, 3,3);
+        }
       }
     }
   } // Renderer
@@ -579,6 +686,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   MouseAdapter mouseHandler = new MouseAdapter() {
     @Override
     public void mouseWheelMoved(MouseWheelEvent e) {
+      userZoomed = true;
       double magFact = 1.0;
       if (e.getWheelRotation() < 0) {
         magFact = 1.1;
@@ -602,17 +710,10 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     public void mousePressed(MouseEvent e) {
       if (e.getButton() == MouseEvent.BUTTON1) {
         draggingTriggered = true;
+        dragVeri = (e.getModifiers() & Event.CTRL_MASK) != 0;
+        dragHori = (e.getModifiers() & Event.SHIFT_MASK) != 0;
         selAnchorX = e.getX();
         selAnchorY = e.getY();
-      }
-    }
-    
-    @Override
-    public void mouseReleased(MouseEvent e) {
-      if (e.getButton() == MouseEvent.BUTTON1) {
-        draggingTriggered = false;
-        dragging = false;
-        repaint();
       }
     }
     
@@ -621,8 +722,20 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       if (draggingTriggered || dragging) {
         draggingTriggered = false;
         dragging = true;
+        dragVeri = (e.getModifiers() & Event.CTRL_MASK) != 0;
+        dragHori = (e.getModifiers() & Event.SHIFT_MASK) != 0;
         selEndX = e.getX();
         selEndY = e.getY();
+        repaint();
+      }
+    }
+    
+    @Override
+    public void mouseReleased(MouseEvent e) {
+      if (e.getButton() == MouseEvent.BUTTON1) {
+        draggingTriggered = false;
+        dragging = false;
+        select(dragVeri, dragHori, selAnchorX, selAnchorY, selEndX, selEndY);
         repaint();
       }
     }
@@ -633,6 +746,36 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       	zoomAll((e.getModifiers() & Event.SHIFT_MASK) == 0,
       			(e.getModifiers() & Event.CTRL_MASK) == 0,
       			e.getPoint());
+      } else if (e.getButton() == MouseEvent.BUTTON1 && !e.isConsumed() && e.getClickCount() == 1) {
+        if (sets.size() > 1) {
+          int vpw = scrl.getViewport().getWidth();
+          int vpx = scrl.getHorizontalScrollBar().getValue();
+          int vpy = scrl.getVerticalScrollBar().getValue();
+
+          int wwv = Math.max(vpw / 8, 40);
+          int hhv = getFont().getSize() + 4;
+          int xv = vpx + vpw - wwv - 2;
+          int yv = vpy + 2;
+          int hhv_inc = hhv;
+          for (SampleSet set : sets) {
+            if (set.isDetailed()) {
+              hhv_inc = hhv * 5;
+            }
+            if (e.getX() >= xv && e.getX() <= xv+wwv &&
+                e.getY() >= yv && e.getY() <= yv + (set.isDetailed() ? hhv*5 : hhv)) {
+              set.setDetailed(!set.isDetailed());
+              repaint();
+              return;
+            }
+            xv -= wwv + 2;
+            if (xv < vpx + 100) {
+              xv = vpx + vpw - wwv - 2;
+              yv += hhv_inc + 2;
+              hhv_inc = hhv;
+            }
+          }
+        }
+
       }
     }
   };
@@ -640,6 +783,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   public void zoomAll(boolean hori, boolean veri, Point pivot) {
     double newMagVer = magVer;
     double newMagHor = magHor;
+    userZoomed = false;
     if (veri) {
       newMagVer = 
         Math.max(MAG_VER_MIN, (double)scrl.getViewport().getHeight() / (getMaxSample() - Math.min(0, getMinSample())));
@@ -652,6 +796,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     repaint();
   }
   public void zoom(double x, double y) {
+    userZoomed = false;
     Point pivot = new Point(
         scrl.getHorizontalScrollBar().getValue() + scrl.getViewport().getWidth()/2, 
         scrl.getVerticalScrollBar().getValue() + scrl.getViewport().getHeight()/2);

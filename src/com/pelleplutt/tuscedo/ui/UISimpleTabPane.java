@@ -298,6 +298,7 @@ public class UISimpleTabPane extends JPanel implements UIO {
     t.closeButton.setVisible(tabs.size() > 1);
     t.setBackground(Color.gray);
     computeLayout();
+    t.markNotified(0);
     fireTabSelected(this, t);
   }
 
@@ -312,15 +313,15 @@ public class UISimpleTabPane extends JPanel implements UIO {
     t.setText(title);
   }
 
-  public void markTabNotified(String id, boolean enable) {
+  public void markTabNotified(String id, int level) {
     Tab t = getTab(id);
     if (t == null)
       return;
-    markTabNotified(t, enable);
+    markTabNotified(t, level);
   }
 
-  public void markTabNotified(Tab t, boolean enable) {
-    t.markNotified(enable);
+  public void markTabNotified(Tab t, int level) {
+    t.markNotified(level);
   }
 
   final Insets __i = new Insets(0, 0, 0, 1);
@@ -565,9 +566,10 @@ public class UISimpleTabPane extends JPanel implements UIO {
     private int markDrop;
     final static Color colMarkDrop = new Color(255,255,255,64);
     final static Color colNotified = new Color(0,255,0,128);
+    final static Color colNotifiedOld = new Color(0,255,0,64);
     static int __tabid = 0;
     final UIInfo uiinfo;
-    volatile boolean isNotified;
+    volatile int isNotified = 0;
     @Override
     public UIInfo getUIInfo() { return uiinfo; }
 
@@ -630,8 +632,14 @@ public class UISimpleTabPane extends JPanel implements UIO {
       return owner;
     }
     
-    public void markNotified(boolean enable) {
-      isNotified = enable;
+    public void markNotified(int level) {
+      if (level > 1) {
+        if (isNotified == 0)
+          return; // no need setting old notification if notification is already cleared
+        if (isNotified == 1 && owner != null && owner.selectedTab == this)
+          level = 0; // no need setting unread notification on selected tab
+      }
+      isNotified = level;
       repaint();
     }
     
@@ -654,8 +662,8 @@ public class UISimpleTabPane extends JPanel implements UIO {
             getFont().getSize());
       }
       paintComponents(g);
-      if (isNotified) {
-        g.setColor(colNotified);
+      if (isNotified > 0) {
+        g.setColor(isNotified == 1 ? colNotified : colNotifiedOld);
         g.fillOval(2, 2, 6, 6);
       }
       g.setColor(colMarkDrop);
@@ -695,7 +703,7 @@ public class UISimpleTabPane extends JPanel implements UIO {
     public void onEvent(UIO obj, Object event) {
     }
 
-    public boolean isNotified() {
+    public int isNotified() {
       return isNotified;
     }
   } // class Tab
