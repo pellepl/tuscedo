@@ -314,7 +314,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   }
   
   public void select(boolean allY, boolean allX, int sx, int sy, int ex, int ey) {
-    double maxSample = getMaxSample();
+    double minGSample = getMinSample(); //Math.min(0, minSample);
+    int hh = renderer.getHeight();
     if (sy < ey) {
       int tmp = sy;
       sy = ey;
@@ -327,10 +328,10 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     }
     selAllY = allY;
     selAllX = allX;
-    selMinYSample = maxSample - sy / magVer;
-    selMaxYSample = maxSample - ey / magVer;
+    selMinYSample = (hh - sy) / magVer + minGSample;
+    selMaxYSample = (hh - ey) / magVer + minGSample;
     selMinXSample = (int)(sx / magHor);
-    selMaxXSample = (int)((ex / magHor) + 1);
+    selMaxXSample = (int)(ex / magHor + 1);
     selActive = true;
   }
   
