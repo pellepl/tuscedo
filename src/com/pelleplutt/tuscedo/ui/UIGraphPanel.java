@@ -10,6 +10,7 @@ import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.event.ActionEvent;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
@@ -19,6 +20,7 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.swing.AbstractAction;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JViewport;
@@ -52,6 +54,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   boolean selActive, selAllX, selAllY;
   double selMinYSample, selMaxYSample;
   int selMinXSample, selMaxXSample;
+  volatile boolean forcePaintSel;
 
 
   static final Color colGraph[] = {
@@ -100,6 +103,11 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     public UIInfo getUIInfo() {return uiinfo;}
     double mul = 1.0;
     boolean detail;
+    boolean selActive, selAllX, selAllY;
+    double selMinYSample, selMaxYSample;
+    int selMinXSample, selMaxXSample;
+    double selMin, selMax, selSum;
+    int selCount;
 
     public SampleSet(String name) {
       uiinfo = new UIInfo(this, "samples" + __id, name);
@@ -157,6 +165,34 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       return maxSample;
     }
     
+    public double getSum() {
+      return sum;
+    }
+    
+    public double getAvg() {
+      return sum / samples.size();
+    }
+    
+    public int getSampleCountSel() {
+      return selActive ? selCount : getSampleCount();
+    }
+
+    public double getMinSel() {
+      return selActive ? selMin: getMin();
+    }
+
+    public double getMaxSel() {
+      return selActive ? selMax: getMax();
+    }
+    
+    public double getSumSel() {
+      return selActive ? selSum: getSum();
+    }
+    
+    public double getAvgSel() {
+      return selActive ? (selSum / selCount) : getAvg();
+    }
+    
     public void scrollToSample(int splIx) {
       UIInfo par = getUIInfo().getParent();
       if (par != null && par.getUI() instanceof UIGraphPanel) {
@@ -198,6 +234,39 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     public void setDetailed(boolean d) {
       detail = d;
     }
+
+    public void select(boolean allY, boolean allX, 
+        double minYSample, double maxYSample,
+        int minXSample, int maxXSample) {
+      selActive = true;
+      int startSample = allX ? 0 : Math.max(0, minXSample);
+      int endSample = allX ? (samples.size()-1) : Math.min(samples.size()-1, maxXSample);
+      selAllY = allY;
+      selAllX = allX;
+      selMinYSample = minYSample;
+      selMaxYSample = maxYSample;
+      selMinXSample = minXSample;
+      selMaxXSample = maxXSample;
+      selSum = 0;
+      selCount = 0;
+      selMin = Double.MAX_VALUE;
+      selMax = Double.MIN_VALUE;
+      for (int i = startSample; i <= endSample; i++) {
+        double s = samples.get(i);
+        if ((selAllX || (i > selMinXSample && i < selMaxXSample)) &&
+            (selAllY || (s > selMinYSample && s < selMaxYSample))) {
+          selCount++;
+          selSum += s;
+          selMin = selMin < s ? selMin : s;
+          selMax = selMax > s ? selMax : s;
+        }
+      }
+      if (selCount == 0) selActive = false;
+    }
+
+    public void unselect() {
+      selActive = false;
+    }
   } // class SampleSet
   
   public UIGraphPanel(String name) {
@@ -217,6 +286,111 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     renderer.addMouseWheelListener(mouseHandler);
     renderer.addMouseListener(mouseHandler);
     renderer.addMouseMotionListener(mouseHandler);
+
+    UIWorkArea.defineAction(renderer, "scrl.up", "up", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        scrl.getVerticalScrollBar().setValue((int)(scrl.getVerticalScrollBar().getValue() - 1));
+      }
+    });
+    UIWorkArea.defineAction(renderer, "scrl.down", "down", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        scrl.getVerticalScrollBar().setValue((int)(scrl.getVerticalScrollBar().getValue() + 1));
+      }
+    });
+    UIWorkArea.defineAction(renderer, "scrl.left", "left", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        scrl.getHorizontalScrollBar().setValue((int)(scrl.getHorizontalScrollBar().getValue() - 1));
+      }
+    });
+    UIWorkArea.defineAction(renderer, "scrl.right", "right", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        scrl.getHorizontalScrollBar().setValue((int)(scrl.getHorizontalScrollBar().getValue() + 1));
+      }
+    });
+    UIWorkArea.defineAction(renderer, "scrl.up.more", "ctrl+up", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        scrl.getVerticalScrollBar().setValue((int)(scrl.getVerticalScrollBar().getValue() - 10));
+      }
+    });
+    UIWorkArea.defineAction(renderer, "scrl.down.more", "ctrl+down", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        scrl.getVerticalScrollBar().setValue((int)(scrl.getVerticalScrollBar().getValue() + 10));
+      }
+    });
+    UIWorkArea.defineAction(renderer, "scrl.left.more", "ctrl+left", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        scrl.getHorizontalScrollBar().setValue((int)(scrl.getHorizontalScrollBar().getValue() - 10));
+      }
+    });
+    UIWorkArea.defineAction(renderer, "scrl.right.more", "ctrl+right", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        scrl.getHorizontalScrollBar().setValue((int)(scrl.getHorizontalScrollBar().getValue() + 10));
+      }
+    });
+    UIWorkArea.defineAction(renderer, "sel.exp.up", "shift+up", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        expandSelection(0,-1);
+      }
+    });
+    UIWorkArea.defineAction(renderer, "sel.exp.down", "shift+down", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        expandSelection(0,1);
+      }
+    });
+    UIWorkArea.defineAction(renderer, "sel.exp.left", "shift+left", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        expandSelection(-1,0);
+      }
+    });
+    UIWorkArea.defineAction(renderer, "sel.exp.right", "shift+right", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        expandSelection(1,0);
+      }
+    });
+    UIWorkArea.defineAction(renderer, "sel.exp.up.more", "ctrl+shift+up", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        expandSelection(0,-10);
+      }
+    });
+    UIWorkArea.defineAction(renderer, "sel.exp.down.more", "ctrl+shift+down", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        expandSelection(0,10);
+      }
+    });
+    UIWorkArea.defineAction(renderer, "sel.exp.left.more", "ctrl+shift+left", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        expandSelection(-10,0);
+      }
+    });
+    UIWorkArea.defineAction(renderer, "sel.exp.right.more", "ctrl+shift+right", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        expandSelection(10,0);
+      }
+    });
+    UIWorkArea.defineAction(renderer, "sel.clear", "escape", new AbstractAction() {
+    @Override
+      public void actionPerformed(ActionEvent e) {
+        unselect();
+      }
+    });
+    
+    renderer.setFocusable(true);
     renderer.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 9));
     addComponentListener(new ComponentAdapter() {
       @Override
@@ -332,7 +506,29 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     selMaxYSample = (hh - ey) / magVer + minGSample;
     selMinXSample = (int)(sx / magHor);
     selMaxXSample = (int)(ex / magHor + 1);
+    for (SampleSet set : sets) {
+      set.select(selAllY, selAllX, selMinYSample, selMaxYSample, selMinXSample, selMaxXSample);
+    }
+
     selActive = true;
+  }
+  
+  public void unselect() {
+    for (SampleSet set : sets) {
+      set.unselect();
+    }
+    selActive = false;
+    repaint();
+  }
+  
+  void expandSelection(int dx, int dy) {
+    if (dx != 0)
+      selEndX += dx;
+    if (dy != 0)
+      selEndY += dy;
+    select(selAllY, selAllX,  selAnchorX, selAnchorY, selEndX, selEndY);
+    forcePaintSel = true;
+    repaint();
   }
   
   class Renderer extends JPanel {
@@ -447,7 +643,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         c++;
       }
       
-      if (dragging) {
+      if (dragging || forcePaintSel) {
         g.setColor(colSelArea);
         int sx = Math.min(selAnchorX, selEndX);
         int sy = Math.min(selAnchorY, selEndY);
@@ -462,6 +658,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         g.fillRect(sx+1, sy+1, ex-sx, ey-sy);
         g.setColor(colSelEdge);
         g.drawRect(sx, sy, ex-sx, ey-sy);
+        forcePaintSel = false;
       }
       
       if (sets.size() > 1) {
@@ -498,13 +695,13 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       g.drawRect(x, y, w, bh);
       g.getClipBounds(_clipR);
       g.setClip(x, y, w, bh);
-      g.setColor(Color.black);
+      g.setColor(set.isDetailed() ? Color.white : Color.black);
       g.drawString(set.getUIInfo().getName(), x+2, y + h - 2);
       if (set.isDetailed()) {
-        g.drawString(" <:" + set.getMin(), x+2, y + h*2 - 2);
-        g.drawString(" >:" + set.getMax(), x+2, y + h*3 - 2);
-        g.drawString(" ~:" + set.sum / set.getSampleCount(), x+2, y + h*4 - 2);
-        g.drawString(" #:" + set.getSampleCount(), x+2, y + h*5 - 2);
+        g.drawString(" <:" + set.getMinSel(), x+2, y + h*2 - 2);
+        g.drawString(" >:" + set.getMaxSel(), x+2, y + h*3 - 2);
+        g.drawString(" ~:" + set.getAvgSel(), x+2, y + h*4 - 2);
+        g.drawString(" #:" + set.getSampleCountSel(), x+2, y + h*5 - 2);
       }
       g.setClip(_clipR);
     }
@@ -709,6 +906,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
 
     @Override
     public void mousePressed(MouseEvent e) {
+      renderer.requestFocusInWindow();
       if (e.getButton() == MouseEvent.BUTTON1) {
         draggingTriggered = true;
         dragVeri = (e.getModifiers() & Event.CTRL_MASK) != 0;
@@ -734,9 +932,11 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     @Override
     public void mouseReleased(MouseEvent e) {
       if (e.getButton() == MouseEvent.BUTTON1) {
+        if (dragging) {
+          select(dragVeri, dragHori, selAnchorX, selAnchorY, selEndX, selEndY);
+        }
         draggingTriggered = false;
         dragging = false;
-        select(dragVeri, dragHori, selAnchorX, selAnchorY, selEndX, selEndY);
         repaint();
       }
     }
@@ -776,7 +976,9 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
             }
           }
         }
-
+        if (!dragging) {
+          unselect();
+        }
       }
     }
   };
