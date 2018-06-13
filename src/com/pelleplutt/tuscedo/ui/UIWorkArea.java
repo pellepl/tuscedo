@@ -291,6 +291,15 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     c.getActionMap().put(name, action);
   }
 
+  public static void defineAnonAction(JComponent c, String name, String keys, int when, 
+      AbstractAction action) {
+    KeyMap key = KeyMap.fromString(keys);
+    c.getInputMap(when).put(
+        KeyStroke.getKeyStroke(key.keyCode, key.modifiers),
+        name);
+    c.getActionMap().put(name, action);
+  }
+
   public void build() {
     setLayout(new BorderLayout());
     
