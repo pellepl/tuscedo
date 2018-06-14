@@ -785,6 +785,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     }
 
     Rectangle _clipR = new Rectangle();
+    
 
     void paintLegend(Graphics2D g, SampleSet set, int x, int y, int w, int h,
         int c) {
@@ -800,10 +801,12 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       g.setColor(set.isDetailed() ? Color.white : Color.black);
       g.drawString(set.getUIInfo().getName(), x + 2, y + h - 2);
       if (set.isDetailed()) {
-        g.drawString(" <:" + set.getMinSel(), x + 2, y + h * 2 - 2);
-        g.drawString(" >:" + set.getMaxSel(), x + 2, y + h * 3 - 2);
-        g.drawString(" ~:" + set.getAvgSel(), x + 2, y + h * 4 - 2);
-        g.drawString(" #:" + set.getSampleCountSel(), x + 2, y + h * 5 - 2);
+        int cw = (w - g.getFont().getSize()*3) / g.getFont().getSize();
+        String f = "% ."+cw+"f";
+        g.drawString(" < " + String.format(f, set.getMinSel()), x + 2, y + h * 2 - 2);
+        g.drawString(" > " + String.format(f, set.getMaxSel()), x + 2, y + h * 3 - 2);
+        g.drawString(" ~ " + String.format(f, set.getAvgSel()), x + 2, y + h * 4 - 2);
+        g.drawString(" #  " + set.getSampleCountSel(), x + 2, y + h * 5 - 2);
       }
       g.setClip(_clipR);
     }
