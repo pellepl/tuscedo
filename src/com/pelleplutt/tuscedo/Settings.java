@@ -1,11 +1,14 @@
 package com.pelleplutt.tuscedo;
 
+import java.awt.Color;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
@@ -63,6 +66,40 @@ public class Settings {
     props.setProperty(BASH_LAST_RET_STRING, "$?");
     props.setProperty(BASH_BACKGROUND_STRING, "&");
     props.setProperty(SERIAL_NEWLINE_STRING, "\n");
+    
+    props.setProperty("col_gen_bg.int", Integer.toString(0x000020));
+    props.setProperty("col_text_fg.int", Integer.toString(0xffff80));
+    props.setProperty("col_input_fg.int", Integer.toString(0x80ffff));
+    props.setProperty("col_input_bg.int", Integer.toString(0x303040));
+    props.setProperty("col_input_bash_bg.int", Integer.toString(0x404040));
+    props.setProperty("col_bash_fg.int", Integer.toString(0xf0f0f0));
+    props.setProperty("col_bash_dbg_fg.int", Integer.toString(0xc0f0f0));
+    props.setProperty("col_process_fg.int", Integer.toString(0xc0c0c0));
+    props.setProperty("col_process_err_fg.int", Integer.toString(0xc08080));
+    props.setProperty("col_find_fg.int", Integer.toString(0x303040));
+    props.setProperty("col_find_bg.int", Integer.toString(0x80ffff));
+    props.setProperty("col_find_mark_fg.int", Integer.toString(0xffc0ff));
+    props.setProperty("col_gen_info_fg.int", Integer.toString(0x44ff44));
+    props.setProperty("col_gen_err_fg.int", Integer.toString(0xff4444));
+
+    props.setProperty("col_tab_fg.int", Integer.toString(0xc0c0c0));
+    props.setProperty("col_tab_bg.int", Integer.toString(0x404040));
+    props.setProperty("col_tab_sel_bg.int", Integer.toString(0x808080));
+    props.setProperty("col_tab_nonsel_bg.int", Integer.toString(0x404040));
+    props.setProperty("col_tab_notifynew_fg.int", Integer.toString(0xff8040));
+    props.setProperty("col_tab_notifyold_fg.int", Integer.toString(0x806040));
+
+    props.setProperty("col_scrollbar_l_fg.int", Integer.toString(0xa0a0a0));
+    props.setProperty("col_scrollbar_d_fg.int", Integer.toString(0x808080));
+    props.setProperty("col_scrollbar_l_bg.int", Integer.toString(0x606060));
+    props.setProperty("col_scrollbar_d_bg.int", Integer.toString(0x404040));
+
+    
+    props.setProperty("scrollbar_w.int", Integer.toString(6));
+    props.setProperty("scrollbar_h.int", Integer.toString(6));
+
+    props.setProperty("tab_drag_ghost.int", Integer.toString(0));
+    
   }
   
   public void saveSettings() {
@@ -106,12 +143,19 @@ public class Settings {
   }
   
   public int integer(String s) {
-    return Integer.parseInt(props.getProperty(s));
+    String v = props.getProperty(s);
+    if (v != null)
+      return Integer.parseInt(v);
+    else
+      return Integer.MIN_VALUE;
   }
   
   public void setInt(String key, int i) {
     Log.println(key+"="+i);
     props.setProperty(key, new Integer(i).toString());
+    if (cbInt.containsKey(key)) {
+      cbInt.get(key).modified(key,  i);
+    }
   }
   
   public void listAdd(String key, String s) {
@@ -205,5 +249,16 @@ public class Settings {
       }
     }
     props.put(key + ".string", val);
+  }
+  
+  Map<String, ModCallback<Integer>> cbInt = new HashMap<String, ModCallback<Integer>>(); 
+  
+  public void listenTrig(String key, ModCallback<Integer> cb) {
+    cbInt.put(key, cb);
+    cb.modified(key, integer(key));
+  }
+  
+  public static interface ModCallback<E> {
+    public void modified(String key, E val);
   }
 }

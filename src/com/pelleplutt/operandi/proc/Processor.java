@@ -69,6 +69,7 @@ public class Processor implements ByteCode {
   String[] args;
   int nestedIRQ;
   IRQHandler irqHandler;
+  public volatile int user;
   
   public Processor(int memorySize) {
     nilM.type = TNIL;

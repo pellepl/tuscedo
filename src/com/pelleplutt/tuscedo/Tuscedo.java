@@ -23,6 +23,7 @@ import javax.swing.WindowConstants;
 import com.pelleplutt.Essential;
 import com.pelleplutt.tuscedo.ui.Scene3D;
 import com.pelleplutt.tuscedo.ui.UICanvasPanel;
+import com.pelleplutt.tuscedo.ui.UICommon;
 import com.pelleplutt.tuscedo.ui.UIGraphPanel;
 import com.pelleplutt.tuscedo.ui.UIInfo;
 import com.pelleplutt.tuscedo.ui.UIO;
@@ -101,7 +102,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     JFrame f = new JFrame();
     f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
     f.getContentPane().setLayout(new BorderLayout());
-    f.getContentPane().setBackground(UIWorkArea.colGenericBg);
+    f.getContentPane().setBackground(UICommon.colGenericBg);
     f.setSize(600, 400);
     //f.setLocationByPlatform(true); // cannot use this - windows x&y will report 0 until moved
     f.setLocation(100, 100);
@@ -109,7 +110,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     
     mainContainer = f.getContentPane();
     TuscedoTabPane tabs = new TuscedoTabPane();
-    tabs.setFont(UIWorkArea.COMMON_FONT);
+    tabs.setFont(UICommon.COMMON_FONT);
 
     addWorkAreaTab(tabs, uiw);
 
@@ -373,5 +374,33 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       }
     }
     return sb.toString();
+  }
+  
+  private void recurseRepaint(UIInfo i) {
+    for (UIInfo c : i.children) {
+      c.getUI().repaint();
+      recurseRepaint(c);
+    }
+  }
+  public void repaintAll() {
+    for (Entry<String, UIInfo> e : uiobjects.entrySet()) {
+      if (e.getValue().getParent() == null) {
+        recurseRepaint(e.getValue());
+      }
+    }
+  }
+
+  private void recurseRedecorate(UIInfo i) {
+    for (UIInfo c : i.children) {
+      c.getUI().decorateUI();
+      recurseRedecorate(c);
+    }
+  }
+  public void redecorateAll() {
+    for (Entry<String, UIInfo> e : uiobjects.entrySet()) {
+      if (e.getValue().getParent() == null) {
+        recurseRedecorate(e.getValue());
+      }
+    }
   }
 }

@@ -50,8 +50,8 @@ public class XtermTerminal implements Console, XConsole, Disposable, Runnable {
         }
       });
     }
-    xstd = new XtermParserTerminal(ftp, this, UIWorkArea.STYLE_BASH_OUT, textEncoding);
-    xerr = new XtermParserTerminal(ftp, this, UIWorkArea.STYLE_BASH_ERR, textEncoding);
+    xstd = new XtermParserTerminal(ftp, this, UICommon.STYLE_BASH_OUT, textEncoding);
+    xerr = new XtermParserTerminal(ftp, this, UICommon.STYLE_BASH_ERR, textEncoding);
     AppSystem.addDisposable(this);
     Thread t = new Thread(this, "XtermConsoleTickler");
     t.setDaemon(true);
@@ -95,7 +95,7 @@ public class XtermTerminal implements Console, XConsole, Disposable, Runnable {
 
   @Override
   public void stdout(String s) {
-    ftp.addText(s, UIWorkArea.STYLE_BASH_OUT);
+    ftp.addText(s, UICommon.STYLE_BASH_OUT);
   }
 
   @Override
@@ -110,7 +110,7 @@ public class XtermTerminal implements Console, XConsole, Disposable, Runnable {
 
   @Override
   public void stderr(String s) {
-    ftp.addText(s, UIWorkArea.STYLE_BASH_ERR);
+    ftp.addText(s, UICommon.STYLE_BASH_ERR);
   }
 
   @Override

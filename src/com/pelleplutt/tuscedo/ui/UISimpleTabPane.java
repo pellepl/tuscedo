@@ -33,8 +33,11 @@ import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
 import com.pelleplutt.Essential;
+import com.pelleplutt.tuscedo.Settings;
 import com.pelleplutt.tuscedo.ui.UIInfo.UIListener;
 import com.pelleplutt.util.AppSystem;
+import com.pelleplutt.util.Log;
+import com.pelleplutt.util.UIUtil;
 
 public class UISimpleTabPane extends JPanel implements UIO {
   JPanel tabPanel;
@@ -80,6 +83,13 @@ public class UISimpleTabPane extends JPanel implements UIO {
       panes.add(UISimpleTabPane.this);
     }
   }
+  
+  public void decorateUI() {
+    for (Tab t : tabs) {
+      decorateTabLabel(t);
+    }
+  }
+
   
   public void addTabListener(TabListener l) {
     synchronized (listeners) {
@@ -142,8 +152,8 @@ public class UISimpleTabPane extends JPanel implements UIO {
         new Dimension(getFont().getSize() + 4, getFont().getSize() + 4));
     tab.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
     tab.setOpaque(true);
-    tab.setForeground(Color.lightGray);
-    tab.setBackground(Color.darkGray);
+    tab.setForeground(UICommon.colTabFg);
+    tab.setBackground(tab == selectedTab ? UICommon.colTabSelBg : UICommon.colTabNonSelBg);
     tab.setFont(getFont());
   }
 
@@ -291,12 +301,12 @@ public class UISimpleTabPane extends JPanel implements UIO {
   public void selectTab(Tab t) {
     ((CardLayout) contentPanel.getLayout()).show(contentPanel, t.getID());
     if (selectedTab != null) {
-      selectedTab.setBackground(Color.darkGray);
+      selectedTab.setBackground(UICommon.colTabNonSelBg);
       selectedTab.closeButton.setVisible(false);
     }
     selectedTab = t;
     t.closeButton.setVisible(tabs.size() > 1);
-    t.setBackground(Color.gray);
+    t.setBackground(UICommon.colTabSelBg);
     computeLayout();
     t.markNotified(0);
     fireTabSelected(this, t);
@@ -447,11 +457,15 @@ public class UISimpleTabPane extends JPanel implements UIO {
             cursorOwner = SwingUtilities.getWindowAncestor(t); 
             cursorOwner.setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
             dragSource = t;
-            //dragGhost = UIUtil.createGhost(t);
+            if (Settings.inst().integer("tab_drag_ghost.int") > 0) {
+              dragGhost = UIUtil.createGhost(t);
+            }
           }
         } else {
-          //Point p = me.getLocationOnScreen();
-          //dragGhost.setLocation(p.x + 1, p.y + 1);
+          if (Settings.inst().integer("tab_drag_ghost.int") > 0) {
+            Point p = me.getLocationOnScreen();
+            dragGhost.setLocation(p.x + 1, p.y + 1);
+          }
           if (dropMarkTab != null) {
             dropMarkTab.unmarkDrop();
           }
@@ -460,8 +474,8 @@ public class UISimpleTabPane extends JPanel implements UIO {
             for (UISimpleTabPane pane : panes) {
               Window w = SwingUtilities.getWindowAncestor(pane);
               if (w == null) continue;
-              Point p = SwingUtilities.convertPoint(me.getComponent(), me.getPoint(), w);
-              Component c = SwingUtilities.getDeepestComponentAt(w, p.x, p.y);
+              Point q = SwingUtilities.convertPoint(me.getComponent(), me.getPoint(), w);
+              Component c = SwingUtilities.getDeepestComponentAt(w, q.x, q.y);
               if (c == null) continue;
               //System.out.println(pane.id + ": " + w.getX() + "," + w.getY() + "  " + c.getClass().getSimpleName());
               if (c instanceof Tab) {
@@ -565,13 +579,16 @@ public class UISimpleTabPane extends JPanel implements UIO {
     JButton closeButton;
     private int markDrop;
     final static Color colMarkDrop = new Color(255,255,255,64);
-    final static Color colNotified = new Color(0,255,0,128);
-    final static Color colNotifiedOld = new Color(0,255,0,64);
     static int __tabid = 0;
     final UIInfo uiinfo;
     volatile int isNotified = 0;
     @Override
     public UIInfo getUIInfo() { return uiinfo; }
+    
+    public void decorateUI() {
+      if (owner != null) owner.decorateTabLabel(this);
+      repaint();
+    }
 
     public Tab(final String n) {
       uiinfo = new UIInfo(this, "tab" + __paneid + "_" + __tabid, n);
@@ -663,7 +680,7 @@ public class UISimpleTabPane extends JPanel implements UIO {
       }
       paintComponents(g);
       if (isNotified > 0) {
-        g.setColor(isNotified == 1 ? colNotified : colNotifiedOld);
+        g.setColor(isNotified == 1 ? UICommon.colTabNotifyNewFg : UICommon.colTabNotifyOldFg);
         g.fillOval(2, 2, 6, 6);
       }
       g.setColor(colMarkDrop);

@@ -106,6 +106,10 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     public UIInfo getUIInfo() {
       return uiinfo;
     }
+    
+    public void decorateUI() {
+      // TODO decor
+    }
 
     double mul = 1.0;
     boolean detail;
@@ -303,7 +307,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
     scrl.getViewport().setScrollMode(JViewport.SIMPLE_SCROLL_MODE); // fix
                                                                     // artefacts
-    UIWorkArea.decorateScrollPane(scrl);
+    UICommon.decorateScrollPane(scrl);
     setLayout(new BorderLayout());
     add(scrl, BorderLayout.CENTER);
     renderer.addMouseWheelListener(mouseHandler);
@@ -311,14 +315,14 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     renderer.addMouseMotionListener(mouseHandler);
 
     int when = JComponent.WHEN_IN_FOCUSED_WINDOW;
-    UIWorkArea.defineAnonAction(renderer, "scrl.up", "up", when, new AbstractAction() {
+    UICommon.defineAnonAction(renderer, "scrl.up", "up", when, new AbstractAction() {
       @Override
       public void actionPerformed(ActionEvent e) {
         scrl.getVerticalScrollBar()
             .setValue((int) (scrl.getVerticalScrollBar().getValue() - 1));
       }
     });
-    UIWorkArea.defineAnonAction(renderer, "scrl.down", "down",when,
+    UICommon.defineAnonAction(renderer, "scrl.down", "down",when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
@@ -326,7 +330,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
                 .setValue((int) (scrl.getVerticalScrollBar().getValue() + 1));
           }
         });
-    UIWorkArea.defineAnonAction(renderer, "scrl.left", "left",when,
+    UICommon.defineAnonAction(renderer, "scrl.left", "left",when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
@@ -334,7 +338,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
                 .setValue((int) (scrl.getHorizontalScrollBar().getValue() - 1));
           }
         });
-    UIWorkArea.defineAnonAction(renderer, "scrl.right", "right",when,
+    UICommon.defineAnonAction(renderer, "scrl.right", "right",when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
@@ -342,7 +346,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
                 .setValue((int) (scrl.getHorizontalScrollBar().getValue() + 1));
           }
         });
-    UIWorkArea.defineAnonAction(renderer, "scrl.up.more", "ctrl+up",when,
+    UICommon.defineAnonAction(renderer, "scrl.up.more", "ctrl+up",when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
@@ -350,7 +354,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
                 .setValue((int) (scrl.getVerticalScrollBar().getValue() - 10));
           }
         });
-    UIWorkArea.defineAnonAction(renderer, "scrl.down.more", "ctrl+down",when,
+    UICommon.defineAnonAction(renderer, "scrl.down.more", "ctrl+down",when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
@@ -358,7 +362,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
                 .setValue((int) (scrl.getVerticalScrollBar().getValue() + 10));
           }
         });
-    UIWorkArea.defineAnonAction(renderer, "scrl.left.more", "ctrl+left",when,
+    UICommon.defineAnonAction(renderer, "scrl.left.more", "ctrl+left",when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
@@ -366,7 +370,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
                 (int) (scrl.getHorizontalScrollBar().getValue() - 10));
           }
         });
-    UIWorkArea.defineAnonAction(renderer, "scrl.right.more", "ctrl+right",when,
+    UICommon.defineAnonAction(renderer, "scrl.right.more", "ctrl+right",when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
@@ -374,63 +378,63 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
                 (int) (scrl.getHorizontalScrollBar().getValue() + 10));
           }
         });
-    UIWorkArea.defineAnonAction(renderer, "sel.exp.up", "shift+up",when,
+    UICommon.defineAnonAction(renderer, "sel.exp.up", "shift+up",when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
             expandSelection(0, -1);
           }
         });
-    UIWorkArea.defineAnonAction(renderer, "sel.exp.down", "shift+down",when,
+    UICommon.defineAnonAction(renderer, "sel.exp.down", "shift+down",when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
             expandSelection(0, 1);
           }
         });
-    UIWorkArea.defineAnonAction(renderer, "sel.exp.left", "shift+left",when,
+    UICommon.defineAnonAction(renderer, "sel.exp.left", "shift+left",when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
             expandSelection(-1, 0);
           }
         });
-    UIWorkArea.defineAnonAction(renderer, "sel.exp.right", "shift+right",when,
+    UICommon.defineAnonAction(renderer, "sel.exp.right", "shift+right",when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
             expandSelection(1, 0);
           }
         });
-    UIWorkArea.defineAnonAction(renderer, "sel.exp.up.more", "ctrl+shift+up",when,
+    UICommon.defineAnonAction(renderer, "sel.exp.up.more", "ctrl+shift+up",when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
             expandSelection(0, -10);
           }
         });
-    UIWorkArea.defineAnonAction(renderer, "sel.exp.down.more", "ctrl+shift+down",when,
+    UICommon.defineAnonAction(renderer, "sel.exp.down.more", "ctrl+shift+down",when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
             expandSelection(0, 10);
           }
         });
-    UIWorkArea.defineAnonAction(renderer, "sel.exp.left.more", "ctrl+shift+left",when,
+    UICommon.defineAnonAction(renderer, "sel.exp.left.more", "ctrl+shift+left",when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
             expandSelection(-10, 0);
           }
         });
-    UIWorkArea.defineAnonAction(renderer, "sel.exp.right.more", "ctrl+shift+right",when,
+    UICommon.defineAnonAction(renderer, "sel.exp.right.more", "ctrl+shift+right",when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
             expandSelection(10, 0);
           }
         });
-    UIWorkArea.defineAnonAction(renderer, "sel.clear", "escape", when,
+    UICommon.defineAnonAction(renderer, "sel.clear", "escape", when,
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
@@ -454,6 +458,10 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         oldH = getHeight();
       }
     });
+  }
+  
+  public void decorateUI() {
+    // TODO decor
   }
 
   public SampleSet getSampleSet(int i) {
@@ -785,7 +793,6 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     }
 
     Rectangle _clipR = new Rectangle();
-    
 
     void paintLegend(Graphics2D g, SampleSet set, int x, int y, int w, int h,
         int c) {
@@ -879,9 +886,9 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         vmax = s > vmax ? s : vmax;
         vsum += s;
         vcount++;
+        int gAvgY = hh
+            - (int) (magVer * ((vsum / (double) vcount) - minGSample));
         if (gx != prevGX) {
-          int gAvgY = hh
-              - (int) (magVer * ((vsum / (double) vcount) - minGSample));
           int gMinY = hh - (int) (magVer * (vmin - minGSample));
           int gMaxY = hh - (int) (magVer * (vmax - minGSample));
           fillPX[0] = prevGX;

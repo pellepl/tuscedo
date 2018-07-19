@@ -43,11 +43,14 @@ public class UICanvasPanel extends JPanel implements UIO {
     scrl = new JScrollPane(renderer, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, 
         JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
     scrl.getViewport().setScrollMode(JViewport.SIMPLE_SCROLL_MODE); // fix artefacts 
-    UIWorkArea.decorateScrollPane(scrl);
+    UICommon.decorateScrollPane(scrl);
     setLayout(new BorderLayout());
     add(scrl, BorderLayout.CENTER);
   }
 
+  public void decorateUI() {
+    // TODO decor
+  }
 
   Graphics2D _g;
   private Graphics2D getSecGraphics() {

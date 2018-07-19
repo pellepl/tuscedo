@@ -27,8 +27,9 @@ public class MNet extends MObj {
     addFunc("localhost", OperandiScript.FN_NET_LOCALHOST, comp);
   }
   
-  public static void createNetFunctions(Map<String, ExtCall> extDefs) {
-    extDefs.put(OperandiScript.FN_NET_IFC, new ExtCall() {
+  public static void createNetFunctions(OperandiScript os) {
+    os.setExtDef(OperandiScript.FN_NET_IFC, "() - returns a list of interfaces",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         MListMap listMap = new MListMap();
         Enumeration<NetworkInterface> e;
@@ -44,7 +45,8 @@ public class MNet extends MObj {
         return null;
       }
     });
-    extDefs.put(OperandiScript.FN_NET_LOCALHOST, new ExtCall() {
+    os.setExtDef(OperandiScript.FN_NET_LOCALHOST, "() - tries to make a vaild guess of localhost ip",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         try {
           return new M(getLocalHostLANAddress().getAddress());
@@ -53,7 +55,8 @@ public class MNet extends MObj {
         return null;
       }
     });
-    extDefs.put(OperandiScript.FN_NET_GET, new ExtCall() {
+    os.setExtDef(OperandiScript.FN_NET_GET, "(<interface>) - returns a struct info of specific interface",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         String name = null; 
         if (args.length > 0) {

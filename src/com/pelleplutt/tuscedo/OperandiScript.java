@@ -23,6 +23,7 @@ import com.pelleplutt.operandi.Source;
 import com.pelleplutt.operandi.proc.ByteCode;
 import com.pelleplutt.operandi.proc.ExtCall;
 import com.pelleplutt.operandi.proc.MListMap;
+import com.pelleplutt.operandi.proc.MMapRef;
 import com.pelleplutt.operandi.proc.MSet;
 import com.pelleplutt.operandi.proc.Processor;
 import com.pelleplutt.operandi.proc.Processor.M;
@@ -30,6 +31,7 @@ import com.pelleplutt.operandi.proc.ProcessorError;
 import com.pelleplutt.operandi.proc.ProcessorError.ProcessorFinishedError;
 import com.pelleplutt.tuscedo.Tuscedo.TuscedoTabPane;
 import com.pelleplutt.tuscedo.ui.UICanvasPanel;
+import com.pelleplutt.tuscedo.ui.UICommon;
 import com.pelleplutt.tuscedo.ui.UIGraphPanel;
 import com.pelleplutt.tuscedo.ui.UIGraphPanel.SampleSet;
 import com.pelleplutt.tuscedo.ui.UIInfo;
@@ -43,36 +45,42 @@ import com.pelleplutt.util.Log;
 import com.pelleplutt.util.io.Port;
 
 public class OperandiScript implements Runnable, Disposable {
-  public static final String FN_SERIAL_INFO = "__serial_info";
-  public static final String FN_SERIAL_DISCONNECT = "__serial_disconnect";
-  public static final String FN_SERIAL_CONNECT = "__serial_connect";
-  public static final String FN_SERIAL_TX = "__serial_tx";
-  public static final String FN_SERIAL_ON_RX = "__serial_on_rx";
-  public static final String FN_SERIAL_ON_RX_CLEAR = "__serial_on_rx_clear";
-  public static final String FN_SERIAL_ON_RX_LIST = "__serial_on_rx_list";
-  public static final String FN_SERIAL_LOG_START = "__serial_log_start";
-  public static final String FN_SERIAL_LOG_AWAIT = "__serial_log_await";
-  public static final String FN_SERIAL_LOG_STOP = "__serial_log_stop";
-  public static final String FN_SERIAL_LOG_GET = "__serial_log_get";
-  public static final String FN_SERIAL_LOG_SIZE = "__serial_log_size";
-  public static final String FN_SERIAL_LOG_CLEAR = "__serial_log_clear";
+  public static final String VAR_SERIAL = "ser";
+  public static final String VAR_DISK = "disk";
+  public static final String VAR_NET = "net";
+  public static final String VAR_SYSTEM = "sys";
+  public static final String VAR_CONF = "conf";
+  public static final String VAR_INFO = "__info";
   
-  public static final String FN_NET_IFC = "__net_ifc";
-  public static final String FN_NET_GET = "__net_get";
-  public static final String FN_NET_LOCALHOST = "__net_localhost";
+  public static final String FN_SERIAL_INFO = "__" + VAR_SERIAL + "_info";
+  public static final String FN_SERIAL_DISCONNECT = "__" + VAR_SERIAL + "_disconnect";
+  public static final String FN_SERIAL_CONNECT = "__" + VAR_SERIAL + "_connect";
+  public static final String FN_SERIAL_TX = "__" + VAR_SERIAL + "_tx";
+  public static final String FN_SERIAL_ON_RX = "__" + VAR_SERIAL + "_on_rx";
+  public static final String FN_SERIAL_ON_RX_CLEAR = "__" + VAR_SERIAL + "_on_rx_clear";
+  public static final String FN_SERIAL_ON_RX_LIST = "__" + VAR_SERIAL + "_on_rx_list";
+  public static final String FN_SERIAL_LOG_START = "__" + VAR_SERIAL + "_log_start";
+  public static final String FN_SERIAL_LOG_AWAIT = "__" + VAR_SERIAL + "_log_await";
+  public static final String FN_SERIAL_LOG_STOP = "__" + VAR_SERIAL + "_log_stop";
+  public static final String FN_SERIAL_LOG_GET = "__" + VAR_SERIAL + "_log_get";
+  public static final String FN_SERIAL_LOG_SIZE = "__" + VAR_SERIAL + "_log_size";
+  public static final String FN_SERIAL_LOG_CLEAR = "__" + VAR_SERIAL + "_log_clear";
+  
+  public static final String FN_NET_IFC = "__" + VAR_NET + "_ifc";
+  public static final String FN_NET_GET = "__" + VAR_NET + "_get";
+  public static final String FN_NET_LOCALHOST = "__" + VAR_NET + "_localhost";
 
-  public static final String FN_SYS_EXEC = "__sys_exec";
-  public static final String FN_SYS_GET_HOME = "__sys_get_home";
+  public static final String FN_SYS_EXEC = "__" + VAR_SYSTEM + "_exec";
+  public static final String FN_SYS_GET_HOME = "__" + VAR_SYSTEM + "_get_home";
 
-  public static final String FN_DISK_LS = "__disk_ls";
-  public static final String FN_DISK_FIND_FILE = "__disk_find";
-  public static final String FN_DISK_READ = "__disk_read";
-  public static final String FN_DISK_READB = "__disk_readb";
-  public static final String FN_DISK_STAT = "__disk_stat";
-  public static final String FN_DISK_MOVE = "__disk_move";
-  public static final String FN_DISK_COPY = "__disk_copy";
+  public static final String FN_DISK_LS = "__" + VAR_DISK + "_ls";
+  public static final String FN_DISK_FIND_FILE = "__" + VAR_DISK + "_find_file";
+  public static final String FN_DISK_READ = "__" + VAR_DISK + "_read";
+  public static final String FN_DISK_READB = "__" + VAR_DISK + "_readb";
+  public static final String FN_DISK_STAT = "__" + VAR_DISK + "_stat";
+  public static final String FN_DISK_MOVE = "__" + VAR_DISK + "_move";
+  public static final String FN_DISK_COPY = "__" + VAR_DISK + "_copy";
 
-  public static final String KEY_UI_ID = ".uio_id";
   public static final String FN_UI_CLOSE = "__ui_close";
   public static final String FN_UI_GET_NAME = "__ui_get_name";
   public static final String FN_UI_SET_NAME = "__ui_set_name";
@@ -80,6 +88,8 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_UI_GET_ANCESTOR = "__ui_ancestor";
   public static final String FN_UI_GET_PARENT = "__ui_parent";
   public static final String FN_UI_GET_CHILDREN = "__ui_children";
+
+  public static final String KEY_UI_ID = ".uio_id";
 
   Executable exe, pexe;
   Compiler comp;
@@ -101,6 +111,8 @@ public class OperandiScript implements Runnable, Disposable {
   volatile int logMatchIx;
   volatile int logParseIx;
 
+  public static final int PROC_HALT = 1;
+  
   static Map<String, M> appVariables = new HashMap<String, M>();
   
   static {
@@ -148,50 +160,66 @@ public class OperandiScript implements Runnable, Disposable {
     return irqHandler;
   }
   
+  Map<Object, String> defhelp = new HashMap<Object, String>();
+  
+  public void setExtDef(String name, String help, ExtCall call) {
+    extDefs.put(name, call);
+    setExtHelp(name, help);
+  }
+  
+  public void setExtHelp(String name, String help) {
+    defhelp.put(name, help);
+  }
+  
   void procReset() {
     exe = pexe = null;
     running = false;
     halted = false;
     lastSrcDbg = null;
     Processor.addCommonExtdefs(extDefs);
-    extDefs.put("println", new ExtCall() {
+    setExtDef("println", "(...) - prints arguments with newline", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
-          currentWA.appendViewText(currentWA.getCurrentView(), "\n", UIWorkArea.STYLE_BASH_OUT);
+          currentWA.appendViewText(currentWA.getCurrentView(), "\n", UICommon.STYLE_BASH_OUT);
         } else {
           for (int i = 0; i < args.length; i++) {
             currentWA.appendViewText(currentWA.getCurrentView(), args[i].asString() + (i < args.length-1 ? " " : ""), 
-                UIWorkArea.STYLE_BASH_OUT);
+                UICommon.STYLE_BASH_OUT);
           }
         }
-        currentWA.appendViewText(currentWA.getCurrentView(), "\n", UIWorkArea.STYLE_BASH_OUT);
+        currentWA.appendViewText(currentWA.getCurrentView(), "\n", UICommon.STYLE_BASH_OUT);
         return null;
       }
     });
-    extDefs.put("print", new ExtCall() {
+    setExtDef("print", "(...) - prints arguments", 
+         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
         } else {
           for (int i = 0; i < args.length; i++) {
             currentWA.appendViewText(currentWA.getCurrentView(), args[i].asString() + (i < args.length-1 ? " " : ""), 
-                UIWorkArea.STYLE_BASH_OUT);
+                UICommon.STYLE_BASH_OUT);
           }
         }
         return null;
       }
     });
-    extDefs.put("__IRQ_consume_timer", new ExtCall() {
+    setExtDef("__IRQ_consume_timer", "() - TODO", 
+         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         Integer addr = irqHandler.consumeTimerIRQ(); 
         return addr == null ? null : new M(addr.intValue());
       }
     });
-    extDefs.put("__IRQ_timer", new ExtCall() {
+    setExtDef("__IRQ_timer", "() - TODO", 
+         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         return new M(irqHandler.hasTimerIRQ());
       }
     });
-    extDefs.put("sleep", new ExtCall() {
+    setExtDef("sleep", "(<time>) - sleeps given milliseconds", 
+         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
@@ -200,7 +228,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("sqrt", new ExtCall() {
+    setExtDef("sqrt", "(<x>) - returns square root", 
+         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
@@ -208,7 +237,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)Math.sqrt(args[0].asFloat()));
       }
     });
-    extDefs.put("sin", new ExtCall() {
+    setExtDef("sin", "(<x>) - returns sinus", 
+         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
@@ -216,7 +246,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)Math.sin(args[0].asFloat()));
       }
     });
-    extDefs.put("cos", new ExtCall() {
+    setExtDef("cos", "(<x>) - returns cosinus", 
+         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
@@ -224,7 +255,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)Math.cos(args[0].asFloat()));
       }
     });
-    extDefs.put("tan", new ExtCall() {
+    setExtDef("tan", "(<x>) - returns tangent", 
+         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
@@ -232,7 +264,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)Math.tan(args[0].asFloat()));
       }
     });
-    extDefs.put("asin", new ExtCall() {
+    setExtDef("asin", "(<x>) - returns arcsinus", 
+         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
@@ -240,7 +273,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)Math.asin(args[0].asFloat()));
       }
     });
-    extDefs.put("acos", new ExtCall() {
+    setExtDef("acos", "(<x>) - returns arccosinus", 
+         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
@@ -248,7 +282,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)Math.acos(args[0].asFloat()));
       }
     });
-    extDefs.put("atan", new ExtCall() {
+    setExtDef("atan", "(<x>) - returns arctangent", 
+         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
@@ -256,7 +291,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)Math.atan(args[0].asFloat()));
       }
     });
-    extDefs.put("atan2", new ExtCall() {
+    setExtDef("atan2",  "(<y>, <x>) - returns 2-argument arctangent", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length <= 1) {
           return null;
@@ -264,12 +300,14 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)Math.atan2(args[0].asFloat(),args[1].asFloat()));
       }
     });
-    extDefs.put("time", new ExtCall() {
+    setExtDef("time", "() - returns current time in milliseconds", 
+         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         return new M((int)System.currentTimeMillis());
       }
     });
-    extDefs.put("base", new ExtCall() {
+    setExtDef("base",  "(<x>, <base>) - returns <x> in base <base>", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length <= 1) {
           return null;
@@ -277,14 +315,16 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(Integer.toString(args[0].asInt(),args[1].asInt()));
       }
     });
-    extDefs.put("uitree", new ExtCall() {
+    setExtDef("uitree",  "() - dumps the ui tree", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         currentWA.appendViewText(currentWA.getCurrentView(), Tuscedo.inst().dumpUITree(), 
-            UIWorkArea.STYLE_BASH_OUT);
+            UICommon.STYLE_BASH_OUT);
         return null;
       }
     });
-    extDefs.put("timer_start", new ExtCall() {
+    setExtDef("timer_start",  "(<future_ms>, <recurrence_ms>, <func>) - starts a timer", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length != 3) {
           return null;
@@ -300,14 +340,16 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put(FN_UI_CLOSE, new ExtCall() {
+    setExtDef(FN_UI_CLOSE,  "() - closes this ui instance", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO uio = getUIOByScriptId(p.getMe());
         if (uio != null) uio.getUIInfo().close();
         return null;
       }
     });
-    extDefs.put(FN_UI_GET_ANCESTOR, new ExtCall() {
+    setExtDef(FN_UI_GET_ANCESTOR,  "() - returns ancestor of this ui instance", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO uio = getUIOByScriptId(p.getMe());
         if (uio == null) return null;
@@ -316,7 +358,8 @@ public class OperandiScript implements Runnable, Disposable {
         return createGenericMUIObj(parenInf.getUI());
       }
     });
-    extDefs.put(FN_UI_GET_PARENT, new ExtCall() {
+    setExtDef(FN_UI_GET_PARENT,  "() - returns parent of this ui instance", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO uio = getUIOByScriptId(p.getMe());
         if (uio == null) return null;
@@ -325,7 +368,8 @@ public class OperandiScript implements Runnable, Disposable {
         return createGenericMUIObj(parenInf.getUI());
       }
     });
-    extDefs.put(FN_UI_GET_CHILDREN, new ExtCall() {
+    setExtDef(FN_UI_GET_CHILDREN,  "() - returns children of this ui instance", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO uio = getUIOByScriptId(p.getMe());
         if (uio == null) return null;
@@ -337,7 +381,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(msetc);
       }
     });
-    extDefs.put(FN_UI_SET_NAME, new ExtCall() {
+    setExtDef(FN_UI_SET_NAME,  "(<name>) - sets name of this ui instance", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
         UIO uio = getUIOByScriptId(p.getMe());
@@ -351,7 +396,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put(FN_UI_GET_NAME, new ExtCall() {
+    setExtDef(FN_UI_GET_NAME, "() - returns name of this ui instance", 
+         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO uio = getUIOByScriptId(p.getMe());
         if (uio != null) {
@@ -360,7 +406,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put(FN_UI_GET_ID, new ExtCall() {
+    setExtDef(FN_UI_GET_ID, "() - returns id of this ui instance", 
+         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO uio = getUIOByScriptId(p.getMe());
         if (uio != null) {
@@ -369,29 +416,50 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__help", new ExtCall() {
+    setExtDef("__help", "() - dumps help struct", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        for (String k : extDefs.keySet()) {
-          if (k.startsWith("__")) continue;
-          currentWA.appendViewText(currentWA.getCurrentView(), k + "\n", UIWorkArea.STYLE_SERIAL_INFO);
-        }
-        for (String k : extDefs.keySet()) {
-          if (!k.startsWith("__")) continue;
-          currentWA.appendViewText(currentWA.getCurrentView(), k + "\n", UIWorkArea.STYLE_SERIAL_INFO);
+        if (args.length > 0) {
+          String help = defhelp.get(args[0].asString());
+          if (help != null) {
+            currentWA.appendViewText(currentWA.getCurrentView(), args[0].asString() + help + "\n", UICommon.STYLE_SERIAL_INFO);
+          }
+        } else {
+          for (String k : extDefs.keySet()) {
+            if (k.startsWith("__")) continue;
+            String help = defhelp.get(k);
+            if (help == null) help = "";
+            currentWA.appendViewText(currentWA.getCurrentView(), k + help + "\n", UICommon.STYLE_SERIAL_INFO);
+          }
+          for (String k : extDefs.keySet()) {
+            if (!k.startsWith("__")) continue;
+            String help = defhelp.get(k);
+            if (help == null) help = "";
+            currentWA.appendViewText(currentWA.getCurrentView(), k + help + "\n", UICommon.STYLE_SERIAL_INFO);
+          }
         }
         return null;
       }
     });
-    createGraphFunctions(extDefs);
-    createCanvasFunctions(extDefs);
-    createTuscedoTabPaneFunctions(extDefs);
-    createSerialFunctions(extDefs);
-    MNet.createNetFunctions(extDefs);
-    MSys.createSysFunctions(extDefs);
-    MDisk.createDiskFunctions(extDefs);
+    createGraphFunctions();
+    createCanvasFunctions();
+    createTuscedoTabPaneFunctions();
+    createSerialFunctions();
+    MNet.createNetFunctions(this);
+    MSys.createSysFunctions(this);
+    MDisk.createDiskFunctions(this);
+    
+    setExtHelp("rand", "() - return random 32-bit number");
+    setExtHelp("randseed", "(<x>) - sets random seed");
+    setExtHelp("cpy", "(<x>) - returns a copy of x");
+    setExtHelp("byte", "(<x>) - returns x as a byte");
+    setExtHelp("strstr", "(<string>, <pattern>(, <fromindex>)) - returns first index of pattern in string, or -1");
+    setExtHelp("strstrr", "(<string>, <pattern>(, <fromindex>)) - returns last index of pattern in string, or -1");
+    setExtHelp("lines", "(<string>) - returns an array of lines");
+    setExtHelp("atoi", "(<x>) - returns x as a number");
     
     comp = new Compiler(extDefs, 0x4000, 0x0000);
     proc.reset();
+    proc.user = 0;
     irqHandler.reset();
   }
   
@@ -440,7 +508,7 @@ public class OperandiScript implements Runnable, Disposable {
       String err = new String(baos.toByteArray(), StandardCharsets.UTF_8);
       AppSystem.closeSilently(ps);
       if (wa != null) {
-        wa.appendViewText(currentView, err, UIWorkArea.STYLE_BASH_ERR);
+        wa.appendViewText(currentView, err, UICommon.STYLE_BASH_ERR);
       } else {
         System.out.println(err);
       }
@@ -479,7 +547,7 @@ public class OperandiScript implements Runnable, Disposable {
             int nestedIRQ = proc.getNestedIRQ();
             String irqInfo = nestedIRQ > 0 ? "[IRQ"+nestedIRQ+"] " : "";
             currentWA.appendViewText(currentView, irqInfo + dbg + "\n", 
-                UIWorkArea.STYLE_BASH_DBG);
+                UICommon.STYLE_BASH_DBG);
           }
           synchronized (q) {
             AppSystem.waitSilently(q, 0);
@@ -492,7 +560,7 @@ public class OperandiScript implements Runnable, Disposable {
       M m = pfe.getRet();
       if (m != null && m.type != Processor.TNIL) {
         currentWA.appendViewText(currentView, "script returned " + m.asString() + "\n", 
-            UIWorkArea.STYLE_BASH_OUT);
+            UICommon.STYLE_BASH_OUT);
       }
     } catch (ProcessorError pe) {
       ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -500,7 +568,7 @@ public class OperandiScript implements Runnable, Disposable {
       proc.dumpError(pe, ps);
       String err = new String(baos.toByteArray(), StandardCharsets.UTF_8);
       AppSystem.closeSilently(ps);
-      currentWA.appendViewText(currentView, err, UIWorkArea.STYLE_BASH_OUT);
+      currentWA.appendViewText(currentView, err, UICommon.STYLE_BASH_OUT);
     }
     finally {
       running = false;
@@ -511,6 +579,8 @@ public class OperandiScript implements Runnable, Disposable {
     lastSrcDbg = null;
     if (!running) return;
     halted = on;
+    if (halted) proc.user |= PROC_HALT;
+    else        proc.user &= ~PROC_HALT;
     if (!halted) {
       synchronized (q) {
         q.notifyAll();
@@ -533,47 +603,52 @@ public class OperandiScript implements Runnable, Disposable {
   
   public void interrupt(int addr) {
     currentWA.appendViewText(currentView, String.format("interrupt -> 0x%08x\n", addr), 
-        UIWorkArea.STYLE_BASH_INPUT);
+        UICommon.STYLE_BASH_INPUT);
     proc.raiseInterrupt(addr);
   }
   
   public void reset() {
     if (running) {
-      running = false;
-      halted = false;
-      synchronized (q) {
-        q.notifyAll();
-      }
-      currentWA.appendViewText(currentView, "processor reset\n", UIWorkArea.STYLE_BASH_INPUT);
-      backtrace();
-      procReset();
+      resetForce();
     }
+  }
+  
+  public void resetForce() {
+    boolean wasRunning = running;
+    running = false;
+    halted = false;
+    synchronized (q) {
+      q.notifyAll();
+    }
+    currentWA.appendViewText(currentView, "processor reset\n", UICommon.STYLE_BASH_INPUT);
+    if (wasRunning) backtrace();
+    procReset();
   }
   
   public void dumpPC() {
     currentWA.appendViewText(currentView, String.format("PC:0x%08x\n", proc.getPC()), 
-        UIWorkArea.STYLE_BASH_INPUT);
+        UICommon.STYLE_BASH_INPUT);
   }
   
   public void dumpFP() {
     currentWA.appendViewText(currentView, String.format("FP:0x%08x\n", proc.getFP()), 
-        UIWorkArea.STYLE_BASH_INPUT);
+        UICommon.STYLE_BASH_INPUT);
   }
   
   public void dumpSP() {
     currentWA.appendViewText(currentView, String.format("SP:0x%08x\n", proc.getSP()), 
-        UIWorkArea.STYLE_BASH_INPUT);
+        UICommon.STYLE_BASH_INPUT);
   }
   
   public void dumpSR() {
     currentWA.appendViewText(currentView, String.format("SR:0x%08x\n", proc.getSR()), 
-        UIWorkArea.STYLE_BASH_INPUT);
+        UICommon.STYLE_BASH_INPUT);
   }
   
   public void dumpMe() {
     M me = proc.getMe();
     currentWA.appendViewText(currentView, String.format("me:%s\n", me == null ? "nil" : me.asString()), 
-        UIWorkArea.STYLE_BASH_INPUT);
+        UICommon.STYLE_BASH_INPUT);
   }
   
   public void backtrace() {
@@ -582,7 +657,7 @@ public class OperandiScript implements Runnable, Disposable {
     proc.unwindStackTrace(ps);
     String bt = new String(baos.toByteArray(), StandardCharsets.UTF_8);
     AppSystem.closeSilently(ps);
-    currentWA.appendViewText(currentView, bt, UIWorkArea.STYLE_BASH_INPUT);
+    currentWA.appendViewText(currentView, bt, UICommon.STYLE_BASH_INPUT);
   }
   
   public void dumpStack() {
@@ -591,27 +666,67 @@ public class OperandiScript implements Runnable, Disposable {
     proc.printStack(ps, "  ", 50);
     String bt = new String(baos.toByteArray(), StandardCharsets.UTF_8);
     AppSystem.closeSilently(ps);
-    currentWA.appendViewText(currentView, bt, UIWorkArea.STYLE_BASH_INPUT);
+    currentWA.appendViewText(currentView, bt, UICommon.STYLE_BASH_INPUT);
+  }
+  
+  public static final String DBG_HALT = "halt";
+  public static final String DBG_HALT_SHORT = "h";
+  public static final String DBG_CONT = "cont";
+  public static final String DBG_CONT_SHORT = "c";
+  public static final String DBG_NEXT = "next";
+  public static final String DBG_NEXT_SHORT = "n";
+  public static final String DBG_STEP = "step";
+  public static final String DBG_STEP_SHORT = "s";
+  public static final String DBG_BACK = "backtrace";
+  public static final String DBG_BACK_SHORT = "bt";
+  public static final String DBG_STACK = "stack";
+  public static final String DBG_STACK_SHORT = "st";
+  public static final String DBG_INT = "interrupt";
+  public static final String DBG_INT_SHORT = "int";
+  public static final String DBG_RES = "reset";
+  public static final String DBG_RES_SHORT = "res";
+  public static final String DBG_V_PC = "pc";
+  public static final String DBG_V_FP = "fp";
+  public static final String DBG_V_SP = "sp";
+  public static final String DBG_V_ME = "me";
+  public static final String DBG_V_SR = "sr";
+  
+  public void dumpDbgHelp() {
+    currentWA.appendViewText(currentView,  ""
+        + DBG_HALT + " (" + DBG_HALT_SHORT + ") - halt processor execution\n"
+        + DBG_CONT + " (" + DBG_CONT_SHORT + ") - resume processor execution\n"
+        + DBG_NEXT + " (" + DBG_NEXT_SHORT + ") - step source\n"
+        + DBG_STEP + " (" + DBG_STEP_SHORT + ") - step instruction\n"
+        + DBG_BACK + " (" + DBG_BACK_SHORT + ") - dumps backtrace\n"
+        + DBG_STACK + " (" + DBG_STACK_SHORT + ") - dumps stack\n"
+        + DBG_INT + " (" + DBG_INT_SHORT + ") - calls interrupt <funcname>\n"
+        + DBG_RES + " (" + DBG_RES_SHORT + ") - resets processor\n"
+        + DBG_V_PC + ", "+ DBG_V_FP + ", "+ DBG_V_SP + ", "+ DBG_V_ME + ", "+ DBG_V_SR + " - shows register\n"
+        ,
+        UICommon.STYLE_BASH_INPUT);
   }
   
   //
   // specific functions
   //
   
-  private void createSerialFunctions(Map<String, ExtCall> extDefs) {
-    extDefs.put(FN_SERIAL_INFO, new ExtCall() {
+  private void createSerialFunctions() {
+    setExtDef(FN_SERIAL_INFO, "() - returns current serial connection parameters",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         return new M(currentWA.getConnectionInfo());
       }
     });
-    extDefs.put(FN_SERIAL_DISCONNECT, new ExtCall() {
+    setExtDef(FN_SERIAL_DISCONNECT, "() - disconnects current serial connection",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         String res = currentWA.getConnectionInfo();
         currentWA.closeSerial();
         return new M(res);
       }
     });
-    extDefs.put(FN_SERIAL_CONNECT, new ExtCall() {
+    setExtDef(FN_SERIAL_CONNECT, "(<serialparams>) - connects to serial, returns non-zero on success",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return new M(0);
         String c = args[0].asString();
@@ -631,7 +746,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(res ? 1 : 0);
       }
     });
-    extDefs.put(FN_SERIAL_TX, new ExtCall() {
+    setExtDef(FN_SERIAL_TX, "(<string|data>) - transmits string, or raw byte if int, or raw bytes if array of ints",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0 || !currentWA.getSerial().isConnected()) return new M(0);
         if (args[0].type == Processor.TSET) {
@@ -663,7 +779,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(1);
       }
     });
-    extDefs.put(FN_SERIAL_ON_RX, new ExtCall() {
+    setExtDef(FN_SERIAL_ON_RX, "(<filter>, <func>) - executes function when filter is matched on a serial line of data, the function arguments will be (line, filter), if func is nil the filter is cleared",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 2) return null;
         if (args[1].type != Processor.TFUNC && args[1].type != Processor.TANON && args[1].type != Processor.TNIL) {
@@ -677,13 +794,15 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put(FN_SERIAL_ON_RX_CLEAR, new ExtCall() {
+    setExtDef(FN_SERIAL_ON_RX_CLEAR, "() - clears all filters",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         currentWA.clearSerialFilters();
         return null;
       }
     });
-    extDefs.put(FN_SERIAL_ON_RX_LIST, new ExtCall() {
+    setExtDef(FN_SERIAL_ON_RX_LIST, "() - returns current filters and corresponding functions",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         List<UIWorkArea.RxFilter> filters = currentWA.getSerialFilters();
         MListMap listMap = new MListMap();
@@ -697,7 +816,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(listMap);
       }
     });
-    extDefs.put(FN_SERIAL_LOG_START, new ExtCall() {
+    setExtDef(FN_SERIAL_LOG_START, "() - starts logging the serial input",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         synchronized (logLock) {
           if (logThread != null) return null;
@@ -751,7 +871,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put(FN_SERIAL_LOG_STOP, new ExtCall() {
+    setExtDef(FN_SERIAL_LOG_STOP, "() - stops logging the serial input, returns the captured log",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         String s = null;
         synchronized (logLock) {
@@ -765,7 +886,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(s);
       }
     });
-    extDefs.put(FN_SERIAL_LOG_AWAIT, new ExtCall() {
+    setExtDef(FN_SERIAL_LOG_AWAIT, "(<filter>, <timeout>) - awaits until filter is found in log, returns index of filter, or -1 timeout",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args.length < 1) return null;
         String await = args[0].asString();
@@ -807,7 +929,8 @@ public class OperandiScript implements Runnable, Disposable {
         } // synchro
       }
     });
-    extDefs.put(FN_SERIAL_LOG_SIZE, new ExtCall() {
+    setExtDef(FN_SERIAL_LOG_SIZE, "() - returns the size of current captured log",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         synchronized (logLock) {
           if (logThread == null) return new M(0);
@@ -815,7 +938,8 @@ public class OperandiScript implements Runnable, Disposable {
         } // synchro
       }
     });
-    extDefs.put(FN_SERIAL_LOG_GET, new ExtCall() {
+    setExtDef(FN_SERIAL_LOG_GET, "() - returns current captured log",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         synchronized (logLock) {
           if (args.length == 0) return new M(log.toString());
@@ -909,8 +1033,9 @@ public class OperandiScript implements Runnable, Disposable {
     };
   }
   
-  private void createGraphFunctions(Map<String, ExtCall> extDefs) {
-    extDefs.put("graph", new ExtCall() {
+  private void createGraphFunctions() {
+    setExtDef("graph", "((<name>,),<data>,...,(<line|plot|bar>)) - opens a graph view", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         String name = "GRAPH";
         int type = UIGraphPanel.GRAPH_LINE;
@@ -949,7 +1074,8 @@ public class OperandiScript implements Runnable, Disposable {
         return mui;
       }
     });
-    extDefs.put("__graph_add", new ExtCall() {
+    setExtDef("__graph_add", "(<data>) - adds data to graph, either as value or as list",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
@@ -964,7 +1090,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__graph_data", new ExtCall() {
+    setExtDef("__graph_data", "() - returns all data of graph as a list",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
         if (ss == null) return null;
@@ -975,7 +1102,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(msetc);
       }
     });
-    extDefs.put("__graph_zoom_all", new ExtCall() {
+    setExtDef("__graph_zoom_all", "() - makes all data visible",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
         if (ss == null) return null;
@@ -985,7 +1113,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__graph_zoom", new ExtCall() {
+    setExtDef("__graph_zoom", "(<horizontal>, <vertical>) - set zooming factors",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 2)  return null;
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
@@ -994,7 +1123,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__graph_zoom_x", new ExtCall() {
+    setExtDef("__graph_zoom_x", "(<horizontal>) - set horizontal zooming factor",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
@@ -1003,7 +1133,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__graph_zoom_y", new ExtCall() {
+    setExtDef("__graph_zoom_y", "(<vertical>) - set vertical zooming factor",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
@@ -1012,7 +1143,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__graph_type", new ExtCall() {
+    setExtDef("__graph_type", "(<line|plot|bar>) - set graph type",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
@@ -1021,14 +1153,16 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__graph_count", new ExtCall() {
+    setExtDef("__graph_count", "() - returns number of graph samples",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
         if (ss == null) return null;
         return new M(ss.getSampleCount());
       }
     });
-    extDefs.put("__graph_get", new ExtCall() {
+    setExtDef("__graph_get","(<index>) - returns sample at index", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
@@ -1036,7 +1170,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)(ss.getSample(args[0].asInt())));
       }
     });
-    extDefs.put("__graph_scroll_x", new ExtCall() {
+    setExtDef("__graph_scroll_x", "(<sampleindex>) - scrolls horizontally to sample index",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
@@ -1045,7 +1180,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__graph_scroll_y", new ExtCall() {
+    setExtDef("__graph_scroll_y", "(<samplevalue>) - scrolls vertically to sample value",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
@@ -1054,7 +1190,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__graph_scroll_sample", new ExtCall() {
+    setExtDef("__graph_scroll_sample", "(<sampleindex>) - scrolls to sample",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
@@ -1063,7 +1200,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__graph_set_mul", new ExtCall() {
+    setExtDef("__graph_set_mul", "(<factor>) - set graph multiplication factor",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
@@ -1073,21 +1211,24 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__graph_min", new ExtCall() {
+    setExtDef("__graph_min", "() - returns minimum value",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
         if (ss == null) return null;
         return new M((float)ss.getMin());
       }
     });
-    extDefs.put("__graph_max", new ExtCall() {
+    setExtDef("__graph_max", "() - returns maximum value",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
         if (ss == null) return null;
         return new M((float)ss.getMax());
       }
     });
-    extDefs.put("__graph_merge", new ExtCall() {
+    setExtDef("__graph_merge", "(<graph>, ...) - merges this graph with another, or others",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
 
@@ -1138,8 +1279,9 @@ public class OperandiScript implements Runnable, Disposable {
     };
   }
   
-  private void createCanvasFunctions(Map<String, ExtCall> extDefs) {
-    extDefs.put("canvas", new ExtCall() {
+  private void createCanvasFunctions() {
+    setExtDef("canvas", "((<title>),(<w>),(<h>)) - creates a canvas",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         String name = "CANVAS";
         int w = 300;
@@ -1171,7 +1313,8 @@ public class OperandiScript implements Runnable, Disposable {
         return mui;
       }
     });
-    extDefs.put("__canvas_set_color", new ExtCall() {
+    setExtDef("__canvas_set_color", "(<color>) - sets current color",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
@@ -1180,7 +1323,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__canvas_draw_line", new ExtCall() {
+    setExtDef("__canvas_draw_line", "(<x1>,<y1>,<x2>,<y2>) - draws a line",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 4)  return null;
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
@@ -1189,7 +1333,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__canvas_draw_rect", new ExtCall() {
+    setExtDef("__canvas_draw_rect", "(<x>,<y>,<w>,<h>) - draws a rectangle",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 4)  return null;
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
@@ -1198,7 +1343,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__canvas_fill_rect", new ExtCall() {
+    setExtDef("__canvas_fill_rect", "(<x>,<y>,<w>,<h>) - draws a filled rectangle",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null)  return null;
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
@@ -1211,7 +1357,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__canvas_draw_oval", new ExtCall() {
+    setExtDef("__canvas_draw_oval", "(<x>,<y>,<w>,<h>) - draws an oval",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 4)  return null;
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
@@ -1220,7 +1367,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__canvas_fill_oval", new ExtCall() {
+    setExtDef("__canvas_fill_oval", "(<x>,<y>,<w>,<h>) - draws a filled oval",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 4)  return null;
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
@@ -1229,7 +1377,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__canvas_draw_text", new ExtCall() {
+    setExtDef("__canvas_draw_text", "(<x>,<y>,<text>) - draws text",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 3)  return null;
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
@@ -1238,21 +1387,24 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__canvas_width", new ExtCall() {
+    setExtDef("__canvas_width", "() - returns width",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
         if (cp == null) return null;
         return new Processor.M(cp.getWidth());
       }
     });
-    extDefs.put("__canvas_height", new ExtCall() {
+    setExtDef("__canvas_height", "() - returns height",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
         if (cp == null) return null;
         return new Processor.M(cp.getHeight());
       }
     });
-    extDefs.put("__canvas_blit", new ExtCall() {
+    setExtDef("__canvas_blit", "() - blits changes to canvas",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
         if (cp == null) return null;
@@ -1260,7 +1412,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__canvas_test", new ExtCall() {
+    setExtDef("__canvas_test", "() - 3d testing", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
         if (cp == null) return null;
@@ -1282,8 +1434,9 @@ public class OperandiScript implements Runnable, Disposable {
     };
   }
   
-  private void createTuscedoTabPaneFunctions(Map<String, ExtCall> extDefs) {
-    extDefs.put("__pane_set_pos", new ExtCall() {
+  private void createTuscedoTabPaneFunctions() {
+    setExtDef("__pane_set_pos", "(<x>, <y>) - sets position of this ui component", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 2)  return null;
         TuscedoTabPane tp= (TuscedoTabPane)getUIOByScriptId(p.getMe());
@@ -1293,7 +1446,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__pane_get_pos", new ExtCall() {
+    setExtDef("__pane_get_pos",  "() - returns position of this ui component", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         TuscedoTabPane tp= (TuscedoTabPane)getUIOByScriptId(p.getMe());
         if (tp == null) return null;
@@ -1304,7 +1458,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(l);
       }
     });
-    extDefs.put("__pane_set_size", new ExtCall() {
+    setExtDef("__pane_set_size",  "(<w>, <h>) - sets size of this ui component", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 2)  return null;
         TuscedoTabPane tp= (TuscedoTabPane)getUIOByScriptId(p.getMe());
@@ -1314,7 +1469,8 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    extDefs.put("__pane_get_size", new ExtCall() {
+    setExtDef("__pane_get_size",  "() - returns size of this ui component", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         TuscedoTabPane tp= (TuscedoTabPane)getUIOByScriptId(p.getMe());
         if (tp == null) return null;
@@ -1363,31 +1519,34 @@ public class OperandiScript implements Runnable, Disposable {
     appVariables.put("__processorversion", new M(Processor.VERSION));
     M m = new M();
     m.type = Processor.TSET;
-    appVariables.put("ser", m);
-    appVariables.put("net", m);
-    appVariables.put("sys", m);
-    appVariables.put("conf", m);
-    appVariables.put("disk", m);
+    appVariables.put(VAR_SERIAL, m);
+    appVariables.put(VAR_NET, m);
+    appVariables.put(VAR_SYSTEM, m);
+    appVariables.put(VAR_CONF, m);
+    appVariables.put(VAR_DISK, m);
+    appVariables.put(VAR_INFO, m);
   }
-  static void injectAppVariables(Compiler comp) {
+  void injectAppVariables(Compiler comp) {
     for (String var : appVariables.keySet()) {
       comp.injectGlobalVariable(null, var);
     }
   }
-  static void injectAppVariablesValues(UIWorkArea wa, Compiler comp, Processor proc) {
+  void injectAppVariablesValues(UIWorkArea wa, Compiler comp, Processor proc) {
     for (String var : appVariables.keySet()) {
       int varAddr = comp.getLinker().lookupVariableAddress(null, var);
       M val;
-      if (var.equals("ser")) {
+      if (var.equals(VAR_SERIAL)) {
         val = new M(new MSerial(wa, comp));
-      } else if (var.equals("net")) {
+      } else if (var.equals(VAR_NET)) {
         val = new M(new MNet(wa, comp));
-      } else if (var.equals("sys")) {
+      } else if (var.equals(VAR_SYSTEM)) {
         val = new M(new MSys(wa, comp));
-      } else if (var.equals("conf")) {
+      } else if (var.equals(VAR_CONF)) {
         val = new M(new MConf(wa, comp));
-      } else if (var.equals("disk")) {
+      } else if (var.equals(VAR_DISK)) {
         val = new M(new MDisk(wa, comp));
+      } else if (var.equals(VAR_INFO)) {
+        val = new M(new MMapRef(defhelp));
       } else {
         val = appVariables.get(var);
       }

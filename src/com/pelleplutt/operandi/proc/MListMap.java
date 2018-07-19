@@ -2,8 +2,10 @@ package com.pelleplutt.operandi.proc;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import com.pelleplutt.operandi.proc.Processor.M;
 public class MListMap implements MSet {
@@ -13,6 +15,15 @@ public class MListMap implements MSet {
   public M[] tup;
   public MListMap() {
     type = Processor.TNIL;
+  }
+  public MListMap(Map<String, String> inmap) {
+    type = TMAP;
+    map = new HashMap<Object, M>();
+    Iterator<Entry<String, String>> it = inmap.entrySet().iterator();
+    while (it.hasNext()) {
+      Map.Entry<String, String> pair = it.next();
+      put(pair.getKey().toString(), new M(pair.getValue().toString()));
+    }
   }
   public void makeArr() {
     type = TARR;

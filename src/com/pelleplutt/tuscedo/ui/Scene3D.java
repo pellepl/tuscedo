@@ -57,6 +57,8 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 
+
+// https://www.lighthouse3d.com/tutorials/opengl_framebuffer_objects/
 public class Scene3D {
   GLFWErrorCallback errorCallback;
   GLFWKeyCallback keyCallback;

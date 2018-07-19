@@ -3,20 +3,8 @@ package com.pelleplutt.tuscedo.ui;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.GradientPaint;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.Paint;
 import java.awt.Point;
-import java.awt.Rectangle;
-import java.awt.RenderingHints;
-import java.awt.Toolkit;
 import java.awt.Window;
-import java.awt.datatransfer.Clipboard;
-import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.ActionEvent;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
@@ -39,20 +27,14 @@ import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.BoundedRangeModel;
 import javax.swing.DefaultListModel;
-import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
-import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTextPane;
 import javax.swing.JWindow;
-import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
-import javax.swing.plaf.basic.BasicScrollBarUI;
 import javax.swing.text.BadLocationException;
 
 import com.pelleplutt.Essential;
@@ -97,8 +79,6 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   public static final String PORT_ARG_PARITY = "parity:";
   public static final String PORT_ARG_STOPBITS = "stopbits:";
   
-  public static final Font COMMON_FONT = new Font(Font.MONOSPACED, Font.PLAIN, 11);
-
   int istate = ISTATE_INPUT;
   JPanel viewPanel = new JPanel();
   JPanel inputPanel = new JPanel();
@@ -109,49 +89,8 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   JLabel infoLabel[] = new JLabel[_ISTATE_NUM];
   Bash bash[] = new Bash[_ISTATE_NUM];
   ProcessACTextField input[] = new ProcessACTextField[_ISTATE_NUM];
-  
-  public static final Color colGenericBg = new Color(0, 0, 32);
-  public static final Color colTextFg = new Color(255, 255, 128);
-  public static final Color colInputFg = new Color(128, 255, 255);
-  public static final Color colInputBg = new Color(48, 48, 64);
-  public static final Color colInputBashBg = new Color(64, 64, 64);
-  public static final Color colBashFg = new Color(255, 255, 255);
-  public static final Color colBashDbgFg = new Color(192, 255, 192);
-  public static final Color colProcessFg = new Color(192, 192, 192);
-  public static final Color colProcessErrFg = new Color(192, 128, 128);
-  public static final Color colFindFg = colInputBg;
-  public static final Color colFindBg = colInputFg;
-  public static final Color colFindMarkFg = new Color(255,192,255);
-  public static final Color colFindMarkBg = null;
-  public static final int STYLE_ID_CONN_IN = 1;
-  public static final int STYLE_ID_HELP = 5;
-  public static final int STYLE_ID_BASH_OUT = 10;
-  public static final int STYLE_ID_BASH_ERR = 11;
-  public static final int STYLE_ID_BASH_INPUT = 12;
-  public static final int STYLE_ID_BASH_DBG = 13;
-  public static final int STYLE_ID_SERIAL_INFO = 20;
-  public static final int STYLE_ID_SERIAL_ERR = 21;
-  public static final int STYLE_ID_FIND = 30;
-  public static final int STYLE_ID_FIND_ALL = 31;
-  public static final FastTextPane.Style STYLE_CONN_IN = 
-      new FastTextPane.Style(STYLE_ID_CONN_IN, colInputFg, null, false); 
-  public static final FastTextPane.Style STYLE_BASH_OUT = 
-      new FastTextPane.Style(STYLE_ID_BASH_OUT, colProcessFg, null, false);
-  public static final FastTextPane.Style STYLE_BASH_ERR = 
-      new FastTextPane.Style(STYLE_ID_BASH_ERR, colProcessErrFg, null, false);
-  public static final FastTextPane.Style STYLE_BASH_INPUT = 
-      new FastTextPane.Style(STYLE_ID_BASH_INPUT, colBashFg, null, false);
-  public static final FastTextPane.Style STYLE_BASH_DBG = 
-      new FastTextPane.Style(STYLE_ID_BASH_DBG, colBashDbgFg, null, false);
-  public static final FastTextPane.Style STYLE_FIND = 
-      new FastTextPane.Style(STYLE_ID_FIND, colFindFg, colFindBg, true);
-  public static final FastTextPane.Style STYLE_FIND_ALL = 
-      new FastTextPane.Style(STYLE_ID_FIND_ALL, colFindMarkFg, colFindMarkBg, true);
-  public static final FastTextPane.Style STYLE_SERIAL_INFO = 
-      new FastTextPane.Style(STYLE_ID_SERIAL_INFO, Color.green, null, true);
-  public static final FastTextPane.Style STYLE_SERIAL_ERR = 
-      new FastTextPane.Style(STYLE_ID_SERIAL_ERR, Color.red, null, true);
-  
+  JScrollPane winSugListSp;
+
   int lastFindIndex = -1;
   String lastFindString = null;
   List<OffsetSpan> findResult;
@@ -234,70 +173,22 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     script = new OperandiScript();
     AppSystem.addDisposable(script);
     Tuscedo.inst().registerTickable(serial);
+    runOperandiInitScripts();
   }
   
-  public static void decorateFTP(FastTextPane ftp) {
-    ftp.setForeground(colTextFg);
-    ftp.setBackground(colGenericBg);
-    ftp.setFont(COMMON_FONT);
-  }
-  
-  public static void decorateComponent(JComponent c) {
-    c.setForeground(colTextFg);
-    c.setBackground(colGenericBg);
-    c.setFont(COMMON_FONT);
-  }
-  
-  public static void decorateScrollPane(JScrollPane sp) {
-    UIManager.put("ScrollBar.width", 6);
-    UIManager.put("ScrollBar.height", 6);
-
-    sp.getVerticalScrollBar().setUI(new SpecScrollBarUI());
-    sp.getHorizontalScrollBar().setUI(new SpecScrollBarUI());
-    sp.getVerticalScrollBar().setBackground(Color.black);
-    sp.getHorizontalScrollBar().setBackground(Color.black);
-    sp.setBackground(colGenericBg);
-    sp.setBorder(null);
-    sp.getHorizontalScrollBar().setFocusable(false);
-    sp.getVerticalScrollBar().setFocusable(false);
-    sp.getHorizontalScrollBar().setRequestFocusEnabled(false);
-    sp.getVerticalScrollBar().setRequestFocusEnabled(false);
-    sp.setFocusable(false);
-  }
-  
-  public static void decorateSplitPane(JSplitPane sp) {
-    sp.setBorder(null);
-    sp.setDividerSize(4);
-  }
-  
-  public static void decorateTextEditor(JTextPane tp) {
-    tp.setFont(COMMON_FONT);
-    tp.setBackground(colInputBg);
-    tp.setCaretColor(new Color(192, 192, 192));
-    tp.setForeground(colInputFg);
-    tp.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
-  }
-  
-  public static void defineAction(JComponent c, String name, String keys, 
-      AbstractAction action) {
-    KeyMap key = KeyMap.getKeyDef(name);
-    if (key == null) {
-      key = KeyMap.fromString(keys);
-      KeyMap.set(name, keys);
+  public void decorateUI() {
+    for (int i = 0; i < _ISTATE_NUM; i++) {
+      UICommon.decorateTextEditor(input[i]);
+      if (views[i] != null) {
+        UICommon. decorateFTP(views[i].ftp);
+        UICommon.decorateFTP(views[i].ftpSec);
+        UICommon.decorateScrollPane(views[i].mainScrollPane);
+        UICommon.decorateScrollPane(views[i].secScrollPane);
+        UICommon.decorateSplitPane(views[i].splitHor);
+        UICommon.decorateSplitPane(views[i].splitVer);
+      }
     }
-    c.getInputMap(JComponent.WHEN_FOCUSED).put(
-        KeyStroke.getKeyStroke(key.keyCode, key.modifiers),
-        name);
-    c.getActionMap().put(name, action);
-  }
-
-  public static void defineAnonAction(JComponent c, String name, String keys, int when, 
-      AbstractAction action) {
-    KeyMap key = KeyMap.fromString(keys);
-    c.getInputMap(when).put(
-        KeyStroke.getKeyStroke(key.keyCode, key.modifiers),
-        name);
-    c.getActionMap().put(name, action);
+    UICommon.decorateScrollPane(winSugListSp);
   }
 
   public void build() {
@@ -314,7 +205,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
         view = new View();
       }
       input[i] = new ProcessACTextField(this);
-      decorateTextEditor(input[i]);
+      UICommon.decorateTextEditor(input[i]);
       input[i].setSuggestionListener(new ACTextField.SuggestionListener() {
         @Override
         public void gotSuggestions(List<String> suggestions) {
@@ -392,55 +283,55 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       String histPath = System.getProperty("user.home") + File.separator + 
           Essential.userSettingPath + File.separator + Essential.historyFile + i;
       input[i].setupHistory(histPath, 4096, 1024); // TODO configurable
-      defineAction(input[i], "input.find", "ctrl+f", actionOpenFind);
-      defineAction(input[i], "input.findback", "ctrl+shift+f", actionOpenFindBack);
-      defineAction(input[i], "input.findregx", "alt+f", actionOpenFindRegex);
-      defineAction(input[i], "input.findregxback", "alt+shift+f", actionOpenFindRegexBack);
-      defineAction(input[i], "input.hex", "ctrl+h", actionOpenHex);
-      defineAction(input[i], "input.script", "ctrl+p", actionOpenScript);
-      defineAction(input[i], "input.inputclose", "escape", actionInputClose);
-      defineAction(input[i], "input.inputenter", "enter", actionInputEnter);
-      defineAction(input[i], "input.inputenterback", "shift+enter", actionInputEnterBack);
-      defineAction(input[i], "input.openserial", "ctrl+o", actionOpenSerialConfig);
-      defineAction(input[i], "input.closeserial", "ctrl+shift+o", actionCloseSerial);
-      defineAction(input[i], "input.help", "f1", actionShowHelp);
-      defineAction(input[i], "input.addtab", "ctrl+shift+t", actionAddTab);
-      defineAction(input[i], "input.closetab", "ctrl+d", actionCloseTab);
-      defineAction(input[i], "input.seltab1", "ctrl+shift+1", actionSelTab1);
-      defineAction(input[i], "input.seltab2", "ctrl+shift+2", actionSelTab2);
-      defineAction(input[i], "input.seltab3", "ctrl+shift+3", actionSelTab3);
-      defineAction(input[i], "input.seltab4", "ctrl+shift+4", actionSelTab4);
-      defineAction(input[i], "input.seltab5", "ctrl+shift+5", actionSelTab5);
-      defineAction(input[i], "input.seltab6", "ctrl+shift+6", actionSelTab6);
-      defineAction(input[i], "input.seltab7", "ctrl+shift+7", actionSelTab7);
-      defineAction(input[i], "input.seltab8", "ctrl+shift+8", actionSelTab8);
-      defineAction(input[i], "input.seltab9", "ctrl+shift+9", actionSelTab9);
-      defineAction(input[i], "input.seltab10", "ctrl+shift+0", actionSelTab10);
-      defineAction(input[i], "input.bash", "ctrl+b", actionOpenBash);
-      defineAction(input[i], "input.complete", "ctrl+space", actionOpenCompletion);
-      defineAction(input[i], "log.input.split", "ctrl+w", actionSplit);
-      defineAction(input[i], "log.input.clear", "ctrl+l", actionClear);
-      defineAction(input[i], "log.input.pageup", "alt+page_up", actionLogPageUp);
-      defineAction(input[i], "log.input.pagedown", "alt+page_down", actionLogPageDown);
-      defineAction(input[i], "log.input.scrollup", "alt+up", actionLogUp);
-      defineAction(input[i], "log.input.scrolldown", "alt+down", actionLogDown);
-      defineAction(input[i], "log.input.scrollleft", "alt+left", actionLogLeft);
-      defineAction(input[i], "log.input.scrollright", "alt+right", actionLogRight);
-      defineAction(input[i], "log.input.home", "ctrl+home", actionLogHome);
-      defineAction(input[i], "log.input.end", "ctrl+end", actionLogEnd);
-      defineAction(input[i], "log.input.xtermtoggle", "ctrl+shift+x", actionLogXtermToggle);
+      UICommon.defineAction(input[i], "input.find", "ctrl+f", actionOpenFind);
+      UICommon.defineAction(input[i], "input.findback", "ctrl+shift+f", actionOpenFindBack);
+      UICommon.defineAction(input[i], "input.findregx", "alt+f", actionOpenFindRegex);
+      UICommon.defineAction(input[i], "input.findregxback", "alt+shift+f", actionOpenFindRegexBack);
+      UICommon.defineAction(input[i], "input.hex", "ctrl+h", actionOpenHex);
+      UICommon.defineAction(input[i], "input.script", "ctrl+p", actionOpenScript);
+      UICommon.defineAction(input[i], "input.inputclose", "escape", actionInputClose);
+      UICommon.defineAction(input[i], "input.inputenter", "enter", actionInputEnter);
+      UICommon.defineAction(input[i], "input.inputenterback", "shift+enter", actionInputEnterBack);
+      UICommon.defineAction(input[i], "input.openserial", "ctrl+o", actionOpenSerialConfig);
+      UICommon.defineAction(input[i], "input.closeserial", "ctrl+shift+o", actionCloseSerial);
+      UICommon.defineAction(input[i], "input.help", "f1", actionShowHelp);
+      UICommon.defineAction(input[i], "input.addtab", "ctrl+shift+t", actionAddTab);
+      UICommon.defineAction(input[i], "input.closetab", "ctrl+d", actionCloseTab);
+      UICommon.defineAction(input[i], "input.seltab1", "ctrl+shift+1", actionSelTab1);
+      UICommon.defineAction(input[i], "input.seltab2", "ctrl+shift+2", actionSelTab2);
+      UICommon.defineAction(input[i], "input.seltab3", "ctrl+shift+3", actionSelTab3);
+      UICommon.defineAction(input[i], "input.seltab4", "ctrl+shift+4", actionSelTab4);
+      UICommon.defineAction(input[i], "input.seltab5", "ctrl+shift+5", actionSelTab5);
+      UICommon.defineAction(input[i], "input.seltab6", "ctrl+shift+6", actionSelTab6);
+      UICommon.defineAction(input[i], "input.seltab7", "ctrl+shift+7", actionSelTab7);
+      UICommon.defineAction(input[i], "input.seltab8", "ctrl+shift+8", actionSelTab8);
+      UICommon.defineAction(input[i], "input.seltab9", "ctrl+shift+9", actionSelTab9);
+      UICommon.defineAction(input[i], "input.seltab10", "ctrl+shift+0", actionSelTab10);
+      UICommon.defineAction(input[i], "input.bash", "ctrl+b", actionOpenBash);
+      UICommon.defineAction(input[i], "input.complete", "ctrl+space", actionOpenCompletion);
+      UICommon.defineAction(input[i], "log.input.split", "ctrl+w", actionSplit);
+      UICommon.defineAction(input[i], "log.input.clear", "ctrl+l", actionClear);
+      UICommon.defineAction(input[i], "log.input.pageup", "alt+page_up", actionLogPageUp);
+      UICommon.defineAction(input[i], "log.input.pagedown", "alt+page_down", actionLogPageDown);
+      UICommon.defineAction(input[i], "log.input.scrollup", "alt+up", actionLogUp);
+      UICommon.defineAction(input[i], "log.input.scrolldown", "alt+down", actionLogDown);
+      UICommon.defineAction(input[i], "log.input.scrollleft", "alt+left", actionLogLeft);
+      UICommon.defineAction(input[i], "log.input.scrollright", "alt+right", actionLogRight);
+      UICommon.defineAction(input[i], "log.input.home", "ctrl+home", actionLogHome);
+      UICommon.defineAction(input[i], "log.input.end", "ctrl+end", actionLogEnd);
+      UICommon.defineAction(input[i], "log.input.xtermtoggle", "ctrl+shift+x", actionLogXtermToggle);
 
       inputLabel[i] = new JLabel();
-      inputLabel[i].setFont(COMMON_FONT);
-      inputLabel[i].setBackground(colInputFg);
-      inputLabel[i].setForeground(colInputBg);
+      inputLabel[i].setFont(UICommon.COMMON_FONT);
+      inputLabel[i].setBackground(UICommon.colInputFg);
+      inputLabel[i].setForeground(UICommon.colInputBg);
       inputLabel[i].setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
       inputLabel[i].setVisible(false);
 
       infoLabel[i] = new JLabel();
-      infoLabel[i].setFont(COMMON_FONT);
-      infoLabel[i].setBackground(colInputFg);
-      infoLabel[i].setForeground(colInputBg);
+      infoLabel[i].setFont(UICommon.COMMON_FONT);
+      infoLabel[i].setBackground(UICommon.colInputFg);
+      infoLabel[i].setForeground(UICommon.colInputBg);
       infoLabel[i].setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
       infoLabel[i].setVisible(false);
       
@@ -455,7 +346,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       inputPanel.add(ip[i], Integer.toString(i));
       
       if (i == ISTATE_INPUT || i == ISTATE_BASH) {
-        XtermTerminal xc = new XtermTerminal(view.ftp, input[i], "UTF-8"); // TODO here
+        XtermTerminal xc = new XtermTerminal(view.ftp, input[i], "UTF-8");
         view.xterm = xc;
         bash[i] = new Bash(input[i], xc, serial, this);
       }
@@ -477,17 +368,17 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     winSug = new JWindow(SwingUtilities.getWindowAncestor(input[ISTATE_INPUT]));
     winSug.setLayout(new BorderLayout());
     winSugList = new JList<String>();
-    winSugList.setForeground(colInputFg);
-    winSugList.setBackground(colInputBg);
-    winSugList.setFont(COMMON_FONT);
-    winSugList.setSelectionBackground(colInputFg);
-    winSugList.setSelectionForeground(colInputBg);
-    JScrollPane sp = new JScrollPane(winSugList, 
+    winSugList.setForeground(UICommon.colInputFg);
+    winSugList.setBackground(UICommon.colInputBg);
+    winSugList.setFont(UICommon.COMMON_FONT);
+    winSugList.setSelectionBackground(UICommon.colInputFg);
+    winSugList.setSelectionForeground(UICommon.colInputBg);
+    winSugListSp = new JScrollPane(winSugList, 
         JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
         JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-    decorateScrollPane(sp);
+    UICommon.decorateScrollPane(winSugListSp);
     //sp.setBorder(BorderFactory.createLineBorder(colTextFg, 1));
-    winSug.add(sp, BorderLayout.CENTER);
+    winSug.add(winSugListSp, BorderLayout.CENTER);
   }
 
   public void setInfo(String s) {
@@ -500,14 +391,14 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   }
   
   public void transmit(String in) {
-    views[ISTATE_INPUT].ftp.addText(in, STYLE_CONN_IN);
+    views[ISTATE_INPUT].ftp.addText(in, UICommon.STYLE_CONN_IN);
     serial.transmit(in);
   }
   
   public void transmit(byte[] b) {
     if (b != null && b.length > 0) {
       String s = AppSystem.formatBytes(b);
-      views[ISTATE_INPUT].ftp.addText("[" + s + "]\n", STYLE_CONN_IN);
+      views[ISTATE_INPUT].ftp.addText("[" + s + "]\n", UICommon.STYLE_CONN_IN);
       serial.transmit(b);
     }
   }
@@ -571,7 +462,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     Matcher mat = pat.matcher(text);
     findResult = new ArrayList<OffsetSpan>();
     while (mat.find()) {
-      curView.ftp.addStyleByOffset(STYLE_FIND_ALL, mat.start(), mat.end());
+      curView.ftp.addStyleByOffset(UICommon.STYLE_FIND_ALL, mat.start(), mat.end());
       if (mat.end() > mat.start()) {
         findResult.add(new OffsetSpan(mat.start(), mat.end()));
       }
@@ -588,10 +479,10 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
         lastFindIndex = 0;
         return;
       }
-      curView.ftp.removeStyle(STYLE_FIND);
+      curView.ftp.removeStyle(UICommon.STYLE_FIND);
       OffsetSpan offs = null;
       if (!str.equals(lastFindString)) {
-        curView.ftp.removeStyle(STYLE_FIND_ALL);
+        curView.ftp.removeStyle(UICommon.STYLE_FIND_ALL);
         findAllOccurences(str, regex);
         if (!findResult.isEmpty()) {
           lastFindIndex = shift ? findResult.size() - 1 : 0;
@@ -615,7 +506,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       }
       if (offs != null) {
         lastFindString = str;
-        curView.ftp.addStyleByOffset(STYLE_FIND, offs.start, offs.end);
+        curView.ftp.addStyleByOffset(UICommon.STYLE_FIND, offs.start, offs.end);
         curView.ftp.scrollToOffset(offs.start);
         setInfo((lastFindIndex + 1) + " OF " + findResult.size());
       }
@@ -649,15 +540,15 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       views[ISTATE_INPUT].ftp.addText("Opening " + portSetting.portName + " " + 
           portSetting.baud + " " + portSetting.databits + 
           Port.parityToString(portSetting.parity).charAt(0) + portSetting.stopbits + "...\n", 
-          STYLE_SERIAL_INFO);
+          UICommon.STYLE_SERIAL_INFO);
       
       serial.open(portSetting);
       
-      views[ISTATE_INPUT].ftp.addText("Connected\n", STYLE_SERIAL_INFO);
+      views[ISTATE_INPUT].ftp.addText("Connected\n", UICommon.STYLE_SERIAL_INFO);
       if (istate == ISTATE_OPEN_SERIAL) enterInputState(ISTATE_INPUT);
       res=true;
     } catch (Exception e) {
-      views[ISTATE_INPUT].ftp.addText("Failed [" + e.getMessage() + "]\n", STYLE_SERIAL_ERR);
+      views[ISTATE_INPUT].ftp.addText("Failed [" + e.getMessage() + "]\n", UICommon.STYLE_SERIAL_ERR);
     } finally {
       input[ISTATE_OPEN_SERIAL].setEnabled(true);
       updateTitle();
@@ -712,8 +603,8 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     case ISTATE_FIND_REGEX:
       lastFindIndex = -1;
       lastFindString = null;
-      curView.ftp.removeStyle(STYLE_FIND);
-      curView.ftp.removeStyle(STYLE_FIND_ALL);
+      curView.ftp.removeStyle(UICommon.STYLE_FIND);
+      curView.ftp.removeStyle(UICommon.STYLE_FIND_ALL);
       break;
     }
   }
@@ -742,11 +633,11 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
         input[istate].setText("");
         if (in.startsWith(settings.string(Settings.BASH_PREFIX_STRING))) {
           String s = in.substring(settings.string(Settings.BASH_PREFIX_STRING).length()); 
-          views[ISTATE_INPUT].ftp.addText(s + "\n", STYLE_BASH_INPUT);
+          views[ISTATE_INPUT].ftp.addText(s + "\n", UICommon.STYLE_BASH_INPUT);
           bash[istate].input(s);
         } else if (in.startsWith(settings.string(Settings.SCRIPT_PREFIX_STRING))) {
           String s = in.substring(settings.string(Settings.SCRIPT_PREFIX_STRING).length()); 
-          getCurrentView().ftp.addText(s + "\n", STYLE_BASH_INPUT);
+          getCurrentView().ftp.addText(s + "\n", UICommon.STYLE_BASH_INPUT);
           script.runScript(this, in + "\n");
         } else {
           transmit(in + Settings.inst().string(Settings.SERIAL_NEWLINE_STRING));
@@ -776,7 +667,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       if (input[istate].isLinkedToProcess() && curView.ftp.isTerminalMode()) {
         // do not echo to running bashes
       } else {
-        views[ISTATE_BASH].ftp.addText(in + "\n", STYLE_BASH_INPUT);
+        views[ISTATE_BASH].ftp.addText(in + "\n", UICommon.STYLE_BASH_INPUT);
       }
       bash[istate].input(in);
       input[istate].setText("");
@@ -789,32 +680,34 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
           } else {
             in = lastDbgCmd;
           }
-          if (in.equalsIgnoreCase("halt") || in.equalsIgnoreCase("h")) {
+          if (in.equalsIgnoreCase(OperandiScript.DBG_HALT) || in.equalsIgnoreCase(OperandiScript.DBG_HALT_SHORT)) {
             script.halt(true);
-          } else if (in.equalsIgnoreCase("cont") || in.equalsIgnoreCase("c")) {
+          } else if (in.equalsIgnoreCase(OperandiScript.DBG_CONT) || in.equalsIgnoreCase(OperandiScript.DBG_CONT_SHORT)) {
             script.halt(false);
-          } else if (in.equalsIgnoreCase("next") || in.equalsIgnoreCase("n")) {
+          } else if (in.equalsIgnoreCase(OperandiScript.DBG_NEXT) || in.equalsIgnoreCase(OperandiScript.DBG_NEXT_SHORT)) {
             script.step();
-          } else if (in.equalsIgnoreCase("step") || in.equalsIgnoreCase("s")) {
+          } else if (in.equalsIgnoreCase(OperandiScript.DBG_STEP) || in.equalsIgnoreCase(OperandiScript.DBG_STEP_SHORT)) {
             script.stepInstr();
-          } else if (in.equalsIgnoreCase("backtrace") || in.equalsIgnoreCase("bt")) {
+          } else if (in.equalsIgnoreCase(OperandiScript.DBG_BACK) || in.equalsIgnoreCase(OperandiScript.DBG_BACK_SHORT)) {
             script.backtrace();
-          } else if (in.equalsIgnoreCase("stack") || in.equalsIgnoreCase("st")) {
+          } else if (in.equalsIgnoreCase(OperandiScript.DBG_STACK) || in.equalsIgnoreCase(OperandiScript.DBG_STACK_SHORT)) {
             script.dumpStack();
-          } else if (in.startsWith("interrupt ") || in.startsWith("int ")) {
+          } else if (in.startsWith(OperandiScript.DBG_INT + " ") || in.startsWith(OperandiScript.DBG_INT_SHORT + " ")) {
             script.interrupt(script.lookupFunc(in.split("\\s")[1]));
-          } else if (in.equalsIgnoreCase("pc")) {
+          } else if (in.equalsIgnoreCase(OperandiScript.DBG_V_PC)) {
             script.dumpPC();
-          } else if (in.equalsIgnoreCase("fp")) {
+          } else if (in.equalsIgnoreCase(OperandiScript.DBG_V_FP)) {
             script.dumpFP();
-          } else if (in.equalsIgnoreCase("sp")) {
+          } else if (in.equalsIgnoreCase(OperandiScript.DBG_V_SP)) {
             script.dumpSP();
-          } else if (in.equalsIgnoreCase("me")) {
+          } else if (in.equalsIgnoreCase(OperandiScript.DBG_V_ME)) {
             script.dumpMe();
-          } else if (in.equalsIgnoreCase("sr")) {
+          } else if (in.equalsIgnoreCase(OperandiScript.DBG_V_SR)) {
             script.dumpSR();
-          } else if (in.equalsIgnoreCase("reset") || in.equalsIgnoreCase("res")) {
+          } else if (in.equalsIgnoreCase(OperandiScript.DBG_RES) || in.equalsIgnoreCase(OperandiScript.DBG_RES_SHORT)) {
             script.reset();
+          } else {
+            script.dumpDbgHelp();
           }
         } else {
           if (in.startsWith("#load ")) {
@@ -827,14 +720,18 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
             for (File f : files) {
               String s = AppSystem.readFile(f);
               if (s == null) {
-                getCurrentView().ftp.addText("file " + f.getAbsolutePath() + " not found\n", STYLE_BASH_ERR);
+                getCurrentView().ftp.addText("file " + f.getAbsolutePath() + " not found\n", UICommon.STYLE_BASH_ERR);
               } else {
-                getCurrentView().ftp.addText("loading file " + f.getAbsolutePath() + "\n", STYLE_BASH_INPUT);
+                getCurrentView().ftp.addText("loading file " + f.getAbsolutePath() + "\n", UICommon.STYLE_BASH_INPUT);
                 script.runScript(this, f, s);
               }
             }
+          } else if (in.equals("#reset")) {
+            script.resetForce();
+          } else if (in.equals("#init")) {
+            runOperandiInitScripts();
           } else {
-            getCurrentView().ftp.addText(in + "\n", STYLE_BASH_INPUT);
+            getCurrentView().ftp.addText(in + "\n", UICommon.STYLE_BASH_INPUT);
             script.runScript(this, in + "\n");
           }
         }
@@ -853,6 +750,19 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     }
   }
   String lastDbgCmd = "";
+  
+  private void runOperandiInitScripts() {
+    String path = System.getProperty("user.home") + File.separator + 
+        Essential.userSettingPath + File.separator;
+    List<File> files = AppSystem.findFiles(path, "init-*.op", false);
+    System.out.println("running operandi init-*.op files in " + path + ":" + files);
+    for (File f : files) {
+      String s = AppSystem.readFile(f);
+      if (s != null) {
+        script.runScript(this, f, s);
+      }
+    }
+  }
   
   public View getCurrentView() {
     return curView;
@@ -1004,7 +914,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     Window w = SwingUtilities.getWindowAncestor(input[istate]);
     Point p = w.getLocation();
     Point p2 = SwingUtilities.convertPoint(input[istate], 0,0, w);
-    int fh = getFontMetrics(COMMON_FONT).getHeight()+2;
+    int fh = getFontMetrics(UICommon.COMMON_FONT).getHeight()+2;
     int h = fh * Math.min(6, arr.length);
     p.x += p2.x;
     p.y += p2.y;
@@ -1041,7 +951,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     Window w = SwingUtilities.getWindowAncestor(input[istate]);
     Point p = w.getLocation();
     Point p2 = SwingUtilities.convertPoint(input[istate], 0,0, w);
-    int fh = getFontMetrics(COMMON_FONT).getHeight()+2;
+    int fh = getFontMetrics(UICommon.COMMON_FONT).getHeight()+2;
     int h = fh * Math.min(6, items.size());
     p.x += p2.x;
     p.y += p2.y;
@@ -1057,17 +967,17 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
         Essential.vMin + "." + Essential.vMic; 
     int midLen = Essential.longname.length() / 2;
     curView.ftp.addText( String.format("%" + (midLen + name.length()/2) + "s\n", name), 
-        STYLE_ID_HELP, Color.white, null, true);
-    curView.ftp.addText(Essential.longname + "\n\n", STYLE_ID_HELP, 
+        UICommon.STYLE_ID_HELP, Color.white, null, true);
+    curView.ftp.addText(Essential.longname + "\n\n", UICommon.STYLE_ID_HELP, 
         Color.lightGray, null, false);
     Set<String> unsorted = KeyMap.getActions();
     List<String> sorted = new ArrayList<String>(unsorted);
     java.util.Collections.sort(sorted);
     for (String d : sorted) {
       KeyMap km = KeyMap.getKeyDef(d);
-      curView.ftp.addText(String.format("%" + (midLen-1) + "s  ", d), STYLE_ID_HELP, 
+      curView.ftp.addText(String.format("%" + (midLen-1) + "s  ", d), UICommon.STYLE_ID_HELP, 
           Color.cyan, null, false);
-      curView.ftp.addText(km.toString() + "\n", STYLE_ID_HELP, Color.yellow, null, false);
+      curView.ftp.addText(km.toString() + "\n", UICommon.STYLE_ID_HELP, Color.yellow, null, false);
     }
   }
   
@@ -1398,15 +1308,6 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     }
   };
 
-  private static JButton createZeroButton() {
-    JButton jbutton = new JButton();
-    jbutton.setPreferredSize(new Dimension(0, 0));
-    jbutton.setMinimumSize(new Dimension(0, 0));
-    jbutton.setMaximumSize(new Dimension(0, 0));
-    jbutton.setFocusable(false);
-    return jbutton;
-  }
-
   @Override
   public void dispose() {
     //Log.println("workarea close serial");
@@ -1423,7 +1324,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   }
 
   public void onSerialData(byte[] b) {
-    String s = new String(b); // TODO here
+    String s = new String(b);
     if (views[ISTATE_INPUT].rawMode) {
       views[ISTATE_INPUT].ftp.addText(s);
     } else {
@@ -1524,13 +1425,13 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   
   public void onSerialDisconnect() {
     lineBuffer = new StringBuilder();
-    views[ISTATE_INPUT].ftp.addText("Disconnected\n", STYLE_SERIAL_INFO);
+    views[ISTATE_INPUT].ftp.addText("Disconnected\n", UICommon.STYLE_SERIAL_INFO);
     updateTitle();
   }
   
   public void onLinkedProcess(ProcessACTextField tf, ProcessGroup process) {
     Log.println("link process " + process.toString());
-    tf.setBackground(UIWorkArea.colInputBashBg);
+    tf.setBackground(UICommon.colInputBashBg);
     Bash bash = ((ProcessGroupInfo)process.getUserData()).bash;
     ((XtermTerminal)bash.console).reviveScreenBuffer(process);
     updateTitle();
@@ -1542,16 +1443,18 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       Bash bash = ((ProcessGroupInfo)process.getUserData()).bash;
       ((XtermTerminal)bash.console).forceOriginalScreenBuffer();
     }
-    tf.setBackground(UIWorkArea.colInputBg);
+    tf.setBackground(UICommon.colInputBg);
     updateTitle();
   }
   
   public void onScriptStart(Processor proc) {
-    input[ISTATE_SCRIPT].setBackground(UIWorkArea.colInputBashBg);
+    if (input != null && input[ISTATE_SCRIPT] != null) 
+      input[ISTATE_SCRIPT].setBackground(UICommon.colInputBashBg);
   }
 
   public void onScriptStop(Processor proc) {
-    input[ISTATE_SCRIPT].setBackground(UIWorkArea.colInputBg);
+    if (input != null && input[ISTATE_SCRIPT] != null) 
+      input[ISTATE_SCRIPT].setBackground(UICommon.colInputBg);
   }
 
   
@@ -1614,61 +1517,6 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   }
   
   
-  static class SpecScrollBarUI extends BasicScrollBarUI {
-    Paint ptrack, ttrack;
-
-    @Override
-    protected void paintTrack(Graphics og, JComponent c,
-        Rectangle trackBounds) {
-      Graphics2D g = (Graphics2D) og;
-      g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-          RenderingHints.VALUE_ANTIALIAS_ON);
-      if (ptrack == null) {
-        if (scrollbar.getOrientation() == JScrollBar.VERTICAL) {
-          ptrack = new GradientPaint(0, 0, new Color(64, 64, 64),
-              UIManager.getInt("ScrollBar.width"), 0, new Color(96, 96, 96));
-        } else {
-          ptrack = new GradientPaint(0, 0, new Color(64, 64, 64), 0,
-              UIManager.getInt("ScrollBar.height"), new Color(96, 96, 96));
-        }
-      }
-      g.setPaint(ptrack);
-      g.fillRect(trackBounds.x, trackBounds.y, trackBounds.width,
-          trackBounds.height);
-    }
-
-    @Override
-    protected void paintThumb(Graphics og, JComponent c,
-        Rectangle thumbBounds) {
-      Graphics2D g = (Graphics2D) og;
-      g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-          RenderingHints.VALUE_ANTIALIAS_ON);
-      if (ttrack == null) {
-        if (scrollbar.getOrientation() == JScrollBar.VERTICAL) {
-          ttrack = new GradientPaint(0, 0, new Color(196, 196, 196),
-              UIManager.getInt("ScrollBar.width"), 0, new Color(128, 128, 128));
-        } else {
-          ttrack = new GradientPaint(0, 0, new Color(196, 196, 196), 0,
-              UIManager.getInt("ScrollBar.height"), new Color(128, 128, 128));
-        }
-      }
-      g.setPaint(ttrack);
-      g.fillRoundRect(thumbBounds.x, thumbBounds.y, thumbBounds.width,
-          thumbBounds.height, UIManager.getInt("ScrollBar.width") / 2,
-          UIManager.getInt("ScrollBar.height") / 2);
-    }
-
-    @Override
-    protected JButton createDecreaseButton(int orientation) {
-      return createZeroButton();
-    }
-
-    @Override
-    protected JButton createIncreaseButton(int orientation) {
-      return createZeroButton();
-    }
-  } // class SpecScrollBarUI
-
   public class OffsetSpan {
     public int start, end;
     public OffsetSpan(int start, int end) {
@@ -1724,7 +1572,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     
     public View() {
       ftp = new FastTermPane();
-      decorateFTP(ftp);
+      UICommon.decorateFTP(ftp);
       
       ftpSec = new FastTextPane();
       ftpSec.setDocument(ftp.getDocument());
@@ -1732,15 +1580,15 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       ftp.addMouseListener(this);
       ftpSec.addMouseListener(this);
       
-      decorateFTP(ftpSec);
+      UICommon.decorateFTP(ftpSec);
       mainScrollPane = new JScrollPane(ftp,
           JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
           JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-      decorateScrollPane(mainScrollPane);
+      UICommon.decorateScrollPane(mainScrollPane);
       secScrollPane = new JScrollPane(ftpSec,
           JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
           JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-      decorateScrollPane(secScrollPane);
+      UICommon.decorateScrollPane(secScrollPane);
 
       mainScrollPane.getVerticalScrollBar().addAdjustmentListener(
           new AutoAdjustmentListener(mainScrollPane));
@@ -1748,10 +1596,10 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
           new AutoAdjustmentListener(secScrollPane));
       
       splitVer = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
-      decorateSplitPane(splitVer);
+      UICommon.decorateSplitPane(splitVer);
       splitVer.setDividerLocation(0);
       splitHor = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
-      decorateSplitPane(splitHor);
+      UICommon.decorateSplitPane(splitHor);
       splitHor.setDividerLocation(100);
       
       curSplit = mainScrollPane;

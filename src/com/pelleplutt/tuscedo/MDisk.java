@@ -42,15 +42,17 @@ public class MDisk extends MObj {
 //    addFunc("open", OperandiScript.FN_DISK_OPEN, comp);
   }
   
-  public static void createDiskFunctions(Map<String, ExtCall> extDefs) {
-    extDefs.put(OperandiScript.FN_DISK_READ, new ExtCall() {
+  public static void createDiskFunctions(OperandiScript os) {
+    os.setExtDef(OperandiScript.FN_DISK_READ, "(<filename>) - returns a file as a string", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args.length < 1) return null;
         String path = args[0].asString();
         return new Processor.M(AppSystem.readFile(new File(path)));
       }
     });
-    extDefs.put(OperandiScript.FN_DISK_READB, new ExtCall() {
+    os.setExtDef(OperandiScript.FN_DISK_READB, "(<filename>) - returns a file as a byte array",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args.length < 1) return null;
         String path = args[0].asString();
@@ -67,7 +69,8 @@ public class MDisk extends MObj {
         return new Processor.M(arr);
       }
     });
-    extDefs.put(OperandiScript.FN_DISK_FIND_FILE, new ExtCall() {
+    os.setExtDef(OperandiScript.FN_DISK_FIND_FILE, "(<path>,<filter>,<recurse>) - returns array of files matching the filter", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args.length < 1) return null;
         String path = args[0].asString();
@@ -81,12 +84,14 @@ public class MDisk extends MObj {
         return new Processor.M(mfiles);
       }
     });
-    extDefs.put(OperandiScript.FN_DISK_LS, new ExtCall() {
+    os.setExtDef(OperandiScript.FN_DISK_LS, "() - NOT IMPLEMENTED",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         throw new ProcessorError("not impl");
       }
     });
-    extDefs.put(OperandiScript.FN_DISK_STAT, new ExtCall() {
+    os.setExtDef(OperandiScript.FN_DISK_STAT, "(<filename>) - returns file information as a struct",
+        new ExtCall() {
       @SuppressWarnings("unchecked")
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args.length < 1) return null;
@@ -118,7 +123,8 @@ public class MDisk extends MObj {
         return new Processor.M(mstat);
       }
     });
-    extDefs.put(OperandiScript.FN_DISK_MOVE, new ExtCall() {
+    os.setExtDef(OperandiScript.FN_DISK_MOVE, "(<source>, <destination>) - moves a file",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args.length < 2) return null;
         String src = args[0].asString();
@@ -131,7 +137,8 @@ public class MDisk extends MObj {
         return null;
       }
     });
-    extDefs.put(OperandiScript.FN_DISK_COPY, new ExtCall() {
+    os.setExtDef(OperandiScript.FN_DISK_COPY, "(<source>, <destination>) - copies a file",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args.length < 2) return null;
         String src = args[0].asString();
