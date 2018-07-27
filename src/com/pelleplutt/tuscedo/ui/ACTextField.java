@@ -343,7 +343,7 @@ public class ACTextField extends JTextPane implements CaretListener {
   /**
    * Accepts current suggestion. Accepts wholly if previous suggestion was accepted.
    */
-  public void accept() {
+  public void acceptCurrent() {
     if (userSelectedSuggestion) {
       acceptSuggestionWholly();
       if (suggestionListener != null) suggestionListener.gotSuggestions(null);
@@ -552,7 +552,7 @@ public class ACTextField extends JTextPane implements CaretListener {
   AbstractAction actionAcceptSuggestion = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      accept();
+      acceptCurrent();
     }
   };
   

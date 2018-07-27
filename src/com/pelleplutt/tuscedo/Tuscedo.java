@@ -8,7 +8,10 @@ import java.awt.Point;
 import java.awt.Window;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
 import java.io.File;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,6 +22,10 @@ import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
+
+import org.lwjgl.BufferUtils;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
 
 import com.pelleplutt.Essential;
 import com.pelleplutt.tuscedo.ui.Scene3D;
@@ -89,6 +96,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
             windows.remove(w);
             //Log.println("window deregistered " + windows.size());
             if (windows.isEmpty()) {
+              System.out.println("byebye");
               Tuscedo.onExit();
               AppSystem.disposeAll();
             }
@@ -199,7 +207,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     }
   }
   
-  public static Scene3D test3d = null; //new Scene3D();
+  public static Scene3D test3d = new Scene3D();
   
   public static void main(String[] args) {
     try {
@@ -208,13 +216,13 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     }
     
     // lwjgl3 scene to bufferedimage
-    
-//    ByteBuffer nativeBuffer = BufferUtils.createByteBuffer(w*h*3);
-//    BufferedImage image = new BufferedImage(w, h, BufferedImage.TYPE_3BYTE_BGR);
-//    GL11.glReadPixels(0, 0, w, h, GL12.GL_BGR, GL11.GL_UNSIGNED_BYTE, nativeBuffer);
-//    byte[] imgData = ((DataBufferByte)image.getRaster().getDataBuffer()).getData();
-//    nativeBuffer.get(imgData);
-
+/*    final int w = 300; final int h = 200;
+    ByteBuffer nativeBuffer = BufferUtils.createByteBuffer(w*h*3);
+    BufferedImage image = new BufferedImage(w, h, BufferedImage.TYPE_3BYTE_BGR);
+    GL11.glReadPixels(0, 0, w, h, GL12.GL_BGR, GL11.GL_UNSIGNED_BYTE, nativeBuffer);
+    byte[] imgData = ((DataBufferByte)image.getRaster().getDataBuffer()).getData();
+    nativeBuffer.get(imgData);
+*/
 
     
     // purejavacomm
@@ -263,9 +271,9 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
           Tuscedo.inst().create(null);
         }
       });
-//      test3d.init();
-//      test3d.render();
-//      render3dloop();
+      test3d.init();
+      test3d.render();
+      render3dloop();
     }
   } // main
   
@@ -307,10 +315,10 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   
   static void onExit() {
     inst.running = false;
-//    test3d.destroy();
-//    synchronized (test3d) {
-//      test3d.notifyAll();
-//    }
+    test3d.destroy();
+    synchronized (test3d) {
+      test3d.notifyAll();
+    }
   }
 
   @Override
@@ -330,27 +338,27 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
 
   @Override
   public void onRemoved(UIO parent, UIO child) {
-    //System.out.println("onRemoved  " + stringify(child.getUIInfo(), 0) + " from " + stringify(parent.getUIInfo(), 0));
+    System.out.println("onRemoved  " + stringify(child.getUIInfo(), 0) + " from " + stringify(parent.getUIInfo(), 0));
   }
 
   @Override
   public void onAdded(UIO parent, UIO child) {
-    //System.out.println("onAdded    " + stringify(child.getUIInfo(), 0) + "  to  " + stringify(parent.getUIInfo(), 0));
+    System.out.println("onAdded    " + stringify(child.getUIInfo(), 0) + "  to  " + stringify(parent.getUIInfo(), 0));
   }
 
   @Override
   public void onClosed(UIO parent, UIO child) {
-//    System.out.println("onClosed   " + 
-//      stringify(child.getUIInfo(), 0) + 
-//      "  in  " + 
-//      (parent == null ? "null":stringify(parent.getUIInfo(), 0)));
+    System.out.println("onClosed   " + 
+      stringify(child.getUIInfo(), 0) + 
+      "  in  " + 
+      (parent == null ? "null":stringify(parent.getUIInfo(), 0)));
     uiobjects.remove(child.getUIInfo().getId());
   }
 
   @Override
   public void onCreated(UIInfo i) {
     uiobjects.put(i.getId(), i);
-//    System.out.println("onCreated  " + stringify(i, 0));
+    System.out.println("onCreated  " + stringify(i, 0));
   }
 
   @Override

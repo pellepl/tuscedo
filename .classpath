@@ -14,7 +14,11 @@
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-glfw-natives-linux.jar"/>
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-glfw-natives-macos.jar"/>
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-glfw-natives-windows.jar"/>
-	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-glfw.jar"/>
+	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-glfw.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:platform:/resource/tuscedo/lib/lwjgl/unp/lwjgl-glfw-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-natives-linux.jar"/>
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-natives-macos.jar"/>
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-natives-windows.jar"/>
@@ -25,12 +29,24 @@
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-opengl-natives-linux.jar"/>
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-opengl-natives-macos.jar"/>
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-opengl-natives-windows.jar"/>
-	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-opengl.jar"/>
+	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-opengl.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:platform:/resource/tuscedo/lib/lwjgl/unp/lwjgl-opengl-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-stb-natives-linux.jar"/>
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-stb-natives-macos.jar"/>
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-stb-natives-windows.jar"/>
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-stb.jar"/>
-	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl.jar"/>
-	<classpathentry kind="lib" path="lib/lwjgl/unp/joml-1.9.9.jar"/>
+	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:platform:/resource/tuscedo/lib/lwjgl/unp/lwjgl-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="lib/lwjgl/unp/joml-1.9.9.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:platform:/resource/tuscedo/lib/lwjgl/unp/joml-1.9.9-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
