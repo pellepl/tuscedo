@@ -29,7 +29,7 @@
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-opengl-natives-linux.jar"/>
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-opengl-natives-macos.jar"/>
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-opengl-natives-windows.jar"/>
-	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-opengl.jar">
+	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-opengl.jar" sourcepath="lib/lwjgl/unp/lwjgl-opengl-sources.jar">
 		<attributes>
 			<attribute name="javadoc_location" value="jar:platform:/resource/tuscedo/lib/lwjgl/unp/lwjgl-opengl-javadoc.jar!/"/>
 		</attributes>
@@ -43,7 +43,7 @@
 			<attribute name="javadoc_location" value="jar:platform:/resource/tuscedo/lib/lwjgl/unp/lwjgl-javadoc.jar!/"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="lib/lwjgl/unp/joml-1.9.9.jar">
+	<classpathentry kind="lib" path="lib/lwjgl/unp/joml-1.9.9.jar" sourcepath="lib/lwjgl/unp/joml-1.9.9-sources.jar">
 		<attributes>
 			<attribute name="javadoc_location" value="jar:platform:/resource/tuscedo/lib/lwjgl/unp/joml-1.9.9-javadoc.jar!/"/>
 		</attributes>

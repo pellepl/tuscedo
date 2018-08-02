@@ -1,3 +1,5 @@
 *.class
 bin
 */lwjgl/unp
+hs_err_pid*
+

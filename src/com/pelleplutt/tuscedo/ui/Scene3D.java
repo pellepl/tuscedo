@@ -1,87 +1,24 @@
 package com.pelleplutt.tuscedo.ui;
 
-import static org.lwjgl.glfw.GLFW.GLFW_FALSE;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE;
-import static org.lwjgl.glfw.GLFW.GLFW_RELEASE;
-import static org.lwjgl.glfw.GLFW.GLFW_RESIZABLE;
-import static org.lwjgl.glfw.GLFW.GLFW_TRUE;
-import static org.lwjgl.glfw.GLFW.GLFW_VISIBLE;
-import static org.lwjgl.glfw.GLFW.glfwCreateWindow;
-import static org.lwjgl.glfw.GLFW.glfwDefaultWindowHints;
-import static org.lwjgl.glfw.GLFW.glfwDestroyWindow;
-import static org.lwjgl.glfw.GLFW.glfwGetPrimaryMonitor;
-import static org.lwjgl.glfw.GLFW.glfwGetVideoMode;
-import static org.lwjgl.glfw.GLFW.glfwInit;
-import static org.lwjgl.glfw.GLFW.glfwMakeContextCurrent;
-import static org.lwjgl.glfw.GLFW.glfwPollEvents;
-import static org.lwjgl.glfw.GLFW.glfwSetErrorCallback;
-import static org.lwjgl.glfw.GLFW.glfwSetFramebufferSizeCallback;
-import static org.lwjgl.glfw.GLFW.glfwSetKeyCallback;
-import static org.lwjgl.glfw.GLFW.glfwSetWindowPos;
-import static org.lwjgl.glfw.GLFW.glfwSetWindowShouldClose;
-import static org.lwjgl.glfw.GLFW.glfwShowWindow;
-import static org.lwjgl.glfw.GLFW.glfwSwapBuffers;
-import static org.lwjgl.glfw.GLFW.glfwSwapInterval;
-import static org.lwjgl.glfw.GLFW.glfwTerminate;
-import static org.lwjgl.glfw.GLFW.glfwWindowHint;
-import static org.lwjgl.glfw.GLFW.glfwWindowShouldClose;
-import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
-import static org.lwjgl.opengl.GL11.GL_CULL_FACE;
-import static org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT;
-import static org.lwjgl.opengl.GL11.GL_DEPTH_TEST;
-import static org.lwjgl.opengl.GL11.GL_MODELVIEW;
-import static org.lwjgl.opengl.GL11.GL_PROJECTION;
-import static org.lwjgl.opengl.GL11.GL_QUADS;
-import static org.lwjgl.opengl.GL11.GL_TRUE;
-import static org.lwjgl.opengl.GL11.glBegin;
-import static org.lwjgl.opengl.GL11.glClear;
-import static org.lwjgl.opengl.GL11.glClearColor;
-import static org.lwjgl.opengl.GL11.glColor3f;
-import static org.lwjgl.opengl.GL11.glEnable;
-import static org.lwjgl.opengl.GL11.glEnd;
-import static org.lwjgl.opengl.GL11.glGetError;
-import static org.lwjgl.opengl.GL11.glLoadMatrixf;
-import static org.lwjgl.opengl.GL11.glMatrixMode;
-import static org.lwjgl.opengl.GL11.glVertex3f;
-import static org.lwjgl.opengl.GL11.glViewport;
-import static org.lwjgl.opengl.GL20.GL_COMPILE_STATUS;
-import static org.lwjgl.opengl.GL20.GL_LINK_STATUS;
-import static org.lwjgl.opengl.GL20.glAttachShader;
-import static org.lwjgl.opengl.GL20.glCompileShader;
-import static org.lwjgl.opengl.GL20.glCreateProgram;
-import static org.lwjgl.opengl.GL20.glCreateShader;
-import static org.lwjgl.opengl.GL20.glDeleteShader;
-import static org.lwjgl.opengl.GL20.glDetachShader;
-import static org.lwjgl.opengl.GL20.glGetShaderInfoLog;
-import static org.lwjgl.opengl.GL20.glGetShaderi;
-import static org.lwjgl.opengl.GL20.glLinkProgram;
-import static org.lwjgl.opengl.GL20.glShaderSource;
-import static org.lwjgl.system.MemoryUtil.NULL;
+import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL15.*;
+import static org.lwjgl.opengl.GL20.*;
+import static org.lwjgl.opengl.GL30.*;
+import static org.lwjgl.system.MemoryUtil.*;
 
-import java.awt.Color;
-import java.awt.Graphics;
-import java.awt.Transparency;
-import java.awt.color.ColorSpace;
-import java.awt.image.BufferedImage;
-import java.awt.image.ColorModel;
-import java.awt.image.ComponentColorModel;
-import java.awt.image.DataBuffer;
-import java.awt.image.DataBufferByte;
-import java.awt.image.Raster;
-import java.awt.image.WritableRaster;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.FloatBuffer;
+import java.awt.*;
+import java.awt.color.*;
+import java.awt.image.*;
+import java.lang.Math;
+import java.nio.*;
+import java.util.*;
+import java.util.List;
 
-import org.joml.Matrix4f;
-import org.lwjgl.BufferUtils;
-import org.lwjgl.glfw.GLFWErrorCallback;
-import org.lwjgl.glfw.GLFWFramebufferSizeCallback;
-import org.lwjgl.glfw.GLFWKeyCallback;
-import org.lwjgl.glfw.GLFWVidMode;
-import org.lwjgl.opengl.GL;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL12;
+import org.joml.*;
+import org.lwjgl.*;
+import org.lwjgl.glfw.*;
+import org.lwjgl.opengl.*;
 
 // https://www.lighthouse3d.com/tutorials/opengl_framebuffer_objects/
 public class Scene3D {
@@ -100,19 +37,24 @@ public class Scene3D {
   Matrix4f modelMatrix = new Matrix4f();
   Matrix4f modelViewMatrix = new Matrix4f();
 
-  // FloatBuffer for transferring matrices to OpenGL
+  // floatBuffer for transferring matrices to OpenGL
   FloatBuffer fb = BufferUtils.createFloatBuffer(16);
 
-  void glInit() {
+  void initGLFW() {
     glfwSetErrorCallback(errorCallback = GLFWErrorCallback.createPrint(System.err));
     if (!glfwInit())
       throw new IllegalStateException("Unable to initialize GLFW");
 
-    // Configure our window
+    // configure our window
     glfwDefaultWindowHints();
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
+    // set callbacks
     window = glfwCreateWindow(width, height, "offscreen", NULL, NULL);
     if (window == NULL)
       throw new RuntimeException("Failed to create the GLFW window");
@@ -135,57 +77,22 @@ public class Scene3D {
       }
     });
 
+    // misc stuff
     GLFWVidMode vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
     glfwSetWindowPos(window, (vidmode.width() - width) / 2, (vidmode.height() - height) / 2);
-
     glfwMakeContextCurrent(window);
     glfwSwapInterval(0);
     if (standalone) glfwShowWindow(window);
   }
-
-  void renderCube() {
-    glBegin(GL_QUADS);
-    glColor3f(0.0f, 0.0f, 0.2f);
-    glVertex3f(0.5f, -0.5f, -0.5f);
-    glVertex3f(-0.5f, -0.5f, -0.5f);
-    glVertex3f(-0.5f, 0.5f, -0.5f);
-    glVertex3f(0.5f, 0.5f, -0.5f);
-    glColor3f(0.0f, 0.0f, 1.0f);
-    glVertex3f(0.5f, -0.5f, 0.5f);
-    glVertex3f(0.5f, 0.5f, 0.5f);
-    glVertex3f(-0.5f, 0.5f, 0.5f);
-    glVertex3f(-0.5f, -0.5f, 0.5f);
-    glColor3f(1.0f, 0.0f, 0.0f);
-    glVertex3f(0.5f, -0.5f, -0.5f);
-    glVertex3f(0.5f, 0.5f, -0.5f);
-    glVertex3f(0.5f, 0.5f, 0.5f);
-    glVertex3f(0.5f, -0.5f, 0.5f);
-    glColor3f(0.2f, 0.0f, 0.0f);
-    glVertex3f(-0.5f, -0.5f, 0.5f);
-    glVertex3f(-0.5f, 0.5f, 0.5f);
-    glVertex3f(-0.5f, 0.5f, -0.5f);
-    glVertex3f(-0.5f, -0.5f, -0.5f);
-    glColor3f(0.0f, 1.0f, 0.0f);
-    glVertex3f(0.5f, 0.5f, 0.5f);
-    glVertex3f(0.5f, 0.5f, -0.5f);
-    glVertex3f(-0.5f, 0.5f, -0.5f);
-    glVertex3f(-0.5f, 0.5f, 0.5f);
-    glColor3f(0.0f, 0.2f, 0.0f);
-    glVertex3f(0.5f, -0.5f, -0.5f);
-    glVertex3f(0.5f, -0.5f, 0.5f);
-    glVertex3f(-0.5f, -0.5f, 0.5f);
-    glVertex3f(-0.5f, -0.5f, -0.5f);
-    glEnd();
-  }
-
+  
   long firstTime;
   BufferedImage image;
   static boolean standalone = false;
 
   public void init() {
-    glInit();
-    GL.createCapabilities();
-
+    initGLFW();
+    initGL();
+    
     // Set the clear color
     glClearColor(0.6f, 0.7f, 0.8f, 1.0f);
     // Enable depth testing
@@ -195,39 +102,145 @@ public class Scene3D {
     // Remember the current time.
     firstTime = System.nanoTime();
   }
+  
+  int progGL;
+  int mLocModelGL;
+  int mLocVPGL;
+  int vLocColorGL;
+  int vLocLightPosGL;
+  int vLocPlayerViewGL;
+  int vLocPlayerPosGL;
+  int vao_sphereGL, vbo_sphereGL;
+  int vbo_sphere_arr_ixGL;
+  
+  int numSphereVertices;
+  int numSphereNormals;
+  int numSphereIndices;
 
-  public void render() {
-    // Build time difference between this and first time.
-    long thisTime = System.nanoTime();
-    float diff = (thisTime - firstTime) / 1E9f;
-    // Compute some rotation angle.
-    float angle = diff;
 
-    // Make the viewport always fill the whole window.
-    glViewport(0, 0, width, height);
-
-    // Build the projection matrix. Watch out here for integer division
-    // when computing the aspect ratio!
-    projMatrix.setPerspective((float) Math.toRadians(40), (float) width / height, 0.01f, 100.0f);
-    glMatrixMode(GL_PROJECTION);
-    glLoadMatrixf(projMatrix.get(fb));
-
-    // Set lookat view matrix
-    viewMatrix.setLookAt(0.0f, 4.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-    glMatrixMode(GL_MODELVIEW);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // Render some grid of cubes at different x and z positions
-    for (int x = -2; x <= 2; x++) {
-      for (int z = -2; z <= 2; z++) {
-        modelMatrix.translation(x * 2.0f, 0, z * 2.0f).rotateY(angle * (float) Math.toRadians(90));
-        glLoadMatrixf(viewMatrix.mul(modelMatrix, modelViewMatrix).get(fb));
-        renderCube();
-      }
-    }
-    glfwSwapBuffers(window);
-    glfwPollEvents();
+  void initGL() {
+    GL.createCapabilities();
+    System.out.println("GL_VERSION: " + glGetString(GL_VERSION));
+    createProgramGL();
+  }
+  
+  void createProgramGL() {
+    int vertexShader = createShader(GL_VERTEX_SHADER, "" 
+        +"#version 330 core \n" 
+        +""
+        +"in vec3 position; \n"
+        +"in vec3 normal; \n"
+        +""
+        +"uniform vec3 scolor; \n"
+        +"uniform mat4 model; \n"
+        +"uniform mat4 viewproj; \n"
+        +"uniform vec3 vLightPos = vec3(0.0, 0.0, 0.0); \n"
+        +"uniform vec3 vPlayerView; \n"
+        +"uniform vec3 vPlayerPos; \n"
+        +""
+        +"out vec3 vertexColor; \n"
+        +"out vec3 vNormal; \n"
+        +"out vec3 vONormal; \n"
+        +"out vec3 vLight; \n"
+        +"out vec3 vView; \n"
+        +"out vec3 vPlayerLight; \n"
+        +""
+        +"void main() { \n"
+        +"  vertexColor = scolor; \n"
+        +""
+        +"  vec4 P = model * vec4(position, 1.0); \n"
+        +""
+        +"  vNormal = mat3(model) * normal; \n"
+        +"  vONormal = normal; \n"
+        +"  vLight = vLightPos - P.xyz; \n"
+        +"  vView = vPlayerPos - P.xyz;//vPlayerView; // -P; \n"
+        +"  vPlayerLight = vLight - vPlayerPos; \n"
+        +""
+        +"  gl_Position = viewproj * P; \n"
+        +"} \n"
+        );
+    int fragmentShader = createShader(GL_FRAGMENT_SHADER, "" 
+        +"#version 330 core \n" 
+        +""
+        +"in vec3 vertexColor; \n" 
+        +"in vec3 vNormal; \n"
+        +"out vec4 fragColor; \n" 
+        +""
+        +"uniform vec3 veyepos; \n" 
+        +""
+        +"void main() {\n"
+        +"  float ambient = 0.15; \n"
+        +"  vec3 vLightPos = vec3(400, 400, 400); \n"
+        +"  vec3 vLight = normalize(veyepos - vLightPos); \n"
+        +"  vec3 H = vLight; //normalize(vLightPos + veyepos); \n" 
+        +"  //vec3 H = normalize(veyepos); \n"
+        +"  float diffuse = max(0, dot(vLight, vNormal)); \n"
+        +"  float specular = pow(max(0, dot(H, vNormal)), 42.0); \n" 
+        +"  fragColor = vec4(vertexColor, 1.0) * min(1.0, ambient+diffuse) + vec4(1,1,1,1) * specular; \n" 
+        +"} \n"
+        );
+    progGL = createProgram(vertexShader, fragmentShader);
     
+    // obtain uniform locations for shader variables
+    mLocModelGL = glGetUniformLocation(progGL, "model");
+    mLocVPGL = glGetUniformLocation(progGL, "viewproj");
+    vLocColorGL = glGetUniformLocation(progGL, "scolor");
+    vLocLightPosGL = glGetUniformLocation(progGL, "vLightPos");
+    vLocPlayerViewGL = glGetUniformLocation(progGL, "vPlayerView");
+    vLocPlayerPosGL = glGetUniformLocation(progGL, "vPlayerPos");
+    
+    // sphere data
+    RenderSphere rs = new RenderSphere(1f, 8);
+    rs.build();
+    numSphereVertices = rs.vertices.size();
+    numSphereNormals = numSphereVertices;
+    numSphereIndices = rs.indices.size();
+    
+    FloatBuffer verticesNormals = BufferUtils.createFloatBuffer((numSphereVertices + numSphereNormals) * 3);
+    for (int i = 0; i < numSphereVertices; i++) {
+      Vector3f v = rs.vertices.get(i);
+      Vector3f n = rs.normals.get(i);
+      verticesNormals.put(v.x).put(v.y).put(v.z);
+      verticesNormals.put(n.x).put(n.y).put(n.z);
+    }
+    verticesNormals.flip();
+    
+    ShortBuffer indices = BufferUtils.createShortBuffer(numSphereIndices);
+    for (int i = 0; i < numSphereIndices; i++) {
+      int index = rs.indices.get(i);
+      indices.put((short)index);
+    }
+    indices.flip();
+    
+    vao_sphereGL = glGenVertexArrays();
+    glBindVertexArray(vao_sphereGL);
+    vbo_sphereGL = glGenBuffers();
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_sphereGL);
+    glBufferData(GL_ARRAY_BUFFER, verticesNormals, GL_STATIC_DRAW);
+
+    vbo_sphere_arr_ixGL = glGenBuffers();
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_sphere_arr_ixGL);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices, GL_STATIC_DRAW);
+    
+    // setup shader data inputs
+    glUseProgram(progGL);
+
+    glBindVertexArray(vao_sphereGL);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_sphereGL);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_sphere_arr_ixGL);
+    
+    int attrPart_pos = glGetAttribLocation(progGL, "position");
+    glEnableVertexAttribArray(attrPart_pos);
+    glVertexAttribPointer(attrPart_pos, 3, GL_FLOAT, false, 6 * 4, 0);
+
+    int attrPart_norm = glGetAttribLocation(progGL, "normal");
+    glEnableVertexAttribArray(attrPart_norm);
+    glVertexAttribPointer(attrPart_norm, 3, GL_FLOAT, false, 6 * 4, 3 * 4);
+
+    
+  }
+
+  void dumpToSwingImage() {
     // dump renderbuffer to image
     image = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
     ByteBuffer nativeBuffer = BufferUtils.createByteBuffer(width*height*3);
@@ -236,8 +249,78 @@ public class Scene3D {
     nativeBuffer.get(imgData);
   }
 
+  
+  final Vector3f playerPos = new Vector3f();
+  final Matrix4f viewProj = new Matrix4f();
+  final FloatBuffer fbViewProj = BufferUtils.createFloatBuffer(16);
+  final Matrix4f mRot = new Matrix4f();
+  final Quaternionf qdir = new Quaternionf();
+  final Quaternionf qdirinv = new Quaternionf();
+  final Matrix4f mModel = new Matrix4f();
+  final FloatBuffer fbModel = BufferUtils.createFloatBuffer(16);
+
+  static final float ZNEAR = 0.1f;
+  static final float ZFAR = 10000f;
+  
+  public void render() {
+    long thisTime = System.nanoTime();
+    float diffMs = (thisTime - firstTime) / 1E9f;
+
+    // calc global viewing matrices
+    commonCameraUpdate(0, 0, 0);
+    viewProj.setPerspective((float)Math.PI/4f, (float)width/(float)height, ZNEAR, ZFAR);
+    playerPos.set(0f, 0f, 0f); // TODO
+    playerPos.negate();
+    qdir.invert(qdirinv); 
+    qdirinv.get(mRot);
+    viewProj.mul(mRot).translate(playerPos);
+    viewProj.get(fbViewProj);
+    
+    // setup GL view
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, width, height);
+    glClearColor(.0f, .0f, .0f, 1f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+
+    // TODO
+    glUseProgram(progGL);
+    glBindVertexArray(vao_sphereGL);
+    glUniformMatrix4fv(mLocVPGL, false, fbViewProj);
+    glUniform3f(vLocPlayerPosGL, -playerPos.x, -playerPos.y, -playerPos.z);
+    glUniform3f(vLocPlayerViewGL, vdirz.x, vdirz.y, vdirz.z);
+    glUniform3f(vLocLightPosGL, -1000f, -1000f, 0);
+    glUniform3f(vLocColorGL, 1f,0f,1f);
+
+    mModel.identity();
+    mModel.translate(
+        (float)(5f*Math.sin(diffMs*1.1)),
+        (float)(5f*Math.sin(diffMs*1.3)),
+        (float)(-20f + 5f*Math.sin(diffMs*1.5)));
+    mModel.get(fbModel);
+    glUniformMatrix4fv(mLocModelGL, false, fbModel);
+    glDrawElements(GL_TRIANGLES, numSphereIndices, GL_UNSIGNED_SHORT, 0);
+    
+    int err = glGetError();
+    if (err != 0) System.out.println("GLERROR:" + Integer.toHexString(err));
+
+    // coda
+
+    glfwSwapBuffers(window);
+    glfwPollEvents();
+    
+    
+
+    dumpToSwingImage();
+  }
+
   public void destroy() {
+    glDeleteVertexArrays(vao_sphereGL);
+    glDeleteBuffers(vbo_sphereGL);
+    glDeleteBuffers(vbo_sphere_arr_ixGL);
+
     glfwDestroyWindow(window);
+    glDeleteProgram(progGL);
     keyCallback.free();
     glfwTerminate();
     errorCallback.free();
@@ -247,13 +330,62 @@ public class Scene3D {
     return image;
   }
   
+  final AxisAngle4f aayaw = new AxisAngle4f();
+  final AxisAngle4f aapitch = new AxisAngle4f();
+  final AxisAngle4f aaroll = new AxisAngle4f();
+  final Quaternionf qyaw = new Quaternionf();
+  final Quaternionf qpitch = new Quaternionf();
+  final Quaternionf qroll = new Quaternionf();
+  final Matrix3f qrotm = new Matrix3f();
+  final Vector3f vdirx = new Vector3f(1,0,0);
+  final Vector3f vdiry = new Vector3f(0,1,0);
+  final Vector3f vdirz = new Vector3f(0,0,1);
+
+  public void commonCameraUpdate(float dx, float dy, float droll)  {
+    // get delta yaw and pitch quaternions
+    aayaw.set(dx*0.001f, 0,1,0);
+    aapitch.set(dy*0.001f, 1,0,0);
+    aaroll.set(droll*0.001f, 0,0,1);
+    qyaw.set(aayaw);
+    qpitch.set(aapitch);
+    qroll.set(aaroll);
+    
+    // apply to current direction
+    qdir.mul(qroll).mul(qpitch).mul(qyaw);
+    qdir.normalize();
+
+    // get base vectors of rotation
+    qdir.get(qrotm);
+    qrotm.getColumn(0, vdirx);
+    qrotm.getColumn(1, vdiry);
+    qrotm.getColumn(2, vdirz);
+  }
+
+  
+  public static void main(String[] args) {
+    standalone = true;
+    Scene3D s = new Scene3D();
+    s.init();
+    
+    while (!destroyed && !glfwWindowShouldClose(s.window)) {
+      s.render();
+    }
+    s.destroy();
+  }
+  
+  //
+  // GL helpers
+  //
+  
   int createShader(int type, String src) {
+    System.out.println("create shader " + type);
     int shader = glCreateShader(type);
     glShaderSource(shader, src);
     glCompileShader(shader);
     int status = glGetShaderi(shader, GL_COMPILE_STATUS);
     if (status != GL_TRUE) {
-      throw new RuntimeException(glGetShaderInfoLog(shader));
+      int err = glGetError();
+      throw new RuntimeException("glerr:" + err + "\n" + glGetShaderInfoLog(shader));
     }
     glGetError();
 
@@ -261,15 +393,20 @@ public class Scene3D {
   }
   
   int createProgram(int... shaders) {
+    System.out.println("create program");
     int prog = glCreateProgram();
+    System.out.println("attaching " + shaders.length +  " shaders");
     for (int shader : shaders) {
       glAttachShader(prog, shader);
     }
+    System.out.println("linking program");
     glLinkProgram(prog);
-    int status = glGetShaderi(prog, GL_LINK_STATUS);
+    int status = glGetProgrami(prog, GL_LINK_STATUS);
     if (status != GL_TRUE) {
-      throw new RuntimeException(glGetShaderInfoLog(prog));
+      int err = glGetError();
+      throw new RuntimeException("glerr:" + err + "\n" + glGetProgramInfoLog(prog));
     }
+    System.out.println("deleting shader info");
     for (int shader : shaders) {
       glDetachShader(prog, shader);
       glDeleteShader(shader);
@@ -311,15 +448,69 @@ public class Scene3D {
 
     return imageBuffer;
   }
+  
 
-  public static void main(String[] args) {
-    standalone = true;
-    Scene3D s = new Scene3D();
-    s.init();
-    
-    while (!destroyed && !glfwWindowShouldClose(s.window)) {
-      s.render();
+  
+  // TODO remove this
+  class RenderSphere {
+    float r;
+    int div;
+    public List<Vector3f> vertices = new ArrayList<Vector3f>();
+    public List<Vector3f> normals = new ArrayList<Vector3f>();
+    public List<Integer> indices= new ArrayList<Integer>();
+
+    public RenderSphere(float radius, int div) {
+      r = radius;
+      this.div = div;
     }
-    s.destroy();
+    
+    public void build() {
+      vertices.add(new Vector3f(0,r,0));
+      normals.add(new Vector3f(0,1,0));
+      for (int aa = 1; aa < div/2; aa++) {
+        float y,rr,x,z;
+        float a = (float)Math.PI * 2f * (float) aa / div;
+        for (int bb = 0; bb < div; bb++) {
+          float b = (float)Math.PI * 2f * (float) bb / div;
+          y = (float)Math.cos(a);
+          rr = (float)Math.sin(a);
+          x = rr*(float)Math.cos(b);
+          z = rr*(float)Math.sin(b);
+          // coords
+          vertices.add(new Vector3f(r*x, r*y, r*z));
+          // normals
+          normals.add(new Vector3f(x, y, z));
+        }
+      }
+      vertices.add(new Vector3f(0,-r,0));
+      normals.add(new Vector3f(0,-1,0));
+      
+      for (int aa = 0; aa <= div/2; aa++) {
+        for (int bb = 0; bb < div; bb++) {
+          if (aa == 0) {
+            // top triangle fan
+            indices.add(0);
+            indices.add(bb + 1);
+            indices.add((1+bb)%div + 1);
+          } else if (aa == div/2) {
+            // bottom triangle fan
+            indices.add(bb + (div/2)*(div-4) + 1);
+            indices.add((1+bb)%div + (div/2)*(div-4) + 1);
+            indices.add((div/2)*(div-4) + 1 + 1);
+          } else {
+            // middle quad stripe
+            // tri a
+            indices.add((aa-1) * div + bb + 1);
+            indices.add((1+aa-1) * div + bb + 1);
+            indices.add((1+aa-1) * div + (1+bb)%div + 1);
+            // tri b
+            indices.add((aa-1) * div + bb + 1);
+            indices.add((1+aa-1) * div + (1+bb)%div + 1);
+            indices.add((aa-1) * div + (1+bb)%div + 1);
+          }
+        }
+      }
+    }
   }
+
 }
