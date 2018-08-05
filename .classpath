@@ -38,7 +38,7 @@
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-stb-natives-macos.jar"/>
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-stb-natives-windows.jar"/>
 	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl-stb.jar"/>
-	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl.jar">
+	<classpathentry kind="lib" path="lib/lwjgl/unp/lwjgl.jar" sourcepath="lib/lwjgl/unp/lwjgl-sources.jar">
 		<attributes>
 			<attribute name="javadoc_location" value="jar:platform:/resource/tuscedo/lib/lwjgl/unp/lwjgl-javadoc.jar!/"/>
 		</attributes>

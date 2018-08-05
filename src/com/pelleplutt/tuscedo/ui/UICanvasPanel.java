@@ -1,19 +1,12 @@
 package com.pelleplutt.tuscedo.ui;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.image.BufferedImage;
+import java.awt.*;
+import java.awt.geom.*;
+import java.awt.image.*;
 
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JViewport;
+import javax.swing.*;
 
-import com.pelleplutt.tuscedo.Tuscedo;
+import com.pelleplutt.tuscedo.*;
 
 public class UICanvasPanel extends JPanel implements UIO {
   volatile BufferedImage pri, sec;
@@ -125,12 +118,5 @@ public class UICanvasPanel extends JPanel implements UIO {
           RenderingHints.VALUE_ANTIALIAS_ON);
       g.drawImage(pri,0,0,this);
     }
-  }
-
-  public void __test() {
-    Graphics2D g = getSecGraphics();
-    Tuscedo.inst().render3d();
-    BufferedImage bi = Tuscedo.test3d.getImage();
-    g.drawImage(bi, 0, 0, null);
   }
 }

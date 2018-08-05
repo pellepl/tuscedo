@@ -1,43 +1,19 @@
 package com.pelleplutt.tuscedo;
 
-import java.awt.BorderLayout;
-import java.awt.Component;
-import java.awt.Container;
-import java.awt.EventQueue;
-import java.awt.Point;
-import java.awt.Window;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferByte;
-import java.io.File;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.awt.*;
+import java.awt.event.*;
+import java.awt.image.*;
+import java.io.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
+import java.util.Map.*;
 
-import javax.swing.JFrame;
-import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
-import javax.swing.WindowConstants;
+import javax.swing.*;
 
-import org.lwjgl.BufferUtils;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL12;
-
-import com.pelleplutt.Essential;
-import com.pelleplutt.tuscedo.ui.Scene3D;
-import com.pelleplutt.tuscedo.ui.UICanvasPanel;
-import com.pelleplutt.tuscedo.ui.UICommon;
-import com.pelleplutt.tuscedo.ui.UIGraphPanel;
-import com.pelleplutt.tuscedo.ui.UIInfo;
-import com.pelleplutt.tuscedo.ui.UIO;
-import com.pelleplutt.tuscedo.ui.UISimpleTabPane;
-import com.pelleplutt.tuscedo.ui.UISimpleTabPane.Tab;
-import com.pelleplutt.tuscedo.ui.UIWorkArea;
-import com.pelleplutt.util.AppSystem;
+import com.pelleplutt.*;
+import com.pelleplutt.tuscedo.ui.*;
+import com.pelleplutt.tuscedo.ui.UISimpleTabPane.*;
+import com.pelleplutt.util.*;
 
 public class Tuscedo implements Runnable, UIInfo.UIListener {
   Container mainContainer;
@@ -156,7 +132,12 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     gp.zoomAll(true, true, new Point());
     return gp.getSampleSet(0).getUIInfo().getId();
   }
-  
+  public String addGraph3dTab(UISimpleTabPane stp, int w, int h, float[][] model) {
+    UI3DPanel gp = new UI3DPanel(w, h, model);
+    Tab t = stp.createTab(null, gp);
+    stp.selectTab(t);
+    return gp.getUIInfo().getId();
+  }
   public String addCanvasTab(UISimpleTabPane stp, int w, int h) {
     UICanvasPanel cp = new UICanvasPanel(w, h);
     Tab t = stp.createTab(null, cp);
@@ -207,23 +188,13 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     }
   }
   
-  public static Scene3D test3d = new Scene3D();
+  public static Scene3D scene3d = new Scene3D();
   
   public static void main(String[] args) {
     try {
       UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
     } catch (Throwable ignore) {
     }
-    
-    // lwjgl3 scene to bufferedimage
-/*    final int w = 300; final int h = 200;
-    ByteBuffer nativeBuffer = BufferUtils.createByteBuffer(w*h*3);
-    BufferedImage image = new BufferedImage(w, h, BufferedImage.TYPE_3BYTE_BGR);
-    GL11.glReadPixels(0, 0, w, h, GL12.GL_BGR, GL11.GL_UNSIGNED_BYTE, nativeBuffer);
-    byte[] imgData = ((DataBufferByte)image.getRaster().getDataBuffer()).getData();
-    nativeBuffer.get(imgData);
-*/
-
     
     // purejavacomm
     
@@ -271,53 +242,59 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
           Tuscedo.inst().create(null);
         }
       });
-      test3d.init();
-      test3d.render();
+      scene3d.init();
+      scene3d.render();
       render3dloop();
     }
   } // main
   
   static final Object renderLock = new Object();
   static boolean rendering = false;
+  static RenderSpec renderSpec;
   
   static void render3dloop() {
     // start render loop, must be in the main thread
-    synchronized (test3d) {
+    synchronized (scene3d) {
       while (inst.running) {
         try {
-          test3d.wait();
+          scene3d.wait();
         } catch (InterruptedException ignore) {}
-        synchronized(renderLock) {
-          if (inst.running) {
-            test3d.render();
-          }
-          rendering = false;
-          renderLock.notifyAll();
+        if (inst.running) {
+          scene3d.render(renderSpec);
+          renderSpec = null;
         }
+        rendering = false;
+        scene3d.notifyAll();
       }
     }
   }
   
   // called from another thread, commence 3d rendering and wait until finished
-  public void render3d() {
-    synchronized (test3d) {
-      test3d.notifyAll();
-    }
-    synchronized(renderLock) {
-      rendering = true;
+  public BufferedImage render3d(RenderSpec rs) {
+    synchronized (scene3d) {
+      // if a rendering is already ongoing, wait till finished
       while (running && rendering) {
         try {
-          renderLock.wait(100);
+          scene3d.wait(100);
         } catch (InterruptedException ignore) {}
       }
+      renderSpec = rs;
+      rendering = true;
+      scene3d.notifyAll();
+      while (running && rendering) {
+        try {
+          scene3d.wait(100);
+        } catch (InterruptedException ignore) {}
+      }
+      return scene3d.getImage();
     }
   }
   
   static void onExit() {
     inst.running = false;
-    test3d.destroy();
-    synchronized (test3d) {
-      test3d.notifyAll();
+    scene3d.destroy();
+    synchronized (scene3d) {
+      scene3d.notifyAll();
     }
   }
 

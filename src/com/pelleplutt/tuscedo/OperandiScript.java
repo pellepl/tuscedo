@@ -1,48 +1,26 @@
 package com.pelleplutt.tuscedo;
 
-import java.awt.Point;
-import java.awt.Window;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.awt.*;
+import java.io.*;
+import java.nio.charset.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 
-import com.pelleplutt.Essential;
+import com.pelleplutt.*;
+import com.pelleplutt.operandi.*;
 import com.pelleplutt.operandi.Compiler;
-import com.pelleplutt.operandi.CompilerError;
-import com.pelleplutt.operandi.Executable;
-import com.pelleplutt.operandi.Source;
-import com.pelleplutt.operandi.proc.ByteCode;
-import com.pelleplutt.operandi.proc.ExtCall;
-import com.pelleplutt.operandi.proc.MListMap;
-import com.pelleplutt.operandi.proc.MMapRef;
-import com.pelleplutt.operandi.proc.MSet;
-import com.pelleplutt.operandi.proc.Processor;
-import com.pelleplutt.operandi.proc.Processor.M;
-import com.pelleplutt.operandi.proc.ProcessorError;
-import com.pelleplutt.operandi.proc.ProcessorError.ProcessorFinishedError;
-import com.pelleplutt.tuscedo.Tuscedo.TuscedoTabPane;
-import com.pelleplutt.tuscedo.ui.UICanvasPanel;
-import com.pelleplutt.tuscedo.ui.UICommon;
-import com.pelleplutt.tuscedo.ui.UIGraphPanel;
-import com.pelleplutt.tuscedo.ui.UIGraphPanel.SampleSet;
-import com.pelleplutt.tuscedo.ui.UIInfo;
-import com.pelleplutt.tuscedo.ui.UIO;
-import com.pelleplutt.tuscedo.ui.UISimpleTabPane;
-import com.pelleplutt.tuscedo.ui.UISimpleTabPane.Tab;
-import com.pelleplutt.tuscedo.ui.UIWorkArea;
-import com.pelleplutt.util.AppSystem;
-import com.pelleplutt.util.AppSystem.Disposable;
-import com.pelleplutt.util.Log;
-import com.pelleplutt.util.io.Port;
+import com.pelleplutt.operandi.proc.*;
+import com.pelleplutt.operandi.proc.Processor.*;
+import com.pelleplutt.operandi.proc.ProcessorError.*;
+import com.pelleplutt.tuscedo.Tuscedo.*;
+import com.pelleplutt.tuscedo.ui.*;
+import com.pelleplutt.tuscedo.ui.UIGraphPanel.*;
+import com.pelleplutt.tuscedo.ui.UISimpleTabPane.*;
+import com.pelleplutt.util.*;
+import com.pelleplutt.util.AppSystem.*;
+import com.pelleplutt.util.io.*;
 
 public class OperandiScript implements Runnable, Disposable {
   public static final String VAR_SERIAL = "ser";
@@ -442,6 +420,7 @@ public class OperandiScript implements Runnable, Disposable {
     });
     createGraphFunctions();
     createCanvasFunctions();
+    create3DFunctions();
     createTuscedoTabPaneFunctions();
     createSerialFunctions();
     MNet.createNetFunctions(this);
@@ -996,6 +975,8 @@ public class OperandiScript implements Runnable, Disposable {
       mobj = createGraphMUIO();
     } else if (uio instanceof UICanvasPanel) {
       mobj = createCanvasMUIO();
+    } else if (uio instanceof UI3DPanel) {
+      mobj = create3DMUIO();
     } else if (uio instanceof TuscedoTabPane) {
       mobj = createTuscedoTabPaneMUIO();
     } else {
@@ -1273,7 +1254,6 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("draw_text", "__canvas_draw_text", comp);
         addFunc("get_width", "__canvas_width", comp);
         addFunc("get_height", "__canvas_height", comp);
-        addFunc("__test", "__canvas_test", comp);
         addFunc("blit", "__canvas_blit", comp);
       }
     };
@@ -1412,15 +1392,102 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__canvas_test", "() - 3d testing", new ExtCall() {
+  }
+  
+  private MObj create3DMUIO() {
+    return new MObj(currentWA, comp, "graph3d") {
+      @Override
+      public void init(UIWorkArea wa, Compiler comp) {
+        addFunc("get_width", "__3d_width", comp);
+        addFunc("get_height", "__3d_height", comp);
+        addFunc("blit", "__3d_blit", comp);
+      }
+    };
+  }
+
+  private float[][] conv(M m) {
+    MSet set = m.ref;
+    int h = set.size();
+    int w = set.get(0).ref.size();
+    float[][] f = new float[w][h];
+    for (int y = 0; y < h; y++) {
+      for (int x = 0; x < w; x++) {
+        f[x][y] = m.ref.get(y).ref.get(x).asFloat();
+      }
+    }
+    return f;
+  }
+  private void create3DFunctions() {
+    setExtDef("graph3d", "((<title>),(<w>),(<h>)) - creates a 3d graph",
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
+        String name = "GRAPH3D";
+        int w = 300;
+        int h = 200;
+        float[][] model = new float[8][8];
+        if (args != null && args.length > 0) {
+          if (args[0].type == Processor.TSTR) {
+            name = args[0].asString();
+            if (args.length > 1) {
+              M mmodel = args[1];
+              model = conv(mmodel);
+            }
+            if (args.length > 2) {
+              w = args[2].asInt();
+            }
+            if (args.length > 3) {
+              h = args[3].asInt();
+            }
+          } else {
+            M mmodel = args[0];
+            model = conv(mmodel);
+            if (args.length > 1) {
+              w = args[1].asInt();
+            }
+            if (args.length > 2) {
+              h = args[2].asInt();
+            }
+          }
+        }
+        
+        String id = Tuscedo.inst().addGraph3dTab(UISimpleTabPane.getTabByComponent(currentWA).getPane(), w, h, 
+            model);
+        UI3DPanel ui = ((UI3DPanel)Tuscedo.inst().getUIObject(id).getUI()); 
+        ui.getUIInfo().setName(name);
+        
+        MObj mobj = create3DMUIO();
+        M mui = new M(mobj);
+        addUIMembers(mobj, ui);
+        return mui;
+      }
+    });
+    setExtDef("__3d_width", "() - returns width",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
         if (cp == null) return null;
-        cp.__test();
+        return new Processor.M(cp.getWidth());
+      }
+    });
+    setExtDef("__3d_height", "() - returns height",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        return new Processor.M(cp.getHeight());
+      }
+    });
+    setExtDef("__3d_blit", "() - blits changes to graph",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.blit();
         return null;
       }
     });
   }
+
 
   private MObj createTuscedoTabPaneMUIO() {
     return new MObj(currentWA, comp, "pane") {
