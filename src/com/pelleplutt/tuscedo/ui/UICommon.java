@@ -324,9 +324,14 @@ public class UICommon {
 
   public static void defineAnonAction(JComponent c, String name, String keys, int when, 
       AbstractAction action) {
+    defineAnonAction(c, name, keys, when, true, action);
+  }
+  
+  public static void defineAnonAction(JComponent c, String name, String keys, int when, 
+      boolean keyDown, AbstractAction action) {
     KeyMap key = KeyMap.fromString(keys);
     c.getInputMap(when).put(
-        KeyStroke.getKeyStroke(key.keyCode, key.modifiers),
+        KeyStroke.getKeyStroke(key.keyCode, key.modifiers, !keyDown),
         name);
     c.getActionMap().put(name, action);
   }

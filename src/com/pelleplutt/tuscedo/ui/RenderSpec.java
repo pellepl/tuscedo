@@ -9,7 +9,11 @@ public class RenderSpec {
   boolean depthTest;
   boolean cullFaces;
   int primitive;
+  public int width = 400;
+  public int height = 300;
+  public boolean dimensionDirty;
 
+  final Vector3f lightPos = new Vector3f();
   final Vector3f playerPos = new Vector3f();
   final Quaternionf qdir = new Quaternionf();
 
@@ -30,6 +34,9 @@ public class RenderSpec {
   
   public boolean modelDataDirty;
   public boolean modelDirty;
+  
+  public float gridMul = 1;
+  public float gridContrast = 0.25f;
   
   private static int __id = 1;
   public final int id = __id++;

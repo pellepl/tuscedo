@@ -8,9 +8,21 @@ import java.awt.image.*;
 import javax.swing.*;
 
 import com.pelleplutt.tuscedo.*;
-import com.pelleplutt.tuscedo.ui.Scene3D.*;
+import com.pelleplutt.tuscedo.Timer;
 
 public class UI3DPanel extends JPanel implements UIO {
+  static final int MOVE_UP = (1<<0);
+  static final int MOVE_DOWN = (1<<1);
+  static final int MOVE_LEFT = (1<<2);
+  static final int MOVE_RIGHT = (1<<3);
+  static final int MOVE_FORWARD = (1<<4);
+  static final int MOVE_BACK = (1<<5);
+  static final int MODEL_ROLL_LEFT = (1<<6);
+  static final int MODEL_ROLL_RIGHT = (1<<7);
+  static final int MODEL_PITCH_UP = (1<<8);
+  static final int MODEL_PITCH_DOWN = (1<<9);
+  
+  volatile int keys = 0;
   volatile BufferedImage pri;
   JScrollPane scrl;
   Renderer renderer;
@@ -31,13 +43,85 @@ public class UI3DPanel extends JPanel implements UIO {
     return uiinfo;
   }
   
+  Timer.Entry timerEntry = null;
+  Runnable keyTask = new Runnable() {
+    public void run() {
+      if ((keys & MOVE_FORWARD) != 0) {
+        renderSpec.cameraWalk(.5f);
+      }
+      else if ((keys & MOVE_BACK) != 0) {
+        renderSpec.cameraWalk(-.5f);
+      }
+      if ((keys & MOVE_LEFT) != 0) {
+        renderSpec.cameraStrafe(-.5f);
+      }
+      else if ((keys & MOVE_RIGHT) != 0) {
+        renderSpec.cameraStrafe(.5f);
+      }
+      if ((keys & MOVE_UP) != 0) {
+        renderSpec.cameraDescend(.5f);
+      }
+      else if ((keys & MOVE_DOWN) != 0) {
+        renderSpec.cameraDescend(-.5f);
+      }
+      if ((keys & MODEL_ROLL_LEFT) != 0) {
+        renderSpec.modelMatrix.rotate(-0.02f, 0f, 1f, 0f);
+      }
+      else if ((keys & MODEL_ROLL_RIGHT) != 0) {
+        renderSpec.modelMatrix.rotate(0.02f, 0f, 1f, 0f);
+      }
+      if ((keys & MODEL_PITCH_UP) != 0) {
+        renderSpec.modelMatrix.rotate(-0.02f, 1f, 0f, 0f);
+      }
+      else if ((keys & MODEL_PITCH_DOWN) != 0) {
+        renderSpec.modelMatrix.rotate(0.02f, 1f, 0f, 0f);
+      }
+      blit();
+    }
+  };
+  
+  void triggerKeys(int oldmask, int newmask) {
+    keys = newmask;
+    if (oldmask == 0) {
+      if (timerEntry != null) {
+        timerEntry.stop();
+        timerEntry = null;
+      }
+      timerEntry = Tuscedo.inst().getTimer().addTask(keyTask, 0, 20);
+    }
+    if (newmask == 0) {
+      if (timerEntry != null) {
+        timerEntry.stop();
+        timerEntry = null;
+      }
+    }
+  }
+  
+  void registerMotionKeys(String key, String actionName, final int keymask) {
+    UICommon.defineAnonAction(renderer, actionName + ".press", key, 
+        JComponent.WHEN_IN_FOCUSED_WINDOW, true, new AbstractAction() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        triggerKeys(keys, keys |= keymask);
+      }
+    });
+    UICommon.defineAnonAction(renderer, actionName + ".release", key, 
+        JComponent.WHEN_IN_FOCUSED_WINDOW, false, new AbstractAction() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        triggerKeys(keys, keys &= ~keymask);
+      }
+    });
+
+  }
+  
   public UI3DPanel(int w, int h, float[][] model) {
     uiinfo = new UIInfo(this, "3d" + __id, "");
     UIInfo.fireEventOnCreated(uiinfo);
 
     __id++;
     pri = new BufferedImage(w, h, BufferedImage.TYPE_4BYTE_ABGR);
-    Renderer renderer = new Renderer();
+    renderer = new Renderer();
     Dimension d = new Dimension(w,h);
     renderer.setMinimumSize(d);
     renderer.setPreferredSize(d);
@@ -60,7 +144,7 @@ public class UI3DPanel extends JPanel implements UIO {
     }
     
     int when = JComponent.WHEN_IN_FOCUSED_WINDOW;
-    UICommon.defineAnonAction(renderer, "3d.vis.mode", "f1", when, new AbstractAction() {
+    UICommon.defineAnonAction(renderer, "3d.mode", "f1", when, new AbstractAction() {
       @Override
       public void actionPerformed(ActionEvent e) {
         renderSpec.primitive++;
@@ -68,100 +152,61 @@ public class UI3DPanel extends JPanel implements UIO {
         blit();
       }
     });
-    UICommon.defineAnonAction(renderer, "3d.vis.cull", "f2", when, new AbstractAction() {
+    UICommon.defineAnonAction(renderer, "3d.grid.size", "f2", when, new AbstractAction() {
       @Override
       public void actionPerformed(ActionEvent e) {
-        renderSpec.depthTest = !renderSpec.depthTest;
+        float m = renderSpec.gridMul;
+        int zeroes = (int)Math.round(Math.log10(m));
+        if ((int)(m / Math.pow(10, zeroes)) != 1) {
+          m *= 2;
+        } else {
+          m *= 5;
+        }
+        if (m > 1000f) m = 1f;
+        renderSpec.gridMul = m;
         blit();
       }
     });
-    UICommon.defineAnonAction(renderer, "3d.vis.depth", "f3", when, new AbstractAction() {
+    UICommon.defineAnonAction(renderer, "3d.grid.contrast", "f3", when, new AbstractAction() {
       @Override
       public void actionPerformed(ActionEvent e) {
-        renderSpec.cullFaces = !renderSpec.cullFaces;
+        renderSpec.gridContrast += 0.25f;
+        if (renderSpec.gridContrast > 1.0f) renderSpec.gridContrast = 0.0f;
         blit();
       }
     });
-    UICommon.defineAnonAction(renderer, "3d.mov.forw", "w", when, new AbstractAction() {
+    UICommon.defineAnonAction(renderer, "3d.light.pos", "f4", when, new AbstractAction() {
       @Override
       public void actionPerformed(ActionEvent e) {
-        renderSpec.cameraWalk(1f);
+        renderSpec.lightPos.set(renderSpec.playerPos);
         blit();
       }
     });
-    UICommon.defineAnonAction(renderer, "3d.mov.back", "s", when, new AbstractAction() {
-      @Override
-      public void actionPerformed(ActionEvent e) {
-        renderSpec.cameraWalk(-1f);
-        blit();
-      }
-    });
-    UICommon.defineAnonAction(renderer, "3d.mov.left", "a", when, new AbstractAction() {
-      @Override
-      public void actionPerformed(ActionEvent e) {
-        renderSpec.cameraStrafe(-1f);
-        blit();
-      }
-    });
-    UICommon.defineAnonAction(renderer, "3d.mov.right", "d", when, new AbstractAction() {
-      @Override
-      public void actionPerformed(ActionEvent e) {
-        renderSpec.cameraStrafe(1f);
-        blit();
-      }
-    });
-    UICommon.defineAnonAction(renderer, "3d.mov.up", "q", when, new AbstractAction() {
-      @Override
-      public void actionPerformed(ActionEvent e) {
-        renderSpec.cameraDescend(1f);
-        blit();
-      }
-    });
-    UICommon.defineAnonAction(renderer, "3d.mov.down", "e", when, new AbstractAction() {
-      @Override
-      public void actionPerformed(ActionEvent e) {
-        renderSpec.cameraDescend(-1f);
-        blit();
-      }
-    });
-    UICommon.defineAnonAction(renderer, "3d.mod.left", "left", when, new AbstractAction() {
-      @Override
-      public void actionPerformed(ActionEvent e) {
-        renderSpec.modelMatrix.rotate(-0.1f, 0f, 1f, 0f);
-        blit();
-      }
-    });
-    UICommon.defineAnonAction(renderer, "3d.mod.right", "right", when, new AbstractAction() {
-      @Override
-      public void actionPerformed(ActionEvent e) {
-        renderSpec.modelMatrix.rotate(0.1f, 0f, 1f, 0f);
-        blit();
-      }
-    });
-    UICommon.defineAnonAction(renderer, "3d.mod.up", "up", when, new AbstractAction() {
-      @Override
-      public void actionPerformed(ActionEvent e) {
-        renderSpec.modelMatrix.rotate(-0.1f, 1f, 0f, 0f);
-        blit();
-      }
-      }); 
-    UICommon.defineAnonAction(renderer, "3d.mod.down", "down", when, new AbstractAction() {
-      @Override
-      public void actionPerformed(ActionEvent e) {
-        renderSpec.modelMatrix.rotate(0.1f, 1f, 0f, 0f);
-        blit();
-      }
-    });
+    registerMotionKeys("w", "3d.mov.forw", MOVE_FORWARD);
+    registerMotionKeys("s", "3d.mov.back", MOVE_BACK);
+    registerMotionKeys("a", "3d.mov.left", MOVE_LEFT);
+    registerMotionKeys("d", "3d.mov.right", MOVE_RIGHT);
+    registerMotionKeys("q", "3d.mov.up", MOVE_UP);
+    registerMotionKeys("e", "3d.mov.down", MOVE_DOWN);
+    registerMotionKeys("up", "3d.mod.up", MODEL_PITCH_UP);
+    registerMotionKeys("down", "3d.mod.down", MODEL_PITCH_DOWN);
+    registerMotionKeys("left", "3d.mod.left", MODEL_ROLL_LEFT);
+    registerMotionKeys("right", "3d.mod.right", MODEL_ROLL_RIGHT);
     
     renderSpec = new RenderSpec();
-    renderSpec.playerPos.set(0, 7, -10);
-    renderSpec.cameraUpdate(0, (float)(-3f*Math.PI/4f*1000f), 0);
+    renderSpec.playerPos.set(0, model.length, model.length);
+    renderSpec.qdir.set(0,0,0,1);
+    renderSpec.cameraUpdate(0, -0.7f*1000f, 0);
+
     renderSpec.cullFaces = false;
     renderSpec.depthTest = true;
     renderSpec.model = model;
     renderSpec.modelDataDirty = true;
     renderSpec.modelDirty = true;
-
+    renderSpec.width = w;
+    renderSpec.height = h;
+    renderSpec.dimensionDirty = true;
+    renderSpec.lightPos.set(40000f, 40000f, 15000f);
   }
   public void decorateUI() {
     // TODO decor
@@ -238,11 +283,6 @@ public class UI3DPanel extends JPanel implements UIO {
     return pri.getHeight();
   }
   
-  public void blit() {
-    render();
-    repaint();
-  }
-  
   class Renderer extends JPanel {
     public void paint(Graphics og) {
       Graphics2D g = (Graphics2D)og;
@@ -252,6 +292,11 @@ public class UI3DPanel extends JPanel implements UIO {
     }
   }
 
+  public void blit() {
+    render();
+    repaint();
+  }
+  
   static final AffineTransform flip = AffineTransform.getScaleInstance(1d, -1d);
   void render() {
     Graphics2D g = getPriGraphics();
@@ -261,5 +306,29 @@ public class UI3DPanel extends JPanel implements UIO {
     tran.concatenate(flip);
     g.setTransform(tran);
     g.drawImage(bi, 0, 0, null);
+  }
+
+  public void setPlayerPosition(float x, float y, float z) {
+    renderSpec.playerPos.set(x,y,z);
+    blit();
+  }
+  public void setPlayerView(float yaw, float pitch, float roll) {
+    renderSpec.qdir.set(0,0,0,1);
+    renderSpec.cameraUpdate(yaw*1000f, pitch*1000f, roll*1000f);
+    blit();
+  }
+  public void setSize(int w, int h) {
+    super.setSize(w, h);
+    Dimension d = new Dimension(w,h);
+    renderer.setMinimumSize(d);
+    renderer.setPreferredSize(d);
+    renderer.setMaximumSize(d);
+    _g = null;
+    pri = new BufferedImage(w, h, BufferedImage.TYPE_4BYTE_ABGR);
+    renderSpec.width = w;
+    renderSpec.height = h;
+    renderSpec.dimensionDirty = true;
+    blit();
+    revalidate();
   }
 }

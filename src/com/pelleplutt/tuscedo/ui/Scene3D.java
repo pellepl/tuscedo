@@ -2,6 +2,7 @@ package com.pelleplutt.tuscedo.ui;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL13.*;
 import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL30.*;
@@ -32,10 +33,6 @@ public class Scene3D {
   GLFWFramebufferSizeCallback fbCallback;
 
   long window;
-  int width = 400;
-  int height = 300;
-  int nwidth = width;
-  int nheight = height;
 
   // JOML matrices
   Matrix4f projMatrix = new Matrix4f();
@@ -61,7 +58,7 @@ public class Scene3D {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
     // set callbacks
-    window = glfwCreateWindow(width, height, "offscreen", NULL, NULL);
+    window = glfwCreateWindow(400, 300, "offscreen", NULL, NULL);
     if (window == NULL)
       throw new RuntimeException("Failed to create the GLFW window");
 
@@ -76,16 +73,16 @@ public class Scene3D {
     glfwSetFramebufferSizeCallback(window, fbCallback = new GLFWFramebufferSizeCallback() {
       @Override
       public void invoke(long window, int w, int h) {
-        if (w > 0 && h > 0) {
-          nwidth = w;
-          nheight = h;
-        }
+//        if (w > 0 && h > 0) {
+//          nwidth = w;
+//          nheight = h;
+//        }
       }
     });
 
     // misc stuff
     GLFWVidMode vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-    glfwSetWindowPos(window, (vidmode.width() - width) / 2, (vidmode.height() - height) / 2);
+    glfwSetWindowPos(window, (vidmode.width() - 400) / 2, (vidmode.height() - 300) / 2);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(0);
     if (standalone) glfwShowWindow(window);
@@ -119,12 +116,22 @@ public class Scene3D {
   int vLocPlayerPosGL;
   int vao_sculptureGL, vbo_sculptureGL;
   int vbo_sculptureArrIxGL;
+
+  int progGridGL;
+  int mLocGridModelGL;
+  int mLocGridViewProjectionGL;
+  int vLocGridColorGL;
+  int vao_gridGL, vbo_gridGL;
+  int vbo_gridArrIxGL;
+
   
   int numSculptureVertices;
   int numSculptureNormals;
   int numSculptureIndices;
 
+  final int gridLines = 201;
 
+  
   void initGL() {
     GL.createCapabilities();
     System.out.println("GL_VERSION: " + glGetString(GL_VERSION));
@@ -151,6 +158,7 @@ public class Scene3D {
         +"out vec3 vONormal; \n"
         +"out vec3 vOLightPos; \n"
         +"out vec3 vOPosition; \n"
+        +"out vec3 vOPlayerPosition; \n"
         +""
         +"void main() { \n"
         +"  vOTVertexColor = tcolor; \n"
@@ -161,6 +169,7 @@ public class Scene3D {
         +""
         +"  vOLightPos = vLightPos; \n"
         +"  vOPosition = vec3(P); \n"
+        +"  vOPlayerPosition = vPlayerPos; \n"
         +""
         +"  gl_Position = viewproj * P; \n"
         +"} \n"
@@ -173,6 +182,7 @@ public class Scene3D {
         +"in vec3 vONormal; \n"
         +"in vec3 vOLightPos; \n"
         +"in vec3 vOPosition; \n" 
+        +"in vec3 vOPlayerPosition; \n" 
         +""
         +"out vec4 fragColor; \n" 
         +""
@@ -187,11 +197,11 @@ public class Scene3D {
         +"    n = -vONormal; \n"
         +"    color = vOBVertexColor; \n"
         +"  } \n"
-        +"  vec3 s = normalize( vec3(vOLightPos - vOPosition) ); \n"
-        +"  vec3 v = normalize( vec3( -vOPosition) ); \n"
+        +"  vec3 s = normalize( vOLightPos - vOPosition ); \n"
+        +"  vec3 v = normalize( vOPlayerPosition - vOPosition ); \n"
         +"  vec3 r = reflect( -s, n ); \n"
         +"  float diffuse = max(0, dot(-s, n)); \n"
-        +"  float specular = pow(max(0, dot(r, v)), 42.0); \n" 
+        +"  float specular = pow(max(0, dot(r, v)), 50.0); \n" 
         +"  fragColor = vec4(color, 1.0) * min(1.0, ambient+diffuse) + vec4(1,1,1,1) * specular; \n" 
         +"} \n"
         );
@@ -205,14 +215,115 @@ public class Scene3D {
     vLocLightPosGL = glGetUniformLocation(progGL, "vLightPos");
     vLocPlayerViewGL = glGetUniformLocation(progGL, "vPlayerView");
     vLocPlayerPosGL = glGetUniformLocation(progGL, "vPlayerPos");
+
+  
+    vertexShader = createShader(GL_VERTEX_SHADER, "" 
+        +"#version 330 core \n" 
+        +""
+        +"in vec3 position; \n"
+        +"in float thickness; \n"
+        +""
+        +"uniform vec4 color; \n"
+        +"uniform mat4 model; \n"
+        +"uniform mat4 viewproj; \n"
+        +""
+        +"out vec4 vOVertexColor; \n"
+        +"out float fOThickness; \n"
+        +""
+        +"void main() { \n"
+        +"  vOVertexColor = color; \n"
+        +"  vec4 P = model * vec4(position, 1.0); \n"
+        +"  fOThickness = thickness; \n" 
+        +"  gl_Position = viewproj * P; \n"
+        +"} \n"
+        );
+    fragmentShader = createShader(GL_FRAGMENT_SHADER, "" 
+        +"#version 330 core \n" 
+        +""
+        +"in vec4 vOVertexColor; \n" 
+        +"in float fOThickness; \n"
+        +""
+        +"out vec4 fragColor; \n" 
+        +""
+        +"void main() {\n"
+        +"  fragColor = vec4(vOVertexColor.xyz, vOVertexColor.w * fOThickness); \n"
+        +"} \n"
+        );
+    progGridGL = createProgram(vertexShader, fragmentShader);
+    
+    // obtain uniform locations for shader variables
+    mLocGridModelGL = glGetUniformLocation(progGridGL, "model");
+    mLocGridViewProjectionGL = glGetUniformLocation(progGridGL, "viewproj");
+    vLocGridColorGL = glGetUniformLocation(progGridGL, "color");
+    
+    // grid data
+    int numGridVertices = (gridLines + gridLines) * 2;
+    final float mul = 1.0f;
+    FloatBuffer gridVertices = BufferUtils.createFloatBuffer(numGridVertices * 4);
+    Vector3f v; 
+    for (int i = 0; i < gridLines; i++) {
+      float t = 0.25f;
+      int ix = i <= gridLines/2 ? i : i - (gridLines/2);
+      if (i == gridLines / 2) {
+        t = 1f;
+      } else if ((ix % 10) == 0) {
+        t = 0.5f;
+      }
+      v = new Vector3f(-gridLines/2 + i, 0, -gridLines/2); v.mul(mul); 
+      gridVertices.put(v.x).put(v.y).put(v.z);
+      gridVertices.put(t);
+      v = new Vector3f(-gridLines/2 + i, 0, gridLines/2);  v.mul(mul);
+      gridVertices.put(v.x).put(v.y).put(v.z);
+      gridVertices.put(t);
+      
+      v = new Vector3f(-gridLines/2, 0, -gridLines/2 + i);  v.mul(mul);
+      gridVertices.put(v.x).put(v.y).put(v.z);
+      gridVertices.put(t);
+      v = new Vector3f(gridLines/2, 0, -gridLines/2 + i);  v.mul(mul);
+      gridVertices.put(v.x).put(v.y).put(v.z);
+      gridVertices.put(t);
+    }
+
+    gridVertices.flip();
+    
+    IntBuffer indices = BufferUtils.createIntBuffer(numGridVertices);
+    for (int i = 0; i < numGridVertices; i++) {
+      indices.put(i);
+    }
+    indices.flip();
+    
+    vao_gridGL = glGenVertexArrays();
+    glBindVertexArray(vao_gridGL);
+    vbo_gridGL = glGenBuffers();
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_gridGL);
+    glBufferData(GL_ARRAY_BUFFER, gridVertices, GL_STATIC_DRAW);
+
+    vbo_gridArrIxGL = glGenBuffers();
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_gridArrIxGL);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices, GL_STATIC_DRAW);
+    
+    // setup shader data inputs
+    glUseProgram(progGridGL);
+
+    glBindVertexArray(vao_gridGL);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_gridGL);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_gridArrIxGL);
+    
+    int attrPart_pos = glGetAttribLocation(progGridGL, "position");
+    glEnableVertexAttribArray(attrPart_pos);
+    glVertexAttribPointer(attrPart_pos, 3, GL_FLOAT, false, 4 * 4, 0);
+
+    int attrPart_thick = glGetAttribLocation(progGridGL, "thickness");
+    glEnableVertexAttribArray(attrPart_thick);
+    glVertexAttribPointer(attrPart_thick, 1, GL_FLOAT, false, 4 * 4, 4 * 3);
   }
 
   ByteBuffer nativeBuffer;
   int ccap;
-  void dumpToSwingImage() {
+  void dumpToSwingImage(RenderSpec rs) {
     // dump renderbuffer to image
-    swingImage = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
-    int cap = width*height*3;
+    swingImage = new BufferedImage(rs.width, rs.height, BufferedImage.TYPE_3BYTE_BGR);
+    int cap = rs.width*rs.height*3;
     cap = ((cap + 255) / 256) * 256;
     //System.out.printf("dump2SI:cap:%d (%dx%d) prev:%s\n", cap, width, height, nativeBuffer);
     if (nativeBuffer == null || cap != ccap) {
@@ -221,7 +332,7 @@ public class Scene3D {
     } else if (nativeBuffer != null) {
       nativeBuffer.flip();
     }
-    GL11.glReadPixels(0, 0, width, height, GL12.GL_BGR, GL11.GL_UNSIGNED_BYTE, nativeBuffer);
+    GL11.glReadPixels(0, 0, rs.width, rs.height, GL12.GL_BGR, GL11.GL_UNSIGNED_BYTE, nativeBuffer);
     byte[] imgData = ((DataBufferByte)swingImage.getRaster().getDataBuffer()).getData();
     nativeBuffer.get(imgData);
   }
@@ -259,12 +370,22 @@ public class Scene3D {
   int lastRenderSpecId;
   
   private void handleRenderSpec(RenderSpec rs) {
+    boolean newSpec = false;
     boolean newModel = false;
     boolean newModelData = false;
     if (lastRenderSpecId != rs.id) {
       lastRenderSpecId = rs.id;
-      newModel = true;
+      newModel = newSpec = true;
     }
+    
+    if (newSpec || rs.dimensionDirty) {
+      glfwSetWindowSize(window, rs.width, rs.height);
+      // TODO need to do this in order to make size changes work
+      glfwShowWindow(window);
+      glfwHideWindow(window);
+      rs.dimensionDirty = false;
+    }
+    
     newModel |= rs.modelDirty;
     newModelData = rs.modelDataDirty;
     rs.modelDirty = false;
@@ -292,10 +413,10 @@ public class Scene3D {
       }
       verticesNormals.flip();
       
-      ShortBuffer indices = BufferUtils.createShortBuffer(numSculptureIndices);
+      IntBuffer indices = BufferUtils.createIntBuffer(numSculptureIndices);
       for (int i = 0; i < numSculptureIndices; i++) {
         int index = sculpture.indices.get(i);
-        indices.put((short)index);
+        indices.put(index);
       }
       indices.flip();
       
@@ -335,7 +456,7 @@ public class Scene3D {
     float diffMs = (thisTime - firstTime) / 1E9f;
 
     // calc global viewing matrices
-    viewProj.setPerspective((float)Math.PI/4f, (float)width/(float)height, ZNEAR, ZFAR);
+    viewProj.setPerspective((float)Math.PI/4f, (float)rs.width/(float)rs.height, ZNEAR, ZFAR);
     _playerPos.set(rs.playerPos);
     _playerPos.negate();
     rs.qdir.invert(qdirinv); 
@@ -345,7 +466,7 @@ public class Scene3D {
     
     // setup GL view
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, width, height);
+    glViewport(0, 0, rs.width, rs.height);
     glClearColor(.05f, .05f, .2f, 1f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     if (rs.depthTest) {
@@ -359,15 +480,15 @@ public class Scene3D {
       glDisable(GL_CULL_FACE);
     }
 
-    // paint
+    // paint sculpture
     glUseProgram(progGL);
     glBindVertexArray(vao_sculptureGL);
     glUniformMatrix4fv(mLocViewProjectionGL, false, fbViewProj);
-    glUniform3f(vLocPlayerPosGL, -rs.playerPos.x, -rs.playerPos.y, -rs.playerPos.z);
+    glUniform3f(vLocPlayerPosGL, rs.playerPos.x, rs.playerPos.y, rs.playerPos.z);
     glUniform3f(vLocPlayerViewGL, rs.vdirz.x, rs.vdirz.y, rs.vdirz.z);
-    glUniform3f(vLocLightPosGL, 40000f, 40000f, 15000f);
+    glUniform3f(vLocLightPosGL, rs.lightPos.x, rs.lightPos.y, rs.lightPos.z);
     glUniform3f(vLocTopColorGL, .5f,.4f,.3f);
-    glUniform3f(vLocBotColorGL, .1f,.4f,.2f);
+    glUniform3f(vLocBotColorGL, .05f,.1f,.6f);
 
     if (standalone) {
       mModel.identity();
@@ -383,7 +504,30 @@ public class Scene3D {
     int mode = GL_TRIANGLES;
     if (rs.primitive == RenderSpec.PRIMITIVE_WIREFRAME) mode = GL_LINES;
     else if (rs.primitive == RenderSpec.PRIMITIVE_DOTS) mode = GL_POINTS;
-    glDrawElements(mode, numSculptureIndices, GL_UNSIGNED_SHORT, 0);
+    glDrawElements(mode, numSculptureIndices, GL_UNSIGNED_INT, 0);
+
+    // paint grid
+    glUseProgram(progGridGL);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_LINE_SMOOTH);
+    glDepthMask(false);
+    glBindVertexArray(vao_gridGL);
+    mModel.set(rs.modelMatrix);
+    mModel.scale(rs.gridMul);
+    mModel.get(fbModel);
+    glUniformMatrix4fv(mLocModelGL, false, fbModel);
+    glUniformMatrix4fv(mLocGridModelGL, false, fbModel);
+    glUniformMatrix4fv(mLocGridViewProjectionGL, false, fbViewProj);
+    glUniform4f(vLocGridColorGL, .0f,0.1f,.0f, rs.gridContrast * 0.2f);
+    glDrawElements(GL_LINES, (gridLines + gridLines) * 2, GL_UNSIGNED_INT, 0);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(true);
+    glUniform4f(vLocGridColorGL, .0f,0.5f,.1f, rs.gridContrast);
+    glDrawElements(GL_LINES, (gridLines + gridLines) * 2, GL_UNSIGNED_INT, 0);
+
+    glDisable(GL_BLEND);
     
     int err = glGetError();
     if (err != 0) System.out.println("GLERROR:" + Integer.toHexString(err));
@@ -393,10 +537,7 @@ public class Scene3D {
     glfwSwapBuffers(window);
     glfwPollEvents();
   
-    dumpToSwingImage();
-    
-    width = nwidth;
-    height = nheight;
+    dumpToSwingImage(rs);
   }
 
   public void destroy() {
@@ -415,16 +556,16 @@ public class Scene3D {
     return swingImage;
   }
   
-  public static void main(String[] args) {
-    standalone = true;
-    Scene3D s = new Scene3D();
-    s.init();
-    
-    while (!destroyed && !glfwWindowShouldClose(s.window)) {
-      s.render();
-    }
-    s.destroy();
-  }
+//  public static void main(String[] args) {
+//    standalone = true;
+//    Scene3D s = new Scene3D();
+//    s.init();
+//    
+//    while (!destroyed && !glfwWindowShouldClose(s.window)) {
+//      s.render();
+//    }
+//    s.destroy();
+//  }
   
   //
   // GL helpers
