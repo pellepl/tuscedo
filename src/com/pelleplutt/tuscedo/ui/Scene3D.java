@@ -392,10 +392,18 @@ public class Scene3D {
     rs.modelDataDirty = false;
     
     // TODO
-    // see if things can differ from newModel / newModelData (optimize)
     // handle float[][][]
     // clear previous vaos and vbos when new model
     if (newModel || newModelData) {
+      if (vao_sculptureGL != 0) {
+        glDeleteVertexArrays(vao_sculptureGL);
+      }
+      if (vbo_sculptureArrIxGL != 0) {
+        glDeleteBuffers(vbo_sculptureArrIxGL);
+      }
+      if (vbo_sculptureGL != 0) {
+        glDeleteBuffers(vbo_sculptureGL);
+      }
       // sculpture data
       float[][] grid = (float[][])rs.model;
       RenderObject sculpture = new RenderGrid(grid); // RenderSphere(3f, 240);
@@ -488,7 +496,7 @@ public class Scene3D {
     glUniform3f(vLocPlayerViewGL, rs.vdirz.x, rs.vdirz.y, rs.vdirz.z);
     glUniform3f(vLocLightPosGL, rs.lightPos.x, rs.lightPos.y, rs.lightPos.z);
     glUniform3f(vLocTopColorGL, .5f,.4f,.3f);
-    glUniform3f(vLocBotColorGL, .05f,.1f,.6f);
+    glUniform3f(vLocBotColorGL, .05f,.3f,.6f);
 
     if (standalone) {
       mModel.identity();

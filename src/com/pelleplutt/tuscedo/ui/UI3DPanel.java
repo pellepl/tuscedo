@@ -17,10 +17,16 @@ public class UI3DPanel extends JPanel implements UIO {
   static final int MOVE_RIGHT = (1<<3);
   static final int MOVE_FORWARD = (1<<4);
   static final int MOVE_BACK = (1<<5);
-  static final int MODEL_ROLL_LEFT = (1<<6);
-  static final int MODEL_ROLL_RIGHT = (1<<7);
-  static final int MODEL_PITCH_UP = (1<<8);
-  static final int MODEL_PITCH_DOWN = (1<<9);
+  static final int MOVE_ROLL_LEFT = (1<<6);
+  static final int MOVE_ROLL_RIGHT = (1<<7);
+  static final int MOVE_PITCH_LEFT = (1<<8);
+  static final int MOVE_PITCH_RIGHT = (1<<9);
+  static final int MOVE_YAW_LEFT = (1<<10);
+  static final int MOVE_YAW_RIGHT = (1<<11);
+  static final int MODEL_ROLL_LEFT = (1<<12);
+  static final int MODEL_ROLL_RIGHT = (1<<13);
+  static final int MODEL_PITCH_UP = (1<<14);
+  static final int MODEL_PITCH_DOWN = (1<<15);
   
   volatile int keys = 0;
   volatile BufferedImage pri;
@@ -64,6 +70,24 @@ public class UI3DPanel extends JPanel implements UIO {
       else if ((keys & MOVE_DOWN) != 0) {
         renderSpec.cameraDescend(-.5f);
       }
+      if ((keys & MOVE_PITCH_LEFT) != 0) {
+        renderSpec.cameraUpdate(0, -10f, 0);
+      }
+      else if ((keys & MOVE_PITCH_RIGHT) != 0) {
+        renderSpec.cameraUpdate(0, 10f, 0);
+      }
+      if ((keys & MOVE_YAW_LEFT) != 0) {
+        renderSpec.cameraUpdate(-10f, 0, 0);
+      }
+      else if ((keys & MOVE_YAW_RIGHT) != 0) {
+        renderSpec.cameraUpdate(10f, 0, 0);
+      }
+      if ((keys & MOVE_ROLL_LEFT) != 0) {
+        renderSpec.cameraUpdate(0, 0, -10f);
+      }
+      else if ((keys & MOVE_ROLL_RIGHT) != 0) {
+        renderSpec.cameraUpdate(0, 0, 10f);
+      }
       if ((keys & MODEL_ROLL_LEFT) != 0) {
         renderSpec.modelMatrix.rotate(-0.02f, 0f, 1f, 0f);
       }
@@ -75,6 +99,9 @@ public class UI3DPanel extends JPanel implements UIO {
       }
       else if ((keys & MODEL_PITCH_DOWN) != 0) {
         renderSpec.modelMatrix.rotate(0.02f, 1f, 0f, 0f);
+      }
+      if ((keys & (MOVE_ROLL_RIGHT | MOVE_ROLL_LEFT)) == 0) {
+        renderSpec.cameraUpdate(0,0,0);
       }
       blit();
     }
@@ -182,12 +209,26 @@ public class UI3DPanel extends JPanel implements UIO {
         blit();
       }
     });
+    UICommon.defineAnonAction(renderer, "3d.mov.reset", "numpad5", when, new AbstractAction() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        renderSpec.qdir.identity();
+        renderSpec.cameraUpdate(0, 0, 0);
+        blit();
+      }
+    });
     registerMotionKeys("w", "3d.mov.forw", MOVE_FORWARD);
     registerMotionKeys("s", "3d.mov.back", MOVE_BACK);
     registerMotionKeys("a", "3d.mov.left", MOVE_LEFT);
     registerMotionKeys("d", "3d.mov.right", MOVE_RIGHT);
     registerMotionKeys("q", "3d.mov.up", MOVE_UP);
     registerMotionKeys("e", "3d.mov.down", MOVE_DOWN);
+    registerMotionKeys("numpad8", "3d.mov.pitl", MOVE_PITCH_LEFT);
+    registerMotionKeys("numpad2", "3d.mov.pitr", MOVE_PITCH_RIGHT);
+    registerMotionKeys("numpad4", "3d.mov.yawl", MOVE_YAW_LEFT);
+    registerMotionKeys("numpad6", "3d.mov.yawr", MOVE_YAW_RIGHT);
+    registerMotionKeys("z", "3d.mov.roll", MOVE_ROLL_LEFT);
+    registerMotionKeys("c", "3d.mov.rolr", MOVE_ROLL_RIGHT);
     registerMotionKeys("up", "3d.mod.up", MODEL_PITCH_UP);
     registerMotionKeys("down", "3d.mod.down", MODEL_PITCH_DOWN);
     registerMotionKeys("left", "3d.mod.left", MODEL_ROLL_LEFT);
@@ -225,7 +266,7 @@ public class UI3DPanel extends JPanel implements UIO {
       int dx = e.getXOnScreen() - clickPointScreen.x; 
       int dy = e.getYOnScreen() - clickPointScreen.y;
       if (dx != 0 || dy != 0) {
-        renderSpec.cameraUpdate(-dx, -dy, 0); // TODO test only
+        renderSpec.cameraUpdate(-dx*2f, -dy*2f, 0);
         robot.mouseMove(clickPointScreen.x, clickPointScreen.y);
         blit();
       }
@@ -306,6 +347,47 @@ public class UI3DPanel extends JPanel implements UIO {
     tran.concatenate(flip);
     g.setTransform(tran);
     g.drawImage(bi, 0, 0, null);
+    g.setTransform(AffineTransform.getScaleInstance(1.0, 1.0));
+    g.setColor(Color.white);
+    g.drawString(String.format("POS  x:%-8.1f y:%-8.1f z:%-8.1f"
+        , renderSpec.playerPos.x
+        , renderSpec.playerPos.y
+        , renderSpec.playerPos.z), 0, 12);
+    g.drawString(String.format("LOOK x:%-8.1f y:%-8.1f z:%-8.1f"
+        , -renderSpec.vdirz.x
+        , -renderSpec.vdirz.y
+        , -renderSpec.vdirz.z), 0, 24);
+    float s, t;
+    s = (float)Math.atan2(renderSpec.vdirx.y, renderSpec.vdirx.x);
+    t = (float)Math.acos(renderSpec.vdirx.z / 1f);
+    g.drawString(String.format("ANGX [s:%-3.1f] t:%-3.1f"
+        , Math.toDegrees(s)
+        , Math.toDegrees(t)
+        ), 100, 36);
+    s = (float)Math.atan2(renderSpec.vdiry.y, renderSpec.vdiry.x);
+    t = (float)Math.acos(renderSpec.vdiry.z / 1f);
+    g.drawString(String.format("ANGY  s:%-3.1f  t:%-3.1f"
+        , Math.toDegrees(s)
+        , Math.toDegrees(t)
+        ), 100, 48);
+    s = (float)Math.atan2(renderSpec.vdirz.y, renderSpec.vdirz.x);
+    t = (float)Math.acos(renderSpec.vdirz.z / 1f);
+    g.drawString(String.format("ANGZ  s:%-3.1f  t:%-3.1f"
+        , Math.toDegrees(s)
+        , Math.toDegrees(t)
+        ), 100, 60);
+    g.setColor(Color.green);
+    g.drawLine(34, 34+24, 
+        (int)(34 + -renderSpec.vdirx.x * 32), 
+        (int)(34 + 24 + -renderSpec.vdirx.y * 32));
+    g.setColor(Color.red);
+    g.drawLine(34, 34+24, 
+        (int)(34 + -renderSpec.vdiry.x * 32), 
+        (int)(34 + 24 + -renderSpec.vdiry.y * 32));
+    g.setColor(Color.yellow);
+    g.drawLine(34, 34+24, 
+        (int)(34 + -renderSpec.vdirz.x * 32), 
+        (int)(34 + 24 + -renderSpec.vdirz.y * 32));
   }
 
   public void setPlayerPosition(float x, float y, float z) {
@@ -315,6 +397,12 @@ public class UI3DPanel extends JPanel implements UIO {
   public void setPlayerView(float yaw, float pitch, float roll) {
     renderSpec.qdir.set(0,0,0,1);
     renderSpec.cameraUpdate(yaw*1000f, pitch*1000f, roll*1000f);
+    blit();
+  }
+  public void setHeightMap(float[][] map) {
+    renderSpec.model = map;
+    renderSpec.modelDirty = true;
+    renderSpec.modelDataDirty = true;
     blit();
   }
   public void setSize(int w, int h) {

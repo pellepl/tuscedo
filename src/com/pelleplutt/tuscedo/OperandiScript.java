@@ -1403,6 +1403,7 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("set_pos", "__3d_set_pos", comp);
         addFunc("set_view", "__3d_set_view", comp);
         addFunc("set_size", "__3d_set_size", comp);
+        addFunc("set_hmap", "__3d_set_hmap", comp);
         addFunc("blit", "__3d_blit", comp);
       }
     };
@@ -1504,6 +1505,15 @@ public class OperandiScript implements Runnable, Disposable {
         UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
         if (cp == null) return null;
         cp.setSize(args[0].asInt(), args[1].asInt());
+        return null;
+      }
+    });
+    setExtDef("__3d_set_hmap", "(<heightmap>) - sets heightmap data model (array of arrays of floats)",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.setHeightMap(conv(args[0]));
         return null;
       }
     });
