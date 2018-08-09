@@ -357,25 +357,25 @@ public class UI3DPanel extends JPanel implements UIO {
         , -renderSpec.vdirz.x
         , -renderSpec.vdirz.y
         , -renderSpec.vdirz.z), 0, 24);
-    float s, t;
-    s = (float)Math.atan2(renderSpec.vdirx.y, renderSpec.vdirx.x);
-    t = (float)Math.acos(renderSpec.vdirx.z / 1f);
-    g.drawString(String.format("ANGX [s:%-3.1f] t:%-3.1f"
-        , Math.toDegrees(s)
-        , Math.toDegrees(t)
-        ), 100, 36);
-    s = (float)Math.atan2(renderSpec.vdiry.y, renderSpec.vdiry.x);
-    t = (float)Math.acos(renderSpec.vdiry.z / 1f);
-    g.drawString(String.format("ANGY  s:%-3.1f  t:%-3.1f"
-        , Math.toDegrees(s)
-        , Math.toDegrees(t)
-        ), 100, 48);
-    s = (float)Math.atan2(renderSpec.vdirz.y, renderSpec.vdirz.x);
-    t = (float)Math.acos(renderSpec.vdirz.z / 1f);
-    g.drawString(String.format("ANGZ  s:%-3.1f  t:%-3.1f"
-        , Math.toDegrees(s)
-        , Math.toDegrees(t)
-        ), 100, 60);
+//    float s, t;
+//    s = (float)Math.atan2(renderSpec.vdirx.y, renderSpec.vdirx.x);
+//    t = (float)Math.acos(renderSpec.vdirx.z / 1f);
+//    g.drawString(String.format("ANGX [s:%-3.1f] t:%-3.1f"
+//        , Math.toDegrees(s)
+//        , Math.toDegrees(t)
+//        ), 100, 36);
+//    s = (float)Math.atan2(renderSpec.vdiry.y, renderSpec.vdiry.x);
+//    t = (float)Math.acos(renderSpec.vdiry.z / 1f);
+//    g.drawString(String.format("ANGY  s:%-3.1f  t:%-3.1f"
+//        , Math.toDegrees(s)
+//        , Math.toDegrees(t)
+//        ), 100, 48);
+//    s = (float)Math.atan2(renderSpec.vdirz.y, renderSpec.vdirz.x);
+//    t = (float)Math.acos(renderSpec.vdirz.z / 1f);
+//    g.drawString(String.format("ANGZ  s:%-3.1f  t:%-3.1f"
+//        , Math.toDegrees(s)
+//        , Math.toDegrees(t)
+//        ), 100, 60);
     g.setColor(Color.green);
     g.drawLine(34, 34+24, 
         (int)(34 + -renderSpec.vdirx.x * 32), 
@@ -400,6 +400,14 @@ public class UI3DPanel extends JPanel implements UIO {
     blit();
   }
   public void setHeightMap(float[][] map) {
+    renderSpec.modeltype = RenderSpec.MODEL_HEIGHTMAP;
+    renderSpec.model = map;
+    renderSpec.modelDirty = true;
+    renderSpec.modelDataDirty = true;
+    blit();
+  }
+  public void setHeightMapColor(float[][][] map) {
+    renderSpec.modeltype = RenderSpec.MODEL_HEIGHTMAP_COLOR;
     renderSpec.model = map;
     renderSpec.modelDirty = true;
     renderSpec.modelDataDirty = true;

@@ -10,6 +10,11 @@ public class RenderSpec {
   public static final int PRIMITIVE_SOLID = 0;
   public static final int PRIMITIVE_WIREFRAME = 1;
   public static final int PRIMITIVE_DOTS = 2;
+  
+  public static final int MODEL_HEIGHTMAP = 0;        // float[w][d]=h
+  public static final int MODEL_HEIGHTMAP_COLOR = 1;  // float[w][d]=[h,r,g,b]
+  public static final int MODEL_POINTCLOUD = 2;       // float[w][d][h]=v
+  
   boolean depthTest;
   boolean cullFaces;
   int primitive;
@@ -36,7 +41,8 @@ public class RenderSpec {
   
   final Matrix4f modelMatrix = new Matrix4f();
 
-  public Object model; // float[][] or float[][][]
+  public int modeltype;
+  public Object model;
   
   public boolean modelDataDirty;
   public boolean modelDirty;
@@ -48,23 +54,27 @@ public class RenderSpec {
   public final int id = __id++;
 
   public void cameraUpdate(float dx, float dy, float droll)  {
-    // get delta yaw and pitch quaternions
-    aayaw.set(dx*0.001f, 0,1,0);
-    aapitch.set(dy*0.001f, 1,0,0);
-    aaroll.set(droll*0.001f, 0,0,1);
-    qyaw.set(aayaw);
-    qpitch.set(aapitch);
-    qroll.set(aaroll);
+    if (dx != 0 || dy != 0 || droll != 0) {
+      // get delta yaw and pitch quaternions
+      aayaw.set(dx*0.001f, 0,1,0);
+      aapitch.set(dy*0.001f, 1,0,0);
+      aaroll.set(droll*0.001f, 0,0,1);
+      qyaw.set(aayaw);
+      qpitch.set(aapitch);
+      qroll.set(aaroll);
+      
+      // apply to current direction
+      qdir.mul(qroll).mul(qpitch).mul(qyaw);
+      qdir.normalize();
+  
+      // get base vectors of rotation
+      qdir.get(qrotm);
+      qrotm.getColumn(0, vdirx);
+      qrotm.getColumn(1, vdiry);
+      qrotm.getColumn(2, vdirz);
+    }
     
-    // apply to current direction
-    qdir.mul(qroll).mul(qpitch).mul(qyaw);
-    qdir.normalize();
-
-    // get base vectors of rotation
-    qdir.get(qrotm);
-    qrotm.getColumn(0, vdirx);
-    qrotm.getColumn(1, vdiry);
-    qrotm.getColumn(2, vdirz);
+    if (droll != 0) return; // no autolevel when rolling
     
     // auto leveling
     float s = (float)Math.atan2(vdirx.y, vdirx.x);
@@ -74,26 +84,15 @@ public class RenderSpec {
     else if (s < 0 && s > -Math.PI) adj = -s;        // -90..0    -> 0
     else if  (s < -Math.PI) adj = (float)-Math.PI-s; // -180..-91 -> -180
     
-    if (Math.abs(adj) < Math.PI/32f || Math.abs(adj) > 31f*Math.PI/32f) return;
-    float adjFact = Math.abs(vdiry.y);
-    System.out.printf("s:%-3.1f + %-3.1f = %-3.1f\n", s, adj, s+adj);
-    aaroll.set(adj*0.005f*adjFact, 0,0,1);
+    if (Math.abs(adj) < Math.PI/64f || Math.abs(adj) > 63f*Math.PI/64f) return;
+    float adjFact = Math.max(0, Math.abs(vdiry.y)*2f - 1f);
+    aaroll.set(adj*0.0013f*adjFact, 0,0,1); // 0.0013 derived heuristically
     qroll.set(aaroll);
     qdir.mul(qroll);
     qdir.get(qrotm);
     qrotm.getColumn(0, vdirx);
     qrotm.getColumn(1, vdiry);
     qrotm.getColumn(2, vdirz);
-
-    
-//    float autoLevelFactor = droll == 0 ? Math.abs(vdiry.y)*0.015f : 0;
-//    if (dy > dx) autoLevelFactor = 0;
-//    vdiry.lerp(vdiry.y > 0 ? VUP : VDOWN, autoLevelFactor).normalize();
-//    vdiry.cross(vdirz, vdirx);
-//    qrotm.setColumn(0, vdirx);
-//    qrotm.setColumn(1, vdiry);
-//    qrotm.setColumn(2, vdirz);
-//    qdir.setFromNormalized(qrotm);
   }
 
   private final Vector3f vmove = new Vector3f();

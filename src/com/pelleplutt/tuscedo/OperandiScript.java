@@ -1403,13 +1403,15 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("set_pos", "__3d_set_pos", comp);
         addFunc("set_view", "__3d_set_view", comp);
         addFunc("set_size", "__3d_set_size", comp);
-        addFunc("set_hmap", "__3d_set_hmap", comp);
+        addFunc("set_model_heightmap", "__3d_set_model_heightmap", comp);
+        addFunc("set_model_heightmap_color", "__3d_set_model_heightmap_color", comp);
         addFunc("blit", "__3d_blit", comp);
       }
     };
   }
 
-  private float[][] conv(M m) {
+  private float[][] convHeightMap(M m) {
+    // TODO check sizes etc, toss proper error desc
     MSet set = m.ref;
     int h = set.size();
     int w = set.get(0).ref.size();
@@ -1421,20 +1423,36 @@ public class OperandiScript implements Runnable, Disposable {
     }
     return f;
   }
+  private float[][][] convHeightMapColor(M m) {
+    // TODO check sizes etc, toss proper error desc
+    MSet set = m.ref;
+    int h = set.size();
+    int w = set.get(0).ref.size();
+    float[][][] f = new float[w][h][2];
+    for (int y = 0; y < h; y++) {
+      for (int x = 0; x < w; x++) {
+        MSet mset = m.ref.get(y).ref.get(x).ref;
+        f[x][y] = new float[] {mset.get(0).asFloat(), 
+            Scene3D.colToFloat(mset.get(1).asFloat(), mset.get(2).asFloat(), mset.get(3).asFloat())};
+      }
+    }
+    return f;
+  }
   private void create3DFunctions() {
     setExtDef("graph3d", "((<title>),(<w>),(<h>)) - creates a 3d graph",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         String name = "GRAPH3D";
-        int w = 300;
-        int h = 200;
+        UISimpleTabPane tpane = UISimpleTabPane.getTabByComponent(currentWA).getPane();
+        int w = tpane.getWidth();
+        int h = tpane.getHeight() - UISimpleTabPane.getTabByComponent(currentWA).getHeight();
         float[][] model = new float[8][8];
         if (args != null && args.length > 0) {
           if (args[0].type == Processor.TSTR) {
             name = args[0].asString();
             if (args.length > 1) {
               M mmodel = args[1];
-              model = conv(mmodel);
+              model = convHeightMap(mmodel);
             }
             if (args.length > 2) {
               w = args[2].asInt();
@@ -1444,7 +1462,7 @@ public class OperandiScript implements Runnable, Disposable {
             }
           } else {
             M mmodel = args[0];
-            model = conv(mmodel);
+            model = convHeightMap(mmodel);
             if (args.length > 1) {
               w = args[1].asInt();
             }
@@ -1454,7 +1472,9 @@ public class OperandiScript implements Runnable, Disposable {
           }
         }
         
-        String id = Tuscedo.inst().addGraph3dTab(UISimpleTabPane.getTabByComponent(currentWA).getPane(), w, h, 
+        w = ((w+99)/100)*100;
+        
+        String id = Tuscedo.inst().addGraph3dTab(tpane, w, h, 
             model);
         UI3DPanel ui = ((UI3DPanel)Tuscedo.inst().getUIObject(id).getUI()); 
         ui.getUIInfo().setName(name);
@@ -1508,12 +1528,21 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__3d_set_hmap", "(<heightmap>) - sets heightmap data model (array of arrays of floats)",
+    setExtDef("__3d_set_model_heightmap", "(<heightmap>) - sets heightmap data model (array of arrays of floats)",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
         if (cp == null) return null;
-        cp.setHeightMap(conv(args[0]));
+        cp.setHeightMap(convHeightMap(args[0]));
+        return null;
+      }
+    });
+    setExtDef("__3d_set_model_heightmap_color", "(<heightmap-colored>) - sets colored heightmap data model (array of arrays of 4 float vector [height, red, green, blue])",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.setHeightMapColor(convHeightMapColor(args[0]));
         return null;
       }
     });

@@ -58,7 +58,7 @@ public class Scene3D {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
     // set callbacks
-    window = glfwCreateWindow(400, 300, "offscreen", NULL, NULL);
+    window = glfwCreateWindow(100, 100, "offscreen", NULL, NULL);
     if (window == NULL)
       throw new RuntimeException("Failed to create the GLFW window");
 
@@ -82,7 +82,7 @@ public class Scene3D {
 
     // misc stuff
     GLFWVidMode vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-    glfwSetWindowPos(window, (vidmode.width() - 400) / 2, (vidmode.height() - 300) / 2);
+    glfwSetWindowPos(window, (vidmode.width() - 100) / 2, (vidmode.height() - 100) / 2);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(0);
     if (standalone) glfwShowWindow(window);
@@ -109,7 +109,6 @@ public class Scene3D {
   int progGL;
   int mLocModelGL;
   int mLocViewProjectionGL;
-  int vLocTopColorGL;
   int vLocBotColorGL;
   int vLocLightPosGL;
   int vLocPlayerViewGL;
@@ -144,8 +143,8 @@ public class Scene3D {
         +""
         +"in vec3 position; \n"
         +"in vec3 normal; \n"
+        +"in float fcolor; \n"
         +""
-        +"uniform vec3 tcolor; \n"
         +"uniform vec3 bcolor; \n"
         +"uniform mat4 model; \n"
         +"uniform mat4 viewproj; \n"
@@ -160,8 +159,18 @@ public class Scene3D {
         +"out vec3 vOPosition; \n"
         +"out vec3 vOPlayerPosition; \n"
         +""
+        +"vec3 unpack_color(float f) { \n"
+        +"  vec3 c; \n"
+        +"  c.b = floor(f / 256.0 / 256.0); \n"
+        +"  c.g = floor((f - c.b * 256.0 * 256.0) / 256.0); \n"
+        +"  c.r = floor(f - c.b * 256.0 * 256.0 - c.g * 256.0); \n"
+        +"  // now we have a vec3 with the 3 components in range [0..255]. Let's normalize it! \n"
+        +"  return c / 255.0; \n"
+        +"} \n"
+        +""
         +"void main() { \n"
-        +"  vOTVertexColor = tcolor; \n"
+        +"//  vOTVertexColor = tcolor; \n"
+        +"  vOTVertexColor = unpack_color(fcolor); \n"
         +"  vOBVertexColor = bcolor; \n"
         +""
         +"  vec4 P = model * vec4(position, 1.0); \n"
@@ -210,7 +219,6 @@ public class Scene3D {
     // obtain uniform locations for shader variables
     mLocModelGL = glGetUniformLocation(progGL, "model");
     mLocViewProjectionGL = glGetUniformLocation(progGL, "viewproj");
-    vLocTopColorGL = glGetUniformLocation(progGL, "tcolor");
     vLocBotColorGL = glGetUniformLocation(progGL, "bcolor");
     vLocLightPosGL = glGetUniformLocation(progGL, "vLightPos");
     vLocPlayerViewGL = glGetUniformLocation(progGL, "vPlayerView");
@@ -324,7 +332,7 @@ public class Scene3D {
     // dump renderbuffer to image
     swingImage = new BufferedImage(rs.width, rs.height, BufferedImage.TYPE_3BYTE_BGR);
     int cap = rs.width*rs.height*3;
-    cap = ((cap + 255) / 256) * 256;
+    //cap = ((cap + 255) / 256) * 256;
     //System.out.printf("dump2SI:cap:%d (%dx%d) prev:%s\n", cap, width, height, nativeBuffer);
     if (nativeBuffer == null || cap != ccap) {
       nativeBuffer = BufferUtils.createByteBuffer(cap);
@@ -369,6 +377,13 @@ public class Scene3D {
   
   int lastRenderSpecId;
   
+  public static float colToFloat(float r, float g, float b) {
+    r = (int)(Math.min(1f,r)*255f);
+    g = (int)(Math.min(1f,g)*255f);
+    b = (int)(Math.min(1f,b)*255f);
+    return r + (float)Math.floor(g*256f) + (float)Math.floor(b*65536f);
+  }
+  
   private void handleRenderSpec(RenderSpec rs) {
     boolean newSpec = false;
     boolean newModel = false;
@@ -405,53 +420,71 @@ public class Scene3D {
         glDeleteBuffers(vbo_sculptureGL);
       }
       // sculpture data
-      float[][] grid = (float[][])rs.model;
-      RenderObject sculpture = new RenderGrid(grid); // RenderSphere(3f, 240);
-      sculpture.build();
-      numSculptureVertices = sculpture.vertices.size();
-      numSculptureNormals = numSculptureVertices;
-      numSculptureIndices = sculpture.indices.size();
-      
-      FloatBuffer verticesNormals = BufferUtils.createFloatBuffer((numSculptureVertices + numSculptureNormals) * 3);
-      for (int i = 0; i < numSculptureVertices; i++) {
-        Vector3f v = sculpture.vertices.get(i);
-        Vector3f n = sculpture.normals.get(i);
-        verticesNormals.put(v.x).put(v.y).put(v.z);
-        verticesNormals.put(n.x).put(n.y).put(n.z);
+      if (rs.modeltype == RenderSpec.MODEL_HEIGHTMAP || 
+          rs.modeltype == RenderSpec.MODEL_HEIGHTMAP_COLOR) {
+        RenderObject sculpture;
+        if (rs.modeltype == RenderSpec.MODEL_HEIGHTMAP) {
+          sculpture = new RenderGrid((float[][])rs.model);
+        } else {
+          sculpture = new RenderGrid((float[][][])rs.model);
+         
+        }
+
+        sculpture.build();
+        numSculptureVertices = sculpture.vertices.size();
+        numSculptureNormals = numSculptureVertices;
+        numSculptureIndices = sculpture.indices.size();
+        
+        FloatBuffer verticesNormals = BufferUtils.createFloatBuffer((numSculptureVertices + numSculptureNormals) * 3 +
+            numSculptureVertices);
+        for (int i = 0; i < numSculptureVertices; i++) {
+          Vector3f v = sculpture.vertices.get(i);
+          Vector3f n = sculpture.normals.get(i);
+          verticesNormals.put(v.x).put(v.y).put(v.z);
+          verticesNormals.put(n.x).put(n.y).put(n.z);
+          if (rs.modeltype == RenderSpec.MODEL_HEIGHTMAP)
+            verticesNormals.put(colToFloat(.5f,.4f,.3f));
+          else
+            verticesNormals.put(sculpture.colors.get(i));
+        }
+        verticesNormals.flip();
+        
+        IntBuffer indices = BufferUtils.createIntBuffer(numSculptureIndices);
+        for (int i = 0; i < numSculptureIndices; i++) {
+          int index = sculpture.indices.get(i);
+          indices.put(index);
+        }
+        indices.flip();
+        
+        vao_sculptureGL = glGenVertexArrays();
+        glBindVertexArray(vao_sculptureGL);
+        vbo_sculptureGL = glGenBuffers();
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_sculptureGL);
+        glBufferData(GL_ARRAY_BUFFER, verticesNormals, GL_STATIC_DRAW);
+  
+        vbo_sculptureArrIxGL = glGenBuffers();
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_sculptureArrIxGL);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices, GL_STATIC_DRAW);
+        
+        // setup shader data inputs
+        glUseProgram(progGL);
+  
+        glBindVertexArray(vao_sculptureGL);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_sculptureGL);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_sculptureArrIxGL);
+        
+        int attrPart_pos = glGetAttribLocation(progGL, "position");
+        glEnableVertexAttribArray(attrPart_pos);
+        glVertexAttribPointer(attrPart_pos, 3, GL_FLOAT, false, 7 * 4, 0);
+  
+        int attrPart_norm = glGetAttribLocation(progGL, "normal");
+        glEnableVertexAttribArray(attrPart_norm);
+        glVertexAttribPointer(attrPart_norm, 3, GL_FLOAT, false, 7 * 4, 3 * 4);
+  
+        int attrPart_col = glGetAttribLocation(progGL, "fcolor");
+        glEnableVertexAttribArray(attrPart_col);
+        glVertexAttribPointer(attrPart_col, 1, GL_FLOAT, false, 7 * 4, 6 * 4);
       }
-      verticesNormals.flip();
-      
-      IntBuffer indices = BufferUtils.createIntBuffer(numSculptureIndices);
-      for (int i = 0; i < numSculptureIndices; i++) {
-        int index = sculpture.indices.get(i);
-        indices.put(index);
-      }
-      indices.flip();
-      
-      vao_sculptureGL = glGenVertexArrays();
-      glBindVertexArray(vao_sculptureGL);
-      vbo_sculptureGL = glGenBuffers();
-      glBindBuffer(GL_ARRAY_BUFFER, vbo_sculptureGL);
-      glBufferData(GL_ARRAY_BUFFER, verticesNormals, GL_STATIC_DRAW);
-
-      vbo_sculptureArrIxGL = glGenBuffers();
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_sculptureArrIxGL);
-      glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices, GL_STATIC_DRAW);
-      
-      // setup shader data inputs
-      glUseProgram(progGL);
-
-      glBindVertexArray(vao_sculptureGL);
-      glBindBuffer(GL_ARRAY_BUFFER, vbo_sculptureGL);
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_sculptureArrIxGL);
-      
-      int attrPart_pos = glGetAttribLocation(progGL, "position");
-      glEnableVertexAttribArray(attrPart_pos);
-      glVertexAttribPointer(attrPart_pos, 3, GL_FLOAT, false, 6 * 4, 0);
-
-      int attrPart_norm = glGetAttribLocation(progGL, "normal");
-      glEnableVertexAttribArray(attrPart_norm);
-      glVertexAttribPointer(attrPart_norm, 3, GL_FLOAT, false, 6 * 4, 3 * 4);
     }
   }
   
@@ -495,7 +528,6 @@ public class Scene3D {
     glUniform3f(vLocPlayerPosGL, rs.playerPos.x, rs.playerPos.y, rs.playerPos.z);
     glUniform3f(vLocPlayerViewGL, rs.vdirz.x, rs.vdirz.y, rs.vdirz.z);
     glUniform3f(vLocLightPosGL, rs.lightPos.x, rs.lightPos.y, rs.lightPos.z);
-    glUniform3f(vLocTopColorGL, .5f,.4f,.3f);
     glUniform3f(vLocBotColorGL, .05f,.3f,.6f);
 
     if (standalone) {
@@ -655,6 +687,7 @@ public class Scene3D {
   abstract class RenderObject {
     public List<Vector3f> vertices = new ArrayList<Vector3f>();
     public List<Vector3f> normals = new ArrayList<Vector3f>();
+    public List<Float> colors = new ArrayList<Float>();
     public List<Integer> indices= new ArrayList<Integer>();
     public abstract void build();
   }
@@ -662,10 +695,16 @@ public class Scene3D {
   class RenderGrid extends RenderObject {
     int w, h;
     float[][] map;
+    float[][][] mapc;
     public RenderGrid(float[][] map) {
       this.w = map.length-1;
       this.h = map[0].length-1;
       this.map = map;
+    }
+    public RenderGrid(float[][][] map) {
+      this.w = map.length-1;
+      this.h = map[0].length-1;
+      this.mapc = map;
     }
     
     public void build() {
@@ -673,13 +712,21 @@ public class Scene3D {
       float offsZ = -(float)h / 2;
       for (int z = 0; z < h; z++) {
         for (int x = 0; x < w; x++) {
-          vertices.add(new Vector3f(x+offsX, map[x][z], z+offsZ));
+          float h00, h01, h10;
+          h00 = map == null ? mapc[x][z][0] : map[x][z]; 
+          h01 = map == null ? mapc[x][z+1][0] : map[x][z+1]; 
+          h10 = map == null ? mapc[x+1][z][0] : map[x+1][z]; 
+          vertices.add(new Vector3f(x+offsX, h00, z+offsZ));
           
-          Vector3f nx = new Vector3f(1f, map[x+1][z] - map[x][z], 0f);
-          Vector3f nz = new Vector3f(0f, map[x][z+1] - map[x][z], 1f);
+          Vector3f nx = new Vector3f(1f, h10-h00, 0f);
+          Vector3f nz = new Vector3f(0f, h01-h00, 1f);
           nx.normalize();
           nz.normalize();
           normals.add(nx.cross(nz));
+          
+          if (map == null) {
+            colors.add(mapc[x][z][1]);
+          }
         }
       }
       for (int z = 0; z < h-1; z++) {
