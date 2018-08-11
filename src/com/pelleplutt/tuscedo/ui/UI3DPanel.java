@@ -209,6 +209,13 @@ public class UI3DPanel extends JPanel implements UIO {
         blit();
       }
     });
+    UICommon.defineAnonAction(renderer, "3d.color.smoothflat", "f5", when, new AbstractAction() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        renderSpec.smoothOrFlat = renderSpec.smoothOrFlat == 0 ? 1 : 0;
+        blit();
+      }
+    });
     UICommon.defineAnonAction(renderer, "3d.mov.reset", "numpad5", when, new AbstractAction() {
       @Override
       public void actionPerformed(ActionEvent e) {
@@ -408,6 +415,13 @@ public class UI3DPanel extends JPanel implements UIO {
   }
   public void setHeightMapColor(float[][][] map) {
     renderSpec.modeltype = RenderSpec.MODEL_HEIGHTMAP_COLOR;
+    renderSpec.model = map;
+    renderSpec.modelDirty = true;
+    renderSpec.modelDataDirty = true;
+    blit();
+  }
+  public void setPointCloud(float[][][] map) {
+    renderSpec.modeltype = RenderSpec.MODEL_POINTCLOUD;
     renderSpec.model = map;
     renderSpec.modelDirty = true;
     renderSpec.modelDataDirty = true;

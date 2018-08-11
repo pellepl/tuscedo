@@ -206,13 +206,22 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("sqrt", "(<x>) - returns square root", 
-         new ExtCall() {
+    setExtDef("sqrt", "(<x>) - returns square root of x", 
+        new ExtCall() {
+     public Processor.M exe(Processor p, Processor.M[] args) {
+       if (args == null || args.length == 0) {
+         return null;
+       } 
+       return new M((float)Math.sqrt(args[0].asFloat()));
+     }
+   });
+    setExtDef("abs", "(<x>) - returns absolute of x", 
+        new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
         } 
-        return new M((float)Math.sqrt(args[0].asFloat()));
+        return new M((float)Math.abs(args[0].asFloat()));
       }
     });
     setExtDef("sin", "(<x>) - returns sinus", 
@@ -1405,6 +1414,7 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("set_size", "__3d_set_size", comp);
         addFunc("set_model_heightmap", "__3d_set_model_heightmap", comp);
         addFunc("set_model_heightmap_color", "__3d_set_model_heightmap_color", comp);
+        addFunc("set_model_cloud", "__3d_set_model_cloud", comp);
         addFunc("blit", "__3d_blit", comp);
       }
     };
@@ -1434,6 +1444,22 @@ public class OperandiScript implements Runnable, Disposable {
         MSet mset = m.ref.get(y).ref.get(x).ref;
         f[x][y] = new float[] {mset.get(0).asFloat(), 
             Scene3D.colToFloat(mset.get(1).asFloat(), mset.get(2).asFloat(), mset.get(3).asFloat())};
+      }
+    }
+    return f;
+  }
+  private float[][][] convPointCloud(M m) {
+    // TODO check sizes etc, toss proper error desc
+    MSet set = m.ref;
+    int d = set.size();
+    int h = set.get(0).ref.size();
+    int w = set.get(0).ref.get(0).ref.size();
+    float[][][] f = new float[w][h][d];
+    for (int z = 0; z < d; z++) {
+      for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+          f[x][y][z] = m.ref.get(z).ref.get(y).ref.get(x).asFloat();
+        }
       }
     }
     return f;
@@ -1543,6 +1569,15 @@ public class OperandiScript implements Runnable, Disposable {
         UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
         if (cp == null) return null;
         cp.setHeightMapColor(convHeightMapColor(args[0]));
+        return null;
+      }
+    });
+    setExtDef("__3d_set_model_cloud", "(<cloud>, <isolevel>) - sets point cloud data model (array of arrays of arrays of floats)",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.setPointCloud(convPointCloud(args[0]));
         return null;
       }
     });

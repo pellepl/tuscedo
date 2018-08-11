@@ -50,6 +50,9 @@ public class RenderSpec {
   public float gridMul = 1;
   public float gridContrast = 0.25f;
   
+  public int smoothOrFlat = 1;
+
+  
   private static int __id = 1;
   public final int id = __id++;
 
@@ -84,7 +87,7 @@ public class RenderSpec {
     else if (s < 0 && s > -Math.PI) adj = -s;        // -90..0    -> 0
     else if  (s < -Math.PI) adj = (float)-Math.PI-s; // -180..-91 -> -180
     
-    if (Math.abs(adj) < Math.PI/64f || Math.abs(adj) > 63f*Math.PI/64f) return;
+    //if (Math.abs(adj) < Math.PI/64f || Math.abs(adj) > 63f*Math.PI/64f) return;
     float adjFact = Math.max(0, Math.abs(vdiry.y)*2f - 1f);
     aaroll.set(adj*0.0013f*adjFact, 0,0,1); // 0.0013 derived heuristically
     qroll.set(aaroll);
