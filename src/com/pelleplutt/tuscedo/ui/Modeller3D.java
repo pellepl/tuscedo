@@ -150,12 +150,21 @@ public abstract class Modeller3D {
     }
     
     public void build() {
-      for (int z = 0; z < data[0][0].length-1; z++) {
-        int zz = z - data[0][0].length/2;
-        for (int y = 0; y < data[0].length-1; y++) {
-          int yy = y - data[0].length/2;
-          for (int x = 0; x < data.length-1; x++) {
-            int xx = x - data.length/2;
+      final int width = data.length-1;
+      final int height = data[0].length-1;
+      final int depth = data[0][0].length-1;
+      VertexLUT lut[] = new VertexLUT[width * height];
+      for (int i = 0; i < lut.length; i++) lut[i] = new VertexLUT();
+      VertexLUT tlut = new VertexLUT();
+      Vector3f n = new Vector3f();
+      Vector3f t = new Vector3f();
+      VertexLUT lutx, luty, lutz;
+      for (int z = 0; z < depth; z++) {
+        int zz = z - depth/2;
+        for (int y = 0; y < height; y++) {
+          int yy = y - height/2;
+          for (int x = 0; x < width; x++) {
+            int xx = x - width/2;
             cubeVerts[0].set(xx  , yy  , zz  ); cubeVals[0] = data[x  ][y  ][z  ];
             cubeVerts[1].set(xx+1, yy  , zz  ); cubeVals[1] = data[x+1][y  ][z  ];
             cubeVerts[2].set(xx+1, yy  , zz+1); cubeVals[2] = data[x+1][y  ][z+1];
@@ -165,30 +174,71 @@ public abstract class Modeller3D {
             cubeVerts[6].set(xx+1, yy+1, zz+1); cubeVals[6] = data[x+1][y+1][z+1];
             cubeVerts[7].set(xx  , yy+1, zz+1); cubeVals[7] = data[x  ][y+1][z+1];
             int triCnt = polygoniseCube(cubeVerts, cubeVals, isolevel, triangles);
+
+            int lutix = (x + width * (y + height * z)) % lut.length;
+            lutx = luty = lutz = null;
+            if (x > 0) lutx = lut[(lut.length + lutix - 1) % lut.length];
+            if (y > 0) luty = lutx = lut[(lut.length + lutix - width) % lut.length];
+            if (z > 0) lutz = lut[(lut.length + lutix - width * height) % lut.length];
             
-            // TODO for test only
-            for (int i = 0; i < triCnt; i++) {
-              indices.add(vertices.size() + 0);
-              indices.add(vertices.size() + 1);
-              indices.add(vertices.size() + 2);
-              vertices.add(new Vector3f(triangles[i][2]));
-              vertices.add(new Vector3f(triangles[i][1]));
-              vertices.add(new Vector3f(triangles[i][0]));
-              Vector3f n = new Vector3f();
-              Vector3f t = new Vector3f();
-              n.set(triangles[i][1]).sub(triangles[i][0]);
-              t.set(triangles[i][2]).sub(triangles[i][0]);
-              n.cross(t);
-              normals.add(n);
-              normals.add(n);
-              normals.add(n);
+            tlut.localVertCnt = 0;
+            for (int tri = 0; tri < triCnt; tri++) {
+              // calculate triangle normal
+              n.set(triangles[tri][1]).sub(triangles[tri][0]);
+              t.set(triangles[tri][2]).sub(triangles[tri][0]);
+              n.cross(t); // wait with normalizing this, we want to keep info on the triangle area
+              // check each triangle vertex if already defined in a previous cube (x-1, y-1 and z-1)
+              for (int j = 0; j < 3; j++) {
+                Vector3f triv = triangles[tri][2-j];
+                int tix = findInLuts(triv, lutx, luty, lutz);
+                if (tix < 0) {
+                  // new vertex
+                  indices.add(vertices.size());
+                  vertices.add(new Vector3f(triv));
+                  normals.add(new Vector3f(n));
+                  // register this new vector for lut update below
+                  tlut.verts[tlut.localVertCnt].set(triv);
+                  tlut.localVertCnt++;
+                } else {
+                  // vertex coherent with a previously defined vertex
+                  indices.add(tix);
+                }
+              }
             }
-            
-            
+            // set the new LUT entry here at current index
+            lut[lutix].globalVertIx = vertices.size() - tlut.localVertCnt;
+            lut[lutix].localVertCnt = tlut.localVertCnt;
+            for (int i = 0; i < tlut.localVertCnt; i++) lut[lutix].verts[i].set(tlut.verts[i]);
           }
         }
       }
-      
+      // TODO fixxup normals
+    }
+    
+    int findInLuts(Vector3f v, VertexLUT lutx, VertexLUT luty, VertexLUT lutz) {
+      int r = -1;
+      if (lutx != null) r = findInLut(v, lutx);
+      if (r >= 0) return r;
+      if (luty != null) r = findInLut(v, luty);
+      if (r >= 0) return r;
+      if (lutz != null) r = findInLut(v, lutz);
+      return r;
+    }
+    
+    int findInLut(Vector3f v, VertexLUT lut) {
+      for (int i = 0; i < lut.localVertCnt; i++) {
+        if (vecMatch(v, lut.verts[i])) {
+          return i + lut.globalVertIx;
+        }
+      }
+      return -1;
+    }
+    
+    static final int EQ_DEC = 100;
+    boolean vecMatch(Vector3f a, Vector3f b) {
+      return (int)(a.x*EQ_DEC) == (int)(b.x*EQ_DEC)
+          && (int)(a.y*EQ_DEC) == (int)(b.y*EQ_DEC)
+          && (int)(a.z*EQ_DEC) == (int)(b.z*EQ_DEC);
     }
     
     int polygoniseCube(Vector3f cubeVerts[], float cubeVals[], float isolevel, Vector3f triangles[][]) {
@@ -259,6 +309,15 @@ public abstract class Modeller3D {
       dst.x = p1.x + a * (p2.x - p1.x);
       dst.y = p1.y + a * (p2.y - p1.y);
       dst.z = p1.z + a * (p2.z - p1.z);
+    }
+    
+    class VertexLUT {
+      int globalVertIx;
+      int localVertCnt;
+      Vector3f verts[] = new Vector3f[3*5];
+      public VertexLUT() {
+        vec3ffill(verts);
+      }
     }
     
     static final int EDGE_TABLE[] = {
