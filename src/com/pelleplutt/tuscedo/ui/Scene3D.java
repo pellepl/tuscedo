@@ -437,7 +437,7 @@ public class Scene3D {
           sculpture = new Modeller3D.Grid((float[][][])rs.model);
         }
       } else if (rs.modeltype == RenderSpec.MODEL_POINTCLOUD) {
-        sculpture = new Modeller3D.Cloud((float[][][])rs.model, 0.5f);
+        sculpture = new Modeller3D.Cloud((float[][][])rs.model, rs.isolevel);
       }
 
       sculpture.build();

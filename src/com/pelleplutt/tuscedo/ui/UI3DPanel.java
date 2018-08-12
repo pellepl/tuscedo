@@ -420,11 +420,12 @@ public class UI3DPanel extends JPanel implements UIO {
     renderSpec.modelDataDirty = true;
     blit();
   }
-  public void setPointCloud(float[][][] map) {
+  public void setPointCloud(float[][][] map, float isolevel) {
     renderSpec.modeltype = RenderSpec.MODEL_POINTCLOUD;
     renderSpec.model = map;
     renderSpec.modelDirty = true;
     renderSpec.modelDataDirty = true;
+    renderSpec.isolevel = isolevel;
     blit();
   }
   public void setSize(int w, int h) {

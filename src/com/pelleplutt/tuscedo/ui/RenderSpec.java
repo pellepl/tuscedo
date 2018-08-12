@@ -51,6 +51,8 @@ public class RenderSpec {
   public float gridContrast = 0.25f;
   
   public int smoothOrFlat = 1;
+  public float isolevel;
+
 
   
   private static int __id = 1;

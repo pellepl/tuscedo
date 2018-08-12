@@ -1577,7 +1577,9 @@ public class OperandiScript implements Runnable, Disposable {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
         if (cp == null) return null;
-        cp.setPointCloud(convPointCloud(args[0]));
+        float isolevel = 0.5f;
+        if (args.length > 1) isolevel = args[1].asFloat();
+        cp.setPointCloud(convPointCloud(args[0]), isolevel);
         return null;
       }
     });

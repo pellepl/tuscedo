@@ -151,16 +151,19 @@ public abstract class Modeller3D {
     
     public void build() {
       for (int z = 0; z < data[0][0].length-1; z++) {
+        int zz = z - data[0][0].length/2;
         for (int y = 0; y < data[0].length-1; y++) {
+          int yy = y - data[0].length/2;
           for (int x = 0; x < data.length-1; x++) {
-            cubeVerts[0].set(x  , y  , z  ); cubeVals[0] = data[x  ][y  ][z  ];
-            cubeVerts[1].set(x+1, y  , z  ); cubeVals[1] = data[x+1][y  ][z  ];
-            cubeVerts[2].set(x+1, y  , z+1); cubeVals[2] = data[x+1][y  ][z+1];
-            cubeVerts[3].set(x  , y  , z+1); cubeVals[3] = data[x  ][y  ][z+1];
-            cubeVerts[4].set(x  , y+1, z  ); cubeVals[4] = data[x  ][y+1][z  ];
-            cubeVerts[5].set(x+1, y+1, z  ); cubeVals[5] = data[x+1][y+1][z  ];
-            cubeVerts[6].set(x+1, y+1, z+1); cubeVals[6] = data[x+1][y+1][z+1];
-            cubeVerts[7].set(x  , y+1, z+1); cubeVals[7] = data[x  ][y+1][z+1];
+            int xx = x - data.length/2;
+            cubeVerts[0].set(xx  , yy  , zz  ); cubeVals[0] = data[x  ][y  ][z  ];
+            cubeVerts[1].set(xx+1, yy  , zz  ); cubeVals[1] = data[x+1][y  ][z  ];
+            cubeVerts[2].set(xx+1, yy  , zz+1); cubeVals[2] = data[x+1][y  ][z+1];
+            cubeVerts[3].set(xx  , yy  , zz+1); cubeVals[3] = data[x  ][y  ][z+1];
+            cubeVerts[4].set(xx  , yy+1, zz  ); cubeVals[4] = data[x  ][y+1][z  ];
+            cubeVerts[5].set(xx+1, yy+1, zz  ); cubeVals[5] = data[x+1][y+1][z  ];
+            cubeVerts[6].set(xx+1, yy+1, zz+1); cubeVals[6] = data[x+1][y+1][z+1];
+            cubeVerts[7].set(xx  , yy+1, zz+1); cubeVals[7] = data[x  ][y+1][z+1];
             int triCnt = polygoniseCube(cubeVerts, cubeVals, isolevel, triangles);
             
             // TODO for test only
@@ -168,14 +171,14 @@ public abstract class Modeller3D {
               indices.add(vertices.size() + 0);
               indices.add(vertices.size() + 1);
               indices.add(vertices.size() + 2);
-              vertices.add(new Vector3f(triangles[i][0]));
-              vertices.add(new Vector3f(triangles[i][1]));
               vertices.add(new Vector3f(triangles[i][2]));
+              vertices.add(new Vector3f(triangles[i][1]));
+              vertices.add(new Vector3f(triangles[i][0]));
               Vector3f n = new Vector3f();
               Vector3f t = new Vector3f();
               n.set(triangles[i][1]).sub(triangles[i][0]);
               t.set(triangles[i][2]).sub(triangles[i][0]);
-              n.cross(t).negate();
+              n.cross(t);
               normals.add(n);
               normals.add(n);
               normals.add(n);
