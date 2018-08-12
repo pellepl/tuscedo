@@ -582,7 +582,8 @@ public class CodeGenBack implements ByteCode {
       if (l instanceof TACInt && ((TACInt)l).x < 9 && ((TACInt)l).x > 0) {
         pushValue(r, frag);
         sp = sp - 1 + 1;
-        addCode(frag, stackInfo() + tac.toString(), ISUB_Q1 + (((TACInt)l).x - 1));
+        addCode(frag, stackInfo() + tac.toString(), INEG);
+        addCode(frag, stackInfo() + tac.toString(), IADD_Q1 + (((TACInt)l).x - 1));
       } else if (r instanceof TACInt && ((TACInt)r).x < 9 && ((TACInt)r).x > 0) {
         pushValue(l, frag);
         sp = sp - 1 + 1;
@@ -590,7 +591,8 @@ public class CodeGenBack implements ByteCode {
       } else if (l instanceof TACInt && ((TACInt)l).x < 256  && ((TACInt)l).x > 0) {
         pushValue(r, frag);
         sp = sp - 1 + 1;
-        addCode(frag, stackInfo() + tac.toString(), ISUB_IM, ((TACInt)l).x - 1);
+        addCode(frag, stackInfo() + tac.toString(), INEG);
+        addCode(frag, stackInfo() + tac.toString(), IADD_IM, ((TACInt)l).x - 1);
       } else if (r instanceof TACInt && ((TACInt)r).x < 256 && ((TACInt)r).x > 0) {
         pushValue(l, frag);
         sp = sp - 1 + 1;

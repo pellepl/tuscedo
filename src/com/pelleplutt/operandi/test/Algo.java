@@ -185,4 +185,29 @@ public class Algo {
     "return fib(12);\n";
     assertEquals(144, Processor.compileAndRun(false, false, sA).i, 0);
   }
+
+  @Test
+  public void testUnaryOptOps1() {
+    String sA;
+    sA = 
+    "a=0.5; b=1-a;\n" +
+    "return b;\n";
+    assertEquals(0.5, Processor.compileAndRun(false, false, sA).f, 0);
+  }
+  @Test
+  public void testUnaryOptOps2() {
+    String sA;
+    sA = 
+    "a=0.5; b=20-a;\n" +
+    "return b;\n";
+    assertEquals(19.5, Processor.compileAndRun(false, false, sA).f, 0);
+  }
+  @Test
+  public void testUnaryOptOps3() {
+    String sA;
+    sA = 
+    "a=0.5; b=-a;\n" +
+    "return b;\n";
+    assertEquals(-0.5, Processor.compileAndRun(false, false, sA).f, 0);
+  }
 }

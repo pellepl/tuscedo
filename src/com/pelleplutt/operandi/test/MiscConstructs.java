@@ -98,8 +98,8 @@ public class MiscConstructs {
         "if (dmin > 1.0) return 'fail dmin=' + dmin;\n" +
         "if (dmax > 1.0) return 'fail dmax=' + dmax;\n" +
         "dd = dmin/(dmin+dmax);\n" +
-        "if (dd < 0.48) return 'fail lo dmin/(dmin+dmax)=' + dd;\n" +
-        "if (dd > 0.52) return 'fail hi dmin/(dmin+dmax)=' + dd;\n" +
+        "if (dd < 0.46) return 'fail lo dmin/(dmin+dmax)=' + dd;\n" +
+        "if (dd > 0.54) return 'fail hi dmin/(dmin+dmax)=' + dd;\n" +
         "return 'OK';\n" +
         "\n";
     assertEquals("OK", Processor.compileAndRun(false, false, sA).str); 
