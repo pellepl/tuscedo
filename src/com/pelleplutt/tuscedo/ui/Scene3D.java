@@ -2,6 +2,7 @@ package com.pelleplutt.tuscedo.ui;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL12.*;
 import static org.lwjgl.opengl.GL13.*;
 import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL20.*;
@@ -11,15 +12,16 @@ import static org.lwjgl.system.MemoryUtil.*;
 import java.awt.*;
 import java.awt.color.*;
 import java.awt.image.*;
+import java.io.*;
 import java.lang.Math;
 import java.nio.*;
-import java.util.*;
-import java.util.List;
 
 import org.joml.*;
 import org.lwjgl.*;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.*;
+
+import com.pelleplutt.util.*;
 
 
 // TODO things crash on linux openjdk when resizing width, running this class' main method.
@@ -106,7 +108,7 @@ public class Scene3D {
     firstTime = System.nanoTime();
   }
   
-  int progGL;
+  int progModelGL;
   int mLocModelGL;
   int mLocViewProjectionGL;
   int vLocBotColorGL;
@@ -124,6 +126,10 @@ public class Scene3D {
   int vao_gridGL, vbo_gridGL;
   int vbo_gridArrIxGL;
 
+  int progSkyboxGL;
+  int mLocSkyboxViewProjectionGL;
+  int vao_skyboxGL;
+  int texSkybox;
   
   int numSculptureVertices;
   int numSculptureNormals;
@@ -139,6 +145,9 @@ public class Scene3D {
   }
   
   void createProgramGL() {
+    
+    // MODEL SHADERS
+    
     int vertexShader = createShader(GL_VERTEX_SHADER, "" 
         +"#version 330 core \n" 
         +""
@@ -222,17 +231,19 @@ public class Scene3D {
         +"  fragColor = vec4(color, 1.0) * min(1.0, ambient+diffuse) + vec4(1,1,1,1) * specular; \n" 
         +"} \n"
         );
-    progGL = createProgram(vertexShader, fragmentShader);
+    progModelGL = createProgram(vertexShader, fragmentShader);
     
     // obtain uniform locations for shader variables
-    mLocModelGL = glGetUniformLocation(progGL, "model");
-    mLocViewProjectionGL = glGetUniformLocation(progGL, "viewproj");
-    vLocBotColorGL = glGetUniformLocation(progGL, "bcolor");
-    vLocLightPosGL = glGetUniformLocation(progGL, "vLightPos");
-    vLocPlayerViewGL = glGetUniformLocation(progGL, "vPlayerView");
-    vLocPlayerPosGL = glGetUniformLocation(progGL, "vPlayerPos");
-    iLocSmoothOrFlatColorGL = glGetUniformLocation(progGL, "iSmoothOrFlatColor");
+    mLocModelGL = glGetUniformLocation(progModelGL, "model");
+    mLocViewProjectionGL = glGetUniformLocation(progModelGL, "viewproj");
+    vLocBotColorGL = glGetUniformLocation(progModelGL, "bcolor");
+    vLocLightPosGL = glGetUniformLocation(progModelGL, "vLightPos");
+    vLocPlayerViewGL = glGetUniformLocation(progModelGL, "vPlayerView");
+    vLocPlayerPosGL = glGetUniformLocation(progModelGL, "vPlayerPos");
+    iLocSmoothOrFlatColorGL = glGetUniformLocation(progModelGL, "iSmoothOrFlatColor");
   
+    // GRID SHADERS
+    
     vertexShader = createShader(GL_VERTEX_SHADER, "" 
         +"#version 330 core \n" 
         +""
@@ -332,8 +343,64 @@ public class Scene3D {
     int attrPart_thick = glGetAttribLocation(progGridGL, "thickness");
     glEnableVertexAttribArray(attrPart_thick);
     glVertexAttribPointer(attrPart_thick, 1, GL_FLOAT, false, 4 * 4, 4 * 3);
+    
+    // SKYBOX SHADERS
+    
+    vertexShader = createShader(GL_VERTEX_SHADER, "" 
+        +"#version 330 core \n" 
+        +""
+        +"uniform mat4 viewproj; \n"
+        +""
+        +"out vec3 vtc; \n"
+        +""
+        +"void main() { \n"
+        +"  vec3[36] verts = vec3[36]( \n"
+        +"    vec3(-1.0, 1.0,-1.0), vec3(-1.0,-1.0,-1.0), vec3( 1.0,-1.0,-1.0), \n"
+        +"    vec3( 1.0,-1.0,-1.0), vec3( 1.0, 1.0,-1.0), vec3(-1.0, 1.0,-1.0), \n"
+        +""
+        +"    vec3(-1.0,-1.0, 1.0), vec3(-1.0,-1.0,-1.0), vec3(-1.0, 1.0,-1.0), \n"
+        +"    vec3(-1.0, 1.0,-1.0), vec3(-1.0, 1.0, 1.0), vec3(-1.0,-1.0, 1.0), \n"
+        +""
+        +"    vec3( 1.0,-1.0,-1.0), vec3( 1.0,-1.0, 1.0), vec3( 1.0, 1.0, 1.0), \n"
+        +"    vec3( 1.0, 1.0, 1.0), vec3( 1.0, 1.0,-1.0), vec3( 1.0,-1.0,-1.0), \n"
+        +""
+        +"    vec3(-1.0,-1.0, 1.0), vec3(-1.0, 1.0, 1.0), vec3( 1.0, 1.0, 1.0), \n"
+        +"    vec3( 1.0, 1.0, 1.0), vec3( 1.0,-1.0, 1.0), vec3(-1.0,-1.0, 1.0), \n"
+        +""
+        +"    vec3(-1.0, 1.0,-1.0), vec3( 1.0, 1.0,-1.0), vec3( 1.0, 1.0, 1.0), \n"
+        +"    vec3( 1.0, 1.0, 1.0), vec3(-1.0, 1.0, 1.0), vec3(-1.0, 1.0,-1.0), \n"
+        +""
+        +"    vec3(-1.0,-1.0,-1.0), vec3(-1.0,-1.0, 1.0), vec3( 1.0,-1.0,-1.0), \n"
+        +"    vec3( 1.0,-1.0,-1.0), vec3(-1.0,-1.0, 1.0), vec3( 1.0,-1.0, 1.0)); \n"
+        +"  vtc = verts[gl_VertexID]; \n"
+        +"  gl_Position = viewproj * vec4(verts[gl_VertexID], 1); \n"
+        +"} \n"
+        );
+    fragmentShader = createShader(GL_FRAGMENT_SHADER, "" 
+        +"#version 330 core \n" 
+        +""
+        +"uniform samplerCube tex_cubemap; \n"
+        +""
+        +"in vec3 vtc; \n"
+        +""
+        +"out vec4 fragColor; \n" 
+        +""
+        +"void main() {\n"
+        +"  fragColor = texture(tex_cubemap, vtc); \n"
+        +"} \n"
+        );
+    progSkyboxGL = createProgram(vertexShader, fragmentShader);
+    
+    // obtain uniform locations for shader variables
+    mLocSkyboxViewProjectionGL = glGetUniformLocation(progSkyboxGL, "viewproj");
+    vao_skyboxGL = glGenVertexArrays();
+    // create texture
+    texSkybox = glGenTextures();
+    glBindTexture(GL_TEXTURE_CUBE_MAP, texSkybox);
+    //loadSkyboxTextures("skyboxes/maskonaive2");
+    calcSkyboxTextures(new Color(8,8,64), new Color(0,0,8));
   }
-
+  
   ByteBuffer nativeBuffer;
   int ccap;
   void dumpToSwingImage(RenderSpec rs) {
@@ -356,6 +423,7 @@ public class Scene3D {
   final Vector3f _playerPos = new Vector3f();
   final Matrix4f viewProj = new Matrix4f();
   final FloatBuffer fbViewProj = BufferUtils.createFloatBuffer(16);
+  final FloatBuffer fbViewRot = BufferUtils.createFloatBuffer(16);
   final Matrix4f mRot = new Matrix4f();
   final Matrix4f mModel = new Matrix4f();
   final FloatBuffer fbModel = BufferUtils.createFloatBuffer(16);
@@ -414,8 +482,6 @@ public class Scene3D {
     rs.modelDirty = false;
     rs.modelDataDirty = false;
     
-    // TODO
-    // handle float[][][]
     // clear previous vaos and vbos when new model
     if (newModel || newModelData) {
       if (vao_sculptureGL != 0) {
@@ -477,21 +543,21 @@ public class Scene3D {
       glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices, GL_STATIC_DRAW);
       
       // setup shader data inputs
-      glUseProgram(progGL);
+      glUseProgram(progModelGL);
 
       glBindVertexArray(vao_sculptureGL);
       glBindBuffer(GL_ARRAY_BUFFER, vbo_sculptureGL);
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_sculptureArrIxGL);
       
-      int attrPart_pos = glGetAttribLocation(progGL, "position");
+      int attrPart_pos = glGetAttribLocation(progModelGL, "position");
       glEnableVertexAttribArray(attrPart_pos);
       glVertexAttribPointer(attrPart_pos, 3, GL_FLOAT, false, 7 * 4, 0);
 
-      int attrPart_norm = glGetAttribLocation(progGL, "normal");
+      int attrPart_norm = glGetAttribLocation(progModelGL, "normal");
       glEnableVertexAttribArray(attrPart_norm);
       glVertexAttribPointer(attrPart_norm, 3, GL_FLOAT, false, 7 * 4, 3 * 4);
 
-      int attrPart_col = glGetAttribLocation(progGL, "fcolor");
+      int attrPart_col = glGetAttribLocation(progModelGL, "fcolor");
       glEnableVertexAttribArray(attrPart_col);
       glVertexAttribPointer(attrPart_col, 1, GL_FLOAT, false, 7 * 4, 6 * 4);
     }
@@ -506,12 +572,14 @@ public class Scene3D {
     float diffMs = (thisTime - firstTime) / 1E9f;
 
     // calc global viewing matrices
-    viewProj.setPerspective((float)Math.PI/4f, (float)rs.width/(float)rs.height, ZNEAR, ZFAR);
     _playerPos.set(rs.playerPos);
     _playerPos.negate();
+    viewProj.setPerspective((float)Math.PI/4f, (float)rs.width/(float)rs.height, ZNEAR, ZFAR);
     rs.qdir.invert(qdirinv); 
     qdirinv.get(mRot);
-    viewProj.mul(mRot).translate(_playerPos);
+    viewProj.mul(mRot);
+    viewProj.get(fbViewRot);
+    viewProj.translate(_playerPos);
     viewProj.get(fbViewProj);
     
     // setup GL view
@@ -529,9 +597,20 @@ public class Scene3D {
     } else {
       glDisable(GL_CULL_FACE);
     }
+    
+    // paint skybox
+    glUseProgram(progSkyboxGL);
+    glBindVertexArray(vao_skyboxGL);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, texSkybox);
+    glDisable(GL_DEPTH_TEST);
+    glUniformMatrix4fv(mLocSkyboxViewProjectionGL, false, fbViewRot);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glEnable(GL_DEPTH_TEST);
+    glerr();
 
     // paint sculpture
-    glUseProgram(progGL);
+    glUseProgram(progModelGL);
     glBindVertexArray(vao_sculptureGL);
     glUniformMatrix4fv(mLocViewProjectionGL, false, fbViewProj);
     glUniform3f(vLocPlayerPosGL, rs.playerPos.x, rs.playerPos.y, rs.playerPos.z);
@@ -555,6 +634,7 @@ public class Scene3D {
     if (rs.primitive == RenderSpec.PRIMITIVE_WIREFRAME) mode = GL_LINES;
     else if (rs.primitive == RenderSpec.PRIMITIVE_DOTS) mode = GL_POINTS;
     glDrawElements(mode, numSculptureIndices, GL_UNSIGNED_INT, 0);
+    glerr();
 
     // paint grid
     glUseProgram(progGridGL);
@@ -564,7 +644,7 @@ public class Scene3D {
     glEnable(GL_LINE_SMOOTH);
     glDepthMask(false);
     glBindVertexArray(vao_gridGL);
-    mModel.set(rs.modelMatrix);
+    mModel.identity();
     mModel.scale(rs.gridMul);
     mModel.get(fbModel);
     glUniformMatrix4fv(mLocModelGL, false, fbModel);
@@ -579,15 +659,26 @@ public class Scene3D {
 
     glDisable(GL_BLEND);
     
-    int err = glGetError();
-    if (err != 0) System.out.println("GLERROR:" + Integer.toHexString(err));
-
+    glerr();
+    
     // coda
 
     glfwSwapBuffers(window);
     glfwPollEvents();
   
     dumpToSwingImage(rs);
+  }
+  
+  static void glerr() {
+    glerr("");
+  }
+  static void glerr(String prefix) {
+    int err = glGetError();
+    if (err != 0) {
+      System.out.println(prefix + "GLERROR:" + Integer.toHexString(err));
+      throw new Error();
+    }
+    
   }
 
   public void destroy() {
@@ -621,7 +712,7 @@ public class Scene3D {
   // GL helpers
   //
   
-  int createShader(int type, String src) {
+  static int createShader(int type, String src) {
     System.out.println("create shader " + type);
     int shader = glCreateShader(type);
     glShaderSource(shader, src);
@@ -636,7 +727,7 @@ public class Scene3D {
     return shader;
   }
   
-  int createProgram(int... shaders) {
+  static int createProgram(int... shaders) {
     System.out.println("create program");
     int prog = glCreateProgram();
     System.out.println("attaching " + shaders.length +  " shaders");
@@ -661,7 +752,7 @@ public class Scene3D {
   }
   
   // image -> bytebuffer (8-bit RED, 8-bit GREEN, 8-bit BLUE, 8-bit wotevah)
-  ByteBuffer createTextureBuffer(BufferedImage bufferedImage) {
+  static ByteBuffer createTextureBuffer(BufferedImage bufferedImage) {
     ByteBuffer imageBuffer;
     WritableRaster raster;
     BufferedImage texImage;
@@ -692,4 +783,54 @@ public class Scene3D {
 
     return imageBuffer;
   }
+
+  static void calcSkyboxTextures(Color heaven, Color ground) {
+    int dim = 256;
+    int target = GL_TEXTURE_CUBE_MAP_POSITIVE_X;
+    Paint paint = new GradientPaint(0,0,heaven, 0,dim,ground);
+    for (String n : SKYBOX_NAMES) {
+      BufferedImage img = new BufferedImage(dim, dim, BufferedImage.TYPE_4BYTE_ABGR);
+      Graphics2D g = (Graphics2D)img.getGraphics();
+      System.out.print("creating img " + n + " " + img.getWidth() + "x" + img.getHeight());
+      if (target == GL_TEXTURE_CUBE_MAP_POSITIVE_Y)       g.setColor(heaven);
+      else if (target == GL_TEXTURE_CUBE_MAP_NEGATIVE_Y)  g.setColor(ground);
+      else                                                g.setPaint(paint);
+      g.fillRect(0, 0, dim, dim);
+      g.dispose();
+      glTexImage2D(target, 0, GL_RGBA, img.getWidth(), img.getHeight(), 0, GL_RGBA, GL_UNSIGNED_BYTE, 
+          createTextureBuffer(img));
+      target++;
+      int err = glGetError();
+      if (err != 0) System.out.println("GLERROR:" + Integer.toHexString(err));
+      else          System.out.println();
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+  }
+  static void loadSkyboxTextures(String path) {
+    int target = GL_TEXTURE_CUBE_MAP_POSITIVE_X;
+    for (String n : SKYBOX_NAMES) {
+      String name = path + File.separator + n;
+      BufferedImage img = AppSystem.loadImage(name);
+      System.out.print("loading img " + name + " " + img.getWidth() + "x" + img.getHeight());
+      glTexImage2D(target, 0, GL_RGBA, img.getWidth(), img.getHeight(), 0, GL_RGBA, GL_UNSIGNED_BYTE, 
+          createTextureBuffer(img));
+      target++;
+      int err = glGetError();
+      if (err != 0) System.out.println("GLERROR:" + Integer.toHexString(err));
+      else          System.out.println();
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+  }
+
+  static final String[] SKYBOX_NAMES = {
+      "posx.jpg", "negx.jpg", "posy.jpg", "negy.jpg", "posz.jpg", "negz.jpg"
+  };
 }
