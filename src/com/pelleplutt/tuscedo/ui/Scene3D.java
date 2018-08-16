@@ -123,6 +123,7 @@ public class Scene3D {
   int mLocGridModelGL;
   int mLocGridViewProjectionGL;
   int vLocGridColorGL;
+  int vLocGridPlayerPosGL;
   int vao_gridGL, vbo_gridGL;
   int vbo_gridArrIxGL;
 
@@ -253,14 +254,19 @@ public class Scene3D {
         +"uniform vec4 color; \n"
         +"uniform mat4 model; \n"
         +"uniform mat4 viewproj; \n"
+        +"uniform vec3 vPlayerPos; \n"
         +""
         +"out vec4 vOVertexColor; \n"
         +"out float fOThickness; \n"
+        +"out vec3 vOPosition; \n"
+        +"out vec3 vOPlayerPosition; \n"
         +""
         +"void main() { \n"
         +"  vOVertexColor = color; \n"
         +"  vec4 P = model * vec4(position, 1.0); \n"
-        +"  fOThickness = thickness; \n" 
+        +"  fOThickness = thickness; \n"
+        +"  vOPosition = vec3(P); \n"
+        +"  vOPlayerPosition = vPlayerPos; \n"
         +"  gl_Position = viewproj * P; \n"
         +"} \n"
         );
@@ -269,11 +275,15 @@ public class Scene3D {
         +""
         +"in vec4 vOVertexColor; \n" 
         +"in float fOThickness; \n"
+        +"in vec3 vOPosition; \n" 
+        +"in vec3 vOPlayerPosition; \n" 
         +""
         +"out vec4 fragColor; \n" 
         +""
         +"void main() {\n"
-        +"  fragColor = vec4(vOVertexColor.xyz, vOVertexColor.w * fOThickness); \n"
+        +"  vec3 d = vOPlayerPosition - vOPosition; \n"
+        +"  float distfact = min(1, length(d)/" + (ZFAR - ZNEAR)/(4f*4f)  +"); \n"
+        +"  fragColor = vec4(vOVertexColor.xyz, vOVertexColor.w * fOThickness * (1 - distfact*distfact)); \n"
         +"} \n"
         );
     progGridGL = createProgram(vertexShader, fragmentShader);
@@ -282,7 +292,8 @@ public class Scene3D {
     mLocGridModelGL = glGetUniformLocation(progGridGL, "model");
     mLocGridViewProjectionGL = glGetUniformLocation(progGridGL, "viewproj");
     vLocGridColorGL = glGetUniformLocation(progGridGL, "color");
-    
+    vLocGridPlayerPosGL = glGetUniformLocation(progGridGL, "vPlayerPos");
+
     // grid data
     int numGridVertices = (gridLines + gridLines) * 2;
     final float mul = 1.0f;
@@ -647,10 +658,10 @@ public class Scene3D {
     mModel.identity();
     mModel.scale(rs.gridMul);
     mModel.get(fbModel);
-    glUniformMatrix4fv(mLocModelGL, false, fbModel);
     glUniformMatrix4fv(mLocGridModelGL, false, fbModel);
     glUniformMatrix4fv(mLocGridViewProjectionGL, false, fbViewProj);
     glUniform4f(vLocGridColorGL, .0f,0.1f,.0f, rs.gridContrast * 0.2f);
+    glUniform3f(vLocGridPlayerPosGL, rs.playerPos.x, rs.playerPos.y, rs.playerPos.z);
     glDrawElements(GL_LINES, (gridLines + gridLines) * 2, GL_UNSIGNED_INT, 0);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(true);
