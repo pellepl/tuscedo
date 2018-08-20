@@ -84,8 +84,8 @@ public class RenderSpec {
     // auto leveling
     float s = (float)Math.atan2(vdirx.y, vdirx.x);
     float adj = 0;
-    if (s > 0 && s < Math.PI) adj = -s;              // 0..90     -> 0
-    else if  (s > Math.PI) adj = (float)Math.PI-s;   // 91..180   -> 180
+    if (s > 0 && s < Math.PI) adj = -s;              //  0..90    -> 0
+    else if  (s > Math.PI) adj = (float)Math.PI-s;   //  91..180  -> 180
     else if (s < 0 && s > -Math.PI) adj = -s;        // -90..0    -> 0
     else if  (s < -Math.PI) adj = (float)-Math.PI-s; // -180..-91 -> -180
     
