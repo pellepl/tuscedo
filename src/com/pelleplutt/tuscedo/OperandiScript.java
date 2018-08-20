@@ -208,13 +208,50 @@ public class OperandiScript implements Runnable, Disposable {
     });
     setExtDef("sqrt", "(<x>) - returns square root of x", 
         new ExtCall() {
-     public Processor.M exe(Processor p, Processor.M[] args) {
-       if (args == null || args.length == 0) {
-         return null;
-       } 
-       return new M((float)Math.sqrt(args[0].asFloat()));
-     }
-   });
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        } 
+        return new M((float)Math.sqrt(args[0].asFloat()));
+      }
+    });
+    setExtDef("log", "(<x>) - returns natural logarithm of x", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        } 
+        return new M((float)Math.log(args[0].asFloat()));
+      }
+    });
+    setExtDef("log10", "(<x>) - returns 10 base logarithm of x", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        } 
+        return new M((float)Math.log10(args[0].asFloat()));
+      }
+    });
+    setExtDef("pow", "(<x>,<y>) - returns x powered by y.", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 2) {
+          return null;
+        } 
+        return new M((float)Math.pow(args[0].asFloat(),args[1].asFloat()));
+      }
+    });
+    setExtDef("frac", "(<x>) - returns fractional part of x", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        } 
+        float f = args[0].asFloat();
+        return new M(f - (int)f);
+      }
+    });
     setExtDef("abs", "(<x>) - returns absolute of x", 
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
@@ -224,33 +261,98 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)Math.abs(args[0].asFloat()));
       }
     });
+    setExtDef("max", "(...) - returns maximum value", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        }
+        float max = Float.MIN_VALUE;
+        for (M m : args) {
+          float v;
+          if (m.type == Processor.TSET) {
+            v = __maxrec(m);
+          } else {
+            v = m.asFloat();
+          }
+          if (v > max) max = v;
+        }
+        return new M(max);
+      }
+    });
+    setExtDef("min", "(...) - returns minimum value", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        }
+        float min = Float.MAX_VALUE;
+        for (M m : args) {
+          float v;
+          if (m.type == Processor.TSET) {
+            v = __minrec(m);
+          } else {
+            v = m.asFloat();
+          }
+          if (v < min) min = v;
+        }
+        return new M(min);
+      }
+    });
     setExtDef("sin", "(<x>) - returns sinus", 
-         new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0) {
-          return null;
-        } 
-        return new M((float)Math.sin(args[0].asFloat()));
-      }
-    });
-    setExtDef("cos", "(<x>) - returns cosinus", 
-         new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0) {
-          return null;
-        } 
-        return new M((float)Math.cos(args[0].asFloat()));
-      }
-    });
-    setExtDef("tan", "(<x>) - returns tangent", 
-         new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0) {
-          return null;
-        } 
-        return new M((float)Math.tan(args[0].asFloat()));
-      }
-    });
+        new ExtCall() {
+     public Processor.M exe(Processor p, Processor.M[] args) {
+       if (args == null || args.length == 0) {
+         return null;
+       } 
+       return new M((float)Math.sin(args[0].asFloat()));
+     }
+   });
+   setExtDef("cos", "(<x>) - returns cosinus", 
+        new ExtCall() {
+     public Processor.M exe(Processor p, Processor.M[] args) {
+       if (args == null || args.length == 0) {
+         return null;
+       } 
+       return new M((float)Math.cos(args[0].asFloat()));
+     }
+   });
+   setExtDef("tan", "(<x>) - returns tangent", 
+        new ExtCall() {
+     public Processor.M exe(Processor p, Processor.M[] args) {
+       if (args == null || args.length == 0) {
+         return null;
+       } 
+       return new M((float)Math.tan(args[0].asFloat()));
+     }
+   });
+   setExtDef("sinh", "(<x>) - returns hyperbolical sinus", 
+       new ExtCall() {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length == 0) {
+        return null;
+      } 
+      return new M((float)Math.sinh(args[0].asFloat()));
+    }
+  });
+  setExtDef("cosh", "(<x>) - returns hyperbolical cosinus", 
+       new ExtCall() {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length == 0) {
+        return null;
+      } 
+      return new M((float)Math.cosh(args[0].asFloat()));
+    }
+  });
+  setExtDef("tanh", "(<x>) - returns hyperbolical tangent", 
+       new ExtCall() {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length == 0) {
+        return null;
+      } 
+      return new M((float)Math.tanh(args[0].asFloat()));
+    }
+  });
     setExtDef("asin", "(<x>) - returns arcsinus", 
          new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
@@ -450,7 +552,34 @@ public class OperandiScript implements Runnable, Disposable {
     proc.user = 0;
     irqHandler.reset();
   }
-  
+  float __maxrec(Processor.M m) {
+    float max = Float.MIN_VALUE;
+    if (m.type == Processor.TSET) {
+      for (int f = 0; f < m.ref.size(); f++) {
+        float v = __maxrec(m.ref.get(f));
+        if (v > max) max = v;
+      }
+    } else {
+      float v = m.asFloat();
+      if (v > max) max = v;
+    }
+    return max;
+  }
+
+  float __minrec(Processor.M m) {
+    float min = Float.MAX_VALUE;
+    if (m.type == Processor.TSET) {
+      for (int f = 0; f < m.ref.size(); f++) {
+        float v = __minrec(m.ref.get(f));
+        if (v < min) min = v;
+      }
+    } else {
+      float v = m.asFloat();
+      if (v < min) min = v;
+    }
+    return min;
+  }
+
   UIO getUIOByScriptId(M me) {
     if (me == null || me.type != Processor.TSET) return null;
     M uioId = me.ref.get(new M(KEY_UI_ID));
@@ -1415,6 +1544,7 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("set_model_heightmap", "__3d_set_model_heightmap", comp);
         addFunc("set_model_heightmap_color", "__3d_set_model_heightmap_color", comp);
         addFunc("set_model_cloud", "__3d_set_model_cloud", comp);
+        addFunc("set_model_cloud_color", "__3d_set_model_cloud_color", comp);
         addFunc("blit", "__3d_blit", comp);
       }
     };
@@ -1459,6 +1589,24 @@ public class OperandiScript implements Runnable, Disposable {
       for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
           f[x][y][z] = m.ref.get(z).ref.get(y).ref.get(x).asFloat();
+        }
+      }
+    }
+    return f;
+  }
+  private float[][][][] convPointCloudColor(M m) {
+    // TODO check sizes etc, toss proper error desc
+    MSet set = m.ref;
+    int d = set.size();
+    int h = set.get(0).ref.size();
+    int w = set.get(0).ref.get(0).ref.size();
+    float[][][][] f = new float[w][h][d][2];
+    for (int z = 0; z < d; z++) {
+      for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+          MSet mset = m.ref.get(z).ref.get(y).ref.get(x).ref;
+          f[x][y][z] = new float[] {mset.get(0).asFloat(), 
+              Scene3D.colToFloat(mset.get(1).asFloat(), mset.get(2).asFloat(), mset.get(3).asFloat())};
         }
       }
     }
@@ -1578,8 +1726,23 @@ public class OperandiScript implements Runnable, Disposable {
         UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
         if (cp == null) return null;
         float isolevel = 0.5f;
+        boolean faceted = false;
         if (args.length > 1) isolevel = args[1].asFloat();
-        cp.setPointCloud(convPointCloud(args[0]), isolevel);
+        if (args.length > 2) faceted = args[2].asInt() != 0;
+        cp.setPointCloud(convPointCloud(args[0]), isolevel, faceted);
+        return null;
+      }
+    });
+    setExtDef("__3d_set_model_cloud_color", "(<cloud>, <isolevel>) - sets colored point cloud data model (array of arrays of arrays of 4 float vector [height, red, green, blue]))",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        float isolevel = 0.5f;
+        boolean faceted = false;
+        if (args.length > 1) isolevel = args[1].asFloat();
+        if (args.length > 2) faceted = args[2].asInt() != 0;
+        cp.setPointCloudColor(convPointCloudColor(args[0]), isolevel, faceted);
         return null;
       }
     });

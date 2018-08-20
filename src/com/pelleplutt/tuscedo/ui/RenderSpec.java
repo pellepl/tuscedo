@@ -14,6 +14,7 @@ public class RenderSpec {
   public static final int MODEL_HEIGHTMAP = 0;        // float[w][d]=h
   public static final int MODEL_HEIGHTMAP_COLOR = 1;  // float[w][d]=[h,r,g,b]
   public static final int MODEL_POINTCLOUD = 2;       // float[w][d][h]=v
+  public static final int MODEL_POINTCLOUD_COLOR = 3; // float[w][d][h]=[v,r,g,b]
   
   boolean depthTest;
   boolean cullFaces;
@@ -52,6 +53,7 @@ public class RenderSpec {
   
   public int smoothOrFlat = 1;
   public float isolevel;
+  public boolean faceted;
 
 
   

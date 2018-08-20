@@ -14,17 +14,17 @@ public abstract class Modeller3D {
   
   public static class Grid extends Modeller3D {
     int w, h;
-    float[][] map;
-    float[][][] mapc;
+    float[][] data;
+    float[][][] datac;
     public Grid(float[][] map) {
       this.w = map.length-1;
       this.h = map[0].length-1;
-      this.map = map;
+      this.data = map;
     }
     public Grid(float[][][] map) {
       this.w = map.length-1;
       this.h = map[0].length-1;
-      this.mapc = map;
+      this.datac = map;
     }
     
     public void build() {
@@ -33,9 +33,9 @@ public abstract class Modeller3D {
       for (int z = 0; z < h; z++) {
         for (int x = 0; x < w; x++) {
           float h00, h01, h10;
-          h00 = map == null ? mapc[x][z][0] : map[x][z]; 
-          h01 = map == null ? mapc[x][z+1][0] : map[x][z+1]; 
-          h10 = map == null ? mapc[x+1][z][0] : map[x+1][z]; 
+          h00 = data == null ? datac[x][z][0] : data[x][z]; 
+          h01 = data == null ? datac[x][z+1][0] : data[x][z+1]; 
+          h10 = data == null ? datac[x+1][z][0] : data[x+1][z]; 
           vertices.add(new Vector3f(x+offsX, h00, z+offsZ));
           
           Vector3f nx = new Vector3f(1f, h10-h00, 0f);
@@ -44,8 +44,8 @@ public abstract class Modeller3D {
           nz.normalize();
           normals.add(nx.cross(nz));
           
-          if (map == null) {
-            colors.add(mapc[x][z][1]);
+          if (data == null) {
+            colors.add(datac[x][z][1]);
           }
         }
       }
@@ -135,7 +135,9 @@ public abstract class Modeller3D {
   public static class Cloud extends Modeller3D {
     // courtesy of http://paulbourke.net/geometry/polygonise/
     float[][][] data;
+    float[][][][] datac;
     float isolevel;
+    boolean faceted;
     private Vector3f vertList[] = new Vector3f[4*3];
     private Vector3f triangles[][] = new Vector3f[16][3];
     private Vector3f onormals[][] = new Vector3f[16][3];
@@ -144,9 +146,21 @@ public abstract class Modeller3D {
     private Vector3f norms[] = new Vector3f[8];
     private Vector3f normList[] = new Vector3f[4*3];
     
-    public Cloud(float[][][] cloud, float isolevel) {
+    public Cloud(float[][][] cloud, float isolevel, boolean faceted) {
       this.data = cloud;
       this.isolevel = isolevel;
+      this.faceted = faceted;
+      vec3ffill(vertList);
+      vec3ffill(triangles);
+      vec3ffill(onormals);
+      vec3ffill(cubeVerts);
+      vec3ffill(norms);
+      vec3ffill(normList);
+    }
+    public Cloud(float[][][][] cloud, float isolevel, boolean faceted) {
+      this.datac = cloud;
+      this.isolevel = isolevel;
+      this.faceted = faceted;
       vec3ffill(vertList);
       vec3ffill(triangles);
       vec3ffill(onormals);
@@ -155,10 +169,15 @@ public abstract class Modeller3D {
       vec3ffill(normList);
     }
     
+    float getData(int x, int y, int z) {
+      if (data == null) return datac[x][y][z][0];
+      else return data[x][y][z];
+    }
+    
     public void build() {
-      final int width = data.length-1;
-      final int height = data[0].length-1;
-      final int depth = data[0][0].length-1;
+      int width = data != null ? data.length-1 :  datac.length-1;
+      int height = data != null ? data[0].length-1 :  datac[0].length-1;;
+      int depth = data != null ? data[0][0].length-1 :  datac[0][0].length-1;;
       VertexLUT lut[] = new VertexLUT[width * height];
       for (int i = 0; i < lut.length; i++) lut[i] = new VertexLUT();
       VertexLUT tlut = new VertexLUT();
@@ -171,48 +190,39 @@ public abstract class Modeller3D {
           int yy = y - height/2;
           for (int x = 0; x < width; x++) {
             int xx = x - width/2;
-            cubeVerts[0].set(xx  , yy  , zz  ); cubeVals[0] = data[x  ][y  ][z  ];
-            cubeVerts[1].set(xx+1, yy  , zz  ); cubeVals[1] = data[x+1][y  ][z  ];
-            cubeVerts[2].set(xx+1, yy  , zz+1); cubeVals[2] = data[x+1][y  ][z+1];
-            cubeVerts[3].set(xx  , yy  , zz+1); cubeVals[3] = data[x  ][y  ][z+1];
-            cubeVerts[4].set(xx  , yy+1, zz  ); cubeVals[4] = data[x  ][y+1][z  ];
-            cubeVerts[5].set(xx+1, yy+1, zz  ); cubeVals[5] = data[x+1][y+1][z  ];
-            cubeVerts[6].set(xx+1, yy+1, zz+1); cubeVals[6] = data[x+1][y+1][z+1];
-            cubeVerts[7].set(xx  , yy+1, zz+1); cubeVals[7] = data[x  ][y+1][z+1];
-            cubeVals[8]  = x < width-1  ? data[x+2][y  ][z  ] : 0;
-            cubeVals[9]  = x < width-1  ? data[x+2][y+1][z  ] : 0;
-            cubeVals[10] = x < width-1  ? data[x+2][y+1][z+1] : 0;
-            cubeVals[11] = x < width-1  ? data[x+2][y  ][z+1] : 0;
-            cubeVals[12] = y < height-1 ? data[x  ][y+2][z  ] : 0;
-            cubeVals[13] = y < height-1 ? data[x+1][y+2][z  ] : 0;
-            cubeVals[14] = y < height-1 ? data[x+1][y+2][z+1] : 0;
-            cubeVals[15] = y < height-1 ? data[x  ][y+2][z+1] : 0;
-            cubeVals[16] = z < depth-1  ? data[x  ][y  ][z+2] : 0;
-            cubeVals[17] = z < depth-1  ? data[x+1][y  ][z+2] : 0;
-            cubeVals[18] = z < depth-1  ? data[x+1][y+1][z+2] : 0;
-            cubeVals[19] = z < depth-1  ? data[x  ][y+1][z+2] : 0;
-            //  n(0)  f(1) - f(0), f(4) - f(0), f(3) - f(0)
-            //  n(1)  f(8) - f(1), f(2) - f(1), f(5) - f(1)
-            //  n(2)  f(9) - f(2), f(13)- f(2), f(6) - f(2)
-            //  n(3)  f(2) - f(3), f(12)- f(3), f(7) - f(3)
-            //  n(4)  f(5) - f(4), f(7) - f(4), f(16)- f(4)
-            //  n(5)  f(11)- f(5), f(6) - f(5), f(17)- f(5)
-            //  n(6)  f(10)- f(6), f(14)- f(6), f(18)- f(6)
-            //  n(7)  f(6) - f(7), f(15)- f(7), f(19)- f(7)
-            norms[0].set(cubeVals[1] -cubeVals[0], cubeVals[4] -cubeVals[0], cubeVals[3] -cubeVals[0]);
-            norms[1].set(cubeVals[8] -cubeVals[1], cubeVals[5] -cubeVals[1], cubeVals[2] -cubeVals[1]);
-            norms[2].set(cubeVals[9] -cubeVals[2], cubeVals[13]-cubeVals[2], cubeVals[6] -cubeVals[2]);
-            norms[3].set(cubeVals[2] -cubeVals[3], cubeVals[12]-cubeVals[3], cubeVals[7] -cubeVals[3]);
-            norms[4].set(cubeVals[5] -cubeVals[4], cubeVals[7] -cubeVals[4], cubeVals[16]-cubeVals[4]);
-            norms[5].set(cubeVals[11]-cubeVals[5], cubeVals[6] -cubeVals[5], cubeVals[17]-cubeVals[5]);
-            norms[6].set(cubeVals[10]-cubeVals[6], cubeVals[14]-cubeVals[6], cubeVals[18]-cubeVals[6]);
-            norms[7].set(cubeVals[6] -cubeVals[7], cubeVals[15]-cubeVals[7], cubeVals[19]-cubeVals[7]);
-            
-            for (int i = 0; i < 7; i++) {
-              norms[i].normalize(); //set(norms[0]);
+            cubeVerts[0].set(xx  , yy  , zz  ); cubeVals[0] = getData(x  ,y  ,z  );
+            cubeVerts[1].set(xx+1, yy  , zz  ); cubeVals[1] = getData(x+1,y  ,z  );
+            cubeVerts[2].set(xx+1, yy  , zz+1); cubeVals[2] = getData(x+1,y  ,z+1);
+            cubeVerts[3].set(xx  , yy  , zz+1); cubeVals[3] = getData(x  ,y  ,z+1);
+            cubeVerts[4].set(xx  , yy+1, zz  ); cubeVals[4] = getData(x  ,y+1,z  );
+            cubeVerts[5].set(xx+1, yy+1, zz  ); cubeVals[5] = getData(x+1,y+1,z  );
+            cubeVerts[6].set(xx+1, yy+1, zz+1); cubeVals[6] = getData(x+1,y+1,z+1);
+            cubeVerts[7].set(xx  , yy+1, zz+1); cubeVals[7] = getData(x  ,y+1,z+1);
+            if (!faceted) {
+              cubeVals[8]  = x < width-1  ? getData(x+2,y  ,z  ) : 0;
+              cubeVals[9]  = x < width-1  ? getData(x+2,y+1,z  ) : 0;
+              cubeVals[10] = x < width-1  ? getData(x+2,y+1,z+1) : 0;
+              cubeVals[11] = x < width-1  ? getData(x+2,y  ,z+1) : 0;
+              cubeVals[12] = y < height-1 ? getData(x  ,y+2,z  ) : 0;
+              cubeVals[13] = y < height-1 ? getData(x+1,y+2,z  ) : 0;
+              cubeVals[14] = y < height-1 ? getData(x+1,y+2,z+1) : 0;
+              cubeVals[15] = y < height-1 ? getData(x  ,y+2,z+1) : 0;
+              cubeVals[16] = z < depth-1  ? getData(x  ,y  ,z+2) : 0;
+              cubeVals[17] = z < depth-1  ? getData(x+1,y  ,z+2) : 0;
+              cubeVals[18] = z < depth-1  ? getData(x+1,y+1,z+2) : 0;
+              cubeVals[19] = z < depth-1  ? getData(x  ,y+1,z+2) : 0;
+              // calculate normals at each point by derivating the scalar field
+              norms[0].set(cubeVals[1] -cubeVals[0], cubeVals[4] -cubeVals[0], cubeVals[3] -cubeVals[0]);
+              norms[1].set(cubeVals[8] -cubeVals[1], cubeVals[5] -cubeVals[1], cubeVals[2] -cubeVals[1]);
+              norms[2].set(cubeVals[11]-cubeVals[2], cubeVals[6] -cubeVals[2], cubeVals[17]-cubeVals[2]);
+              norms[3].set(cubeVals[2] -cubeVals[3], cubeVals[7] -cubeVals[3], cubeVals[16]-cubeVals[3]);
+              norms[4].set(cubeVals[5] -cubeVals[4], cubeVals[12]-cubeVals[4], cubeVals[7] -cubeVals[4]);
+              norms[5].set(cubeVals[9] -cubeVals[5], cubeVals[13]-cubeVals[5], cubeVals[6] -cubeVals[5]);
+              norms[6].set(cubeVals[10]-cubeVals[6], cubeVals[14]-cubeVals[6], cubeVals[18]-cubeVals[6]);
+              norms[7].set(cubeVals[6] -cubeVals[7], cubeVals[15]-cubeVals[7], cubeVals[19]-cubeVals[7]);
             }
             
-            int triCnt = polygoniseCube(cubeVerts, cubeVals, isolevel, triangles, onormals);
+            int triCnt = polygoniseCube(isolevel, triangles, onormals);
 
             int lutix = (x + width * (y + height * z)) % lut.length;
             lutx = luty = lutz = null;
@@ -222,20 +232,22 @@ public abstract class Modeller3D {
             
             tlut.localVertCnt = 0;
             for (int tri = 0; tri < triCnt; tri++) {
-              // calculate triangle normal
-              // Apparently the derivative of a cloud surface is the normal. Cool..!
-              n.set(
-                  data[x+1][y  ][z  ] - data[x][y][z],
-                  data[x  ][y+1][z  ] - data[x][y][z],
-                  data[x  ][y  ][z+1] - data[x][y][z]
-                  );
-              if (n.lengthSquared() < 0.00001) {
-                // that derivative seemed a bit off, so try cross product of the triangle instead
-                n.set(triangles[tri][1]).sub(triangles[tri][0]);
-                t.set(triangles[tri][2]).sub(triangles[tri][0]);
-                n.cross(t);
+              if (faceted) {
+                // calculate triangle normal
+                float v = getData(x,y,z);
+                n.set(
+                    getData(x+1,y  ,z  ) - v,
+                    getData(x  ,y+1,z  ) - v,
+                    getData(x  ,y  ,z+1) - v
+                    );
+                if (n.lengthSquared() < 0.00001) {
+                  // that derivative seemed a bit off, so try cross product of the triangle instead
+                  n.set(triangles[tri][1]).sub(triangles[tri][0]);
+                  t.set(triangles[tri][2]).sub(triangles[tri][0]);
+                  n.cross(t);
+                }
+                n.normalize();
               }
-              n.normalize();
               // check each triangle vertex if already defined in a previous cube (x-1, y-1 and z-1)
               for (int j = 0; j < 3; j++) {
                 Vector3f triv = triangles[tri][2-j];
@@ -244,8 +256,8 @@ public abstract class Modeller3D {
                   // new vertex
                   indices.add(vertices.size());
                   vertices.add(new Vector3f(triv));
-                  n = new Vector3f(triv);
-                  normals.add(new Vector3f(onormals[tri][2-j].normalize()));
+                  normals.add(faceted ? new Vector3f(n) : new Vector3f(onormals[tri][2-j]));
+                  if (data == null) colors.add(datac[x][y][z][1]);
                   // register this new vector for lut update below
                   tlut.verts[tlut.localVertCnt].set(triv);
                   tlut.localVertCnt++;
@@ -290,34 +302,34 @@ public abstract class Modeller3D {
           && (int)(a.z*EQ_DEC) == (int)(b.z*EQ_DEC);
     }
     
-    //                 4 ___________________  5   
-    //                  /|                 /|
-    //                 / |                / |
-    //                /  |               /  |
-    //             7 /___|______________/ 6 |
-    //              |    |              |   |
-    //              |    |              |   |
-    //              |  0 |______________|___| 1  
-    //              |   /               |   /
-    //              |  /                |  /
-    //              | /                 | /
-    //              |/__________________|/
-    //             3                      2
+    //                 4 ______________ 5   
+    //                  /|            /|
+    //                 / |           / |
+    //                /  |          /  |
+    //             7 /___|_________/ 6 |
+    //              |    |         |   |
+    //              |    |         |   |
+    //              |  0 |_________|___| 1
+    //              |   /          |   /
+    //              |  /           |  /
+    //              | /            | /
+    //              |/_____________|/
+    //             3                 2
     //
     //  0     x   y   z
     //  1     x+1 y   z
-    //  2     x+1 y+1 z
-    //  3     x   y+1 z
-    //  4     x   y   z+1
-    //  5     x+1 y   z+1
+    //  2     x+1 y   z+1
+    //  3     x   y   z+1
+    //  4     x   y+1 z  
+    //  5     x+1 y+1 z  
     //  6     x+1 y+1 z+1
     //  7     x   y+1 z+1
-    //  n(0)  f(1)-          f(0), f(3)-          f(0), f(4)-          f(0)
-    //  n(1)  f(x+2,y,z)-    f(1), f(2)-          f(1), f(5)-          f(1)
-    //  n(2)  f(x+2,y+1,z)-  f(2), f(x+1,y+2,z)-  f(2), f(6)-          f(2)
-    //  n(3)  f(2)-          f(3), f(x,y+2,z)-    f(3), f(7)-          f(3)
-    //  n(4)  f(5)-          f(4), f(7)-          f(4), f(x,y,z+2)-    f(4)
-    //  n(5)  f(x+2,y,z+1)-  f(5), f(6)-          f(5), f(x+1,y,z+2)-  f(5)
+    //  n(0)  f(1)-          f(0), f(4)-          f(0), f(3)-          f(0)
+    //  n(1)  f(x+2,y,z)-    f(1), f(5)-          f(1), f(2)-          f(1)
+    //  n(2)  f(x+2,y,z+1)-  f(2), f(6)-          f(2), f(x+1,y,z+2)-  f(2)
+    //  n(3)  f(2)-          f(3), f(7)-          f(3), f(x,y,z+2)-    f(3)
+    //  n(4)  f(5)-          f(4), f(x,y+2,z)-    f(4), f(7)-          f(4)
+    //  n(5)  f(x+2,y+1,z)-  f(5), f(x+1,y+2,z)-  f(5), f(6)-          f(5)
     //  n(6)  f(x+2,y+1,z+1)-f(6), f(x+1,y+2,z+1)-f(6), f(x+1,y+1,z+2)-f(6)
     //  n(7)  f(6)-          f(7), f(x,y+2,z+1)-  f(7), f(x,y+1,z+2)-  f(7)
     //  8     x+2 y   z 
@@ -332,15 +344,15 @@ public abstract class Modeller3D {
     //  17    x+1 y   z+2
     //  18    x+1 y+1 z+2
     //  19    x   y+1 z+2
-    //  n(0)  f(1) - f(0), f(3) - f(0), f(4) - f(0)
-    //  n(1)  f(8) - f(1), f(2) - f(1), f(5) - f(1)
-    //  n(2)  f(9) - f(2), f(13)- f(2), f(6) - f(2)
-    //  n(3)  f(2) - f(3), f(12)- f(3), f(7) - f(3)
-    //  n(4)  f(5) - f(4), f(7) - f(4), f(16)- f(4)
-    //  n(5)  f(11)- f(5), f(6) - f(5), f(17)- f(5)
-    //  n(6)  f(10)- f(6), f(14)- f(6), f(18)- f(6)
-    //  n(7)  f(6) - f(7), f(15)- f(7), f(19)- f(7)
-int polygoniseCube(Vector3f cubeVerts[], float cubeVals[], float isolevel, Vector3f triangles[][], Vector3f normals[][]) {
+    //  n(0)  f(1)-          f(0), f(4)-          f(0), f(3)-          f(0)
+    //  n(1)  f(8)-          f(1), f(5)-          f(1), f(2)-          f(1)
+    //  n(2)  f(11)-         f(2), f(6)-          f(2), f(17)-         f(2)
+    //  n(3)  f(2)-          f(3), f(7)-          f(3), f(16)-         f(3)
+    //  n(4)  f(5)-          f(4), f(12)-         f(4), f(7)-          f(4)
+    //  n(5)  f(9)-          f(5), f(13)-         f(5), f(6)-          f(5)
+    //  n(6)  f(10)-         f(6), f(14)-         f(6), f(18)-         f(6)
+    //  n(7)  f(6)-          f(7), f(15)-         f(7), f(19)-         f(7)
+int polygoniseCube(float isolevel, Vector3f triangles[][], Vector3f normals[][]) {
       int triCnt = 0;
       int cubeIx = 0;
 
@@ -359,81 +371,78 @@ int polygoniseCube(Vector3f cubeVerts[], float cubeVals[], float isolevel, Vecto
       if (edge == 0) return 0;
       
       // find the vertices where the surface intersects the cube
-      if ((edge & 1) != 0) {
-        vertexLerp(vertList[0],  isolevel,cubeVerts[0],cubeVerts[1],cubeVals[0],cubeVals[1]);
-        vertexLerp(normList[0],  isolevel,norms[0],    norms[1],    cubeVals[0],cubeVals[1]);
-      }
-      if ((edge & 2) != 0) {
-        vertexLerp(vertList[1],  isolevel,cubeVerts[1],cubeVerts[2],cubeVals[1],cubeVals[2]);
-        vertexLerp(normList[1],  isolevel,norms[1],    norms[2],    cubeVals[1],cubeVals[2]);
-      }
-      if ((edge & 4) != 0) {
-        vertexLerp(vertList[2],  isolevel,cubeVerts[2],cubeVerts[3],cubeVals[2],cubeVals[3]);
-        vertexLerp(normList[2],  isolevel,norms[2],    norms[3],    cubeVals[2],cubeVals[3]);
-      }
-      if ((edge & 8) != 0) {
-        vertexLerp(vertList[3],  isolevel,cubeVerts[3],cubeVerts[0],cubeVals[3],cubeVals[0]);
-        vertexLerp(normList[3],  isolevel,norms[3],    norms[0],    cubeVals[3],cubeVals[0]);
-      }
-      if ((edge & 16) != 0) {
-        vertexLerp(vertList[4],  isolevel,cubeVerts[4],cubeVerts[5],cubeVals[4],cubeVals[5]);
-        vertexLerp(normList[4],  isolevel,norms[4],    norms[5],    cubeVals[4],cubeVals[5]);
-      }
-      if ((edge & 32) != 0) {
-        vertexLerp(vertList[5],  isolevel,cubeVerts[5],cubeVerts[6],cubeVals[5],cubeVals[6]);
-        vertexLerp(normList[5],  isolevel,norms[5],    norms[6],    cubeVals[5],cubeVals[6]);
-      }
-      if ((edge & 64) != 0) {
-        vertexLerp(vertList[6],  isolevel,cubeVerts[6],cubeVerts[7],cubeVals[6],cubeVals[7]);
-        vertexLerp(normList[6],  isolevel,norms[6],    norms[7],    cubeVals[6],cubeVals[7]);
-      }
-      if ((edge & 128) != 0) {
-        vertexLerp(vertList[7],  isolevel,cubeVerts[7],cubeVerts[4],cubeVals[7],cubeVals[4]);
-        vertexLerp(normList[7],  isolevel,norms[7],    norms[4],    cubeVals[7],cubeVals[4]);
-      }
-      if ((edge & 256) != 0) {
-        vertexLerp(vertList[8],  isolevel,cubeVerts[0],cubeVerts[4],cubeVals[0],cubeVals[4]);
-        vertexLerp(normList[8],  isolevel,norms[0],    norms[4],    cubeVals[0],cubeVals[4]);
-      }
-      if ((edge & 512) != 0) {
-        vertexLerp(vertList[9],  isolevel,cubeVerts[1],cubeVerts[5],cubeVals[1],cubeVals[5]);
-        vertexLerp(normList[9],  isolevel,norms[1],    norms[5],    cubeVals[1],cubeVals[5]);
-      }
-      if ((edge & 1024) != 0) {
-        vertexLerp(vertList[10], isolevel,cubeVerts[2],cubeVerts[6],cubeVals[2],cubeVals[6]);
-        vertexLerp(normList[10], isolevel,norms[2],    norms[6],    cubeVals[2],cubeVals[6]);
-      }
-      if ((edge & 2048) != 0) {
-        vertexLerp(vertList[11], isolevel,cubeVerts[3],cubeVerts[7],cubeVals[3],cubeVals[7]);
-        vertexLerp(normList[11], isolevel,norms[3],    norms[7],    cubeVals[3],cubeVals[7]);
+      // and the normals at those points
+      if ((edge & 1) != 0) vlerp(vertList[0],  isolevel,cubeVerts[0],cubeVerts[1],cubeVals[0],cubeVals[1]);
+      if ((edge & 2) != 0) vlerp(vertList[1],  isolevel,cubeVerts[1],cubeVerts[2],cubeVals[1],cubeVals[2]);
+      if ((edge & 4) != 0) vlerp(vertList[2],  isolevel,cubeVerts[2],cubeVerts[3],cubeVals[2],cubeVals[3]);
+      if ((edge & 8) != 0) vlerp(vertList[3],  isolevel,cubeVerts[3],cubeVerts[0],cubeVals[3],cubeVals[0]);
+      if ((edge & 16) != 0) vlerp(vertList[4],  isolevel,cubeVerts[4],cubeVerts[5],cubeVals[4],cubeVals[5]);
+      if ((edge & 32) != 0) vlerp(vertList[5],  isolevel,cubeVerts[5],cubeVerts[6],cubeVals[5],cubeVals[6]);
+      if ((edge & 64) != 0) vlerp(vertList[6],  isolevel,cubeVerts[6],cubeVerts[7],cubeVals[6],cubeVals[7]);
+      if ((edge & 128) != 0) vlerp(vertList[7],  isolevel,cubeVerts[7],cubeVerts[4],cubeVals[7],cubeVals[4]);
+      if ((edge & 256) != 0) vlerp(vertList[8],  isolevel,cubeVerts[0],cubeVerts[4],cubeVals[0],cubeVals[4]);
+      if ((edge & 512) != 0) vlerp(vertList[9],  isolevel,cubeVerts[1],cubeVerts[5],cubeVals[1],cubeVals[5]);
+      if ((edge & 1024) != 0) vlerp(vertList[10], isolevel,cubeVerts[2],cubeVerts[6],cubeVals[2],cubeVals[6]);
+      if ((edge & 2048) != 0) vlerp(vertList[11], isolevel,cubeVerts[3],cubeVerts[7],cubeVals[3],cubeVals[7]);
+      if (!faceted) {
+        if ((edge & 1) != 0) {
+          vlerp(normList[0],  isolevel,norms[0], norms[1], cubeVals[0],cubeVals[1]); normList[0].normalize();
+        }
+        if ((edge & 2) != 0) {
+          vlerp(normList[1],  isolevel,norms[1], norms[2], cubeVals[1],cubeVals[2]); normList[1].normalize();
+        }
+        if ((edge & 4) != 0) {
+          vlerp(normList[2],  isolevel,norms[2], norms[3], cubeVals[2],cubeVals[3]); normList[2].normalize();
+        }
+        if ((edge & 8) != 0) {
+          vlerp(normList[3],  isolevel,norms[3], norms[0], cubeVals[3],cubeVals[0]); normList[3].normalize();
+        }
+        if ((edge & 16) != 0) {
+          vlerp(normList[4],  isolevel,norms[4], norms[5], cubeVals[4],cubeVals[5]); normList[4].normalize();
+        }
+        if ((edge & 32) != 0) {
+          vlerp(normList[5],  isolevel,norms[5], norms[6], cubeVals[5],cubeVals[6]); normList[5].normalize();
+        }
+        if ((edge & 64) != 0) {
+          vlerp(normList[6],  isolevel,norms[6], norms[7], cubeVals[6],cubeVals[7]); normList[6].normalize();
+        }
+        if ((edge & 128) != 0) {
+          vlerp(normList[7],  isolevel,norms[7], norms[4], cubeVals[7],cubeVals[4]); normList[7].normalize();
+        }
+        if ((edge & 256) != 0) {
+          vlerp(normList[8],  isolevel,norms[0], norms[4], cubeVals[0],cubeVals[4]); normList[8].normalize();
+        }
+        if ((edge & 512) != 0) {
+          vlerp(normList[9],  isolevel,norms[1], norms[5], cubeVals[1],cubeVals[5]); normList[9].normalize();
+        }
+        if ((edge & 1024) != 0) {
+          vlerp(normList[10], isolevel,norms[2], norms[6], cubeVals[2],cubeVals[6]); normList[10].normalize();
+        }
+        if ((edge & 2048) != 0) {
+          vlerp(normList[11], isolevel,norms[3], norms[7], cubeVals[3],cubeVals[7]); normList[11].normalize();
+        }
       }
       
-      // create the triangles 
-      // TODO Here, we should be able to get the normals as well - from looking at vertexlerp 
+      // Create the triangles 
+      //      Here, we are able to get the normals as well - from looking at vertexlerp 
       //      args we know what points each edge is computed from. 
       //      Calculate normal for each point by derivating the density data per point and lerp
-      //      between these.
-      //      Thus, need more cubeVals. Example one dimension:
-      //      cubeVal0=x0 -- cubeVal1=x1 -- cubeVal2=x2
-      //           --normal01--   |   --normal12--
-      //      n = lerp(normal01, normal12, (isolevel - cubeVal0) / (cubeVal1 - cubeVal0)).normalize
-      //      n = lerp(x1-x0, x2-x1, (i - x0) / (x1 - x0)).normalize
-      //      n = x1-x0 + (i-x0)/(x1-x0)*(x2-x1 - x1+x0) =
-      //          x1-x0 + (i-x0)/(x1-x0)*(x2+x0-2x1) 
-      //          
+      //      between these in same manner as we find the vertices.
       for (int i = 0; TRI_TABLE[cubeIx][i] != -1; i += 3) {
         triangles[triCnt][0] = vertList[TRI_TABLE[cubeIx][i  ]];
         triangles[triCnt][1] = vertList[TRI_TABLE[cubeIx][i+1]];
         triangles[triCnt][2] = vertList[TRI_TABLE[cubeIx][i+2]];
-        normals[triCnt][0] = normList[TRI_TABLE[cubeIx][i  ]];
-        normals[triCnt][1] = normList[TRI_TABLE[cubeIx][i+1]];
-        normals[triCnt][2] = normList[TRI_TABLE[cubeIx][i+2]];
+        if (!faceted) {
+          normals[triCnt][0] = normList[TRI_TABLE[cubeIx][i  ]];
+          normals[triCnt][1] = normList[TRI_TABLE[cubeIx][i+1]];
+          normals[triCnt][2] = normList[TRI_TABLE[cubeIx][i+2]];
+        }
         triCnt++;
       }
       return triCnt;
     }
     
-    void vertexLerp(Vector3f dst, float isolevel, Vector3f p1, Vector3f p2, float v1, float v2) {
+    void vlerp(Vector3f dst, float isolevel, Vector3f p1, Vector3f p2, float v1, float v2) {
       if (Math.abs(isolevel - v1) < 0.0001) {
         dst.set(p1); return;
       }

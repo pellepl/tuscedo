@@ -420,12 +420,22 @@ public class UI3DPanel extends JPanel implements UIO {
     renderSpec.modelDataDirty = true;
     blit();
   }
-  public void setPointCloud(float[][][] map, float isolevel) {
+  public void setPointCloud(float[][][] map, float isolevel, boolean faceted) {
     renderSpec.modeltype = RenderSpec.MODEL_POINTCLOUD;
     renderSpec.model = map;
     renderSpec.modelDirty = true;
     renderSpec.modelDataDirty = true;
     renderSpec.isolevel = isolevel;
+    renderSpec.faceted = faceted;
+    blit();
+  }
+  public void setPointCloudColor(float[][][][] map, float isolevel, boolean faceted) {
+    renderSpec.modeltype = RenderSpec.MODEL_POINTCLOUD_COLOR;
+    renderSpec.model = map;
+    renderSpec.modelDirty = true;
+    renderSpec.modelDataDirty = true;
+    renderSpec.isolevel = isolevel;
+    renderSpec.faceted = faceted;
     blit();
   }
   public void setSize(int w, int h) {

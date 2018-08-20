@@ -513,8 +513,13 @@ public class Scene3D {
         } else {
           sculpture = new Modeller3D.Grid((float[][][])rs.model);
         }
-      } else if (rs.modeltype == RenderSpec.MODEL_POINTCLOUD) {
-        sculpture = new Modeller3D.Cloud((float[][][])rs.model, rs.isolevel);
+      } else if (rs.modeltype == RenderSpec.MODEL_POINTCLOUD ||
+                 rs.modeltype == RenderSpec.MODEL_POINTCLOUD_COLOR) {
+        if (rs.modeltype == RenderSpec.MODEL_POINTCLOUD) {
+          sculpture = new Modeller3D.Cloud((float[][][])rs.model, rs.isolevel, rs.faceted);
+        } else {
+          sculpture = new Modeller3D.Cloud((float[][][][])rs.model, rs.isolevel, rs.faceted);
+        }
       }
 
       sculpture.build();
