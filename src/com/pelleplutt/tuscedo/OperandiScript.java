@@ -55,6 +55,8 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_DISK_FIND_FILE = "__" + VAR_DISK + "_find_file";
   public static final String FN_DISK_READ = "__" + VAR_DISK + "_read";
   public static final String FN_DISK_READB = "__" + VAR_DISK + "_readb";
+  public static final String FN_DISK_WRITE = "__" + VAR_DISK + "_write";
+  public static final String FN_DISK_WRITEB = "__" + VAR_DISK + "_writeb";
   public static final String FN_DISK_STAT = "__" + VAR_DISK + "_stat";
   public static final String FN_DISK_MOVE = "__" + VAR_DISK + "_move";
   public static final String FN_DISK_COPY = "__" + VAR_DISK + "_copy";
@@ -402,6 +404,24 @@ public class OperandiScript implements Runnable, Disposable {
           return null;
         } 
         return new M(Integer.toString(args[0].asInt(),args[1].asInt()));
+      }
+    });
+    setExtDef("srlz",  "(<x>) - stringifies x (see dsrlz)", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 1) {
+          return null;
+        } 
+        return new M(MSerializer.serialize(args[0]));
+      }
+    });
+    setExtDef("dsrlz",  "(<string>) - destringifies string (see srlz)", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 1) {
+          return null;
+        } 
+        return MSerializer.deserialize(args[0].asString());
       }
     });
     setExtDef("uitree",  "() - dumps the ui tree", 

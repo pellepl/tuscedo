@@ -213,7 +213,7 @@ public class MListMap implements MSet {
     return ml;
   }
   
-  static final int MAX_DEPTH = 3;
+  static final int MAX_DEPTH = 6;
   static final int MAX_ELEMENTS = 1000;
   static public int stringifyAppend(MSet m, StringBuilder s, int els, int depth) {
     if (depth <= MAX_DEPTH && els < MAX_ELEMENTS) {

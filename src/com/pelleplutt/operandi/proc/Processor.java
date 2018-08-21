@@ -1925,7 +1925,7 @@ public class Processor implements ByteCode {
       case TFUNC:
         return String.format("->0x%06x", i);
       case TANON:
-        return String.format(":>0x%06x", i) + ref;
+        return String.format(":>0x%06x", i);
       case TSET:
         return ref.toString();
       default:
@@ -2116,14 +2116,15 @@ public class Processor implements ByteCode {
   
   static void setDbg(List<String> a, boolean ena) {
     for (String s:a) {
-      if (s.equals("run") || s.equals("*")) Processor.dbgRun = ena;
-      if (s.equals("mem") || s.equals("*")) Processor.dbgMem = ena;
-      if (s.equals("ast") || s.equals("*")) AST.dbg = ena;
-      if (s.equals("gra") || s.equals("*")) Grammar.dbg = ena;
-      if (s.equals("str") || s.equals("*")) StructAnalysis.dbg = ena;
-      if (s.equals("fro") || s.equals("*")) CodeGenFront.dbg = ena;
-      if (s.equals("bak") || s.equals("*")) CodeGenBack.dbg = ena;
-      if (s.equals("lin") || s.equals("*")) Linker.dbg = ena;
+      boolean all = s.equals("*") || s.equals("all");
+      if (s.equals("run") || all) Processor.dbgRun = ena;
+      if (s.equals("mem") || all) Processor.dbgMem = ena;
+      if (s.equals("ast") || all) AST.dbg = ena;
+      if (s.equals("gra") || all) Grammar.dbg = ena;
+      if (s.equals("str") || all) StructAnalysis.dbg = ena;
+      if (s.equals("fro") || all) CodeGenFront.dbg = ena;
+      if (s.equals("bak") || all) CodeGenBack.dbg = ena;
+      if (s.equals("lin") || all) Linker.dbg = ena;
     }
   }
   

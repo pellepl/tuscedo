@@ -1,5 +1,6 @@
 package com.pelleplutt.tuscedo;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -14,6 +15,7 @@ import java.util.Set;
 import com.pelleplutt.operandi.Compiler;
 import com.pelleplutt.operandi.proc.ExtCall;
 import com.pelleplutt.operandi.proc.MListMap;
+import com.pelleplutt.operandi.proc.MSet;
 import com.pelleplutt.operandi.proc.Processor;
 import com.pelleplutt.operandi.proc.ProcessorError;
 import com.pelleplutt.tuscedo.ui.UIWorkArea;
@@ -28,7 +30,8 @@ public class MDisk extends MObj {
     this.workarea = wa;
     addFunc("read", OperandiScript.FN_DISK_READ, comp);
     addFunc("readb", OperandiScript.FN_DISK_READB, comp);
-//    addFunc("write", OperandiScript.FN_DISK_WRITE, comp);
+    addFunc("write", OperandiScript.FN_DISK_WRITE, comp);
+    addFunc("writeb", OperandiScript.FN_DISK_WRITEB, comp);
 //    addFunc("rm", OperandiScript.FN_DISK_RM, comp);
 //    addFunc("mkdir", OperandiScript.FN_DISK_MKDIR, comp);
     addFunc("ls", OperandiScript.FN_DISK_LS, comp);
@@ -67,6 +70,28 @@ public class MDisk extends MObj {
           arr.add(new Processor.M((int)b & 0xff));
         }
         return new Processor.M(arr);
+      }
+    });
+    os.setExtDef(OperandiScript.FN_DISK_WRITE, "(<filename>, <string>) - writes file as a string", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args.length < 2) return null;
+        String path = args[0].asString();
+        String data = args[1].asString();
+        return new Processor.M(AppSystem.writeFile(new File(path), data) ? 1 : 0);
+      }
+    });
+    os.setExtDef(OperandiScript.FN_DISK_WRITEB, "(<filename>, <array>) - writes binary file as a byte array",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args.length < 2) return null;
+        String path = args[0].asString();
+        MSet data = args[1].ref;
+        ByteArrayOutputStream baos = new ByteArrayOutputStream(data.size());
+        for (int i = 0; i < data.size(); i++) {
+          baos.write(data.get(i).asInt() & 0xff);
+        }
+        return new Processor.M(AppSystem.writeFile(new File(path), baos.toByteArray()) ? 1 : 0);
       }
     });
     os.setExtDef(OperandiScript.FN_DISK_FIND_FILE, "(<path>,<filter>,<recurse>) - returns array of files matching the filter", 
