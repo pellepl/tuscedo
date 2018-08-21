@@ -142,8 +142,23 @@ public class UISimpleTabPane extends JPanel implements UIO {
             return tab;
           }
         }
+        
+        while (c != null) {
+          if (c instanceof UIO) {
+            UIO uio = ((UIO)c).getUIInfo().getUI(); 
+            if (uio instanceof Component) {
+              for (Tab tab : stp.tabs) {
+                if (tab.content == uio) {
+                  return tab;
+                }
+              }
+            }
+          }
+          c = c.getParent();
+        }
       }
     }
+    System.out.println("no tab found for "+ c);
     return null;
   }
 

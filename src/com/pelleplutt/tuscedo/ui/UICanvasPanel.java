@@ -39,6 +39,8 @@ public class UICanvasPanel extends JPanel implements UIO {
     UICommon.decorateScrollPane(scrl);
     setLayout(new BorderLayout());
     add(scrl, BorderLayout.CENTER);
+    UICommon.defineCommonActions(renderer, JComponent.WHEN_IN_FOCUSED_WINDOW);
+
   }
 
   public void decorateUI() {

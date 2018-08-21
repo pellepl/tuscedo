@@ -1,31 +1,14 @@
 package com.pelleplutt.tuscedo.ui;
 
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.GradientPaint;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.Paint;
-import java.awt.Rectangle;
-import java.awt.RenderingHints;
+import java.awt.*;
+import java.awt.event.*;
 
-import javax.swing.AbstractAction;
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JScrollBar;
-import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
-import javax.swing.JTextPane;
-import javax.swing.KeyStroke;
-import javax.swing.UIManager;
-import javax.swing.plaf.basic.BasicScrollBarUI;
+import javax.swing.*;
+import javax.swing.plaf.basic.*;
 
-import com.pelleplutt.tuscedo.Settings;
-import com.pelleplutt.tuscedo.Settings.ModCallback;
-import com.pelleplutt.tuscedo.Tuscedo;
-import com.pelleplutt.util.FastTextPane;
+import com.pelleplutt.tuscedo.*;
+import com.pelleplutt.tuscedo.Settings.*;
+import com.pelleplutt.util.*;
 
 public class UICommon {
   public static final Font COMMON_FONT = new Font(Font.MONOSPACED, Font.PLAIN, 11);
@@ -310,16 +293,20 @@ public class UICommon {
   }
   
   public static void defineAction(JComponent c, String name, String keys, 
-      AbstractAction action) {
+      int when, AbstractAction action) {
     KeyMap key = KeyMap.getKeyDef(name);
     if (key == null) {
       key = KeyMap.fromString(keys);
       KeyMap.set(name, keys);
     }
-    c.getInputMap(JComponent.WHEN_FOCUSED).put(
+    c.getInputMap(when).put(
         KeyStroke.getKeyStroke(key.keyCode, key.modifiers),
         name);
     c.getActionMap().put(name, action);
+  }
+  public static void defineAction(JComponent c, String name, String keys, 
+      AbstractAction action) {
+    defineAction(c, name, keys, JComponent.WHEN_FOCUSED, action);
   }
 
   public static void defineAnonAction(JComponent c, String name, String keys, int when, 
@@ -399,4 +386,46 @@ public class UICommon {
       return createZeroButton();
     }
   } // class SpecScrollBarUI
+
+  public static void defineCommonActions(JComponent c, int when) {
+    UICommon.defineAction(c, "input.addtab", "ctrl+shift+t", when, actionAddTab);
+    UICommon.defineAction(c, "input.seltab1", "ctrl+shift+1",when, actionSelTab[0]);
+    UICommon.defineAction(c, "input.seltab2", "ctrl+shift+2",when, actionSelTab[1]);
+    UICommon.defineAction(c, "input.seltab3", "ctrl+shift+3",when, actionSelTab[2]);
+    UICommon.defineAction(c, "input.seltab4", "ctrl+shift+4",when, actionSelTab[3]);
+    UICommon.defineAction(c, "input.seltab5", "ctrl+shift+5",when, actionSelTab[4]);
+    UICommon.defineAction(c, "input.seltab6", "ctrl+shift+6",when, actionSelTab[5]);
+    UICommon.defineAction(c, "input.seltab7", "ctrl+shift+7",when, actionSelTab[6]);
+    UICommon.defineAction(c, "input.seltab8", "ctrl+shift+8",when, actionSelTab[7]);
+    UICommon.defineAction(c, "input.seltab9", "ctrl+shift+9",when, actionSelTab[8]);
+    UICommon.defineAction(c, "input.seltab10", "ctrl+shift+0",when, actionSelTab[9]);
+  }
+  
+  static AbstractAction actionAddTab = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      System.out.println((Component)e.getSource()); 
+      Tuscedo.inst().addWorkAreaTab(
+          UISimpleTabPane.getTabByComponent((Component)e.getSource()).getPane(), null);
+    }
+  };
+  
+  static AbstractAction actionSelTab[] = new AbstractAction[10];
+  static {
+    for (int i = 0; i < 10; i++) {
+      final int j = i;
+      actionSelTab[i] = new AbstractAction() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+          selectTab(j, (Component)e.getSource());
+        }
+      };
+    }
+  }
+  
+  static void selectTab(int ix, Component c) {
+    UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent(c); 
+    UISimpleTabPane stp = t.getPane();
+    stp.selectTab(ix);
+  }
 }

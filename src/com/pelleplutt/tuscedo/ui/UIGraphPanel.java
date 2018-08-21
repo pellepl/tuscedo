@@ -441,6 +441,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
             unselect();
           }
         });
+    UICommon.defineCommonActions(renderer, JComponent.WHEN_IN_FOCUSED_WINDOW);
 
     renderer.setFocusable(true);
     renderer.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 9));

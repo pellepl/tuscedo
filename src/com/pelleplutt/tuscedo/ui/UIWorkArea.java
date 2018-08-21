@@ -295,18 +295,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       UICommon.defineAction(input[i], "input.openserial", "ctrl+o", actionOpenSerialConfig);
       UICommon.defineAction(input[i], "input.closeserial", "ctrl+shift+o", actionCloseSerial);
       UICommon.defineAction(input[i], "input.help", "f1", actionShowHelp);
-      UICommon.defineAction(input[i], "input.addtab", "ctrl+shift+t", actionAddTab);
       UICommon.defineAction(input[i], "input.closetab", "ctrl+d", actionCloseTab);
-      UICommon.defineAction(input[i], "input.seltab1", "ctrl+shift+1", actionSelTab1);
-      UICommon.defineAction(input[i], "input.seltab2", "ctrl+shift+2", actionSelTab2);
-      UICommon.defineAction(input[i], "input.seltab3", "ctrl+shift+3", actionSelTab3);
-      UICommon.defineAction(input[i], "input.seltab4", "ctrl+shift+4", actionSelTab4);
-      UICommon.defineAction(input[i], "input.seltab5", "ctrl+shift+5", actionSelTab5);
-      UICommon.defineAction(input[i], "input.seltab6", "ctrl+shift+6", actionSelTab6);
-      UICommon.defineAction(input[i], "input.seltab7", "ctrl+shift+7", actionSelTab7);
-      UICommon.defineAction(input[i], "input.seltab8", "ctrl+shift+8", actionSelTab8);
-      UICommon.defineAction(input[i], "input.seltab9", "ctrl+shift+9", actionSelTab9);
-      UICommon.defineAction(input[i], "input.seltab10", "ctrl+shift+0", actionSelTab10);
       UICommon.defineAction(input[i], "input.bash", "ctrl+b", actionOpenBash);
       UICommon.defineAction(input[i], "input.complete", "ctrl+space", actionOpenCompletion);
       UICommon.defineAction(input[i], "log.input.split", "ctrl+w", actionSplit);
@@ -321,6 +310,8 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       UICommon.defineAction(input[i], "log.input.end", "ctrl+end", actionLogEnd);
       UICommon.defineAction(input[i], "log.input.xtermtoggle", "ctrl+shift+x", actionLogXtermToggle);
 
+      UICommon.defineCommonActions(input[i], JComponent.WHEN_FOCUSED);
+      
       inputLabel[i] = new JLabel();
       inputLabel[i].setFont(UICommon.COMMON_FONT);
       inputLabel[i].setBackground(UICommon.colInputFg);
@@ -1168,79 +1159,10 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     }
   };
 
-  AbstractAction actionAddTab = new AbstractAction() {
-    @Override
-    public void actionPerformed(ActionEvent e) {
-      Tuscedo.inst().addWorkAreaTab(
-          UISimpleTabPane.getTabByComponent(UIWorkArea.this).getPane(), null);
-    }
-  };
-
   AbstractAction actionCloseTab = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
       closeTab();
-    }
-  };
-
-  AbstractAction actionSelTab1 = new AbstractAction() {
-    @Override
-    public void actionPerformed(ActionEvent e) {
-      selectTab(0);
-    }
-  };
-  AbstractAction actionSelTab2 = new AbstractAction() {
-    @Override
-    public void actionPerformed(ActionEvent e) {
-      selectTab(1);
-    }
-  };
-  AbstractAction actionSelTab3 = new AbstractAction() {
-    @Override
-    public void actionPerformed(ActionEvent e) {
-      selectTab(2);
-    }
-  };
-  AbstractAction actionSelTab4 = new AbstractAction() {
-    @Override
-    public void actionPerformed(ActionEvent e) {
-      selectTab(3);
-    }
-  };
-  AbstractAction actionSelTab5 = new AbstractAction() {
-    @Override
-    public void actionPerformed(ActionEvent e) {
-      selectTab(4);
-    }
-  };
-  AbstractAction actionSelTab6 = new AbstractAction() {
-    @Override
-    public void actionPerformed(ActionEvent e) {
-      selectTab(5);
-    }
-  };
-  AbstractAction actionSelTab7 = new AbstractAction() {
-    @Override
-    public void actionPerformed(ActionEvent e) {
-      selectTab(6);
-    }
-  };
-  AbstractAction actionSelTab8 = new AbstractAction() {
-    @Override
-    public void actionPerformed(ActionEvent e) {
-      selectTab(7);
-    }
-  };
-  AbstractAction actionSelTab9 = new AbstractAction() {
-    @Override
-    public void actionPerformed(ActionEvent e) {
-      selectTab(8);
-    }
-  };
-  AbstractAction actionSelTab10 = new AbstractAction() {
-    @Override
-    public void actionPerformed(ActionEvent e) {
-      selectTab(9);
     }
   };
 
