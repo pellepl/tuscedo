@@ -235,7 +235,28 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     if (args.length > 0 && args[0].endsWith(".op")) {
       UIWorkArea wa = new UIWorkArea();
       wa.build();
+      wa.getScript().currentWA = wa;
       wa.getScript().runScript(wa, new File(args[0]), args[0]);
+    } else if (args.length > 0 && args[0].equals("-nogui")) {
+      UIWorkArea wa = new UIWorkArea();
+      wa.build();
+      wa.getScript().currentWA = wa;
+      BufferedReader buffer=new BufferedReader(new InputStreamReader(System.in));
+      String input = "";
+      while (true) {
+        String line = null;
+        try { line = buffer.readLine(); } catch (IOException e) { }
+        if (line == null) break;
+        if (line.trim().endsWith("\\")) {
+          int sep = line.lastIndexOf('\\');
+          input += line.substring(0,sep)+"\n";
+          continue;
+        } else {
+          input += line + "\n";
+        }
+        wa.getScript().runScript(wa, input);
+        input = "";
+      }
     } else {
       EventQueue.invokeLater(new Runnable() {
         public void run() {

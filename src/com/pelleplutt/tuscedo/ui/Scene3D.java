@@ -704,9 +704,9 @@ public class Scene3D {
 
     glfwDestroyWindow(window);
     //glDeleteProgram(progGL);
-    keyCallback.free();
+    if (keyCallback != null) keyCallback.free();
     glfwTerminate();
-    errorCallback.free();
+    if (errorCallback != null) errorCallback.free();
   }
   
   public BufferedImage getImage() {

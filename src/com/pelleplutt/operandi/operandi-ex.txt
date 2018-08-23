@@ -1,0 +1,263 @@
+==== OPERANDI ====
+
+Keywords:
+  module    func      if        else      while     in
+  for       break     continue  return    goto      me
+  global    $argc     $argv     $<num>    nil       __BKPT
+
+Loosely typed. C-like. Code treated as variables, lambdas.
+
+
+
+=== LOOPS ===
+
+Classic for loop
+  for (i = 0; i < 10; i++) println(i);
+
+Classic while loop
+  i = 0;
+  while (i < 10) println(i++);
+
+Array iterating for loop
+  for (i in [0,1,2,3,4,5,6,7,8,9]) println(i);
+
+Range iterating for loop
+  for (i in 0#9) println(i);
+
+Range lambda loop
+  (0#9)[{println($0);}]
+  
+  
+  
+=== FUNCTIONS and LAMBDAS ===
+
+Functions are declared with 'func' keyword
+  func my_function(x, y) {
+    return x+y;
+  }
+
+Arguments and argument count can be accessed with $argv and $argc
+  func my_function(x, y) {
+    if ($argc != 2) {
+      println("error");
+      return 0;
+    } 
+    return $argv[0]+$argv[1];
+  }
+
+Arguments can also be accessed by $<argnum>
+  func my_function(x, y) {
+    return $0+$1;
+  }
+  
+Lambdas, or anonymous functions, are declared like this
+  l = { println("hello world") };
+  
+Lamdas takes anonymous arguments
+  l = { println("hello world, I'm " + $0) };
+  l("Alex");
+
+Lambas as iterators - $0 is the set entry, and $1 is the set index
+  array = [1,2,3,4];
+  array[{println($0);}]; // prints 1,2,3,4
+ 
+Undefined arguments are always nil
+
+  
+  
+=== VARIABLES ===
+
+Variable declaration, typeless
+  var;              // declared, will be nil
+  
+Variable declaration and assignment
+  var=1;            // declared - if not declared before
+  
+Scopes, example 1
+  var = 1;          // declared
+  if (var == 1) {
+    var;            // new var, declared locally for this scope
+    var = 2;
+    println(var);   // prints 2 (the local) 
+  }
+  println(var);     // prints 1
+  
+Scopes, example 2
+  var = 1;          // declared
+  if (var == 1) {
+    var = 2;        // reassigns the var declared above
+    println(var);   // prints 2 
+  }
+  println(var);     // prints 2
+  
+Global definition, declares a variable as global in an inner scope
+  var = 1;          // declared
+  if (var == 1) {
+    global glob;    // globally declared
+    glob = 3;
+    println(glob);  // prints 3 
+  }
+  println(glob);    // glob accessible, prints 3
+
+=== SETS ===
+
+== RANGES ==
+
+Ranges takes O(1) memory. In all other senses ranges are regarded as arrays,
+but immutable.
+
+Create a range
+  n = 0#9;
+
+Create a range going backwards
+  n = 9#0;
+
+Create a range with defined step
+  n = 0#0.5#9;
+
+== ARRAYS ==
+
+Create an array
+  a = [1,2,'three',4];
+  
+Access an array
+  println(a[2]);
+
+Add element to array
+  a += "test";
+
+Remove element from array
+  a[2] = nil;
+
+Create a zero array with 10 elements
+  a = (0#9)[return 0];
+
+Make new array with all elements being less than 5
+  small_a = a[$0 < 5];
+
+Multiply each element with 2 in array
+  mul_a = a[return $0*2];
+
+Remove all threes from array
+  nothree_a = a[{if ($0 == 3) return nil; else return $0;}];
+
+Remove every second element
+  half_a = a[{if ($1 & 1) return nil; else return $0;}];
+  half_a = a[0#2#len(a)-1];
+
+Create a 2D matrix filled with function values
+  func f(x, y) {
+    return sin(x) + cos(y);
+  }
+  matrix = (0#0.1#1)[{
+    y=$0;
+    return (0#0.1#1)[{
+      x=$0;
+      return f(x,y);
+    }];
+  }];
+
+Reverse an array
+  rev_a = a[len(a)-1#0];
+
+Duplicate each element in an array
+  fat_a = a[0#0.5#len(a)-0.5];
+
+
+
+== MAPS ==
+
+Create a map
+  m = [1:100, 'test':2, 'foo':'bar'];
+  
+Access a map
+  println(m[1]);
+  println(m.test); // dot operator for string keys
+  
+Add an entry to a map
+  m['new'] = 'hi';  
+  m += ('new':'hi');
+  
+Remove an entry from a map
+  m['new'] = nil;
+  m.new = nil;
+  
+Iterate through a map
+  for (e in m) println(e.key + "=" + e.val);
+  
+Get array of keys
+  k = m[return $0.key];
+
+Get array of values
+  v = m[return $0.val];
+  
+Make a map from two arrays
+  akey = ['a','b','c'];
+  aval = [1,2,3];
+  map = akey[return (akey[$1]:aval[$1])];
+  
+Maps can hold functions
+  func op_add(x,y) { println(x+y); }
+  func op_sub(x,y) { println(x-y); }
+  alu = ['add':op_add, 'sub':op_sub, 'mul':{println($0*$1);} ];
+  alu.add(1,2);
+  alu['add'](1,2);
+
+
+
+=== TUPLES ===
+
+Declare a tuple
+  t = ('k':123);
+  
+A tuple is basically a map entry, consisting of a key and a value
+  map += t;
+  println(t.key);
+  println(t.value);
+
+
+
+=== OO ===
+
+Maps are instances. Called with dot (.). Keyword 'me' will refer to the map
+being dotted. Ex:
+
+  func incage(x) {
+    me.age += x;
+  }
+
+  inst = [
+    'age' : 10,
+    'name' : 'Alex',
+    'hi' : { println("Hi I'm " + me.name + ", I'm " + me.age + " years old"); },
+    'yearspass' : incage
+  ]; 
+
+$ inst.hi();
+> Hi I'm Alex, I'm 10 years old
+$ inst.yearspass(10);
+$ inst.hi();
+> Hi I'm Alex, I'm 20 years old
+
+
+
+=== MODULES ===
+
+Modules are namespaces. Declared in top of a file.
+
+file1:
+  module moda;
+
+  var_a = 10;  
+  func fa(a) { return a*var_a; }
+  
+file2:
+  module modb;
+  
+  var_b = 11;
+  func fb(b) { return b/var_b; }
+  
+Accessed by dot operator
+
+   moda.fa(modb.var_b);
+   modb.fb(moda.var_a);

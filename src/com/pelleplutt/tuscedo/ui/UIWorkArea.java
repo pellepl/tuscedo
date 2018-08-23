@@ -283,6 +283,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       String histPath = System.getProperty("user.home") + File.separator + 
           Essential.userSettingPath + File.separator + Essential.historyFile + i;
       input[i].setupHistory(histPath, 4096, 1024); // TODO configurable
+      UICommon.defineCommonActions(input[i], JComponent.WHEN_FOCUSED);
       UICommon.defineAction(input[i], "input.find", "ctrl+f", actionOpenFind);
       UICommon.defineAction(input[i], "input.findback", "ctrl+shift+f", actionOpenFindBack);
       UICommon.defineAction(input[i], "input.findregx", "alt+f", actionOpenFindRegex);
@@ -310,7 +311,6 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       UICommon.defineAction(input[i], "log.input.end", "ctrl+end", actionLogEnd);
       UICommon.defineAction(input[i], "log.input.xtermtoggle", "ctrl+shift+x", actionLogXtermToggle);
 
-      UICommon.defineCommonActions(input[i], JComponent.WHEN_FOCUSED);
       
       inputLabel[i] = new JLabel();
       inputLabel[i].setFont(UICommon.COMMON_FONT);
@@ -701,25 +701,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
             script.dumpDbgHelp();
           }
         } else {
-          if (in.startsWith("#load ")) {
-            String fullpath = in.substring("#load ".length());
-            int pathDelim = fullpath.lastIndexOf(File.separator);
-            String path = pathDelim >= 0 ? fullpath.substring(0, pathDelim) : ".";
-            String file = pathDelim >= 0 ? fullpath.substring(pathDelim+1) : fullpath;
-            List<File> files = AppSystem.findFiles(path, file, false);
-            System.out.println(path + " " + file + " " + files);
-            for (File f : files) {
-              String s = AppSystem.readFile(f);
-              if (s == null) {
-                getCurrentView().ftp.addText("file " + f.getAbsolutePath() + " not found\n", UICommon.STYLE_BASH_ERR);
-              } else {
-                getCurrentView().ftp.addText("loading file " + f.getAbsolutePath() + "\n", UICommon.STYLE_BASH_INPUT);
-                script.runScript(this, f, s);
-              }
-            }
-          } else if (in.equals("#reset")) {
-            script.resetForce();
-          } else if (in.equals("#init")) {
+          if (in.equals("#init")) {
             runOperandiInitScripts();
           } else {
             getCurrentView().ftp.addText(in + "\n", UICommon.STYLE_BASH_INPUT);

@@ -388,25 +388,34 @@ public class UICommon {
   } // class SpecScrollBarUI
 
   public static void defineCommonActions(JComponent c, int when) {
-    UICommon.defineAction(c, "input.addtab", "ctrl+shift+t", when, actionAddTab);
-    UICommon.defineAction(c, "input.seltab1", "ctrl+shift+1",when, actionSelTab[0]);
-    UICommon.defineAction(c, "input.seltab2", "ctrl+shift+2",when, actionSelTab[1]);
-    UICommon.defineAction(c, "input.seltab3", "ctrl+shift+3",when, actionSelTab[2]);
-    UICommon.defineAction(c, "input.seltab4", "ctrl+shift+4",when, actionSelTab[3]);
-    UICommon.defineAction(c, "input.seltab5", "ctrl+shift+5",when, actionSelTab[4]);
-    UICommon.defineAction(c, "input.seltab6", "ctrl+shift+6",when, actionSelTab[5]);
-    UICommon.defineAction(c, "input.seltab7", "ctrl+shift+7",when, actionSelTab[6]);
-    UICommon.defineAction(c, "input.seltab8", "ctrl+shift+8",when, actionSelTab[7]);
-    UICommon.defineAction(c, "input.seltab9", "ctrl+shift+9",when, actionSelTab[8]);
-    UICommon.defineAction(c, "input.seltab10", "ctrl+shift+0",when, actionSelTab[9]);
+    UICommon.defineAction(c, "common.addtab", "ctrl+shift+t", when, actionAddTab);
+    UICommon.defineAction(c, "common.closetab", "ctrl+d", when, actionCloseTab);
+    UICommon.defineAction(c, "common.seltab1", "ctrl+shift+1",when, actionSelTab[0]);
+    UICommon.defineAction(c, "common.seltab2", "ctrl+shift+2",when, actionSelTab[1]);
+    UICommon.defineAction(c, "common.seltab3", "ctrl+shift+3",when, actionSelTab[2]);
+    UICommon.defineAction(c, "common.seltab4", "ctrl+shift+4",when, actionSelTab[3]);
+    UICommon.defineAction(c, "common.seltab5", "ctrl+shift+5",when, actionSelTab[4]);
+    UICommon.defineAction(c, "common.seltab6", "ctrl+shift+6",when, actionSelTab[5]);
+    UICommon.defineAction(c, "common.seltab7", "ctrl+shift+7",when, actionSelTab[6]);
+    UICommon.defineAction(c, "common.seltab8", "ctrl+shift+8",when, actionSelTab[7]);
+    UICommon.defineAction(c, "common.seltab9", "ctrl+shift+9",when, actionSelTab[8]);
+    UICommon.defineAction(c, "common.seltab10", "ctrl+shift+0",when, actionSelTab[9]);
   }
   
   static AbstractAction actionAddTab = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      System.out.println((Component)e.getSource()); 
       Tuscedo.inst().addWorkAreaTab(
           UISimpleTabPane.getTabByComponent((Component)e.getSource()).getPane(), null);
+    }
+  };
+  
+  static AbstractAction actionCloseTab = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent((Component)e.getSource()); 
+      UISimpleTabPane stp = t.getPane();
+      stp.removeTab(t);
     }
   };
   

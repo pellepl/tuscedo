@@ -23,15 +23,15 @@ public class MConf extends MObj {
     return v == null ? null : new M(v);
   }
 
-  @Override
-  public M get(int ix) {
-    throw new ProcessorError(type + " object cannot be indexed");
-  }
-
-  @Override
-  public M getElement(int ix) {
-    throw new ProcessorError(type + " object cannot be iterated");
-  }
+//  @Override
+//  public M get(int ix) {
+//    throw new ProcessorError(type + " object cannot be indexed");
+//  }
+//
+//  @Override
+//  public M getElement(int ix) {
+//    throw new ProcessorError(type + " object cannot be iterated");
+//  }
 
   @Override
   public void put(Object key, M m) {

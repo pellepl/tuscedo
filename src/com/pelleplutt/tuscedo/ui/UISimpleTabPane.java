@@ -158,7 +158,7 @@ public class UISimpleTabPane extends JPanel implements UIO {
         }
       }
     }
-    System.out.println("no tab found for "+ c);
+    // no tab found, running gui-less?
     return null;
   }
 

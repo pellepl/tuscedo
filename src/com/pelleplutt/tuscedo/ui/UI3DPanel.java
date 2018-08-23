@@ -171,6 +171,8 @@ public class UI3DPanel extends JPanel implements UIO {
     }
     
     int when = JComponent.WHEN_IN_FOCUSED_WINDOW;
+    UICommon.defineCommonActions(renderer, when);
+
     UICommon.defineAnonAction(renderer, "3d.mode", "f1", when, new AbstractAction() {
       @Override
       public void actionPerformed(ActionEvent e) {
@@ -240,7 +242,6 @@ public class UI3DPanel extends JPanel implements UIO {
     registerMotionKeys("down", "3d.mod.down", MODEL_PITCH_DOWN);
     registerMotionKeys("left", "3d.mod.left", MODEL_ROLL_LEFT);
     registerMotionKeys("right", "3d.mod.right", MODEL_ROLL_RIGHT);
-    UICommon.defineCommonActions(renderer, when);
     renderer.setFocusable(true);
 
     renderSpec = new RenderSpec();

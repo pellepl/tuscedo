@@ -30,44 +30,44 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String VAR_CONF = "conf";
   public static final String VAR_INFO = "__info";
   
-  public static final String FN_SERIAL_INFO = "__" + VAR_SERIAL + "_info";
-  public static final String FN_SERIAL_DISCONNECT = "__" + VAR_SERIAL + "_disconnect";
-  public static final String FN_SERIAL_CONNECT = "__" + VAR_SERIAL + "_connect";
-  public static final String FN_SERIAL_TX = "__" + VAR_SERIAL + "_tx";
-  public static final String FN_SERIAL_ON_RX = "__" + VAR_SERIAL + "_on_rx";
-  public static final String FN_SERIAL_ON_RX_CLEAR = "__" + VAR_SERIAL + "_on_rx_clear";
-  public static final String FN_SERIAL_ON_RX_LIST = "__" + VAR_SERIAL + "_on_rx_list";
-  public static final String FN_SERIAL_LOG_START = "__" + VAR_SERIAL + "_log_start";
-  public static final String FN_SERIAL_LOG_AWAIT = "__" + VAR_SERIAL + "_log_await";
-  public static final String FN_SERIAL_LOG_STOP = "__" + VAR_SERIAL + "_log_stop";
-  public static final String FN_SERIAL_LOG_GET = "__" + VAR_SERIAL + "_log_get";
-  public static final String FN_SERIAL_LOG_SIZE = "__" + VAR_SERIAL + "_log_size";
-  public static final String FN_SERIAL_LOG_CLEAR = "__" + VAR_SERIAL + "_log_clear";
+  public static final String FN_SERIAL_INFO = VAR_SERIAL + ":info";
+  public static final String FN_SERIAL_DISCONNECT = VAR_SERIAL + ":disconnect";
+  public static final String FN_SERIAL_CONNECT = VAR_SERIAL + ":connect";
+  public static final String FN_SERIAL_TX = VAR_SERIAL + ":tx";
+  public static final String FN_SERIAL_ON_RX = VAR_SERIAL + ":on_rx";
+  public static final String FN_SERIAL_ON_RX_CLEAR = VAR_SERIAL + ":on_rx_clear";
+  public static final String FN_SERIAL_ON_RX_LIST = VAR_SERIAL + ":on_rx_list";
+  public static final String FN_SERIAL_LOG_START = VAR_SERIAL + ":log_start";
+  public static final String FN_SERIAL_LOG_AWAIT = VAR_SERIAL + ":log_await";
+  public static final String FN_SERIAL_LOG_STOP = VAR_SERIAL + ":log_stop";
+  public static final String FN_SERIAL_LOG_GET = VAR_SERIAL + ":log_get";
+  public static final String FN_SERIAL_LOG_SIZE = VAR_SERIAL + ":log_size";
+  public static final String FN_SERIAL_LOG_CLEAR = VAR_SERIAL + ":log_clear";
   
-  public static final String FN_NET_IFC = "__" + VAR_NET + "_ifc";
-  public static final String FN_NET_GET = "__" + VAR_NET + "_get";
-  public static final String FN_NET_LOCALHOST = "__" + VAR_NET + "_localhost";
+  public static final String FN_NET_IFC = VAR_NET + ":ifc";
+  public static final String FN_NET_GET = VAR_NET + ":get";
+  public static final String FN_NET_LOCALHOST = VAR_NET + ":localhost";
 
-  public static final String FN_SYS_EXEC = "__" + VAR_SYSTEM + "_exec";
-  public static final String FN_SYS_GET_HOME = "__" + VAR_SYSTEM + "_get_home";
+  public static final String FN_SYS_EXEC = VAR_SYSTEM + ":exec";
+  public static final String FN_SYS_GET_HOME = VAR_SYSTEM + ":get_home";
 
-  public static final String FN_DISK_LS = "__" + VAR_DISK + "_ls";
-  public static final String FN_DISK_FIND_FILE = "__" + VAR_DISK + "_find_file";
-  public static final String FN_DISK_READ = "__" + VAR_DISK + "_read";
-  public static final String FN_DISK_READB = "__" + VAR_DISK + "_readb";
-  public static final String FN_DISK_WRITE = "__" + VAR_DISK + "_write";
-  public static final String FN_DISK_WRITEB = "__" + VAR_DISK + "_writeb";
-  public static final String FN_DISK_STAT = "__" + VAR_DISK + "_stat";
-  public static final String FN_DISK_MOVE = "__" + VAR_DISK + "_move";
-  public static final String FN_DISK_COPY = "__" + VAR_DISK + "_copy";
+  public static final String FN_DISK_LS =  VAR_DISK + ":ls";
+  public static final String FN_DISK_FIND_FILE =  VAR_DISK + ":find_file";
+  public static final String FN_DISK_READ =  VAR_DISK + ":read";
+  public static final String FN_DISK_READB =  VAR_DISK + ":readb";
+  public static final String FN_DISK_WRITE =  VAR_DISK + ":write";
+  public static final String FN_DISK_WRITEB =  VAR_DISK + ":writeb";
+  public static final String FN_DISK_STAT =  VAR_DISK + ":stat";
+  public static final String FN_DISK_MOVE =  VAR_DISK + ":move";
+  public static final String FN_DISK_COPY =  VAR_DISK + ":copy";
 
-  public static final String FN_UI_CLOSE = "__ui_close";
-  public static final String FN_UI_GET_NAME = "__ui_get_name";
-  public static final String FN_UI_SET_NAME = "__ui_set_name";
-  public static final String FN_UI_GET_ID = "__ui_get_id";
-  public static final String FN_UI_GET_ANCESTOR = "__ui_ancestor";
-  public static final String FN_UI_GET_PARENT = "__ui_parent";
-  public static final String FN_UI_GET_CHILDREN = "__ui_children";
+  public static final String FN_UI_CLOSE = "ui:close";
+  public static final String FN_UI_GET_NAME = "ui:get_name";
+  public static final String FN_UI_SET_NAME = "ui:set_name";
+  public static final String FN_UI_GET_ID = "ui:get_id";
+  public static final String FN_UI_GET_ANCESTOR = "ui:get_ancestor";
+  public static final String FN_UI_GET_PARENT = "ui:get_parent";
+  public static final String FN_UI_GET_CHILDREN = "ui:get_children";
 
   public static final String KEY_UI_ID = ".uio_id";
 
@@ -533,18 +533,27 @@ public class OperandiScript implements Runnable, Disposable {
             currentWA.appendViewText(currentWA.getCurrentView(), args[0].asString() + help + "\n", UICommon.STYLE_SERIAL_INFO);
           }
         } else {
+          List<String> h = new ArrayList<>();
           for (String k : extDefs.keySet()) {
-            if (k.startsWith("__")) continue;
+            if (k.contains(":")) continue;
             String help = defhelp.get(k);
             if (help == null) help = "";
-            currentWA.appendViewText(currentWA.getCurrentView(), k + help + "\n", UICommon.STYLE_SERIAL_INFO);
+            h.add(k + help);
+            
           }
+          h.sort(null);
+          for (String s : h) currentWA.appendViewText(currentWA.getCurrentView(), s + "\n", UICommon.STYLE_SERIAL_INFO);
+          h.clear();
+          
           for (String k : extDefs.keySet()) {
-            if (!k.startsWith("__")) continue;
+            if (!k.contains(":")) continue;
             String help = defhelp.get(k);
             if (help == null) help = "";
-            currentWA.appendViewText(currentWA.getCurrentView(), k + help + "\n", UICommon.STYLE_SERIAL_INFO);
+            h.add(k + help);
           }
+          h.sort(null);
+          for (String s : h) currentWA.appendViewText(currentWA.getCurrentView(), s + "\n", UICommon.STYLE_SERIAL_INFO);
+          h.clear();
         }
         return null;
       }
@@ -610,9 +619,26 @@ public class OperandiScript implements Runnable, Disposable {
   }
   
   public void runScript(UIWorkArea wa, String s) {
-    synchronized (q) {
-      q.add(new RunRequest(wa, new Source.SourceString("cli", s)));
-      q.notifyAll();
+    if (s.startsWith("#reset") && s.length() < 8) {
+      resetForce();
+    } else if (s.startsWith("#load ")) {
+      String fullpath = s.substring("#load ".length()).trim();
+      int pathDelim = fullpath.lastIndexOf(File.separator);
+      String path = pathDelim >= 0 ? fullpath.substring(0, pathDelim) : ".";
+      String file = pathDelim >= 0 ? fullpath.substring(pathDelim+1) : fullpath;
+      List<File> files = AppSystem.findFiles(path, file, false);
+      System.out.println(path + " " + file + " " + files);
+      for (File f : files) {
+        String scr = AppSystem.readFile(f);
+        if (scr != null) {
+          runScript(wa, f, scr);
+        }
+      }
+    } else {
+      synchronized (q) {
+        q.add(new RunRequest(wa, new Source.SourceString("cli", s)));
+        q.notifyAll();
+      }
     }
   }
   
@@ -1153,21 +1179,22 @@ public class OperandiScript implements Runnable, Disposable {
     return new MObj(currentWA, comp, "graph") {
       @Override
       public void init(UIWorkArea wa, Compiler comp) {
-        addFunc("add", "__graph_add", comp);
-        addFunc("data", "__graph_data", comp);
-        addFunc("zoom_all", "__graph_zoom_all", comp);
-        addFunc("zoom", "__graph_zoom", comp);
-        addFunc("zoom_x", "__graph_zoom_x", comp);
-        addFunc("zoom_y", "__graph_zoom_y", comp);
-        addFunc("set_type", "__graph_type", comp);
-        addFunc("count", "__graph_count", comp);
-        addFunc("scroll_x", "__graph_scroll_x", comp);
-        addFunc("scroll_y", "__graph_scroll_y", comp);
-        addFunc("scroll_sample", "__graph_scroll_sample", comp);
-        addFunc("set_mul", "__graph_set_mul", comp);
-        addFunc("min", "__graph_min", comp);
-        addFunc("max", "__graph_max", comp);
-        addFunc("merge", "__graph_merge", comp);
+        addFunc("add", "graph:add", comp);
+        addFunc("data", "graph:data", comp);
+        addFunc("zoom_all", "graph:zoom_all", comp);
+        addFunc("zoom", "graph:zoom", comp);
+        addFunc("zoom_x", "graph:zoom_x", comp);
+        addFunc("zoom_y", "graph:zoom_y", comp);
+        addFunc("set_type", "graph:type", comp);
+        addFunc("count", "graph:count", comp);
+        addFunc("scroll_x", "graph:scroll_x", comp);
+        addFunc("scroll_y", "graph:scroll_y", comp);
+        addFunc("scroll_sample", "graph:scroll_sample", comp);
+        addFunc("set_mul", "graph:set_mul", comp);
+        addFunc("set_offs", "graph:set_offs", comp);
+        addFunc("min", "graph:min", comp);
+        addFunc("max", "graph:max", comp);
+        addFunc("join", "graph:join", comp);
       }
     };
   }
@@ -1213,7 +1240,7 @@ public class OperandiScript implements Runnable, Disposable {
         return mui;
       }
     });
-    setExtDef("__graph_add", "(<data>) - adds data to graph, either as value or as list",
+    setExtDef("graph:add", "(<data>) - adds data to graph, either as value or as list",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -1229,7 +1256,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__graph_data", "() - returns all data of graph as a list",
+    setExtDef("graph:data", "() - returns all data of graph as a list",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
@@ -1241,7 +1268,7 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(msetc);
       }
     });
-    setExtDef("__graph_zoom_all", "() - makes all data visible",
+    setExtDef("graph:zoom_all", "() - makes all data visible",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
@@ -1252,7 +1279,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__graph_zoom", "(<horizontal>, <vertical>) - set zooming factors",
+    setExtDef("graph:zoom", "(<horizontal>, <vertical>) - set zooming factors",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 2)  return null;
@@ -1262,7 +1289,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__graph_zoom_x", "(<horizontal>) - set horizontal zooming factor",
+    setExtDef("graph:zoom_x", "(<horizontal>) - set horizontal zooming factor",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -1272,7 +1299,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__graph_zoom_y", "(<vertical>) - set vertical zooming factor",
+    setExtDef("graph:zoom_y", "(<vertical>) - set vertical zooming factor",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -1282,7 +1309,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__graph_type", "(<line|plot|bar>) - set graph type",
+    setExtDef("graph:type", "(<line|plot|bar>) - set graph type",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -1292,7 +1319,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__graph_count", "() - returns number of graph samples",
+    setExtDef("graph:count", "() - returns number of graph samples",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
@@ -1300,7 +1327,7 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(ss.getSampleCount());
       }
     });
-    setExtDef("__graph_get","(<index>) - returns sample at index", 
+    setExtDef("graph:get","(<index>) - returns sample at index", 
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -1309,7 +1336,7 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)(ss.getSample(args[0].asInt())));
       }
     });
-    setExtDef("__graph_scroll_x", "(<sampleindex>) - scrolls horizontally to sample index",
+    setExtDef("graph:scroll_x", "(<sampleindex>) - scrolls horizontally to sample index",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -1319,7 +1346,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__graph_scroll_y", "(<samplevalue>) - scrolls vertically to sample value",
+    setExtDef("graph:scroll_y", "(<samplevalue>) - scrolls vertically to sample value",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -1329,7 +1356,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__graph_scroll_sample", "(<sampleindex>) - scrolls to sample",
+    setExtDef("graph:scroll_sample", "(<sampleindex>) - scrolls to sample",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -1339,7 +1366,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__graph_set_mul", "(<factor>) - set graph multiplication factor",
+    setExtDef("graph:set_mul", "(<factor>) - set graph multiplication factor",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -1350,7 +1377,18 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__graph_min", "() - returns minimum value",
+    setExtDef("graph:set_offs", "(<offset>) - set graph offset",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
+        if (ss == null) return null;
+        ss.setOffset(args[0].asFloat());
+        ss.repaint();
+        return null;
+      }
+    });
+    setExtDef("graph:min", "() - returns minimum value",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
@@ -1358,7 +1396,7 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)ss.getMin());
       }
     });
-    setExtDef("__graph_max", "() - returns maximum value",
+    setExtDef("graph:max", "() - returns maximum value",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
@@ -1366,7 +1404,7 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)ss.getMax());
       }
     });
-    setExtDef("__graph_merge", "(<graph>, ...) - merges this graph with another, or others",
+    setExtDef("graph:join", "(<graph>, ...) - join this graph with another, or others",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -1403,16 +1441,16 @@ public class OperandiScript implements Runnable, Disposable {
     return new MObj(currentWA, comp, "canvas") {
       @Override
       public void init(UIWorkArea wa, Compiler comp) {
-        addFunc("set_color", "__canvas_set_color", comp);
-        addFunc("draw_line", "__canvas_draw_line", comp);
-        addFunc("draw_rect", "__canvas_draw_rect", comp);
-        addFunc("fill_rect", "__canvas_fill_rect", comp);
-        addFunc("draw_oval", "__canvas_draw_oval", comp);
-        addFunc("fill_oval", "__canvas_fill_oval", comp);
-        addFunc("draw_text", "__canvas_draw_text", comp);
-        addFunc("get_width", "__canvas_width", comp);
-        addFunc("get_height", "__canvas_height", comp);
-        addFunc("blit", "__canvas_blit", comp);
+        addFunc("set_color", "canvas:set_color", comp);
+        addFunc("draw_line", "canvas:draw_line", comp);
+        addFunc("draw_rect", "canvas:draw_rect", comp);
+        addFunc("fill_rect", "canvas:fill_rect", comp);
+        addFunc("draw_oval", "canvas:draw_oval", comp);
+        addFunc("fill_oval", "canvas:fill_oval", comp);
+        addFunc("draw_text", "canvas:draw_text", comp);
+        addFunc("get_width", "canvas:width", comp);
+        addFunc("get_height", "canvas:height", comp);
+        addFunc("blit", "canvas:blit", comp);
       }
     };
   }
@@ -1441,7 +1479,12 @@ public class OperandiScript implements Runnable, Disposable {
           }
         }
         
-        String id = Tuscedo.inst().addCanvasTab(UISimpleTabPane.getTabByComponent(currentWA).getPane(), w, h);
+        Tab tab = UISimpleTabPane.getTabByComponent(currentWA);
+        if (tab == null) {
+          Tuscedo.inst().create(currentWA);
+          tab = UISimpleTabPane.getTabByComponent(currentWA);
+        }
+        String id = Tuscedo.inst().addCanvasTab(tab.getPane(), w, h);
         UICanvasPanel ui = ((UICanvasPanel)Tuscedo.inst().getUIObject(id).getUI()); 
         ui.getUIInfo().setName(name);
         
@@ -1451,7 +1494,7 @@ public class OperandiScript implements Runnable, Disposable {
         return mui;
       }
     });
-    setExtDef("__canvas_set_color", "(<color>) - sets current color",
+    setExtDef("canvas:set_color", "(<color>) - sets current color",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -1461,7 +1504,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__canvas_draw_line", "(<x1>,<y1>,<x2>,<y2>) - draws a line",
+    setExtDef("canvas:draw_line", "(<x1>,<y1>,<x2>,<y2>) - draws a line",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 4)  return null;
@@ -1471,7 +1514,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__canvas_draw_rect", "(<x>,<y>,<w>,<h>) - draws a rectangle",
+    setExtDef("canvas:draw_rect", "(<x>,<y>,<w>,<h>) - draws a rectangle",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 4)  return null;
@@ -1481,7 +1524,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__canvas_fill_rect", "(<x>,<y>,<w>,<h>) - draws a filled rectangle",
+    setExtDef("canvas:fill_rect", "(<x>,<y>,<w>,<h>) - draws a filled rectangle",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null)  return null;
@@ -1495,7 +1538,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__canvas_draw_oval", "(<x>,<y>,<w>,<h>) - draws an oval",
+    setExtDef("canvas:draw_oval", "(<x>,<y>,<w>,<h>) - draws an oval",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 4)  return null;
@@ -1505,7 +1548,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__canvas_fill_oval", "(<x>,<y>,<w>,<h>) - draws a filled oval",
+    setExtDef("canvas:fill_oval", "(<x>,<y>,<w>,<h>) - draws a filled oval",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 4)  return null;
@@ -1515,7 +1558,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__canvas_draw_text", "(<x>,<y>,<text>) - draws text",
+    setExtDef("canvas:draw_text", "(<x>,<y>,<text>) - draws text",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 3)  return null;
@@ -1525,7 +1568,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__canvas_width", "() - returns width",
+    setExtDef("canvas:width", "() - returns width",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
@@ -1533,7 +1576,7 @@ public class OperandiScript implements Runnable, Disposable {
         return new Processor.M(cp.getWidth());
       }
     });
-    setExtDef("__canvas_height", "() - returns height",
+    setExtDef("canvas:height", "() - returns height",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
@@ -1541,7 +1584,7 @@ public class OperandiScript implements Runnable, Disposable {
         return new Processor.M(cp.getHeight());
       }
     });
-    setExtDef("__canvas_blit", "() - blits changes to canvas",
+    setExtDef("canvas:blit", "() - blits changes to canvas",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
@@ -1556,16 +1599,16 @@ public class OperandiScript implements Runnable, Disposable {
     return new MObj(currentWA, comp, "graph3d") {
       @Override
       public void init(UIWorkArea wa, Compiler comp) {
-        addFunc("get_width", "__3d_width", comp);
-        addFunc("get_height", "__3d_height", comp);
-        addFunc("set_pos", "__3d_set_pos", comp);
-        addFunc("set_view", "__3d_set_view", comp);
-        addFunc("set_size", "__3d_set_size", comp);
-        addFunc("set_model_heightmap", "__3d_set_model_heightmap", comp);
-        addFunc("set_model_heightmap_color", "__3d_set_model_heightmap_color", comp);
-        addFunc("set_model_cloud", "__3d_set_model_cloud", comp);
-        addFunc("set_model_cloud_color", "__3d_set_model_cloud_color", comp);
-        addFunc("blit", "__3d_blit", comp);
+        addFunc("get_width", "graph3d:width", comp);
+        addFunc("get_height", "graph3d:height", comp);
+        addFunc("set_pos", "graph3d:set_pos", comp);
+        addFunc("set_view", "graph3d:set_view", comp);
+        addFunc("set_size", "graph3d:set_size", comp);
+        addFunc("set_model_heightmap", "graph3d:set_model_heightmap", comp);
+        addFunc("set_model_heightmap_color", "graph3d:set_model_heightmap_color", comp);
+        addFunc("set_model_cloud", "graph3d:set_model_cloud", comp);
+        addFunc("set_model_cloud_color", "graph3d:set_model_cloud_color", comp);
+        addFunc("blit", "graph3d:blit", comp);
       }
     };
   }
@@ -1637,9 +1680,16 @@ public class OperandiScript implements Runnable, Disposable {
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         String name = "GRAPH3D";
-        UISimpleTabPane tpane = UISimpleTabPane.getTabByComponent(currentWA).getPane();
-        int w = tpane.getWidth();
-        int h = tpane.getHeight() - UISimpleTabPane.getTabByComponent(currentWA).getHeight();
+        int w = 400; int h = 300;
+        Tab tab = UISimpleTabPane.getTabByComponent(currentWA);
+        if (tab == null) {
+          Tuscedo.inst().create(currentWA);
+          tab = UISimpleTabPane.getTabByComponent(currentWA);
+        }
+        UISimpleTabPane tpane = null;
+        tpane = tab.getPane();
+        w = tpane.getWidth();
+        h = tpane.getHeight() -tab.getHeight();
         float[][] model = new float[8][8];
         if (args != null && args.length > 0) {
           if (args[0].type == Processor.TSTR) {
@@ -1679,7 +1729,7 @@ public class OperandiScript implements Runnable, Disposable {
         return mui;
       }
     });
-    setExtDef("__3d_width", "() - returns width",
+    setExtDef("graph3d:width", "() - returns width",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
@@ -1687,7 +1737,7 @@ public class OperandiScript implements Runnable, Disposable {
         return new Processor.M(cp.getWidth());
       }
     });
-    setExtDef("__3d_height", "() - returns height",
+    setExtDef("graph3d:height", "() - returns height",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
@@ -1695,7 +1745,7 @@ public class OperandiScript implements Runnable, Disposable {
         return new Processor.M(cp.getHeight());
       }
     });
-    setExtDef("__3d_set_pos", "(<x>, <y>, <z>) - set beholders position",
+    setExtDef("graph3d:set_pos", "(<x>, <y>, <z>) - set beholders position",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
@@ -1704,7 +1754,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__3d_set_view", "(<yaw>, <pitch>, <roll>) - sets beholders viewing orientation",
+    setExtDef("graph3d:set_view", "(<yaw>, <pitch>, <roll>) - sets beholders viewing orientation",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
@@ -1713,7 +1763,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__3d_set_size", "(<width>, <height>) - sets viewport dimensions",
+    setExtDef("graph3d:set_size", "(<width>, <height>) - sets viewport dimensions",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
@@ -1722,7 +1772,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__3d_set_model_heightmap", "(<heightmap>) - sets heightmap data model (array of arrays of floats)",
+    setExtDef("graph3d:set_model_heightmap", "(<heightmap>) - sets heightmap data model (array of arrays of floats)",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
@@ -1731,7 +1781,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__3d_set_model_heightmap_color", "(<heightmap-colored>) - sets colored heightmap data model (array of arrays of 4 float vector [height, red, green, blue])",
+    setExtDef("graph3d:set_model_heightmap_color", "(<heightmap-colored>) - sets colored heightmap data model (array of arrays of 4 float vector [height, red, green, blue])",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
@@ -1740,7 +1790,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__3d_set_model_cloud", "(<cloud>, <isolevel>) - sets point cloud data model (array of arrays of arrays of floats)",
+    setExtDef("graph3d:set_model_cloud", "(<cloud>, <isolevel>) - sets point cloud data model (array of arrays of arrays of floats)",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
@@ -1753,7 +1803,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__3d_set_model_cloud_color", "(<cloud>, <isolevel>) - sets colored point cloud data model (array of arrays of arrays of 4 float vector [height, red, green, blue]))",
+    setExtDef("graph3d:set_model_cloud_color", "(<cloud>, <isolevel>) - sets colored point cloud data model (array of arrays of arrays of 4 float vector [height, red, green, blue]))",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
@@ -1766,7 +1816,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__3d_blit", "() - blits changes to graph",
+    setExtDef("graph3d:blit", "() - blits changes to graph",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
@@ -1782,16 +1832,16 @@ public class OperandiScript implements Runnable, Disposable {
     return new MObj(currentWA, comp, "pane") {
       @Override
       public void init(UIWorkArea wa, Compiler comp) {
-        addFunc("set_pos", "__pane_set_pos", comp);
-        addFunc("get_pos", "__pane_get_pos", comp);
-        addFunc("set_size", "__pane_set_size", comp);
-        addFunc("get_size", "__pane_get_size", comp);
+        addFunc("set_pos", "pane:set_pos", comp);
+        addFunc("get_pos", "pane:get_pos", comp);
+        addFunc("set_size", "pane:set_size", comp);
+        addFunc("get_size", "pane:get_size", comp);
       }
     };
   }
   
   private void createTuscedoTabPaneFunctions() {
-    setExtDef("__pane_set_pos", "(<x>, <y>) - sets position of this ui component", 
+    setExtDef("pane:set_pos", "(<x>, <y>) - sets position of this ui component", 
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 2)  return null;
@@ -1802,7 +1852,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__pane_get_pos",  "() - returns position of this ui component", 
+    setExtDef("pane:get_pos",  "() - returns position of this ui component", 
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         TuscedoTabPane tp= (TuscedoTabPane)getUIOByScriptId(p.getMe());
@@ -1814,7 +1864,7 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(l);
       }
     });
-    setExtDef("__pane_set_size",  "(<w>, <h>) - sets size of this ui component", 
+    setExtDef("pane:set_size",  "(<w>, <h>) - sets size of this ui component", 
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 2)  return null;
@@ -1825,7 +1875,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("__pane_get_size",  "() - returns size of this ui component", 
+    setExtDef("pane:get_size",  "() - returns size of this ui component", 
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         TuscedoTabPane tp= (TuscedoTabPane)getUIOByScriptId(p.getMe());
