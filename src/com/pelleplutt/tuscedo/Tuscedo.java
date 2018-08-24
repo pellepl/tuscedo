@@ -4,6 +4,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.*;
 import java.io.*;
+import java.net.*;
 import java.util.*;
 import java.util.List;
 import java.util.Map.*;
@@ -38,6 +39,9 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   public static Tuscedo inst() {
     if (inst == null) {
       inst = new Tuscedo();
+      try {
+        checkInitScripts();
+      } catch (Throwable t) {t.printStackTrace();}
     }
     return inst;
   }
@@ -190,6 +194,56 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   
   public static Scene3D scene3d = new Scene3D();
   
+  static void checkInitScripts() {
+    File initPath = new File(System.getProperty("user.home") + File.separator + 
+        Essential.userSettingPath + File.separator);
+    try {
+      String initDeclaration = new String(AppSystem.getAppResource("init-op/init-declaration"));
+      String[] initResources = initDeclaration.split("\\r?\\n");
+      for (String initResource : initResources) {
+        boolean copy = false;
+        File initFile = new File(initPath, new File(initResource).getName());
+        if (initFile.exists()) {
+          URL url = Thread.currentThread().getContextClassLoader().getResource(initResource);
+          long resourceDate = url.openConnection().getLastModified();
+          long fileDate = initFile.lastModified();
+          if (resourceDate > fileDate) {
+            copy = true;
+          }
+        } else {
+          copy = true;
+        }
+        if (copy) {
+          AppSystem.copyAppResource(initResource, initFile);
+        }
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+  
+  private static void cli() {
+    UIWorkArea wa = new UIWorkArea();
+    wa.build();
+    wa.getScript().currentWA = wa;
+    BufferedReader buffer=new BufferedReader(new InputStreamReader(System.in));
+    String input = "";
+    while (true) {
+      String line = null;
+      try { line = buffer.readLine(); } catch (IOException e) { }
+      if (line == null) break;
+      if (line.trim().endsWith("\\")) {
+        int sep = line.lastIndexOf('\\');
+        input += line.substring(0,sep)+"\n";
+        continue;
+      } else {
+        input += line + "\n";
+      }
+      wa.getScript().runScript(wa, input);
+      input = "";
+    }
+  }
+  
   public static void main(String[] args) {
     try {
       UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -238,25 +292,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       wa.getScript().currentWA = wa;
       wa.getScript().runScript(wa, new File(args[0]), args[0]);
     } else if (args.length > 0 && args[0].equals("-nogui")) {
-      UIWorkArea wa = new UIWorkArea();
-      wa.build();
-      wa.getScript().currentWA = wa;
-      BufferedReader buffer=new BufferedReader(new InputStreamReader(System.in));
-      String input = "";
-      while (true) {
-        String line = null;
-        try { line = buffer.readLine(); } catch (IOException e) { }
-        if (line == null) break;
-        if (line.trim().endsWith("\\")) {
-          int sep = line.lastIndexOf('\\');
-          input += line.substring(0,sep)+"\n";
-          continue;
-        } else {
-          input += line + "\n";
-        }
-        wa.getScript().runScript(wa, input);
-        input = "";
-      }
+      cli();
     } else {
       EventQueue.invokeLater(new Runnable() {
         public void run() {

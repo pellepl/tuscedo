@@ -1,0 +1,23 @@
+/**
+   Returns a 3D field matrix with specified dimensions as ranges. If function is
+   given it will be called with x, y, and z as parameters, and the matrix will
+   be populated with the functions' return value.
+   If no function is given, the matrix is initialized with zeroes. 
+   @param rw    width range, e.g. -1#0.1#1
+   @param rh    height range, e.g. -1#0.1#1
+   @param rd    depth range, e.g. -1#0.1#1
+   @param f     fill function getting x,y,z as params
+*/
+func matrix(rw, rh, rd, f) {
+  return rd[{
+    z = $0;
+    return rh[{
+      y = $0;
+      return rw[{
+        x = $0;
+        if (f == nil) return 0;
+        else          return f(x,y,z);
+      }];
+    }];
+  }];
+}

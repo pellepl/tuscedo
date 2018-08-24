@@ -1,7 +1,8 @@
 package com.pelleplutt.tuscedo.ui;
 
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
+import java.awt.event.*;
+
+import javax.swing.*;
 
 public abstract class XtermKeyListener implements KeyListener {
   
@@ -37,7 +38,7 @@ public abstract class XtermKeyListener implements KeyListener {
       case KeyEvent.VK_END: sendVT(XT_VT_END); break;
       case KeyEvent.VK_DELETE: sendVT(XT_VT_DELETE); break;
       default: 
-        System.out.println("unhandled " + e);
+        System.out.println("xterm keypressed unhandled " + e);
         break;
       }
     }

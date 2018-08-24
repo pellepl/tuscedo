@@ -577,7 +577,11 @@ public class AST implements Lexer.Emitter {
       // declare
       opers.push(new OpArrDecl(arrdeclid++));
     } else {
-      throw new CompilerError("unhandled operation (" + opString(prevTokix) + ")", exprs.peek());
+      if (exprs.isEmpty()) {
+        throw new CompilerError("syntax error", null);
+      } else {
+        throw new CompilerError("unhandled operation (" + opString(prevTokix) + ")", exprs.peek());
+      }
     }
   }
   

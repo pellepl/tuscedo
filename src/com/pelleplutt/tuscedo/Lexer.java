@@ -255,6 +255,14 @@ public class Lexer {
     createSymbol(root, sym, symid, 0);
   }
 
+  /**
+   * A compound symbol must not be neighboring other compound characters.
+   * E.g. if a-z are compound characters, and "if" is a compound symbol,
+   * then "what if then" will match, but "whatif then" will not match.
+   * Otherwise equals to addSymbol.
+   * @param sym
+   * @param symid
+   */
   public void addSymbolCompound(String sym, int symid) {
     if (root == null) {
       root = new ByteNodes();

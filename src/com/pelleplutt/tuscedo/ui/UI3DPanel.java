@@ -242,7 +242,6 @@ public class UI3DPanel extends JPanel implements UIO {
     registerMotionKeys("down", "3d.mod.down", MODEL_PITCH_DOWN);
     registerMotionKeys("left", "3d.mod.left", MODEL_ROLL_LEFT);
     registerMotionKeys("right", "3d.mod.right", MODEL_ROLL_RIGHT);
-    renderer.setFocusable(true);
 
     renderSpec = new RenderSpec();
     renderSpec.playerPos.set(0, model.length, model.length);
@@ -268,7 +267,6 @@ public class UI3DPanel extends JPanel implements UIO {
     Point clickPointScreen;
     @Override
     public void mouseClicked(MouseEvent arg0) {
-      // TODO Auto-generated method stub
     }
     @Override
     public void mouseDragged(MouseEvent e) {
@@ -278,20 +276,19 @@ public class UI3DPanel extends JPanel implements UIO {
       if (dx != 0 || dy != 0) {
         renderSpec.cameraUpdate(-dx*2f, -dy*2f, 0);
         robot.mouseMove(clickPointScreen.x, clickPointScreen.y);
-        blit();
+        if (timerEntry == null) blit();
       }
     }
     @Override
     public void mouseEntered(MouseEvent arg0) {
-      // TODO Auto-generated method stub
     }
     @Override
     public void mouseExited(MouseEvent arg0) {
       UI3DPanel.this.setCursor(null);
+      keys = 0;
     }
     @Override
     public void mouseMoved(MouseEvent arg0) {
-      // TODO Auto-generated method stub
     }
     @Override
     public void mousePressed(MouseEvent e) {
@@ -304,7 +301,7 @@ public class UI3DPanel extends JPanel implements UIO {
     @Override
     public void mouseWheelMoved(MouseWheelEvent e) {
       renderSpec.cameraWalk(-2f * e.getWheelRotation());
-      blit();
+      if (timerEntry == null) blit();
     }
   };
 
@@ -349,7 +346,7 @@ public class UI3DPanel extends JPanel implements UIO {
   }
   
   static final AffineTransform flip = AffineTransform.getScaleInstance(1d, -1d);
-  void render() {
+  synchronized void render() {
     Graphics2D g = getPriGraphics();
     BufferedImage bi = Tuscedo.inst().render3d(renderSpec);
     AffineTransform tran = AffineTransform.getTranslateInstance(0,
