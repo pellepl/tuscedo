@@ -181,7 +181,7 @@ public class UI3DPanel extends JPanel implements UIO {
         blit();
       }
     });
-    UICommon.defineAnonAction(renderer, "3d.grid.size", "f2", when, new AbstractAction() {
+    UICommon.defineAnonAction(renderer, "3d.grid.size", "f3", when, new AbstractAction() {
       @Override
       public void actionPerformed(ActionEvent e) {
         float m = renderSpec.gridMul;
@@ -196,7 +196,7 @@ public class UI3DPanel extends JPanel implements UIO {
         blit();
       }
     });
-    UICommon.defineAnonAction(renderer, "3d.grid.contrast", "f3", when, new AbstractAction() {
+    UICommon.defineAnonAction(renderer, "3d.grid.contrast", "f2", when, new AbstractAction() {
       @Override
       public void actionPerformed(ActionEvent e) {
         renderSpec.gridContrast += 0.25f;
@@ -256,7 +256,7 @@ public class UI3DPanel extends JPanel implements UIO {
     renderSpec.width = w;
     renderSpec.height = h;
     renderSpec.dimensionDirty = true;
-    renderSpec.lightPos.set(40000f, 40000f, 15000f);
+    renderSpec.lightPos.set(-60, 200, 300);
   }
   public void decorateUI() {
     // TODO decor

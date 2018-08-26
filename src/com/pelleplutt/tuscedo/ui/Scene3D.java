@@ -36,6 +36,11 @@ public class Scene3D {
 
   long window;
 
+  static final float ZNEAR = 0.1f;
+  static final float ZFAR = 5000f;
+  static final float SHADOW_PROJECTION_RADIUS = 40f;
+  static final float SHADOW_Z_BIAS = 0.001f;
+  
   // JOML matrices
   Matrix4f projMatrix = new Matrix4f();
   Matrix4f viewMatrix = new Matrix4f();
@@ -108,9 +113,16 @@ public class Scene3D {
     firstTime = System.nanoTime();
   }
   
+  int progShadowGL;
+  int fbo_depthMap;
+  int texShadowMap;
+  int mLocShadowModelGL;
+  int mLocShadowLightProjGL;
+  
   int progModelGL;
   int mLocModelGL;
   int mLocViewProjectionGL;
+  int mLocLightSpaceGL;
   int vLocBotColorGL;
   int vLocLightPosGL;
   int vLocPlayerViewGL;
@@ -131,6 +143,10 @@ public class Scene3D {
   int mLocSkyboxViewProjectionGL;
   int vao_skyboxGL;
   int texSkybox;
+
+  int progTestGL;
+  int texTest;
+
   
   int numSculptureVertices;
   int numSculptureNormals;
@@ -142,14 +158,55 @@ public class Scene3D {
   void initGL() {
     GL.createCapabilities();
     System.out.println("GL_VERSION: " + glGetString(GL_VERSION));
-    createProgramGL();
+    setupGL();
   }
   
-  void createProgramGL() {
+  static final int SHADOW_MAP_W = 1024;
+  static final int SHADOW_MAP_H = 1024;
+  
+  void setupGL() {
+    int vertexShader, fragmentShader;
+    // SHADOW MAPPER
+    fbo_depthMap = glGenFramebuffers();
+    texShadowMap = glGenTextures();
+    glBindTexture(GL_TEXTURE_2D, texShadowMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 
+        SHADOW_MAP_W, SHADOW_MAP_H, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER); 
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);  
+    float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);  
+    
+    vertexShader = createShader(GL_VERTEX_SHADER, "" 
+        +"#version 330 core \n" 
+        +""
+        +"in vec3 position; \n"
+        +""
+        +"uniform mat4 model; \n"
+        +"uniform mat4 mLightSpace; \n"
+        +""
+        +"void main() { \n"
+        +"  gl_Position = mLightSpace* model * vec4(position, 1.0); \n"
+        +"} \n"
+        );
+    fragmentShader = createShader(GL_FRAGMENT_SHADER, "" 
+        +"#version 330 core \n" 
+        +""
+        +"void main() {\n"
+        +"  // gl_FragDepth = gl_FragCoord.z; \n"
+        +"} \n"
+        );
+    progShadowGL = createProgram(vertexShader, fragmentShader);
+    
+    // obtain uniform locations for shader variables
+    mLocShadowModelGL = glGetUniformLocation(progShadowGL, "model");
+    mLocShadowLightProjGL = glGetUniformLocation(progShadowGL, "mLightSpace");
     
     // MODEL SHADERS
     
-    int vertexShader = createShader(GL_VERTEX_SHADER, "" 
+    vertexShader = createShader(GL_VERTEX_SHADER, "" 
         +"#version 330 core \n" 
         +""
         +"in vec3 position; \n"
@@ -159,6 +216,7 @@ public class Scene3D {
         +"uniform vec3 bcolor; \n"
         +"uniform mat4 model; \n"
         +"uniform mat4 viewproj; \n"
+        +"uniform mat4 mLightSpace; \n"
         +"uniform vec3 vLightPos ; \n"
         +"uniform vec3 vPlayerView; \n"
         +"uniform vec3 vPlayerPos; \n"
@@ -170,6 +228,7 @@ public class Scene3D {
         +"out vec3 vOLightPos; \n"
         +"out vec3 vOPosition; \n"
         +"out vec3 vOPlayerPosition; \n"
+        +"out vec4 vOFragPosLightSpace; \n"
         +""
         +"vec3 unpack_color(float f) { \n"
         +"  vec3 c; \n"
@@ -185,6 +244,7 @@ public class Scene3D {
         +"  vOBVertexColor = bcolor; \n"
         +""
         +"  vec4 P = model * vec4(position, 1.0); \n"
+        +"  vOFragPosLightSpace = mLightSpace * P; \n"
         +"  vONormal = normalize(mat3(model) * normal); \n"
         +""
         +"  vOLightPos = vLightPos; \n"
@@ -194,20 +254,48 @@ public class Scene3D {
         +"  gl_Position = viewproj * P; \n"
         +"} \n"
         );
-    int fragmentShader = createShader(GL_FRAGMENT_SHADER, "" 
+    //https://learnopengl.com/Advanced-Lighting/Shadows/Shadow-Mapping
+    fragmentShader = createShader(GL_FRAGMENT_SHADER, "" 
         +"#version 330 core \n" 
         +""
         +"in vec3 vOTVertexColorSmooth; \n" 
         +"flat in vec3 vOTVertexColor; \n" 
-        +"in vec3 vOBVertexColor; \n" 
-        +"in vec3 vONormal; \n"
-        +"in vec3 vOLightPos; \n"
+        +"in vec3 vOBVertexColor; \n"
         +"in vec3 vOPosition; \n" 
+        +"in vec3 vONormal; \n" 
+        +"in vec3 vOLightPos; \n" 
         +"in vec3 vOPlayerPosition; \n" 
+        +"in vec4 vOFragPosLightSpace; \n"
         +""
         +"uniform int iSmoothOrFlatColor; \n"
+        +"uniform sampler2D shadowMap; \n"
         +""
         +"out vec4 fragColor; \n" 
+        +""
+        +"float calc_shadow(vec4 fragPosLightSpace) { \n" 
+        +"    // perform perspective divide \n" 
+        +"    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w; \n" 
+        +"    // transform to [0,1] range \n" 
+        +"    projCoords = projCoords * 0.5 + 0.5; \n" 
+        +"    // get closest depth value from light's perspective (using [0,1] range fragPosLight as coords) \n" 
+        +"    float closestDepth = texture(shadowMap, projCoords.xy).r; \n" 
+        +"    // get depth of current fragment from light's perspective \n" 
+        +"    float currentDepth = projCoords.z; \n" 
+        +"    // check whether current frag pos is in shadow \n"
+        +"    float bias = " + SHADOW_Z_BIAS + "; \n"
+        +"  float shadow = 0.0;\n" 
+        +"  vec2 texelSize = 1.0 / textureSize(shadowMap, 0);\n" 
+        +"  for(int x = -2; x <= 2; ++x) {\n" 
+        +"    for(int y = -2; y <= 2; ++y) {\n" 
+        +"      float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; \n" 
+        +"      shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        \n" 
+        +"    } \n" 
+        +"  } \n" 
+        +"  shadow /= 25.0; \n"
+        +"    if (projCoords.z > 1.0) shadow = 0.0; \n"
+        
+        +"    return shadow;\n"
+        +"} \n"
         +""
         +"void main() {\n"
         +"  vec3 color; \n" 
@@ -229,7 +317,9 @@ public class Scene3D {
         +"  vec3 r = reflect( -s, n ); \n"
         +"  float diffuse = max(0, dot(-s, n)); \n"
         +"  float specular = pow(max(0, dot(r, v)), 50.0); \n" 
-        +"  fragColor = vec4(color, 1.0) * min(1.0, ambient+diffuse) + vec4(1,1,1,1) * specular; \n" 
+        +"  float shadow = gl_FrontFacing ? calc_shadow(vOFragPosLightSpace) : 0; \n"
+        +"  fragColor = (ambient + (1.0 - shadow) * (diffuse + specular)) * vec4(color, 1.0); \n"
+        //+"  fragColor = (vec4(color, 1.0) * min(1.0, ambient+diffuse) + vec4(1,1,1,1) * specular) + in_shadow * vec4(0,0,1,0); \n" 
         +"} \n"
         );
     progModelGL = createProgram(vertexShader, fragmentShader);
@@ -237,6 +327,7 @@ public class Scene3D {
     // obtain uniform locations for shader variables
     mLocModelGL = glGetUniformLocation(progModelGL, "model");
     mLocViewProjectionGL = glGetUniformLocation(progModelGL, "viewproj");
+    mLocLightSpaceGL = glGetUniformLocation(progModelGL, "mLightSpace");
     vLocBotColorGL = glGetUniformLocation(progModelGL, "bcolor");
     vLocLightPosGL = glGetUniformLocation(progModelGL, "vLightPos");
     vLocPlayerViewGL = glGetUniformLocation(progModelGL, "vPlayerView");
@@ -410,6 +501,60 @@ public class Scene3D {
     glBindTexture(GL_TEXTURE_CUBE_MAP, texSkybox);
     //loadSkyboxTextures("skyboxes/maskonaive2");
     calcSkyboxTextures(new Color(8,8,64), new Color(0,0,8));
+
+  
+    // TEST SHADERS
+    
+    vertexShader = createShader(GL_VERTEX_SHADER, "" 
+        +"#version 330 core \n" 
+        +""
+        +"uniform mat4 viewproj; \n"
+        +""
+        +"out vec3 vtc; \n"
+        +""
+        +"void main() { \n"
+        +"  vec3[6] verts = vec3[6]( \n"
+        +"    vec3(-1.0, 1.0,-1.0), vec3(-1.0,-1.0,-1.0), vec3( 1.0,-1.0,-1.0), \n"
+        +"    vec3( 1.0,-1.0,-1.0), vec3( 1.0, 1.0,-1.0), vec3(-1.0, 1.0,-1.0)); \n"
+        +"  vtc = verts[gl_VertexID]; \n"
+        +"  gl_Position = vec4(verts[gl_VertexID], 1); \n"
+        +"} \n"
+        );
+    fragmentShader = createShader(GL_FRAGMENT_SHADER, "" 
+        +"#version 330 core \n" 
+        +""
+        +"uniform sampler2D tex; \n"
+        +""
+        +"in vec3 vtc; \n"
+        +""
+        +"out vec4 fragColor; \n" 
+        +""
+        +"void main() {\n"
+        +"  fragColor = vec4(texture(tex, vtc.xy).r,0,0,1); \n"
+        +"} \n"
+        );
+    progTestGL = createProgram(vertexShader, fragmentShader);
+    texTest = glGenTextures();
+    glBindTexture(GL_TEXTURE_2D, texTest);
+//    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 
+//        SHADOW_MAP_W, SHADOW_MAP_H, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    BufferedImage bi = new BufferedImage(1024, 1024, BufferedImage.TYPE_4BYTE_ABGR);
+    Graphics g = bi.getGraphics();
+    g.setColor(Color.white);
+    g.fillRect(0, 0, 1024, 1024);
+    g.setColor(Color.black);
+    g.drawLine(0, 0, 1024, 1024);
+    g.drawLine(1024, 0, 0, 1024);
+    g.fillRect(500, 500, 24, 24);
+    g.dispose();
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SHADOW_MAP_W, SHADOW_MAP_H, 0, GL_RGBA, GL_UNSIGNED_BYTE, 
+        createTextureBuffer(bi));
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); 
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);  
+
   }
   
   ByteBuffer nativeBuffer;
@@ -433,6 +578,8 @@ public class Scene3D {
  
   final Vector3f _playerPos = new Vector3f();
   final Matrix4f viewProj = new Matrix4f();
+  final Matrix4f lightProj = new Matrix4f();
+  final FloatBuffer fbLightProj = BufferUtils.createFloatBuffer(16);
   final FloatBuffer fbViewProj = BufferUtils.createFloatBuffer(16);
   final FloatBuffer fbViewRot = BufferUtils.createFloatBuffer(16);
   final Matrix4f mRot = new Matrix4f();
@@ -440,9 +587,6 @@ public class Scene3D {
   final FloatBuffer fbModel = BufferUtils.createFloatBuffer(16);
   final Quaternionf qdirinv = new Quaternionf();
 
-  static final float ZNEAR = 0.1f;
-  static final float ZFAR = 10000f;
-  
   static RenderSpec defspec = new RenderSpec();
   static {
     defspec.primitive = RenderSpec.PRIMITIVE_SOLID;
@@ -583,6 +727,7 @@ public class Scene3D {
     render(defspec);
   }
   public void render(RenderSpec rs) {
+    int mode;
     handleRenderSpec(rs);
     long thisTime = System.nanoTime();
     float diffMs = (thisTime - firstTime) / 1E9f;
@@ -597,7 +742,32 @@ public class Scene3D {
     viewProj.get(fbViewRot);
     viewProj.translate(_playerPos);
     viewProj.get(fbViewProj);
+    lightProj.identity();
+    lightProj.ortho(-SHADOW_PROJECTION_RADIUS, SHADOW_PROJECTION_RADIUS, 
+        -SHADOW_PROJECTION_RADIUS, SHADOW_PROJECTION_RADIUS, ZNEAR, ZFAR);
+    lightProj.lookAt(rs.lightPos.x, rs.lightPos.y, rs.lightPos.z, 0,0,0, 0,1,0);
+    lightProj.get(fbLightProj);
+    mModel.set(rs.modelMatrix);
+    mModel.get(fbModel);
     
+    // render shadow map
+    glUseProgram(progShadowGL);
+    glUniformMatrix4fv(mLocShadowLightProjGL, false,  fbLightProj);
+    glUniformMatrix4fv(mLocShadowModelGL, false, fbModel);
+    glBindVertexArray(vao_sculptureGL);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_depthMap);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texShadowMap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    glViewport(0, 0, SHADOW_MAP_W, SHADOW_MAP_H);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    mode = GL_TRIANGLES;
+    if (rs.primitive == RenderSpec.PRIMITIVE_WIREFRAME) mode = GL_LINES;
+    else if (rs.primitive == RenderSpec.PRIMITIVE_DOTS) mode = GL_POINTS;
+    glDrawElements(mode, numSculptureIndices, GL_UNSIGNED_INT, 0);
+
     // setup GL view
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, rs.width, rs.height);
@@ -629,24 +799,18 @@ public class Scene3D {
     glUseProgram(progModelGL);
     glBindVertexArray(vao_sculptureGL);
     glUniformMatrix4fv(mLocViewProjectionGL, false, fbViewProj);
+    glUniformMatrix4fv(mLocLightSpaceGL, false, fbLightProj);
     glUniform3f(vLocPlayerPosGL, rs.playerPos.x, rs.playerPos.y, rs.playerPos.z);
     glUniform3f(vLocPlayerViewGL, rs.vdirz.x, rs.vdirz.y, rs.vdirz.z);
     glUniform3f(vLocLightPosGL, rs.lightPos.x, rs.lightPos.y, rs.lightPos.z);
     glUniform3f(vLocBotColorGL, .05f,.3f,.6f);
     glUniform1i(iLocSmoothOrFlatColorGL, rs.smoothOrFlat);
 
-    if (standalone) {
-      mModel.identity();
-      mModel.translate(
-          (float)(5f*Math.sin(diffMs*1.1)),
-          (float)(5f*Math.sin(diffMs*1.3)),
-          (float)(-20f + 5f*Math.sin(diffMs*1.5)));
-    } else {
-      mModel.set(rs.modelMatrix);
-    }
+    mModel.set(rs.modelMatrix);
     mModel.get(fbModel);
     glUniformMatrix4fv(mLocModelGL, false, fbModel);
-    int mode = GL_TRIANGLES;
+    glBindTexture(GL_TEXTURE_2D, texShadowMap);
+    mode = GL_TRIANGLES;
     if (rs.primitive == RenderSpec.PRIMITIVE_WIREFRAME) mode = GL_LINES;
     else if (rs.primitive == RenderSpec.PRIMITIVE_DOTS) mode = GL_POINTS;
     glDrawElements(mode, numSculptureIndices, GL_UNSIGNED_INT, 0);
@@ -676,6 +840,12 @@ public class Scene3D {
     glDisable(GL_BLEND);
     
     glerr();
+
+    // test
+//    glDisable(GL_DEPTH_TEST);
+//    glUseProgram(progTestGL);
+//    glBindTexture(GL_TEXTURE_2D, texShadowMap);
+//    glDrawArrays(GL_TRIANGLES, 0, 6);
     
     // coda
 
@@ -712,18 +882,7 @@ public class Scene3D {
   public BufferedImage getImage() {
     return swingImage;
   }
-  
-//  public static void main(String[] args) {
-//    standalone = true;
-//    Scene3D s = new Scene3D();
-//    s.init();
-//    
-//    while (!destroyed && !glfwWindowShouldClose(s.window)) {
-//      s.render();
-//    }
-//    s.destroy();
-//  }
-  
+
   //
   // GL helpers
   //
