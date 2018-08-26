@@ -38,8 +38,8 @@ public class Scene3D {
 
   static final float ZNEAR = 0.1f;
   static final float ZFAR = 5000f;
-  static final float SHADOW_PROJECTION_RADIUS = 40f;
-  static final float SHADOW_Z_BIAS = 0.001f;
+  static final float SHADOW_PROJECTION_RADIUS = 100f;
+  static final float SHADOW_Z_BIAS = 0.0005f;
   
   // JOML matrices
   Matrix4f projMatrix = new Matrix4f();
@@ -318,7 +318,8 @@ public class Scene3D {
         +"  float diffuse = max(0, dot(-s, n)); \n"
         +"  float specular = pow(max(0, dot(r, v)), 50.0); \n" 
         +"  float shadow = gl_FrontFacing ? calc_shadow(vOFragPosLightSpace) : 0; \n"
-        +"  fragColor = (ambient + (1.0 - shadow) * (diffuse + specular)) * vec4(color, 1.0); \n"
+        +"  fragColor = (ambient + (1.0 - shadow) * (diffuse + specular)) * vec4(color, 1.0) +  \n"
+        +"              specular * (1.0 - shadow) * vec4(.2,.2,.2,1); \n"
         //+"  fragColor = (vec4(color, 1.0) * min(1.0, ambient+diffuse) + vec4(1,1,1,1) * specular) + in_shadow * vec4(0,0,1,0); \n" 
         +"} \n"
         );
