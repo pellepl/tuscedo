@@ -54,6 +54,8 @@ public class RenderSpec {
   public int smoothOrFlat = 1;
   public float isolevel;
   public boolean faceted;
+  public boolean disableShadows;
+  public boolean checkered;
 
 
   

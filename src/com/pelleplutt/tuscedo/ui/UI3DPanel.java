@@ -211,10 +211,24 @@ public class UI3DPanel extends JPanel implements UIO {
         blit();
       }
     });
-    UICommon.defineAnonAction(renderer, "3d.color.smoothflat", "f5", when, new AbstractAction() {
+    UICommon.defineAnonAction(renderer, "3d.light.toggleshadows", "f5", when, new AbstractAction() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        renderSpec.disableShadows = !renderSpec.disableShadows;
+        blit();
+      }
+    });
+    UICommon.defineAnonAction(renderer, "3d.color.smoothflat", "f6", when, new AbstractAction() {
       @Override
       public void actionPerformed(ActionEvent e) {
         renderSpec.smoothOrFlat = renderSpec.smoothOrFlat == 0 ? 1 : 0;
+        blit();
+      }
+    });
+    UICommon.defineAnonAction(renderer, "3d.color.togglecheckered", "f7", when, new AbstractAction() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        renderSpec.checkered = !renderSpec.checkered;
         blit();
       }
     });

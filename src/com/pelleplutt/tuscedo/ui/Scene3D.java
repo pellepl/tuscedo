@@ -92,25 +92,13 @@ public class Scene3D {
     glfwSetWindowPos(window, (vidmode.width() - 100) / 2, (vidmode.height() - 100) / 2);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(0);
-    if (standalone) glfwShowWindow(window);
   }
   
-  long firstTime;
   BufferedImage swingImage;
-  static boolean standalone = false;
 
   public void init() {
     initGLFW();
     initGL();
-    
-    // Set the clear color
-    glClearColor(0.6f, 0.7f, 0.8f, 1.0f);
-    // Enable depth testing
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-
-    // Remember the current time.
-    firstTime = System.nanoTime();
   }
   
   int progShadowGL;
@@ -128,8 +116,11 @@ public class Scene3D {
   int vLocPlayerViewGL;
   int vLocPlayerPosGL;
   int iLocSmoothOrFlatColorGL;
+  int iLocShadowsGL;
+  int iLocCheckeredGL;
   int vao_sculptureGL, vbo_sculptureGL;
   int vbo_sculptureArrIxGL;
+  int texModelGrid;
 
   int progGridGL;
   int mLocGridModelGL;
@@ -227,6 +218,7 @@ public class Scene3D {
         +"out vec3 vONormal; \n"
         +"out vec3 vOLightPos; \n"
         +"out vec3 vOPosition; \n"
+        +"out vec3 vOP; \n"
         +"out vec3 vOPlayerPosition; \n"
         +"out vec4 vOFragPosLightSpace; \n"
         +""
@@ -246,6 +238,7 @@ public class Scene3D {
         +"  vec4 P = model * vec4(position, 1.0); \n"
         +"  vOFragPosLightSpace = mLightSpace * P; \n"
         +"  vONormal = normalize(mat3(model) * normal); \n"
+        +"  vOP = position; \n"
         +""
         +"  vOLightPos = vLightPos; \n"
         +"  vOPosition = vec3(P); \n"
@@ -262,12 +255,15 @@ public class Scene3D {
         +"flat in vec3 vOTVertexColor; \n" 
         +"in vec3 vOBVertexColor; \n"
         +"in vec3 vOPosition; \n" 
+        +"in vec3 vOP; \n" 
         +"in vec3 vONormal; \n" 
         +"in vec3 vOLightPos; \n" 
         +"in vec3 vOPlayerPosition; \n" 
         +"in vec4 vOFragPosLightSpace; \n"
         +""
         +"uniform int iSmoothOrFlatColor; \n"
+        +"uniform int iShadows; \n"
+        +"uniform int iCheckered; \n"
         +"uniform sampler2D shadowMap; \n"
         +""
         +"out vec4 fragColor; \n" 
@@ -283,15 +279,15 @@ public class Scene3D {
         +"    float currentDepth = projCoords.z; \n" 
         +"    // check whether current frag pos is in shadow \n"
         +"    float bias = " + SHADOW_Z_BIAS + "; \n"
-        +"  float shadow = 0.0;\n" 
-        +"  vec2 texelSize = 1.0 / textureSize(shadowMap, 0);\n" 
-        +"  for(int x = -2; x <= 2; ++x) {\n" 
-        +"    for(int y = -2; y <= 2; ++y) {\n" 
-        +"      float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; \n" 
-        +"      shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        \n" 
+        +"    float shadow = 0.0;\n" 
+        +"    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);\n" 
+        +"    for(int x = -2; x <= 2; ++x) {\n" 
+        +"      for(int y = -2; y <= 2; ++y) {\n" 
+        +"        float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; \n" 
+        +"        shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        \n" 
+        +"      } \n" 
         +"    } \n" 
-        +"  } \n" 
-        +"  shadow /= 25.0; \n"
+        +"    shadow /= 25.0; \n"
         +"    if (projCoords.z > 1.0) shadow = 0.0; \n"
         
         +"    return shadow;\n"
@@ -317,10 +313,12 @@ public class Scene3D {
         +"  vec3 r = reflect( -s, n ); \n"
         +"  float diffuse = max(0, dot(-s, n)); \n"
         +"  float specular = pow(max(0, dot(r, v)), 50.0); \n" 
-        +"  float shadow = gl_FrontFacing ? calc_shadow(vOFragPosLightSpace) : 0; \n"
-        +"  fragColor = (ambient + (1.0 - shadow) * (diffuse + specular)) * vec4(color, 1.0) +  \n"
-        +"              specular * (1.0 - shadow) * vec4(.2,.2,.2,1); \n"
-        //+"  fragColor = (vec4(color, 1.0) * min(1.0, ambient+diffuse) + vec4(1,1,1,1) * specular) + in_shadow * vec4(0,0,1,0); \n" 
+        +"  float shadow = iShadows != 0 ? (gl_FrontFacing ? calc_shadow(vOFragPosLightSpace) : 0) : 0; \n"
+        +"  if (iCheckered != 0 && (int((vOP.x+10000)/5) + int((vOP.y+10000)/5) + int((vOP.z+10000)/5) ) %2 < 1 ) \n"
+        +"     color *= 0.5;  \n" 
+        +"  specular *= (1.0 - shadow);  \n" 
+        +"  fragColor = (ambient + (1.0 - shadow * 0.8) * (diffuse + specular)) * vec4(color, 1.0) +  \n"
+        +"              specular * vec4(.2,.2,.2,1); \n"
         +"} \n"
         );
     progModelGL = createProgram(vertexShader, fragmentShader);
@@ -334,6 +332,8 @@ public class Scene3D {
     vLocPlayerViewGL = glGetUniformLocation(progModelGL, "vPlayerView");
     vLocPlayerPosGL = glGetUniformLocation(progModelGL, "vPlayerPos");
     iLocSmoothOrFlatColorGL = glGetUniformLocation(progModelGL, "iSmoothOrFlatColor");
+    iLocShadowsGL = glGetUniformLocation(progModelGL, "iShadows");
+    iLocCheckeredGL = glGetUniformLocation(progModelGL, "iCheckered");
   
     // GRID SHADERS
     
@@ -534,28 +534,24 @@ public class Scene3D {
         +"  fragColor = vec4(texture(tex, vtc.xy).r,0,0,1); \n"
         +"} \n"
         );
-    progTestGL = createProgram(vertexShader, fragmentShader);
-    texTest = glGenTextures();
-    glBindTexture(GL_TEXTURE_2D, texTest);
-//    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 
-//        SHADOW_MAP_W, SHADOW_MAP_H, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    BufferedImage bi = new BufferedImage(1024, 1024, BufferedImage.TYPE_4BYTE_ABGR);
-    Graphics g = bi.getGraphics();
-    g.setColor(Color.white);
-    g.fillRect(0, 0, 1024, 1024);
-    g.setColor(Color.black);
-    g.drawLine(0, 0, 1024, 1024);
-    g.drawLine(1024, 0, 0, 1024);
-    g.fillRect(500, 500, 24, 24);
-    g.dispose();
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SHADOW_MAP_W, SHADOW_MAP_H, 0, GL_RGBA, GL_UNSIGNED_BYTE, 
-        createTextureBuffer(bi));
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);  
-
+//    progTestGL = createProgram(vertexShader, fragmentShader);
+//    texTest = glGenTextures();
+//    glBindTexture(GL_TEXTURE_2D, texTest);
+//    BufferedImage bi = new BufferedImage(1024, 1024, BufferedImage.TYPE_4BYTE_ABGR);
+//    Graphics g = bi.getGraphics();
+//    g.setColor(Color.white);
+//    g.fillRect(0, 0, 1024, 1024);
+//    g.setColor(Color.black);
+//    g.drawLine(0, 0, 1024, 1024);
+//    g.drawLine(1024, 0, 0, 1024);
+//    g.fillRect(500, 500, 24, 24);
+//    g.dispose();
+//    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SHADOW_MAP_W, SHADOW_MAP_H, 0, GL_RGBA, GL_UNSIGNED_BYTE, 
+//        createTextureBuffer(bi));
+//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); 
+//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);  
   }
   
   ByteBuffer nativeBuffer;
@@ -730,8 +726,6 @@ public class Scene3D {
   public void render(RenderSpec rs) {
     int mode;
     handleRenderSpec(rs);
-    long thisTime = System.nanoTime();
-    float diffMs = (thisTime - firstTime) / 1E9f;
 
     // calc global viewing matrices
     _playerPos.set(rs.playerPos);
@@ -806,6 +800,8 @@ public class Scene3D {
     glUniform3f(vLocLightPosGL, rs.lightPos.x, rs.lightPos.y, rs.lightPos.z);
     glUniform3f(vLocBotColorGL, .05f,.3f,.6f);
     glUniform1i(iLocSmoothOrFlatColorGL, rs.smoothOrFlat);
+    glUniform1i(iLocShadowsGL, rs.disableShadows ? 0 : 1);
+    glUniform1i(iLocCheckeredGL, rs.checkered ? 1 : 0);
 
     mModel.set(rs.modelMatrix);
     mModel.get(fbModel);
