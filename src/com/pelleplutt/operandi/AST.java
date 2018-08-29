@@ -674,8 +674,9 @@ public class AST implements Lexer.Emitter {
   }
   
   void handleArrayDeclaration() {
-    ASTNode e = exprs.get(exprs.size()-2);
-    if (e.op == OP_ADECL && ((ASTNodeArrDecl)e).arrid == ((OpArrDecl)opers.peek()).arrid) {
+    ASTNode e = null;
+    if (exprs.size() >= 2) e = exprs.get(exprs.size()-2);
+    if (e != null && e.op == OP_ADECL && ((ASTNodeArrDecl)e).arrid == ((OpArrDecl)opers.peek()).arrid) {
       ASTNodeArrDecl adecle = (ASTNodeArrDecl)exprs.get(exprs.size()-2);
       adecle.operands.add(exprs.pop());
     } else {
