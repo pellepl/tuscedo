@@ -26,7 +26,7 @@ import com.pelleplutt.operandi.proc.ProcessorError.ProcessorBreakpointError;
 import com.pelleplutt.operandi.proc.ProcessorError.ProcessorFinishedError;
 
 public class Processor implements ByteCode {
-  public static final int VERSION = 0x00000001;
+  public static final int VERSION = 0x00000002;
   
   public static final int TNIL = 0;
   public static final int TINT = 1;

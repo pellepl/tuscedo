@@ -561,6 +561,17 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
+    setExtDef("exit", "(<x>) - kills app", 
+        new ExtCall() {
+     public Processor.M exe(Processor p, Processor.M[] args) {
+       if (args == null || args.length == 0) {
+         System.exit(0);
+       } 
+       System.exit((args[0].asInt()));
+       return null;
+     }
+   });
+
     createGraphFunctions();
     createCanvasFunctions();
     create3DFunctions();
@@ -621,9 +632,24 @@ public class OperandiScript implements Runnable, Disposable {
     return uio;
   }
   
+  public void runOperandiInitScripts(UIWorkArea wa) {
+    String path = System.getProperty("user.home") + File.separator + 
+        Essential.userSettingPath + File.separator;
+    List<File> files = AppSystem.findFiles(path, "init-*.op", false);
+    System.out.println("running operandi init-*.op files in " + path + ":" + files);
+    for (File f : files) {
+      String s = AppSystem.readFile(f);
+      if (s != null) {
+        runScript(wa, f, s);
+      }
+    }
+  }
+  
+
   public void runScript(UIWorkArea wa, String s) {
     if (s.startsWith("#reset") && s.length() < 8) {
       resetForce();
+      runOperandiInitScripts(wa);
     } else if (s.startsWith("#load ")) {
       String fullpath = s.substring("#load ".length()).trim();
       int pathDelim = fullpath.lastIndexOf(File.separator);

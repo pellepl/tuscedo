@@ -173,7 +173,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     script = new OperandiScript();
     AppSystem.addDisposable(script);
     Tuscedo.inst().registerTickable(serial);
-    runOperandiInitScripts();
+    script.runOperandiInitScripts(this);
   }
   
   public void decorateUI() {
@@ -700,7 +700,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
           }
         } else {
           if (in.equals("#init")) {
-            runOperandiInitScripts();
+            script.runOperandiInitScripts(this);
           } else {
             getCurrentView().ftp.addText(in + "\n", UICommon.STYLE_BASH_INPUT);
             script.runScript(this, in + "\n");
@@ -721,19 +721,6 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     }
   }
   String lastDbgCmd = "";
-  
-  private void runOperandiInitScripts() {
-    String path = System.getProperty("user.home") + File.separator + 
-        Essential.userSettingPath + File.separator;
-    List<File> files = AppSystem.findFiles(path, "init-*.op", false);
-    System.out.println("running operandi init-*.op files in " + path + ":" + files);
-    for (File f : files) {
-      String s = AppSystem.readFile(f);
-      if (s != null) {
-        script.runScript(this, f, s);
-      }
-    }
-  }
   
   public View getCurrentView() {
     return curView;
