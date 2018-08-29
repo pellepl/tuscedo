@@ -36,7 +36,6 @@ import com.pelleplutt.Essential;
 import com.pelleplutt.tuscedo.Settings;
 import com.pelleplutt.tuscedo.ui.UIInfo.UIListener;
 import com.pelleplutt.util.AppSystem;
-import com.pelleplutt.util.Log;
 import com.pelleplutt.util.UIUtil;
 
 public class UISimpleTabPane extends JPanel implements UIO {
@@ -164,12 +163,12 @@ public class UISimpleTabPane extends JPanel implements UIO {
 
   void decorateTabLabel(Tab tab) {
     tab.setPreferredSize(
-        new Dimension(getFont().getSize() + 4, getFont().getSize() + 4));
+        new Dimension(UICommon.font.getSize() + 4, UICommon.font.getSize() + 4));
     tab.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
     tab.setOpaque(true);
     tab.setForeground(UICommon.colTabFg);
     tab.setBackground(tab == selectedTab ? UICommon.colTabSelBg : UICommon.colTabNonSelBg);
-    tab.setFont(getFont());
+    tab.setFont(UICommon.font);
   }
 
   public Tab createTab(String name, Component c) {

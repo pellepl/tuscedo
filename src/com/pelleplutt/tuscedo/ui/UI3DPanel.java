@@ -156,9 +156,9 @@ public class UI3DPanel extends JPanel implements UIO {
     scrl = new JScrollPane(renderer, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, 
         JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
     scrl.getViewport().setScrollMode(JViewport.SIMPLE_SCROLL_MODE); // fix artefacts 
-    UICommon.decorateScrollPane(scrl);
     setLayout(new BorderLayout());
     add(scrl, BorderLayout.CENTER);
+    decorateUI();
     
     renderer.addMouseListener(mouseCtrl);
     renderer.addMouseMotionListener(mouseCtrl);
@@ -273,7 +273,7 @@ public class UI3DPanel extends JPanel implements UIO {
     renderSpec.lightPos.set(-60, 200, 300);
   }
   public void decorateUI() {
-    // TODO decor
+    UICommon.decorateScrollPane(scrl);
   }
   
   Robot robot;
@@ -366,6 +366,7 @@ public class UI3DPanel extends JPanel implements UIO {
     AffineTransform tran = AffineTransform.getTranslateInstance(0,
         bi.getHeight());
     tran.concatenate(flip);
+    g.setFont(UICommon.font);
     g.setTransform(tran);
     g.drawImage(bi, 0, 0, null);
     g.setTransform(AffineTransform.getScaleInstance(1.0, 1.0));

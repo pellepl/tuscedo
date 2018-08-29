@@ -11,8 +11,7 @@ import com.pelleplutt.tuscedo.Settings.*;
 import com.pelleplutt.util.*;
 
 public class UICommon {
-  public static final Font COMMON_FONT = new Font(Font.MONOSPACED, Font.PLAIN, 11);
-
+  public static Font font = new Font(Font.MONOSPACED, Font.PLAIN, 11);
 
   public static Color colBashDbgFg;
   public static Color colBashFg;
@@ -39,6 +38,10 @@ public class UICommon {
   public static Color colScrollBarDFg;
   public static Color colScrollBarLBg;
   public static Color colScrollBarDBg;
+  public static Color colOpOut;
+  public static Color colOpIn;
+  public static Color colOpErr;
+  public static Color colOpDbg;
   
   public static FastTextPane.Style STYLE_CONN_IN;
   public static FastTextPane.Style STYLE_BASH_INPUT;
@@ -46,9 +49,28 @@ public class UICommon {
   public static FastTextPane.Style STYLE_BASH_OUT;
   public static FastTextPane.Style STYLE_BASH_ERR;
   public static FastTextPane.Style STYLE_FIND;
-  public static FastTextPane.Style STYLE_FIND_ALL;
-  public static FastTextPane.Style STYLE_SERIAL_INFO;
-  public static FastTextPane.Style STYLE_SERIAL_ERR;
+  public static FastTextPane.Style STYLE_FIND_MARK;
+  public static FastTextPane.Style STYLE_GENERIC_INFO;
+  public static FastTextPane.Style STYLE_GENERIC_ERR;
+  public static FastTextPane.Style STYLE_OP_IN;
+  public static FastTextPane.Style STYLE_OP_DBG;
+  public static FastTextPane.Style STYLE_OP_OUT;
+  public static FastTextPane.Style STYLE_OP_ERR;
+    
+  public static final int STYLE_ID_CONN_IN = 1;
+  public static final int STYLE_ID_HELP = 5;
+  public static final int STYLE_ID_BASH_OUT = 10;
+  public static final int STYLE_ID_BASH_ERR = 11;
+  public static final int STYLE_ID_BASH_INPUT = 12;
+  public static final int STYLE_ID_BASH_DBG = 13;
+  public static final int STYLE_ID_FIND = 30;
+  public static final int STYLE_ID_FIND_MARK = 31;
+  public static final int STYLE_ID_GENERIC_INFO = 20;
+  public static final int STYLE_ID_GENERIC_ERR = 21;
+  public static final int STYLE_ID_OP_OUT = 40;
+  public static final int STYLE_ID_OP_ERR = 41;
+  public static final int STYLE_ID_OP_IN = 42;
+  public static final int STYLE_ID_OP_DBG = 43;
   
   static {
     Settings s = Settings.inst();
@@ -100,6 +122,38 @@ public class UICommon {
         Tuscedo.inst().redecorateAll();
       }
     });
+    s.listenTrig("col_op_out_fg.int", new ModCallback<Integer>() {
+      public void modified(String key, Integer val) {
+        colOpOut = new Color(val);
+        if (STYLE_OP_OUT == null) STYLE_OP_OUT = new FastTextPane.Style(STYLE_ID_OP_OUT, colOpOut, null, false);
+        else STYLE_OP_OUT.setFgColor(val); 
+        Tuscedo.inst().redecorateAll();
+      }
+    });
+    s.listenTrig("col_op_in_fg.int", new ModCallback<Integer>() {
+      public void modified(String key, Integer val) {
+        colOpIn = new Color(val);
+        if (STYLE_OP_IN == null) STYLE_OP_IN = new FastTextPane.Style(STYLE_ID_OP_IN, colOpIn, null, false);
+        else STYLE_OP_IN.setFgColor(val); 
+        Tuscedo.inst().redecorateAll();
+      }
+    });
+    s.listenTrig("col_op_err_fg.int", new ModCallback<Integer>() {
+      public void modified(String key, Integer val) {
+        colOpErr = new Color(val);
+        if (STYLE_OP_ERR == null) STYLE_OP_ERR = new FastTextPane.Style(STYLE_ID_OP_ERR, colOpErr, null, false);
+        else STYLE_OP_ERR.setFgColor(val); 
+        Tuscedo.inst().redecorateAll();
+      }
+    });
+    s.listenTrig("col_op_dbg_fg.int", new ModCallback<Integer>() {
+      public void modified(String key, Integer val) {
+        colOpDbg = new Color(val);
+        if (STYLE_OP_DBG == null) STYLE_OP_DBG = new FastTextPane.Style(STYLE_ID_OP_DBG, colOpDbg, null, false);
+        else STYLE_OP_DBG.setFgColor(val); 
+        Tuscedo.inst().redecorateAll();
+      }
+    });
     s.listenTrig("col_process_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colProcessFg = new Color(val);
@@ -135,24 +189,24 @@ public class UICommon {
     s.listenTrig("col_find_mark_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colFindMarkFg = new Color(val);
-        if (STYLE_FIND_ALL == null) STYLE_FIND_ALL = new FastTextPane.Style(STYLE_ID_FIND_ALL, colFindMarkFg, colFindMarkBg, true);
-        else STYLE_FIND_ALL.setFgColor(val); 
+        if (STYLE_FIND_MARK == null) STYLE_FIND_MARK = new FastTextPane.Style(STYLE_ID_FIND_MARK, colFindMarkFg, colFindMarkBg, true);
+        else STYLE_FIND_MARK.setFgColor(val); 
         Tuscedo.inst().redecorateAll();
       }
     });
     s.listenTrig("col_gen_info_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colGenericInfoFg = new Color(val);
-        if (STYLE_SERIAL_INFO == null) STYLE_SERIAL_INFO = new FastTextPane.Style(STYLE_ID_SERIAL_INFO, colGenericInfoFg, null, true);
-        else STYLE_SERIAL_INFO.setFgColor(val); 
+        if (STYLE_GENERIC_INFO == null) STYLE_GENERIC_INFO = new FastTextPane.Style(STYLE_ID_GENERIC_INFO, colGenericInfoFg, null, true);
+        else STYLE_GENERIC_INFO.setFgColor(val); 
         Tuscedo.inst().redecorateAll();
       }
     });
     s.listenTrig("col_gen_err_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colGenericErrFg = new Color(val);
-        if (STYLE_SERIAL_ERR == null) STYLE_SERIAL_ERR = new FastTextPane.Style(STYLE_ID_SERIAL_ERR, colGenericErrFg, null, true);
-        else STYLE_SERIAL_ERR.setFgColor(val); 
+        if (STYLE_GENERIC_ERR == null) STYLE_GENERIC_ERR = new FastTextPane.Style(STYLE_ID_GENERIC_ERR, colGenericErrFg, null, true);
+        else STYLE_GENERIC_ERR.setFgColor(val); 
         Tuscedo.inst().redecorateAll();
       }
     });
@@ -228,32 +282,34 @@ public class UICommon {
         Tuscedo.inst().redecorateAll();
       }
     });
-
+    s.listenTrig("font_size.int", new ModCallback<Integer>() {
+      public void modified(String key, Integer val) {
+        font = new Font(Font.MONOSPACED, Font.PLAIN, val);
+        Tuscedo.inst().redecorateAll();
+      }
+    });
   }
-  
-  public static final int STYLE_ID_CONN_IN = 1;
-  public static final int STYLE_ID_HELP = 5;
-  public static final int STYLE_ID_BASH_OUT = 10;
-  public static final int STYLE_ID_BASH_ERR = 11;
-  public static final int STYLE_ID_BASH_INPUT = 12;
-  public static final int STYLE_ID_BASH_DBG = 13;
-  public static final int STYLE_ID_SERIAL_INFO = 20;
-  public static final int STYLE_ID_SERIAL_ERR = 21;
-  public static final int STYLE_ID_FIND = 30;
-  public static final int STYLE_ID_FIND_ALL = 31;
-  
+
   public static void decorateFTP(FastTextPane ftp) {
     if (ftp == null) return;
     ftp.setForeground(colTextFg);
     ftp.setBackground(colGenericBg);
-    ftp.setFont(COMMON_FONT);
+    ftp.setFont(font);
   }
   
   public static void decorateComponent(JComponent c) {
     if (c == null) return;
     c.setForeground(colTextFg);
     c.setBackground(colGenericBg);
-    c.setFont(COMMON_FONT);
+    c.setFont(font);
+  }
+  
+  public static void decorateHiliteLabel(JLabel l) {
+    if (l == null) return;
+    l.setFont(font);
+    l.setBackground(colInputFg);
+    l.setForeground(colInputBg);
+    l.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
   }
   
   public static void decorateScrollPane(JScrollPane sp) {
@@ -285,7 +341,7 @@ public class UICommon {
   
   public static void decorateTextEditor(JTextPane tp) {
     if (tp == null) return;
-    tp.setFont(COMMON_FONT);
+    tp.setFont(font);
     tp.setBackground(colInputBg);
     tp.setCaretColor(new Color(192, 192, 192));
     tp.setForeground(colInputFg);

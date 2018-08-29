@@ -2,6 +2,7 @@ package com.pelleplutt.tuscedo;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -11,6 +12,8 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.pelleplutt.operandi.Compiler;
 import com.pelleplutt.operandi.proc.ExtCall;
@@ -32,17 +35,14 @@ public class MDisk extends MObj {
     addFunc("readb", OperandiScript.FN_DISK_READB, comp);
     addFunc("write", OperandiScript.FN_DISK_WRITE, comp);
     addFunc("writeb", OperandiScript.FN_DISK_WRITEB, comp);
-//    addFunc("rm", OperandiScript.FN_DISK_RM, comp);
-//    addFunc("mkdir", OperandiScript.FN_DISK_MKDIR, comp);
+    addFunc("mkdir", OperandiScript.FN_DISK_MKDIR, comp);
     addFunc("ls", OperandiScript.FN_DISK_LS, comp);
     addFunc("find_file", OperandiScript.FN_DISK_FIND_FILE, comp);
-    addFunc("move", OperandiScript.FN_DISK_MOVE, comp);
+    addFunc("mv", OperandiScript.FN_DISK_MOVE, comp);
     addFunc("stat", OperandiScript.FN_DISK_STAT, comp);
-    addFunc("copy", OperandiScript.FN_DISK_COPY, comp);
-//    addFunc("touch", OperandiScript.FN_DISK_TOUCH, comp);
-//    addFunc("cd", OperandiScript.FN_DISK_CD, comp);
-//    addFunc("pwd", OperandiScript.FN_DISK_PWD, comp);
-//    addFunc("open", OperandiScript.FN_DISK_OPEN, comp);
+    addFunc("cp", OperandiScript.FN_DISK_COPY, comp);
+    addFunc("rm", OperandiScript.FN_DISK_RM, comp);
+    addFunc("touch", OperandiScript.FN_DISK_TOUCH, comp);
   }
   
   public static void createDiskFunctions(OperandiScript os) {
@@ -109,10 +109,32 @@ public class MDisk extends MObj {
         return new Processor.M(mfiles);
       }
     });
-    os.setExtDef(OperandiScript.FN_DISK_LS, "() - NOT IMPLEMENTED",
+    os.setExtDef(OperandiScript.FN_DISK_LS, "(<path>(,<filter>)) - returns array of files and directories in given path, optionally filtered",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        throw new ProcessorError("not impl");
+        String path = ".";
+        FileFilter filter = null;
+        if (args.length > 0) path = args[0].asString();
+        if (args.length > 1) {
+          String ffilt = args[1].asString();
+          String patStr = "\\Q" + ffilt.replaceAll("\\*", "\\\\E(.*)\\\\Q") + "\\E";
+          final Pattern pattern = Pattern.compile(patStr);
+          filter = new FileFilter() {
+            @Override
+            public boolean accept(File pathname) {
+              Matcher m = pattern.matcher(pathname.getAbsolutePath());
+              return m.matches();
+            }
+          };
+        }
+        File[] files = new File(path).listFiles(filter);
+        MListMap mfiles = new MListMap();
+        if (files != null) {
+          for (File f : files) {
+            mfiles.add(new Processor.M(f.getAbsolutePath()));
+          }
+        }
+        return new Processor.M(mfiles);
       }
     });
     os.setExtDef(OperandiScript.FN_DISK_STAT, "(<filename>) - returns file information as a struct",
@@ -169,10 +191,41 @@ public class MDisk extends MObj {
         String src = args[0].asString();
         String dst = args[1].asString();
         try {
-          Files.copy(Paths.get(src), Paths.get(dst), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+          Files.copy(Paths.get(src), Paths.get(dst), StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
           throw new ProcessorError(e.getMessage());
         }
+        return null;
+      }
+    });
+    os.setExtDef(OperandiScript.FN_DISK_RM, "(<path>) - removes a file or directory",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args.length < 1) return null;
+        String src = args[0].asString();
+        try {
+          Files.delete(Paths.get(src));
+        } catch (IOException e) {
+          throw new ProcessorError(e.getMessage());
+        }
+        return null;
+      }
+    });
+    os.setExtDef(OperandiScript.FN_DISK_MKDIR, "(<path>) - creates a directory",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args.length < 1) return null;
+        String src = args[0].asString();
+        new File(src).mkdirs();
+        return null;
+      }
+    });
+    os.setExtDef(OperandiScript.FN_DISK_TOUCH, "(<path>) - touches a file",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args.length < 1) return null;
+        String src = args[0].asString();
+        new File(src).setLastModified(System.currentTimeMillis());
         return null;
       }
     });

@@ -4,6 +4,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.*;
 import java.io.*;
+import java.lang.reflect.InvocationTargetException;
 import java.net.*;
 import java.util.*;
 import java.util.List;
@@ -17,6 +18,7 @@ import com.pelleplutt.tuscedo.ui.UISimpleTabPane.*;
 import com.pelleplutt.util.*;
 
 public class Tuscedo implements Runnable, UIInfo.UIListener {
+  public static boolean noterm = false;
   Container mainContainer;
   static Tuscedo inst;
   static List<Window> windows = new ArrayList<Window>();
@@ -98,7 +100,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     
     mainContainer = f.getContentPane();
     TuscedoTabPane tabs = new TuscedoTabPane();
-    tabs.setFont(UICommon.COMMON_FONT);
+    tabs.setFont(UICommon.font);
 
     addWorkAreaTab(tabs, uiw);
 
@@ -286,14 +288,27 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       e1.printStackTrace();
     }
   */
-    if (args.length > 0 && args[0].endsWith(".op")) {
-      UIWorkArea wa = new UIWorkArea();
-      wa.build();
-      wa.getScript().currentWA = wa;
-      wa.getScript().runScript(wa, new File(args[0]), args[0]);
-    } else if (args.length > 0 && args[0].equals("-nogui")) {
+    boolean doCli = false;
+    boolean doGui = true;
+    UIWorkArea tmpwa = null;
+    for (int i = 0; i < args.length; i++) {
+      if (args[i].endsWith(".op")) {
+        if (tmpwa == null) {
+          tmpwa = new UIWorkArea();
+          tmpwa.build();
+          tmpwa.getScript().currentWA = tmpwa;
+          tmpwa.getScript().runScript(tmpwa, new File(args[i]), args[i]);
+        }
+        doGui = false;
+      } else if (args[i].equals("--nogui")) {
+        doCli = true;
+      } else if (args[i].equals("--noterm")) {
+        noterm = true;
+      }
+    }
+    if (doCli) {
       cli();
-    } else {
+    } else if (doGui ){
       EventQueue.invokeLater(new Runnable() {
         public void run() {
           Tuscedo.inst().create(null);
@@ -439,10 +454,14 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     }
   }
   public void redecorateAll() {
-    for (Entry<String, UIInfo> e : uiobjects.entrySet()) {
-      if (e.getValue().getParent() == null) {
-        recurseRedecorate(e.getValue());
-      }
-    }
+      SwingUtilities.invokeLater(new Runnable() {
+        public void run() {
+          for (Entry<String, UIInfo> e : uiobjects.entrySet()) {
+            if (e.getValue().getParent() == null) {
+              recurseRedecorate(e.getValue());
+            }
+          }
+        }
+      });
   }
 }

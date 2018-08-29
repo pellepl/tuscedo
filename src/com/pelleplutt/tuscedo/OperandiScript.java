@@ -58,8 +58,11 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_DISK_WRITE =  VAR_DISK + ":write";
   public static final String FN_DISK_WRITEB =  VAR_DISK + ":writeb";
   public static final String FN_DISK_STAT =  VAR_DISK + ":stat";
-  public static final String FN_DISK_MOVE =  VAR_DISK + ":move";
-  public static final String FN_DISK_COPY =  VAR_DISK + ":copy";
+  public static final String FN_DISK_MOVE =  VAR_DISK + ":mv";
+  public static final String FN_DISK_COPY =  VAR_DISK + ":cp";
+  public static final String FN_DISK_RM =  VAR_DISK + ":rm";
+  public static final String FN_DISK_MKDIR =  VAR_DISK + ":mkdir";
+  public static final String FN_DISK_TOUCH =  VAR_DISK + ":touch";
 
   public static final String FN_UI_CLOSE = "ui:close";
   public static final String FN_UI_GET_NAME = "ui:get_name";
@@ -161,14 +164,14 @@ public class OperandiScript implements Runnable, Disposable {
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
-          currentWA.appendViewText(currentWA.getCurrentView(), "\n", UICommon.STYLE_BASH_OUT);
+          currentWA.appendViewText(currentWA.getCurrentView(), "\n", UICommon.STYLE_OP_OUT);
         } else {
           for (int i = 0; i < args.length; i++) {
             currentWA.appendViewText(currentWA.getCurrentView(), args[i].asString() + (i < args.length-1 ? " " : ""), 
-                UICommon.STYLE_BASH_OUT);
+                UICommon.STYLE_OP_OUT);
           }
         }
-        currentWA.appendViewText(currentWA.getCurrentView(), "\n", UICommon.STYLE_BASH_OUT);
+        currentWA.appendViewText(currentWA.getCurrentView(), "\n", UICommon.STYLE_OP_OUT);
         return null;
       }
     });
@@ -179,7 +182,7 @@ public class OperandiScript implements Runnable, Disposable {
         } else {
           for (int i = 0; i < args.length; i++) {
             currentWA.appendViewText(currentWA.getCurrentView(), args[i].asString() + (i < args.length-1 ? " " : ""), 
-                UICommon.STYLE_BASH_OUT);
+                UICommon.STYLE_OP_OUT);
           }
         }
         return null;
@@ -428,7 +431,7 @@ public class OperandiScript implements Runnable, Disposable {
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         currentWA.appendViewText(currentWA.getCurrentView(), Tuscedo.inst().dumpUITree(), 
-            UICommon.STYLE_BASH_OUT);
+            UICommon.STYLE_OP_DBG);
         return null;
       }
     });
@@ -530,7 +533,7 @@ public class OperandiScript implements Runnable, Disposable {
         if (args.length > 0) {
           String help = defhelp.get(args[0].asString());
           if (help != null) {
-            currentWA.appendViewText(currentWA.getCurrentView(), args[0].asString() + help + "\n", UICommon.STYLE_SERIAL_INFO);
+            currentWA.appendViewText(currentWA.getCurrentView(), args[0].asString() + help + "\n", UICommon.STYLE_OP_DBG);
           }
         } else {
           List<String> h = new ArrayList<>();
@@ -542,7 +545,7 @@ public class OperandiScript implements Runnable, Disposable {
             
           }
           h.sort(null);
-          for (String s : h) currentWA.appendViewText(currentWA.getCurrentView(), s + "\n", UICommon.STYLE_SERIAL_INFO);
+          for (String s : h) currentWA.appendViewText(currentWA.getCurrentView(), s + "\n", UICommon.STYLE_OP_DBG);
           h.clear();
           
           for (String k : extDefs.keySet()) {
@@ -552,7 +555,7 @@ public class OperandiScript implements Runnable, Disposable {
             h.add(k + help);
           }
           h.sort(null);
-          for (String s : h) currentWA.appendViewText(currentWA.getCurrentView(), s + "\n", UICommon.STYLE_SERIAL_INFO);
+          for (String s : h) currentWA.appendViewText(currentWA.getCurrentView(), s + "\n", UICommon.STYLE_OP_DBG);
           h.clear();
         }
         return null;
@@ -671,7 +674,7 @@ public class OperandiScript implements Runnable, Disposable {
       String err = new String(baos.toByteArray(), StandardCharsets.UTF_8);
       AppSystem.closeSilently(ps);
       if (wa != null) {
-        wa.appendViewText(currentView, err, UICommon.STYLE_BASH_ERR);
+        wa.appendViewText(currentView, err, UICommon.STYLE_OP_ERR);
       } else {
         System.out.println(err);
       }
@@ -710,7 +713,7 @@ public class OperandiScript implements Runnable, Disposable {
             int nestedIRQ = proc.getNestedIRQ();
             String irqInfo = nestedIRQ > 0 ? "[IRQ"+nestedIRQ+"] " : "";
             currentWA.appendViewText(currentView, irqInfo + dbg + "\n", 
-                UICommon.STYLE_BASH_DBG);
+                UICommon.STYLE_OP_DBG);
           }
           synchronized (q) {
             AppSystem.waitSilently(q, 0);
@@ -722,8 +725,8 @@ public class OperandiScript implements Runnable, Disposable {
     } catch (ProcessorFinishedError pfe) {
       M m = pfe.getRet();
       if (m != null && m.type != Processor.TNIL) {
-        currentWA.appendViewText(currentView, "script returned " + m.asString() + "\n", 
-            UICommon.STYLE_BASH_OUT);
+        currentWA.appendViewText(currentView, m.asString() + "\n", 
+            UICommon.STYLE_OP_OUT);
       }
     } catch (ProcessorError pe) {
       ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -731,7 +734,7 @@ public class OperandiScript implements Runnable, Disposable {
       proc.dumpError(pe, ps);
       String err = new String(baos.toByteArray(), StandardCharsets.UTF_8);
       AppSystem.closeSilently(ps);
-      currentWA.appendViewText(currentView, err, UICommon.STYLE_BASH_OUT);
+      currentWA.appendViewText(currentView, err, UICommon.STYLE_OP_ERR);
     }
     finally {
       running = false;
@@ -766,7 +769,7 @@ public class OperandiScript implements Runnable, Disposable {
   
   public void interrupt(int addr) {
     currentWA.appendViewText(currentView, String.format("interrupt -> 0x%08x\n", addr), 
-        UICommon.STYLE_BASH_INPUT);
+        UICommon.STYLE_OP_DBG);
     proc.raiseInterrupt(addr);
   }
   
@@ -783,35 +786,35 @@ public class OperandiScript implements Runnable, Disposable {
     synchronized (q) {
       q.notifyAll();
     }
-    currentWA.appendViewText(currentView, "processor reset\n", UICommon.STYLE_BASH_INPUT);
+    currentWA.appendViewText(currentView, "processor reset\n", UICommon.STYLE_OP_DBG);
     if (wasRunning) backtrace();
     procReset();
   }
   
   public void dumpPC() {
     currentWA.appendViewText(currentView, String.format("PC:0x%08x\n", proc.getPC()), 
-        UICommon.STYLE_BASH_INPUT);
+        UICommon.STYLE_OP_DBG);
   }
   
   public void dumpFP() {
     currentWA.appendViewText(currentView, String.format("FP:0x%08x\n", proc.getFP()), 
-        UICommon.STYLE_BASH_INPUT);
+        UICommon.STYLE_OP_DBG);
   }
   
   public void dumpSP() {
     currentWA.appendViewText(currentView, String.format("SP:0x%08x\n", proc.getSP()), 
-        UICommon.STYLE_BASH_INPUT);
+        UICommon.STYLE_OP_DBG);
   }
   
   public void dumpSR() {
     currentWA.appendViewText(currentView, String.format("SR:0x%08x\n", proc.getSR()), 
-        UICommon.STYLE_BASH_INPUT);
+        UICommon.STYLE_OP_DBG);
   }
   
   public void dumpMe() {
     M me = proc.getMe();
     currentWA.appendViewText(currentView, String.format("me:%s\n", me == null ? "nil" : me.asString()), 
-        UICommon.STYLE_BASH_INPUT);
+        UICommon.STYLE_OP_DBG);
   }
   
   public void backtrace() {
@@ -820,7 +823,7 @@ public class OperandiScript implements Runnable, Disposable {
     proc.unwindStackTrace(ps);
     String bt = new String(baos.toByteArray(), StandardCharsets.UTF_8);
     AppSystem.closeSilently(ps);
-    currentWA.appendViewText(currentView, bt, UICommon.STYLE_BASH_INPUT);
+    currentWA.appendViewText(currentView, bt, UICommon.STYLE_OP_DBG);
   }
   
   public void dumpStack() {
@@ -829,7 +832,7 @@ public class OperandiScript implements Runnable, Disposable {
     proc.printStack(ps, "  ", 50);
     String bt = new String(baos.toByteArray(), StandardCharsets.UTF_8);
     AppSystem.closeSilently(ps);
-    currentWA.appendViewText(currentView, bt, UICommon.STYLE_BASH_INPUT);
+    currentWA.appendViewText(currentView, bt, UICommon.STYLE_OP_DBG);
   }
   
   public static final String DBG_HALT = "halt";
@@ -866,7 +869,7 @@ public class OperandiScript implements Runnable, Disposable {
         + DBG_RES + " (" + DBG_RES_SHORT + ") - resets processor\n"
         + DBG_V_PC + ", "+ DBG_V_FP + ", "+ DBG_V_SP + ", "+ DBG_V_ME + ", "+ DBG_V_SR + " - shows register\n"
         ,
-        UICommon.STYLE_BASH_INPUT);
+        UICommon.STYLE_OP_DBG);
   }
   
   //

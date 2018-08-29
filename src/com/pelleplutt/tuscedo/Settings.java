@@ -82,6 +82,11 @@ public class Settings {
     props.setProperty("col_gen_info_fg.int", Integer.toString(0x44ff44));
     props.setProperty("col_gen_err_fg.int", Integer.toString(0xff4444));
 
+    props.setProperty("col_op_in_fg.int", Integer.toString(0xff4444));
+    props.setProperty("col_op_out_fg.int", Integer.toString(0xf0f0f0));
+    props.setProperty("col_op_err_fg.int", Integer.toString(0xc08080));
+    props.setProperty("col_op_dbg_fg.int", Integer.toString(0x80c0c0));
+
     props.setProperty("col_tab_fg.int", Integer.toString(0xc0c0c0));
     props.setProperty("col_tab_bg.int", Integer.toString(0x404040));
     props.setProperty("col_tab_sel_bg.int", Integer.toString(0x808080));
@@ -100,6 +105,7 @@ public class Settings {
 
     props.setProperty("tab_drag_ghost.int", Integer.toString(0));
     
+    props.setProperty("font_size.int", Integer.toString(11));
   }
   
   public void saveSettings() {

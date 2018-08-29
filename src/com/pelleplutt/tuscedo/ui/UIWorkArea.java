@@ -180,12 +180,16 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     for (int i = 0; i < _ISTATE_NUM; i++) {
       UICommon.decorateTextEditor(input[i]);
       if (views[i] != null) {
-        UICommon. decorateFTP(views[i].ftp);
+        UICommon.decorateFTP(views[i].ftp);
         UICommon.decorateFTP(views[i].ftpSec);
         UICommon.decorateScrollPane(views[i].mainScrollPane);
         UICommon.decorateScrollPane(views[i].secScrollPane);
         UICommon.decorateSplitPane(views[i].splitHor);
         UICommon.decorateSplitPane(views[i].splitVer);
+      }
+      if (input[i] != null) {
+        UICommon.decorateHiliteLabel(inputLabel[i]);
+        UICommon.decorateHiliteLabel(infoLabel[i]);
       }
     }
     UICommon.decorateScrollPane(winSugListSp);
@@ -313,17 +317,11 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
 
       
       inputLabel[i] = new JLabel();
-      inputLabel[i].setFont(UICommon.COMMON_FONT);
-      inputLabel[i].setBackground(UICommon.colInputFg);
-      inputLabel[i].setForeground(UICommon.colInputBg);
-      inputLabel[i].setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
+      UICommon.decorateHiliteLabel(inputLabel[i]);
       inputLabel[i].setVisible(false);
 
       infoLabel[i] = new JLabel();
-      infoLabel[i].setFont(UICommon.COMMON_FONT);
-      infoLabel[i].setBackground(UICommon.colInputFg);
-      infoLabel[i].setForeground(UICommon.colInputBg);
-      infoLabel[i].setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
+      UICommon.decorateHiliteLabel(infoLabel[i]);
       infoLabel[i].setVisible(false);
       
       ip[i] = new JPanel(new BorderLayout());
@@ -361,7 +359,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     winSugList = new JList<String>();
     winSugList.setForeground(UICommon.colInputFg);
     winSugList.setBackground(UICommon.colInputBg);
-    winSugList.setFont(UICommon.COMMON_FONT);
+    winSugList.setFont(UICommon.font);
     winSugList.setSelectionBackground(UICommon.colInputFg);
     winSugList.setSelectionForeground(UICommon.colInputBg);
     winSugListSp = new JScrollPane(winSugList, 
@@ -453,7 +451,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     Matcher mat = pat.matcher(text);
     findResult = new ArrayList<OffsetSpan>();
     while (mat.find()) {
-      curView.ftp.addStyleByOffset(UICommon.STYLE_FIND_ALL, mat.start(), mat.end());
+      curView.ftp.addStyleByOffset(UICommon.STYLE_FIND_MARK, mat.start(), mat.end());
       if (mat.end() > mat.start()) {
         findResult.add(new OffsetSpan(mat.start(), mat.end()));
       }
@@ -473,7 +471,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       curView.ftp.removeStyle(UICommon.STYLE_FIND);
       OffsetSpan offs = null;
       if (!str.equals(lastFindString)) {
-        curView.ftp.removeStyle(UICommon.STYLE_FIND_ALL);
+        curView.ftp.removeStyle(UICommon.STYLE_FIND_MARK);
         findAllOccurences(str, regex);
         if (!findResult.isEmpty()) {
           lastFindIndex = shift ? findResult.size() - 1 : 0;
@@ -531,15 +529,15 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       views[ISTATE_INPUT].ftp.addText("Opening " + portSetting.portName + " " + 
           portSetting.baud + " " + portSetting.databits + 
           Port.parityToString(portSetting.parity).charAt(0) + portSetting.stopbits + "...\n", 
-          UICommon.STYLE_SERIAL_INFO);
+          UICommon.STYLE_GENERIC_INFO);
       
       serial.open(portSetting);
       
-      views[ISTATE_INPUT].ftp.addText("Connected\n", UICommon.STYLE_SERIAL_INFO);
+      views[ISTATE_INPUT].ftp.addText("Connected\n", UICommon.STYLE_GENERIC_INFO);
       if (istate == ISTATE_OPEN_SERIAL) enterInputState(ISTATE_INPUT);
       res=true;
     } catch (Exception e) {
-      views[ISTATE_INPUT].ftp.addText("Failed [" + e.getMessage() + "]\n", UICommon.STYLE_SERIAL_ERR);
+      views[ISTATE_INPUT].ftp.addText("Failed [" + e.getMessage() + "]\n", UICommon.STYLE_GENERIC_ERR);
     } finally {
       input[ISTATE_OPEN_SERIAL].setEnabled(true);
       updateTitle();
@@ -595,7 +593,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       lastFindIndex = -1;
       lastFindString = null;
       curView.ftp.removeStyle(UICommon.STYLE_FIND);
-      curView.ftp.removeStyle(UICommon.STYLE_FIND_ALL);
+      curView.ftp.removeStyle(UICommon.STYLE_FIND_MARK);
       break;
     }
   }
@@ -741,9 +739,33 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     return curView;
   }
   
+  public static final String ANSI_RESET = "\u001B[0m";
+  public static final String ANSI_BLACK = "\u001B[30m";
+  public static final String ANSI_RED = "\u001B[31;1m";
+  public static final String ANSI_GREEN = "\u001B[32m";
+  public static final String ANSI_YELLOW = "\u001B[33m";
+  public static final String ANSI_BLUE = "\u001B[34m";
+  public static final String ANSI_PURPLE = "\u001B[35m";
+  public static final String ANSI_CYAN = "\u001B[36m";
+  public static final String ANSI_WHITE = "\u001B[37;1m";
   public void appendViewText(View view, String text, FastTextPane.Style style) {
-    if (getParent() == null || !isVisible()) {
+    if (getParent() == null) {
+      if (!Tuscedo.noterm) {
+        if (style == UICommon.STYLE_OP_OUT) {
+          System.out.print(ANSI_WHITE);
+        }
+        else if (style == UICommon.STYLE_OP_ERR) {
+          System.out.print(ANSI_RED);
+        }
+        else if (style == UICommon.STYLE_OP_DBG) {
+          System.out.print(ANSI_CYAN);
+        }
+        else {
+          System.out.print(ANSI_RESET);
+        }
+      }
       System.out.print(text);
+      if (!Tuscedo.noterm) System.out.print(ANSI_RESET);
     } else {
       view.ftp.addText(text, style);
     }
@@ -887,7 +909,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     Window w = SwingUtilities.getWindowAncestor(input[istate]);
     Point p = w.getLocation();
     Point p2 = SwingUtilities.convertPoint(input[istate], 0,0, w);
-    int fh = getFontMetrics(UICommon.COMMON_FONT).getHeight()+2;
+    int fh = getFontMetrics(UICommon.font).getHeight()+2;
     int h = fh * Math.min(6, arr.length);
     p.x += p2.x;
     p.y += p2.y;
@@ -924,7 +946,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     Window w = SwingUtilities.getWindowAncestor(input[istate]);
     Point p = w.getLocation();
     Point p2 = SwingUtilities.convertPoint(input[istate], 0,0, w);
-    int fh = getFontMetrics(UICommon.COMMON_FONT).getHeight()+2;
+    int fh = getFontMetrics(UICommon.font).getHeight()+2;
     int h = fh * Math.min(6, items.size());
     p.x += p2.x;
     p.y += p2.y;
@@ -1329,7 +1351,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   
   public void onSerialDisconnect() {
     lineBuffer = new StringBuilder();
-    views[ISTATE_INPUT].ftp.addText("Disconnected\n", UICommon.STYLE_SERIAL_INFO);
+    views[ISTATE_INPUT].ftp.addText("Disconnected\n", UICommon.STYLE_GENERIC_INFO);
     updateTitle();
   }
   
