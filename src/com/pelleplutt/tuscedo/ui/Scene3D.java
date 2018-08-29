@@ -885,7 +885,7 @@ public class Scene3D {
   //
   
   static int createShader(int type, String src) {
-    System.out.println("create shader " + type);
+    //System.out.println("create shader " + type);
     int shader = glCreateShader(type);
     glShaderSource(shader, src);
     glCompileShader(shader);
@@ -900,20 +900,20 @@ public class Scene3D {
   }
   
   static int createProgram(int... shaders) {
-    System.out.println("create program");
+    //System.out.println("create program");
     int prog = glCreateProgram();
-    System.out.println("attaching " + shaders.length +  " shaders");
+    //System.out.println("attaching " + shaders.length +  " shaders");
     for (int shader : shaders) {
       glAttachShader(prog, shader);
     }
-    System.out.println("linking program");
+    //System.out.println("linking program");
     glLinkProgram(prog);
     int status = glGetProgrami(prog, GL_LINK_STATUS);
     if (status != GL_TRUE) {
       int err = glGetError();
       throw new RuntimeException("glerr:" + err + "\n" + glGetProgramInfoLog(prog));
     }
-    System.out.println("deleting shader info");
+    //System.out.println("deleting shader info");
     for (int shader : shaders) {
       glDetachShader(prog, shader);
       glDeleteShader(shader);
@@ -963,7 +963,7 @@ public class Scene3D {
     for (String n : SKYBOX_NAMES) {
       BufferedImage img = new BufferedImage(dim, dim, BufferedImage.TYPE_4BYTE_ABGR);
       Graphics2D g = (Graphics2D)img.getGraphics();
-      System.out.print("creating img " + n + " " + img.getWidth() + "x" + img.getHeight());
+      //System.out.print("creating img " + n + " " + img.getWidth() + "x" + img.getHeight());
       if (target == GL_TEXTURE_CUBE_MAP_POSITIVE_Y)       g.setColor(heaven);
       else if (target == GL_TEXTURE_CUBE_MAP_NEGATIVE_Y)  g.setColor(ground);
       else                                                g.setPaint(paint);
@@ -974,7 +974,7 @@ public class Scene3D {
       target++;
       int err = glGetError();
       if (err != 0) System.out.println("GLERROR:" + Integer.toHexString(err));
-      else          System.out.println();
+      //else          System.out.println();
     }
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -987,13 +987,13 @@ public class Scene3D {
     for (String n : SKYBOX_NAMES) {
       String name = path + File.separator + n;
       BufferedImage img = AppSystem.loadImage(name);
-      System.out.print("loading img " + name + " " + img.getWidth() + "x" + img.getHeight());
+      //System.out.print("loading img " + name + " " + img.getWidth() + "x" + img.getHeight());
       glTexImage2D(target, 0, GL_RGBA, img.getWidth(), img.getHeight(), 0, GL_RGBA, GL_UNSIGNED_BYTE, 
           createTextureBuffer(img));
       target++;
       int err = glGetError();
       if (err != 0) System.out.println("GLERROR:" + Integer.toHexString(err));
-      else          System.out.println();
+      //else          System.out.println();
     }
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

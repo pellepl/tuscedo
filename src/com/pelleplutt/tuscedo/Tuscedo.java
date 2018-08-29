@@ -78,7 +78,6 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
             windows.remove(w);
             //Log.println("window deregistered " + windows.size());
             if (windows.isEmpty()) {
-              System.out.println("byebye");
               Tuscedo.onExit();
               AppSystem.disposeAll();
             }
@@ -387,27 +386,27 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
 
   @Override
   public void onRemoved(UIO parent, UIO child) {
-    System.out.println("onRemoved  " + stringify(child.getUIInfo(), 0) + " from " + stringify(parent.getUIInfo(), 0));
+    //System.out.println("onRemoved  " + stringify(child.getUIInfo(), 0) + " from " + stringify(parent.getUIInfo(), 0));
   }
 
   @Override
   public void onAdded(UIO parent, UIO child) {
-    System.out.println("onAdded    " + stringify(child.getUIInfo(), 0) + "  to  " + stringify(parent.getUIInfo(), 0));
+    //System.out.println("onAdded    " + stringify(child.getUIInfo(), 0) + "  to  " + stringify(parent.getUIInfo(), 0));
   }
 
   @Override
   public void onClosed(UIO parent, UIO child) {
-    System.out.println("onClosed   " + 
-      stringify(child.getUIInfo(), 0) + 
-      "  in  " + 
-      (parent == null ? "null":stringify(parent.getUIInfo(), 0)));
+//    System.out.println("onClosed   " + 
+//      stringify(child.getUIInfo(), 0) + 
+//      "  in  " + 
+//      (parent == null ? "null":stringify(parent.getUIInfo(), 0)));
     uiobjects.remove(child.getUIInfo().getId());
   }
 
   @Override
   public void onCreated(UIInfo i) {
     uiobjects.put(i.getId(), i);
-    System.out.println("onCreated  " + stringify(i, 0));
+//    System.out.println("onCreated  " + stringify(i, 0));
   }
 
   @Override
