@@ -1244,7 +1244,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       views[ISTATE_INPUT].xterm.stdout(b, b.length);
     }
     final UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent(UIWorkArea.this);
-    if (t.isNotified() != 1) {
+    if (t != null && t.isNotified() != 1) {
       t.markNotified(1);
       Tuscedo.inst().getTimer().addTask(new Runnable() {
         @Override
