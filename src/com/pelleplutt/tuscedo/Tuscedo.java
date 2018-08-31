@@ -79,7 +79,6 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
             //Log.println("window deregistered " + windows.size());
             if (windows.isEmpty()) {
               Tuscedo.onExit();
-              AppSystem.disposeAll();
             }
           }
         }
@@ -361,11 +360,14 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     }
   }
   
-  static void onExit() {
+  public static void onExit() {
+    AppSystem.disposeAll();
     inst.running = false;
-    scene3d.destroy();
-    synchronized (scene3d) {
-      scene3d.notifyAll();
+    if (scene3d != null) {
+      scene3d.destroy();
+      synchronized (scene3d) {
+        scene3d.notifyAll();
+      }
     }
   }
 

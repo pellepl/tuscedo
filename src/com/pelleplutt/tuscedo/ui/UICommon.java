@@ -469,7 +469,7 @@ public class UICommon {
   static AbstractAction actionCloseTab = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent((Component)e.getSource()); 
+      UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent((Component)e.getSource());
       UISimpleTabPane stp = t.getPane();
       stp.removeTab(t);
     }

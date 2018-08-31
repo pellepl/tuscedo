@@ -1,15 +1,29 @@
 package com.pelleplutt.tuscedo.ui;
 
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.swing.JComponent;
+
 public class UIInfo {
+  public static final String EVENT_MOUSE_PRESS = "evmousepress";
+  public static final String EVENT_MOUSE_RELEASE = "evmouserelease";
+  public static final String EVENT_KEY_PRESS = "evkeypress";
+  public static final String EVENT_KEY_RELEASE = "evkeyrelease";
+  
   private UIO ui;
   final public String id;
   public String name;
   public UIInfo parent;
   public List<UIInfo> children;
   boolean closed;
+  public int mousepressx, mousepressy, mousepressb;
+  public int mouserelx, mouserely, mouserelb;
+  public int keypress, keyrel;
   
   public UIInfo(UIO ui, String id, String name) {
     this.ui = ui;
@@ -109,6 +123,12 @@ public class UIInfo {
   }
   
   List<UIListener> listeners = new ArrayList<UIListener>();
+
+  public int irqMousePressAddr = 0;
+  public int irqMouseReleaseAddr = 0;
+  public int irqKeyPressAddr = 0;
+  public int irqKeyReleaseAddr = 0;
+  
   static List<UIListener> glisteners = new ArrayList<UIListener>();
   public void addListener(UIListener l) {
     if (!listeners.contains(l)) listeners.add(l);
@@ -158,4 +178,40 @@ public class UIInfo {
   public String asString() {
     return getId() + " [" + getName() + "] : " + getUI().getClass().getSimpleName();
   }
+
+  public void registerCallbacks(UIO uio, JComponent c) {
+    c.setFocusable(true);
+    c.addMouseListener(mouseHandler);
+    c.addKeyListener(new KeyListener() {
+      @Override
+      public void keyTyped(KeyEvent e) {
+      }
+      @Override
+      public void keyReleased(KeyEvent e) {
+        keyrel = e.getKeyCode();
+        fireEventGeneric(ui, UIInfo.EVENT_KEY_RELEASE);
+      }
+      @Override
+      public void keyPressed(KeyEvent e) {
+        keypress = e.getKeyCode();
+        fireEventGeneric(ui, UIInfo.EVENT_KEY_PRESS);
+      }
+    });
+  }
+  MouseAdapter mouseHandler = new MouseAdapter() {
+    @Override
+    public void mousePressed(MouseEvent e) {
+      mousepressx = e.getX();
+      mousepressy = e.getY();
+      mousepressb = e.getButton();
+      fireEventGeneric(ui, UIInfo.EVENT_MOUSE_PRESS);
+    }
+    @Override
+    public void mouseReleased(MouseEvent e) {
+      mouserelx = e.getX();
+      mouserely = e.getY();
+      mouserelb = e.getButton();
+      fireEventGeneric(ui, UIInfo.EVENT_MOUSE_RELEASE);
+    }
+  };
 }

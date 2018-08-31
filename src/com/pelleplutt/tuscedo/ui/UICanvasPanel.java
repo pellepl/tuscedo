@@ -1,12 +1,9 @@
 package com.pelleplutt.tuscedo.ui;
 
 import java.awt.*;
-import java.awt.geom.*;
 import java.awt.image.*;
 
 import javax.swing.*;
-
-import com.pelleplutt.tuscedo.*;
 
 public class UICanvasPanel extends JPanel implements UIO {
   volatile BufferedImage pri, sec;
@@ -28,7 +25,7 @@ public class UICanvasPanel extends JPanel implements UIO {
     __id++;
     pri = new BufferedImage(w, h, BufferedImage.TYPE_4BYTE_ABGR);
     sec = new BufferedImage(w, h, BufferedImage.TYPE_4BYTE_ABGR);
-    Renderer renderer = new Renderer();
+    renderer = new Renderer();
     Dimension d = new Dimension(w,h);
     renderer.setMinimumSize(d);
     renderer.setPreferredSize(d);
@@ -40,7 +37,7 @@ public class UICanvasPanel extends JPanel implements UIO {
     setLayout(new BorderLayout());
     add(scrl, BorderLayout.CENTER);
     UICommon.defineCommonActions(renderer, JComponent.WHEN_IN_FOCUSED_WINDOW);
-
+    uiinfo.registerCallbacks(this, renderer);
   }
 
   public void decorateUI() {

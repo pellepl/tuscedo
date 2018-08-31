@@ -1,26 +1,55 @@
 package com.pelleplutt.tuscedo;
 
-import java.awt.*;
-import java.io.*;
-import java.nio.charset.*;
-import java.util.*;
+import static com.pelleplutt.tuscedo.OperandiIRQHandler.IRQ_BLOCK_SYSTEM;
+import static com.pelleplutt.tuscedo.OperandiIRQHandler.IRQ_SYSTEM_TIMER;
+
+import java.awt.Point;
+import java.awt.Window;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-import javax.swing.*;
+import javax.swing.SwingUtilities;
 
-import com.pelleplutt.*;
-import com.pelleplutt.operandi.*;
+import com.pelleplutt.Essential;
 import com.pelleplutt.operandi.Compiler;
-import com.pelleplutt.operandi.proc.*;
-import com.pelleplutt.operandi.proc.Processor.*;
-import com.pelleplutt.operandi.proc.ProcessorError.*;
-import com.pelleplutt.tuscedo.Tuscedo.*;
-import com.pelleplutt.tuscedo.ui.*;
-import com.pelleplutt.tuscedo.ui.UIGraphPanel.*;
-import com.pelleplutt.tuscedo.ui.UISimpleTabPane.*;
-import com.pelleplutt.util.*;
-import com.pelleplutt.util.AppSystem.*;
-import com.pelleplutt.util.io.*;
+import com.pelleplutt.operandi.CompilerError;
+import com.pelleplutt.operandi.Executable;
+import com.pelleplutt.operandi.Source;
+import com.pelleplutt.operandi.proc.ByteCode;
+import com.pelleplutt.operandi.proc.ExtCall;
+import com.pelleplutt.operandi.proc.MListMap;
+import com.pelleplutt.operandi.proc.MMapRef;
+import com.pelleplutt.operandi.proc.MSerializer;
+import com.pelleplutt.operandi.proc.MSet;
+import com.pelleplutt.operandi.proc.Processor;
+import com.pelleplutt.operandi.proc.Processor.M;
+import com.pelleplutt.operandi.proc.ProcessorError;
+import com.pelleplutt.operandi.proc.ProcessorError.ProcessorFinishedError;
+import com.pelleplutt.tuscedo.Tuscedo.TuscedoTabPane;
+import com.pelleplutt.tuscedo.ui.Scene3D;
+import com.pelleplutt.tuscedo.ui.UI3DPanel;
+import com.pelleplutt.tuscedo.ui.UICanvasPanel;
+import com.pelleplutt.tuscedo.ui.UICommon;
+import com.pelleplutt.tuscedo.ui.UIGraphPanel;
+import com.pelleplutt.tuscedo.ui.UIGraphPanel.SampleSet;
+import com.pelleplutt.tuscedo.ui.UIInfo;
+import com.pelleplutt.tuscedo.ui.UIInfo.UIListener;
+import com.pelleplutt.tuscedo.ui.UIO;
+import com.pelleplutt.tuscedo.ui.UISimpleTabPane;
+import com.pelleplutt.tuscedo.ui.UISimpleTabPane.Tab;
+import com.pelleplutt.tuscedo.ui.UIWorkArea;
+import com.pelleplutt.util.AppSystem;
+import com.pelleplutt.util.AppSystem.Disposable;
+import com.pelleplutt.util.Log;
+import com.pelleplutt.util.io.Port;
 
 public class OperandiScript implements Runnable, Disposable {
   public static final String VAR_SERIAL = "ser";
@@ -71,6 +100,14 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_UI_GET_ANCESTOR = "ui:get_ancestor";
   public static final String FN_UI_GET_PARENT = "ui:get_parent";
   public static final String FN_UI_GET_CHILDREN = "ui:get_children";
+  public static final String FN_UI_ON_MOUSE_PRESS = "ui:on_mouse_press";
+  public static final String FN_UI_ON_MOUSE_RELEASE = "ui:on_mouse_release";
+  public static final String FN_UI_ON_KEY_PRESS = "ui:on_key_press";
+  public static final String FN_UI_ON_KEY_RELEASE = "ui:on_key_release";
+  public static final String FN_UI_GET_MOUSE_PRESS = "ui:get_mouse_press";
+  public static final String FN_UI_GET_MOUSE_RELEASE = "ui:get_mouse_release";
+  public static final String FN_UI_GET_KEY_PRESS = "ui:get_key_press";
+  public static final String FN_UI_GET_KEY_RELEASE = "ui:get_key_release";
 
   public static final String KEY_UI_ID = ".uio_id";
 
@@ -110,7 +147,6 @@ public class OperandiScript implements Runnable, Disposable {
     Thread t = new Thread(this, "operandi");
     t.setDaemon(true);
     t.start();
-    irqHandler.installIRQHandlers(this);;
   }
   
   @Override
@@ -160,14 +196,13 @@ public class OperandiScript implements Runnable, Disposable {
     halted = false;
     lastSrcDbg = null;
     Processor.addCommonExtdefs(extDefs);
-    setExtDef("println", "(...) - prints arguments with newline", 
-        new ExtCall() {
+    setExtDef("println", "(...) - prints arguments with newline", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           currentWA.appendViewText(currentWA.getCurrentView(), "\n", UICommon.STYLE_OP_OUT);
         } else {
           for (int i = 0; i < args.length; i++) {
-            currentWA.appendViewText(currentWA.getCurrentView(), args[i].asString() + (i < args.length-1 ? " " : ""), 
+            currentWA.appendViewText(currentWA.getCurrentView(), args[i].asString() + (i < args.length - 1 ? " " : ""),
                 UICommon.STYLE_OP_OUT);
           }
         }
@@ -175,99 +210,77 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("print", "(...) - prints arguments", 
-         new ExtCall() {
+    setExtDef("print", "(...) - prints arguments", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
         } else {
           for (int i = 0; i < args.length; i++) {
-            currentWA.appendViewText(currentWA.getCurrentView(), args[i].asString() + (i < args.length-1 ? " " : ""), 
+            currentWA.appendViewText(currentWA.getCurrentView(), args[i].asString() + (i < args.length - 1 ? " " : ""),
                 UICommon.STYLE_OP_OUT);
           }
         }
         return null;
       }
     });
-    setExtDef("__IRQ_consume_timer", "() - TODO", 
-         new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        Integer addr = irqHandler.consumeTimerIRQ(); 
-        return addr == null ? null : new M(addr.intValue());
-      }
-    });
-    setExtDef("__IRQ_timer", "() - TODO", 
-         new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        return new M(irqHandler.hasTimerIRQ());
-      }
-    });
-    setExtDef("sleep", "(<time>) - sleeps given milliseconds", 
-         new ExtCall() {
+    setExtDef("sleep", "(<time>) - sleeps given milliseconds", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
-        } 
+        }
         AppSystem.sleep(args[0].asInt());
         return null;
       }
     });
-    setExtDef("sqrt", "(<x>) - returns square root of x", 
-        new ExtCall() {
+    setExtDef("sqrt", "(<x>) - returns square root of x", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
-        } 
-        return new M((float)Math.sqrt(args[0].asFloat()));
+        }
+        return new M((float) Math.sqrt(args[0].asFloat()));
       }
     });
-    setExtDef("log", "(<x>) - returns natural logarithm of x", 
-        new ExtCall() {
+    setExtDef("log", "(<x>) - returns natural logarithm of x", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
-        } 
-        return new M((float)Math.log(args[0].asFloat()));
+        }
+        return new M((float) Math.log(args[0].asFloat()));
       }
     });
-    setExtDef("log10", "(<x>) - returns 10 base logarithm of x", 
-        new ExtCall() {
+    setExtDef("log10", "(<x>) - returns 10 base logarithm of x", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
-        } 
-        return new M((float)Math.log10(args[0].asFloat()));
+        }
+        return new M((float) Math.log10(args[0].asFloat()));
       }
     });
-    setExtDef("pow", "(<x>,<y>) - returns x powered by y.", 
-        new ExtCall() {
+    setExtDef("pow", "(<x>,<y>) - returns x powered by y.", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 2) {
           return null;
-        } 
-        return new M((float)Math.pow(args[0].asFloat(),args[1].asFloat()));
+        }
+        return new M((float) Math.pow(args[0].asFloat(), args[1].asFloat()));
       }
     });
-    setExtDef("frac", "(<x>) - returns fractional part of x", 
-        new ExtCall() {
+    setExtDef("frac", "(<x>) - returns fractional part of x", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
-        } 
+        }
         float f = args[0].asFloat();
-        return new M(f - (int)f);
+        return new M(f - (int) f);
       }
     });
-    setExtDef("abs", "(<x>) - returns absolute of x", 
-        new ExtCall() {
+    setExtDef("abs", "(<x>) - returns absolute of x", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
-        } 
-        return new M((float)Math.abs(args[0].asFloat()));
+        }
+        return new M((float) Math.abs(args[0].asFloat()));
       }
     });
-    setExtDef("max", "(...) - returns maximum value", 
-        new ExtCall() {
+    setExtDef("max", "(...) - returns maximum value", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
@@ -280,13 +293,13 @@ public class OperandiScript implements Runnable, Disposable {
           } else {
             v = m.asFloat();
           }
-          if (v > max) max = v;
+          if (v > max)
+            max = v;
         }
         return new M(max);
       }
     });
-    setExtDef("min", "(...) - returns minimum value", 
-        new ExtCall() {
+    setExtDef("min", "(...) - returns minimum value", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
@@ -299,232 +312,150 @@ public class OperandiScript implements Runnable, Disposable {
           } else {
             v = m.asFloat();
           }
-          if (v < min) min = v;
+          if (v < min)
+            min = v;
         }
         return new M(min);
       }
     });
-    setExtDef("sin", "(<x>) - returns sinus", 
-        new ExtCall() {
-     public Processor.M exe(Processor p, Processor.M[] args) {
-       if (args == null || args.length == 0) {
-         return null;
-       } 
-       return new M((float)Math.sin(args[0].asFloat()));
-     }
-   });
-   setExtDef("cos", "(<x>) - returns cosinus", 
-        new ExtCall() {
-     public Processor.M exe(Processor p, Processor.M[] args) {
-       if (args == null || args.length == 0) {
-         return null;
-       } 
-       return new M((float)Math.cos(args[0].asFloat()));
-     }
-   });
-   setExtDef("tan", "(<x>) - returns tangent", 
-        new ExtCall() {
-     public Processor.M exe(Processor p, Processor.M[] args) {
-       if (args == null || args.length == 0) {
-         return null;
-       } 
-       return new M((float)Math.tan(args[0].asFloat()));
-     }
-   });
-   setExtDef("sinh", "(<x>) - returns hyperbolical sinus", 
-       new ExtCall() {
-    public Processor.M exe(Processor p, Processor.M[] args) {
-      if (args == null || args.length == 0) {
-        return null;
-      } 
-      return new M((float)Math.sinh(args[0].asFloat()));
-    }
-  });
-  setExtDef("cosh", "(<x>) - returns hyperbolical cosinus", 
-       new ExtCall() {
-    public Processor.M exe(Processor p, Processor.M[] args) {
-      if (args == null || args.length == 0) {
-        return null;
-      } 
-      return new M((float)Math.cosh(args[0].asFloat()));
-    }
-  });
-  setExtDef("tanh", "(<x>) - returns hyperbolical tangent", 
-       new ExtCall() {
-    public Processor.M exe(Processor p, Processor.M[] args) {
-      if (args == null || args.length == 0) {
-        return null;
-      } 
-      return new M((float)Math.tanh(args[0].asFloat()));
-    }
-  });
-    setExtDef("asin", "(<x>) - returns arcsinus", 
-         new ExtCall() {
+    setExtDef("sin", "(<x>) - returns sinus", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
-        } 
-        return new M((float)Math.asin(args[0].asFloat()));
+        }
+        return new M((float) Math.sin(args[0].asFloat()));
       }
     });
-    setExtDef("acos", "(<x>) - returns arccosinus", 
-         new ExtCall() {
+    setExtDef("cos", "(<x>) - returns cosinus", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
-        } 
-        return new M((float)Math.acos(args[0].asFloat()));
+        }
+        return new M((float) Math.cos(args[0].asFloat()));
       }
     });
-    setExtDef("atan", "(<x>) - returns arctangent", 
-         new ExtCall() {
+    setExtDef("tan", "(<x>) - returns tangent", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
           return null;
-        } 
-        return new M((float)Math.atan(args[0].asFloat()));
+        }
+        return new M((float) Math.tan(args[0].asFloat()));
       }
     });
-    setExtDef("atan2",  "(<y>, <x>) - returns 2-argument arctangent", 
-        new ExtCall() {
+    setExtDef("sinh", "(<x>) - returns hyperbolical sinus", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        }
+        return new M((float) Math.sinh(args[0].asFloat()));
+      }
+    });
+    setExtDef("cosh", "(<x>) - returns hyperbolical cosinus", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        }
+        return new M((float) Math.cosh(args[0].asFloat()));
+      }
+    });
+    setExtDef("tanh", "(<x>) - returns hyperbolical tangent", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        }
+        return new M((float) Math.tanh(args[0].asFloat()));
+      }
+    });
+    setExtDef("asin", "(<x>) - returns arcsinus", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        }
+        return new M((float) Math.asin(args[0].asFloat()));
+      }
+    });
+    setExtDef("acos", "(<x>) - returns arccosinus", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        }
+        return new M((float) Math.acos(args[0].asFloat()));
+      }
+    });
+    setExtDef("atan", "(<x>) - returns arctangent", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        }
+        return new M((float) Math.atan(args[0].asFloat()));
+      }
+    });
+    setExtDef("atan2", "(<y>, <x>) - returns 2-argument arctangent", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length <= 1) {
           return null;
-        } 
-        return new M((float)Math.atan2(args[0].asFloat(),args[1].asFloat()));
+        }
+        return new M((float) Math.atan2(args[0].asFloat(), args[1].asFloat()));
       }
     });
-    setExtDef("time", "() - returns current time in milliseconds", 
-         new ExtCall() {
+    setExtDef("time", "() - returns current time in milliseconds", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        return new M((int)System.currentTimeMillis());
+        return new M((int) System.currentTimeMillis());
       }
     });
-    setExtDef("base",  "(<x>, <base>) - returns <x> in base <base>", 
-        new ExtCall() {
+    setExtDef("base", "(<x>, <base>) - returns <x> in base <base>", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length <= 1) {
           return null;
-        } 
-        return new M(Integer.toString(args[0].asInt(),args[1].asInt()));
+        }
+        return new M(Integer.toString(args[0].asInt(), args[1].asInt()));
       }
     });
-    setExtDef("srlz",  "(<x>) - stringifies x (see dsrlz)", 
-        new ExtCall() {
+    setExtDef("srlz", "(<x>) - stringifies x (see dsrlz)", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 1) {
           return null;
-        } 
+        }
         return new M(MSerializer.serialize(args[0]));
       }
     });
-    setExtDef("dsrlz",  "(<string>) - destringifies string (see srlz)", 
-        new ExtCall() {
+    setExtDef("dsrlz", "(<string>) - destringifies string (see srlz)", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 1) {
           return null;
-        } 
+        }
         return MSerializer.deserialize(args[0].asString());
       }
     });
-    setExtDef("uitree",  "() - dumps the ui tree", 
-        new ExtCall() {
+    setExtDef("uitree", "() - dumps the ui tree", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        currentWA.appendViewText(currentWA.getCurrentView(), Tuscedo.inst().dumpUITree(), 
-            UICommon.STYLE_OP_DBG);
+        currentWA.appendViewText(currentWA.getCurrentView(), Tuscedo.inst().dumpUITree(), UICommon.STYLE_OP_DBG);
         return null;
       }
     });
-    setExtDef("timer_start",  "(<future_ms>, <recurrence_ms>, <func>) - starts a timer", 
-        new ExtCall() {
+    setExtDef("timer_start", "(<future_ms>, <recurrence_ms>, <func>) - starts a timer", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length != 3) {
           return null;
-        } 
+        }
         final int timerAddr = args[2].i;
-        Log.println("operandi add timer: in " +args[0].asInt() + "ms, rec " + args[1].asInt() + ", calling " + args[2]);
+        Log.println(
+            "operandi add timer: in " + args[0].asInt() + "ms, rec " + args[1].asInt() + ", calling " + args[2]);
         Tuscedo.inst.getTimer().addTask(new Runnable() {
           @Override
           public void run() {
-            if (running) getIRQHandler().callTimerIRQ(timerAddr);
+            if (running) {
+              irqHandler.queue(IRQ_BLOCK_SYSTEM, IRQ_SYSTEM_TIMER).trigger(timerAddr);
+            }
           }
         }, args[0].asInt(), args[1].asInt());
         return null;
       }
     });
-    setExtDef(FN_UI_CLOSE,  "() - closes this ui instance", 
-        new ExtCall() {
+    setExtDef("trap", "() - interrupts wfi", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        UIO uio = getUIOByScriptId(p.getMe());
-        if (uio != null) uio.getUIInfo().close();
-        return null;
-      }
-    });
-    setExtDef(FN_UI_GET_ANCESTOR,  "() - returns ancestor of this ui instance", 
-        new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        UIO uio = getUIOByScriptId(p.getMe());
-        if (uio == null) return null;
-        UIInfo parenInf = uio.getUIInfo().getAncestor();
-        if (parenInf == null) return null;
-        return createGenericMUIObj(parenInf.getUI());
-      }
-    });
-    setExtDef(FN_UI_GET_PARENT,  "() - returns parent of this ui instance", 
-        new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        UIO uio = getUIOByScriptId(p.getMe());
-        if (uio == null) return null;
-        UIInfo parenInf = uio.getUIInfo().getParent();
-        if (parenInf == null) return null;
-        return createGenericMUIObj(parenInf.getUI());
-      }
-    });
-    setExtDef(FN_UI_GET_CHILDREN,  "() - returns children of this ui instance", 
-        new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        UIO uio = getUIOByScriptId(p.getMe());
-        if (uio == null) return null;
-        UIInfo uii = uio.getUIInfo();
-        MSet msetc = new MListMap();
-        for (UIInfo cuii : uii.children) {
-          msetc.add(createGenericMUIObj(cuii.getUI()));
-        }
-        return new M(msetc);
-      }
-    });
-    setExtDef(FN_UI_SET_NAME,  "(<name>) - sets name of this ui instance", 
-        new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0)  return null;
-        UIO uio = getUIOByScriptId(p.getMe());
-        if (uio != null) {
-          uio.getUIInfo().setName(args[0].asString());
-          UIInfo anc = uio.getUIInfo().getAncestor();
-          if (anc != null) {
-            anc.getUI().repaint();
-          }
-        }
-        return null;
-      }
-    });
-    setExtDef(FN_UI_GET_NAME, "() - returns name of this ui instance", 
-         new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        UIO uio = getUIOByScriptId(p.getMe());
-        if (uio != null) {
-          return new M(uio.getUIInfo().getName());
-        }
-        return null;
-      }
-    });
-    setExtDef(FN_UI_GET_ID, "() - returns id of this ui instance", 
-         new ExtCall() {
-      public Processor.M exe(Processor p, Processor.M[] args) {
-        UIO uio = getUIOByScriptId(p.getMe());
-        if (uio != null) {
-          return new M(uio.getUIInfo().id);
-        }
+        OperandiScript.this.getIRQHandler()
+            .queue(OperandiIRQHandler.IRQ_BLOCK_SYSTEM, OperandiIRQHandler.IRQ_SYSTEM_USER).trigger(0);
         return null;
       }
     });
@@ -533,53 +464,64 @@ public class OperandiScript implements Runnable, Disposable {
         if (args.length > 0) {
           String help = defhelp.get(args[0].asString());
           if (help != null) {
-            currentWA.appendViewText(currentWA.getCurrentView(), args[0].asString() + help + "\n", UICommon.STYLE_OP_DBG);
+            currentWA.appendViewText(currentWA.getCurrentView(), args[0].asString() + help + "\n",
+                UICommon.STYLE_OP_DBG);
           }
         } else {
           List<String> h = new ArrayList<>();
           for (String k : extDefs.keySet()) {
-            if (k.contains(":")) continue;
+            if (k.contains(":"))
+              continue;
             String help = defhelp.get(k);
-            if (help == null) help = "";
+            if (help == null)
+              help = "";
             h.add(k + help);
-            
+
           }
           h.sort(null);
-          for (String s : h) currentWA.appendViewText(currentWA.getCurrentView(), s + "\n", UICommon.STYLE_OP_DBG);
+          for (String s : h)
+            currentWA.appendViewText(currentWA.getCurrentView(), s + "\n", UICommon.STYLE_OP_DBG);
           h.clear();
-          
+
           for (String k : extDefs.keySet()) {
-            if (!k.contains(":")) continue;
+            if (!k.contains(":"))
+              continue;
             String help = defhelp.get(k);
-            if (help == null) help = "";
+            if (help == null)
+              help = "";
             h.add(k + help);
           }
           h.sort(null);
-          for (String s : h) currentWA.appendViewText(currentWA.getCurrentView(), s + "\n", UICommon.STYLE_OP_DBG);
+          for (String s : h)
+            currentWA.appendViewText(currentWA.getCurrentView(), s + "\n", UICommon.STYLE_OP_DBG);
           h.clear();
         }
         return null;
       }
     });
-    setExtDef("exit", "(<x>) - kills app", 
-        new ExtCall() {
-     public Processor.M exe(Processor p, Processor.M[] args) {
-       if (args == null || args.length == 0) {
-         System.exit(0);
-       } 
-       System.exit((args[0].asInt()));
-       return null;
-     }
-   });
+    setExtDef("exit", "(<x>) - kills app", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        Tuscedo.onExit();
+        System.exit((args == null || args.length == 0) ? 0 : (args[0].asInt()));
+        return null;
+      }
+    });
+    setExtDef("wfi", "(<x>) - waits for interrupt given milliseconds", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        return new M(awaitIRQ(args.length > 0 ? args[0].asInt() : 0) ? 1 : 0);
+      }
+    });
 
     createGraphFunctions();
     createCanvasFunctions();
     create3DFunctions();
+    createUIFunctions();
     createTuscedoTabPaneFunctions();
     createSerialFunctions();
     MNet.createNetFunctions(this);
     MSys.createSysFunctions(this);
     MDisk.createDiskFunctions(this);
+    getIRQHandler().createIRQFunctions(this);
     
     setExtHelp("rand", "() - return random 32-bit number");
     setExtHelp("randseed", "(<x>) - sets random seed");
@@ -594,7 +536,9 @@ public class OperandiScript implements Runnable, Disposable {
     proc.reset();
     proc.user = 0;
     irqHandler.reset();
+    irqHandler.installIRQHandlers(this);
   }
+  
   float __maxrec(Processor.M m) {
     float max = Float.MIN_VALUE;
     if (m.type == Processor.TSET) {
@@ -644,7 +588,6 @@ public class OperandiScript implements Runnable, Disposable {
       }
     }
   }
-  
 
   public void runScript(UIWorkArea wa, String s) {
     if (s.startsWith("#reset") && s.length() < 8) {
@@ -1179,6 +1122,30 @@ public class OperandiScript implements Runnable, Disposable {
     f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_CLOSE));
     f.type = Processor.TFUNC;
     mobj.putIntern("close", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_ON_MOUSE_PRESS));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("on_mouse_press", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_ON_MOUSE_RELEASE));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("on_mouse_release", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_ON_KEY_PRESS));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("on_key_press", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_ON_KEY_RELEASE));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("on_key_release", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_GET_MOUSE_PRESS));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("get_mouse_press", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_GET_MOUSE_RELEASE));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("get_mouse_release", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_GET_KEY_PRESS));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("get_key_press", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_GET_KEY_RELEASE));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("get_key_release", f);
   }
 
   private M createGenericMUIObj(UIO uio) {
@@ -1484,6 +1451,58 @@ public class OperandiScript implements Runnable, Disposable {
     };
   }
   
+  private void addOperandiUIListener(UIO ui) {
+    ui.getUIInfo().addListener(new UIListener() {
+      @Override
+      public void onRemoved(UIO parent, UIO child) {
+      }
+      @Override
+      public void onEvent(UIO uio, Object event) {
+        if (event == UIInfo.EVENT_MOUSE_PRESS) {
+          int addr = uio.getUIInfo().irqMousePressAddr;
+          if (addr > 0) {
+            OperandiScript.this.getIRQHandler()
+            .queue(OperandiIRQHandler.IRQ_BLOCK_UI, OperandiIRQHandler.IRQ_UI_MOUSE_PRESS)
+            .trigger(addr);
+          }
+        }
+        else if (event == UIInfo.EVENT_MOUSE_RELEASE) {
+          int addr = uio.getUIInfo().irqMouseReleaseAddr;
+          if (addr > 0) {
+            OperandiScript.this.getIRQHandler()
+            .queue(OperandiIRQHandler.IRQ_BLOCK_UI, OperandiIRQHandler.IRQ_UI_MOUSE_RELEASE)
+            .trigger(addr);
+          }
+        }
+        else if (event == UIInfo.EVENT_KEY_PRESS) {
+          int addr = uio.getUIInfo().irqKeyPressAddr;
+          if (addr > 0) {
+            OperandiScript.this.getIRQHandler()
+            .queue(OperandiIRQHandler.IRQ_BLOCK_UI, OperandiIRQHandler.IRQ_UI_KEY_PRESS)
+            .trigger(addr);
+          }
+        }
+        else if (event == UIInfo.EVENT_KEY_RELEASE) {
+          int addr = uio.getUIInfo().irqKeyReleaseAddr;
+          if (addr > 0) {
+            OperandiScript.this.getIRQHandler()
+            .queue(OperandiIRQHandler.IRQ_BLOCK_UI, OperandiIRQHandler.IRQ_UI_KEY_RELEASE)
+            .trigger(addr);
+          }
+        }
+      }
+      @Override
+      public void onCreated(UIInfo obj) {
+      }
+      @Override
+      public void onClosed(UIO parent, UIO child) {
+      }
+      @Override
+      public void onAdded(UIO parent, UIO child) {
+      }
+    });
+  }
+
   private void createCanvasFunctions() {
     setExtDef("canvas", "((<title>),(<w>),(<h>)) - creates a canvas",
         new ExtCall() {
@@ -1520,6 +1539,7 @@ public class OperandiScript implements Runnable, Disposable {
         MObj mobj = createCanvasMUIO();
         M mui = new M(mobj);
         addUIMembers(mobj, ui);
+        addOperandiUIListener(ui);
         return mui;
       }
     });
@@ -1856,6 +1876,166 @@ public class OperandiScript implements Runnable, Disposable {
     });
   }
 
+  private void createUIFunctions() {
+    setExtDef(FN_UI_CLOSE,  "() - closes this ui instance", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO uio = getUIOByScriptId(p.getMe());
+        if (uio != null) uio.getUIInfo().close();
+        return null;
+      }
+    });
+    setExtDef(FN_UI_GET_ANCESTOR,  "() - returns ancestor of this ui instance", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO uio = getUIOByScriptId(p.getMe());
+        if (uio == null) return null;
+        UIInfo parenInf = uio.getUIInfo().getAncestor();
+        if (parenInf == null) return null;
+        return createGenericMUIObj(parenInf.getUI());
+      }
+    });
+    setExtDef(FN_UI_GET_PARENT,  "() - returns parent of this ui instance", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO uio = getUIOByScriptId(p.getMe());
+        if (uio == null) return null;
+        UIInfo parenInf = uio.getUIInfo().getParent();
+        if (parenInf == null) return null;
+        return createGenericMUIObj(parenInf.getUI());
+      }
+    });
+    setExtDef(FN_UI_GET_CHILDREN,  "() - returns children of this ui instance", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO uio = getUIOByScriptId(p.getMe());
+        if (uio == null) return null;
+        UIInfo uii = uio.getUIInfo();
+        MSet msetc = new MListMap();
+        for (UIInfo cuii : uii.children) {
+          msetc.add(createGenericMUIObj(cuii.getUI()));
+        }
+        return new M(msetc);
+      }
+    });
+    setExtDef(FN_UI_SET_NAME,  "(<name>) - sets name of this ui instance", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        UIO uio = getUIOByScriptId(p.getMe());
+        if (uio != null) {
+          uio.getUIInfo().setName(args[0].asString());
+          UIInfo anc = uio.getUIInfo().getAncestor();
+          if (anc != null) {
+            anc.getUI().repaint();
+          }
+        }
+        return null;
+      }
+    });
+    setExtDef(FN_UI_GET_NAME, "() - returns name of this ui instance", 
+         new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO uio = getUIOByScriptId(p.getMe());
+        if (uio != null) {
+          return new M(uio.getUIInfo().getName());
+        }
+        return null;
+      }
+    });
+    setExtDef(FN_UI_GET_ID, "() - returns id of this ui instance", 
+         new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO uio = getUIOByScriptId(p.getMe());
+        if (uio != null) {
+          return new M(uio.getUIInfo().id);
+        }
+        return null;
+      }
+    });
+    setExtDef(FN_UI_ON_MOUSE_PRESS, "(<func>) - calls func on mouse press",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO cp = getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.getUIInfo().irqMousePressAddr = args[0].i;
+        return null;
+      }
+    });
+    setExtDef(FN_UI_ON_MOUSE_RELEASE, "(<func>) - calls func on mouse release",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO cp = getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.getUIInfo().irqMouseReleaseAddr = args[0].i;
+        return null;
+      }
+    });
+    setExtDef(FN_UI_ON_KEY_PRESS, "(<func>) - calls func on key press",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO cp = getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.getUIInfo().irqKeyPressAddr = args[0].i;
+        return null;
+      }
+    });
+    setExtDef(FN_UI_ON_KEY_RELEASE, "(<func>) - calls func on key release",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO cp = getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.getUIInfo().irqKeyReleaseAddr = args[0].i;
+        return null;
+      }
+    });
+    setExtDef(FN_UI_GET_MOUSE_PRESS, "() - returns last mouse press",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO cp = getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        MSet mres = new MListMap();
+        UIInfo ui = cp.getUIInfo();
+        mres.add(new M(ui.mousepressx));
+        mres.add(new M(ui.mousepressy));
+        mres.add(new M(ui.mousepressb));
+        return new M(mres);
+      }
+    });
+    setExtDef(FN_UI_GET_MOUSE_RELEASE, "() - returns last mouse release",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO cp = getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        MSet mres = new MListMap();
+        UIInfo ui = cp.getUIInfo();
+        mres.add(new M(ui.mouserelx));
+        mres.add(new M(ui.mouserely));
+        mres.add(new M(ui.mouserelb));
+        return new M(mres);
+      }
+    });
+    setExtDef(FN_UI_GET_KEY_PRESS, "() - returns last key press",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO cp = getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        UIInfo ui = cp.getUIInfo();
+        return new M(ui.keypress);
+      }
+    });
+    setExtDef(FN_UI_GET_KEY_RELEASE, "() - returns last key release",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO cp = getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        UIInfo ui = cp.getUIInfo();
+        return new M(ui.keyrel);
+      }
+    });
+
+  }
+
 
   private MObj createTuscedoTabPaneMUIO() {
     return new MObj(currentWA, comp, "pane") {
@@ -1986,6 +2166,21 @@ public class OperandiScript implements Runnable, Disposable {
         val = appVariables.get(var);
       }
       proc.setMemory(varAddr, val);
+    }
+  }
+
+  private Object wfi = new Object();
+  public void irqTriggered() {
+    synchronized (wfi) {
+      wfi.notify();
+    }
+  }
+  public boolean awaitIRQ(long millisecs) {
+    synchronized (wfi) {
+      if (!irqHandler.pendingIRQ()) {
+        AppSystem.waitSilently(wfi, millisecs);
+      }
+      return irqHandler.pendingIRQ();
     }
   }
 }
