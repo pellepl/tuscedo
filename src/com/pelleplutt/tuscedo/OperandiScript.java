@@ -1728,8 +1728,8 @@ public class OperandiScript implements Runnable, Disposable {
     setExtDef("graph3d", "((<title>),(<w>),(<h>)) - creates a 3d graph",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
+        int w, h;
         String name = "GRAPH3D";
-        int w = 400; int h = 300;
         Tab tab = UISimpleTabPane.getTabByComponent(currentWA);
         if (tab == null) {
           Tuscedo.inst().create(currentWA);

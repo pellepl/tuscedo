@@ -72,18 +72,23 @@ public class UICommon {
   public static final int STYLE_ID_OP_IN = 42;
   public static final int STYLE_ID_OP_DBG = 43;
   
+  static void uiUpdate() {
+    Tuscedo.inst().redecorateAll();
+    Tuscedo.settingsDirty = true;
+  }
+  
   static {
     Settings s = Settings.inst();
     s.listenTrig("col_gen_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colGenericBg = new Color(val);
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_text_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colTextFg = new Color(val);
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_input_fg.int", new ModCallback<Integer>() {
@@ -91,19 +96,19 @@ public class UICommon {
         colInputFg = new Color(val);
         if (STYLE_CONN_IN == null) STYLE_CONN_IN = new FastTextPane.Style(STYLE_ID_CONN_IN, colInputFg, null, false);
         else STYLE_CONN_IN.setFgColor(val); 
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_input_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colInputBg = new Color(val);
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_input_bash_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colInputBashBg = new Color(val);
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_bash_fg.int", new ModCallback<Integer>() {
@@ -111,7 +116,7 @@ public class UICommon {
         colBashFg = new Color(val);
         if (STYLE_BASH_INPUT == null) STYLE_BASH_INPUT = new FastTextPane.Style(STYLE_ID_BASH_INPUT, colBashFg, null, false);
         else STYLE_BASH_INPUT.setFgColor(val); 
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_bash_dbg_fg.int", new ModCallback<Integer>() {
@@ -119,7 +124,7 @@ public class UICommon {
         colBashDbgFg = new Color(val);
         if (STYLE_BASH_DBG == null) STYLE_BASH_DBG = new FastTextPane.Style(STYLE_ID_BASH_DBG, colBashDbgFg, null, false);
         else STYLE_BASH_DBG.setFgColor(val); 
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_op_out_fg.int", new ModCallback<Integer>() {
@@ -127,7 +132,7 @@ public class UICommon {
         colOpOut = new Color(val);
         if (STYLE_OP_OUT == null) STYLE_OP_OUT = new FastTextPane.Style(STYLE_ID_OP_OUT, colOpOut, null, false);
         else STYLE_OP_OUT.setFgColor(val); 
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_op_in_fg.int", new ModCallback<Integer>() {
@@ -135,7 +140,7 @@ public class UICommon {
         colOpIn = new Color(val);
         if (STYLE_OP_IN == null) STYLE_OP_IN = new FastTextPane.Style(STYLE_ID_OP_IN, colOpIn, null, false);
         else STYLE_OP_IN.setFgColor(val); 
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_op_err_fg.int", new ModCallback<Integer>() {
@@ -143,7 +148,7 @@ public class UICommon {
         colOpErr = new Color(val);
         if (STYLE_OP_ERR == null) STYLE_OP_ERR = new FastTextPane.Style(STYLE_ID_OP_ERR, colOpErr, null, false);
         else STYLE_OP_ERR.setFgColor(val); 
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_op_dbg_fg.int", new ModCallback<Integer>() {
@@ -151,7 +156,7 @@ public class UICommon {
         colOpDbg = new Color(val);
         if (STYLE_OP_DBG == null) STYLE_OP_DBG = new FastTextPane.Style(STYLE_ID_OP_DBG, colOpDbg, null, false);
         else STYLE_OP_DBG.setFgColor(val); 
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_process_fg.int", new ModCallback<Integer>() {
@@ -159,7 +164,7 @@ public class UICommon {
         colProcessFg = new Color(val);
         if (STYLE_BASH_OUT == null) STYLE_BASH_OUT = new FastTextPane.Style(STYLE_ID_BASH_OUT, colProcessFg, null, false);
         else STYLE_BASH_OUT.setFgColor(val); 
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_process_err_fg.int", new ModCallback<Integer>() {
@@ -167,7 +172,7 @@ public class UICommon {
         colProcessErrFg = new Color(val);
         if (STYLE_BASH_ERR == null) STYLE_BASH_ERR = new FastTextPane.Style(STYLE_ID_BASH_ERR, colProcessErrFg, null, false);
         else STYLE_BASH_ERR.setFgColor(val); 
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_find_fg.int", new ModCallback<Integer>() {
@@ -175,7 +180,7 @@ public class UICommon {
         colFindFg = new Color(val);
         if (STYLE_FIND == null) STYLE_FIND = new FastTextPane.Style(STYLE_ID_FIND, colFindFg, colFindBg, false);
         else STYLE_FIND.setFgColor(val); 
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_find_bg.int", new ModCallback<Integer>() {
@@ -183,7 +188,7 @@ public class UICommon {
         colFindBg = new Color(val);
         if (STYLE_FIND == null) STYLE_FIND = new FastTextPane.Style(STYLE_ID_FIND, colFindFg, colFindBg, false);
         else STYLE_FIND.setBgColor(val); 
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_find_mark_fg.int", new ModCallback<Integer>() {
@@ -191,7 +196,7 @@ public class UICommon {
         colFindMarkFg = new Color(val);
         if (STYLE_FIND_MARK == null) STYLE_FIND_MARK = new FastTextPane.Style(STYLE_ID_FIND_MARK, colFindMarkFg, colFindMarkBg, true);
         else STYLE_FIND_MARK.setFgColor(val); 
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_gen_info_fg.int", new ModCallback<Integer>() {
@@ -199,7 +204,7 @@ public class UICommon {
         colGenericInfoFg = new Color(val);
         if (STYLE_GENERIC_INFO == null) STYLE_GENERIC_INFO = new FastTextPane.Style(STYLE_ID_GENERIC_INFO, colGenericInfoFg, null, true);
         else STYLE_GENERIC_INFO.setFgColor(val); 
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_gen_err_fg.int", new ModCallback<Integer>() {
@@ -207,85 +212,85 @@ public class UICommon {
         colGenericErrFg = new Color(val);
         if (STYLE_GENERIC_ERR == null) STYLE_GENERIC_ERR = new FastTextPane.Style(STYLE_ID_GENERIC_ERR, colGenericErrFg, null, true);
         else STYLE_GENERIC_ERR.setFgColor(val); 
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     
     s.listenTrig("scrollbar_w.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("scrollbar_h.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
 
     s.listenTrig("col_tab_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colTabFg = new Color(val);
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_tab_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colTabBg = new Color(val);
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_tab_sel_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colTabSelBg = new Color(val);
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_tab_nonsel_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colTabNonSelBg = new Color(val);
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_tab_notifynew_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colTabNotifyNewFg = new Color(val);
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_tab_notifyold_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colTabNotifyOldFg = new Color(val);
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_scrollbar_l_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colScrollBarLFg = new Color(val);
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_scrollbar_d_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colScrollBarDFg = new Color(val);
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_scrollbar_l_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colScrollBarLBg = new Color(val);
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("col_scrollbar_d_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colScrollBarDBg = new Color(val);
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
     s.listenTrig("font_size.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         font = new Font(Font.MONOSPACED, Font.PLAIN, val);
-        Tuscedo.inst().redecorateAll();
+        uiUpdate();
       }
     });
   }
@@ -444,18 +449,20 @@ public class UICommon {
   } // class SpecScrollBarUI
 
   public static void defineCommonActions(JComponent c, int when) {
-    UICommon.defineAction(c, "common.addtab", "ctrl+shift+t", when, actionAddTab);
-    UICommon.defineAction(c, "common.closetab", "ctrl+d", when, actionCloseTab);
-    UICommon.defineAction(c, "common.seltab1", "ctrl+shift+1",when, actionSelTab[0]);
-    UICommon.defineAction(c, "common.seltab2", "ctrl+shift+2",when, actionSelTab[1]);
-    UICommon.defineAction(c, "common.seltab3", "ctrl+shift+3",when, actionSelTab[2]);
-    UICommon.defineAction(c, "common.seltab4", "ctrl+shift+4",when, actionSelTab[3]);
-    UICommon.defineAction(c, "common.seltab5", "ctrl+shift+5",when, actionSelTab[4]);
-    UICommon.defineAction(c, "common.seltab6", "ctrl+shift+6",when, actionSelTab[5]);
-    UICommon.defineAction(c, "common.seltab7", "ctrl+shift+7",when, actionSelTab[6]);
-    UICommon.defineAction(c, "common.seltab8", "ctrl+shift+8",when, actionSelTab[7]);
-    UICommon.defineAction(c, "common.seltab9", "ctrl+shift+9",when, actionSelTab[8]);
-    UICommon.defineAction(c, "common.seltab10", "ctrl+shift+0",when, actionSelTab[9]);
+    UICommon.defineAction(c, "common.tab.add", "ctrl+shift+t", when, actionAddTab);
+    UICommon.defineAction(c, "common.tab.close", "ctrl+d", when, actionCloseTab);
+    UICommon.defineAction(c, "common.tab.1", "ctrl+shift+1",when, actionSelTab[0]);
+    UICommon.defineAction(c, "common.tab.2", "ctrl+shift+2",when, actionSelTab[1]);
+    UICommon.defineAction(c, "common.tab.3", "ctrl+shift+3",when, actionSelTab[2]);
+    UICommon.defineAction(c, "common.tab.4", "ctrl+shift+4",when, actionSelTab[3]);
+    UICommon.defineAction(c, "common.tab.5", "ctrl+shift+5",when, actionSelTab[4]);
+    UICommon.defineAction(c, "common.tab.6", "ctrl+shift+6",when, actionSelTab[5]);
+    UICommon.defineAction(c, "common.tab.7", "ctrl+shift+7",when, actionSelTab[6]);
+    UICommon.defineAction(c, "common.tab.8", "ctrl+shift+8",when, actionSelTab[7]);
+    UICommon.defineAction(c, "common.tab.9", "ctrl+shift+9",when, actionSelTab[8]);
+    UICommon.defineAction(c, "common.tab.10", "ctrl+shift+0",when, actionSelTab[9]);
+    UICommon.defineAction(c, "common.tab.next", "ctrl+shift+plus",when, actionNextTab);
+    UICommon.defineAction(c, "common.tab.prev", "ctrl+shift+minus",when, actionPrevTab);
   }
   
   static AbstractAction actionAddTab = new AbstractAction() {
@@ -493,4 +500,22 @@ public class UICommon {
     UISimpleTabPane stp = t.getPane();
     stp.selectTab(ix);
   }
+  
+  static AbstractAction actionPrevTab = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent((Component)e.getSource()); 
+      UISimpleTabPane stp = t.getPane();
+      stp.selectPrevTab();
+    }
+  };
+
+  static AbstractAction actionNextTab = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent((Component)e.getSource()); 
+      UISimpleTabPane stp = t.getPane();
+      stp.selectNextTab();
+    }
+  };
 }

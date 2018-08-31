@@ -162,6 +162,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   public UIInfo getUIInfo() {
     return uiinfo;
   }
+  public void onClose() {}
   
   public UIWorkArea() {
     uiinfo = new UIInfo(this, "workarea" + __id, "");
@@ -1342,6 +1343,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     updateTitle();
   }
   
+
   public void onLinkedProcess(ProcessACTextField tf, ProcessGroup process) {
     Log.println("link process " + process.toString());
     tf.setBackground(UICommon.colInputBashBg);

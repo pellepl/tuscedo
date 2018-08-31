@@ -4,4 +4,5 @@ public interface UIO {
   public UIInfo getUIInfo();
   public void repaint();
   public void decorateUI();
+  public void onClose();
 }

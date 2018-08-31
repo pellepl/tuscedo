@@ -59,6 +59,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   public UIInfo getUIInfo() {
     return uiinfo;
   }
+  public void onClose() {}
 
   boolean userZoomed = false;
 
@@ -106,7 +107,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     public UIInfo getUIInfo() {
       return uiinfo;
     }
-    
+    public void onClose() {}
+
     public void decorateUI() {
       // TODO decor
     }

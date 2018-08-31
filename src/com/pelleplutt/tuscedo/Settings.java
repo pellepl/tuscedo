@@ -35,6 +35,11 @@ public class Settings {
   public final static String BASH_LAST_RET_STRING = "bashlastret.string";
   public final static String BASH_BACKGROUND_STRING = "bashbackground.string";
 
+  public final static String WINDOW_POSX_INT= "window.pos.x.int";
+  public final static String WINDOW_POSY_INT= "window.pos.y.int";
+  public final static String WINDOW_DIMW_INT= "window.dim.w.int";
+  public final static String WINDOW_DIMH_INT= "window.dim.h.int";
+
   public static final int MAX_LIST_ENTRIES = 9;
   
   Properties props = new Properties();
@@ -66,7 +71,12 @@ public class Settings {
     props.setProperty(BASH_LAST_RET_STRING, "$?");
     props.setProperty(BASH_BACKGROUND_STRING, "&");
     props.setProperty(SERIAL_NEWLINE_STRING, "\n");
-    
+
+    props.setProperty(WINDOW_POSX_INT, "100");
+    props.setProperty(WINDOW_POSY_INT, "100");
+    props.setProperty(WINDOW_DIMW_INT, "600");
+    props.setProperty(WINDOW_DIMH_INT, "400");
+
     props.setProperty("col_gen_bg.int", Integer.toString(0x000020));
     props.setProperty("col_text_fg.int", Integer.toString(0xffff80));
     props.setProperty("col_input_fg.int", Integer.toString(0x80ffff));

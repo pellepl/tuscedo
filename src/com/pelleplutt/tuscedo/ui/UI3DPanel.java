@@ -48,6 +48,12 @@ public class UI3DPanel extends JPanel implements UIO {
   public UIInfo getUIInfo() {
     return uiinfo;
   }
+  public void onClose() {
+    if (timerEntry != null) {
+      timerEntry.stop();
+      timerEntry = null;
+    }
+  }
   
   Timer.Entry timerEntry = null;
   Runnable keyTask = new Runnable() {
@@ -299,7 +305,7 @@ public class UI3DPanel extends JPanel implements UIO {
     @Override
     public void mouseExited(MouseEvent arg0) {
       UI3DPanel.this.setCursor(null);
-      keys = 0;
+      triggerKeys(keys, 0);
     }
     @Override
     public void mouseMoved(MouseEvent arg0) {

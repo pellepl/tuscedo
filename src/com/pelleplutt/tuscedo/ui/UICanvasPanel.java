@@ -17,6 +17,7 @@ public class UICanvasPanel extends JPanel implements UIO {
   public UIInfo getUIInfo() {
     return uiinfo;
   }
+  public void onClose() {}
   
   public UICanvasPanel(int w, int h) {
     uiinfo = new UIInfo(this, "canvas" + __id, "");

@@ -4,7 +4,6 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.*;
 import java.io.*;
-import java.lang.reflect.InvocationTargetException;
 import java.net.*;
 import java.util.*;
 import java.util.List;
@@ -19,6 +18,7 @@ import com.pelleplutt.util.*;
 
 public class Tuscedo implements Runnable, UIInfo.UIListener {
   public static boolean noterm = false;
+  public volatile static boolean settingsDirty = false;
   Container mainContainer;
   static Tuscedo inst;
   static List<Window> windows = new ArrayList<Window>();
@@ -36,8 +36,16 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     UIInfo.addGlobalListener(this);
     timer = new Timer();
     AppSystem.addDisposable(timer);
+    registerTickable(new Tickable() {
+      @Override
+      public void tick() {
+        if (settingsDirty) {
+          settingsDirty = false;
+          Settings.inst().saveSettings();
+        }
+      }});
   }
-  
+
   public static Tuscedo inst() {
     if (inst == null) {
       inst = new Tuscedo();
@@ -85,15 +93,32 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       });
     }
   }
+  
+  static int __winposx = Settings.inst().integer(Settings.WINDOW_POSX_INT);
+  static int __winposy = Settings.inst().integer(Settings.WINDOW_POSY_INT);
 
   public void create(UIWorkArea uiw) {
     JFrame f = new JFrame();
     f.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
     f.getContentPane().setLayout(new BorderLayout());
     f.getContentPane().setBackground(UICommon.colGenericBg);
-    f.setSize(600, 400);
-    //f.setLocationByPlatform(true); // cannot use this - windows x&y will report 0 until moved
-    f.setLocation(100, 100);
+    f.setSize(Settings.inst().integer(Settings.WINDOW_DIMW_INT), Settings.inst().integer(Settings.WINDOW_DIMH_INT));
+    f.setLocation(__winposx, __winposy);
+    __winposx += 50;
+    __winposy += 50;
+    try {
+      Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+      if (__winposx + Settings.inst().integer(Settings.WINDOW_DIMW_INT) >= screenSize.width) {
+        __winposx -= screenSize.width - Settings.inst().integer(Settings.WINDOW_DIMW_INT);
+      }
+      if (__winposy + Settings.inst().integer(Settings.WINDOW_DIMH_INT) >= screenSize.height) {
+        __winposy -= screenSize.height - Settings.inst().integer(Settings.WINDOW_DIMH_INT);
+      }
+    } catch (Throwable t) {
+      __winposx = 0;
+      __winposy = 0;
+    }
+    
     registerWindow(f);
     
     mainContainer = f.getContentPane();
@@ -107,10 +132,31 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     
     try {
       f.setIconImage(AppSystem.loadImage("tuscedo.png"));
-      f.setTitle(Essential.name + " " + Essential.vMaj + "." + Essential.vMin + "." + Essential.vMic);
     } catch (Throwable t) {}
+    f.setTitle(Essential.name + " " + Essential.vMaj + "." + Essential.vMin + "." + Essential.vMic);
     
     f.setVisible(true);
+    
+    f.addComponentListener(new ComponentListener() {
+      @Override
+      public void componentShown(ComponentEvent e) {
+      }
+      @Override
+      public void componentResized(ComponentEvent e) {
+        Settings.inst().setInt(Settings.WINDOW_DIMW_INT, e.getComponent().getWidth());
+        Settings.inst().setInt(Settings.WINDOW_DIMH_INT, e.getComponent().getHeight());
+        settingsDirty = true;
+      }
+      @Override
+      public void componentMoved(ComponentEvent e) {
+        Settings.inst().setInt(Settings.WINDOW_POSX_INT, e.getComponent().getX());
+        Settings.inst().setInt(Settings.WINDOW_POSY_INT, e.getComponent().getY());
+        settingsDirty = true;
+      }
+      @Override
+      public void componentHidden(ComponentEvent e) {
+      }
+    });;
   }
   
   public String addWorkAreaTab(UISimpleTabPane stp, UIWorkArea w) {
@@ -403,6 +449,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
 //      "  in  " + 
 //      (parent == null ? "null":stringify(parent.getUIInfo(), 0)));
     uiobjects.remove(child.getUIInfo().getId());
+    child.onClose();
   }
 
   @Override

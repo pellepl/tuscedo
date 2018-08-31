@@ -58,6 +58,7 @@ public class UISimpleTabPane extends JPanel implements UIO {
   final UIInfo uiinfo;
   @Override
   public UIInfo getUIInfo() { return uiinfo; }
+  public void onClose() {}
 
   public UISimpleTabPane() {
     uiinfo = new UIInfo(this, "tabpane" + __paneid, "");
@@ -303,6 +304,24 @@ public class UISimpleTabPane extends JPanel implements UIO {
     if (ix >= 0 && ix < tabs.size()) {
       selectTab(tabs.get(ix));
     }
+  }
+
+  public void selectNextTab() {
+    int ix = tabs.indexOf(selectedTab);
+    ix++;
+    if (ix >= tabs.size()) {
+      ix = 0;
+    }
+    selectTab(ix);
+  }
+
+  public void selectPrevTab() {
+    int ix = tabs.indexOf(selectedTab);
+    ix--;
+    if (ix < 0) {
+      ix =  tabs.size()-1;
+    }
+    selectTab(ix);
   }
 
   public void selectTab(String id) {
@@ -586,7 +605,7 @@ public class UISimpleTabPane extends JPanel implements UIO {
       }
     }
   };
-
+  
   public static class Tab extends JPanel implements UIO, UIListener {
     public Component content;
     public UISimpleTabPane owner;
@@ -598,7 +617,8 @@ public class UISimpleTabPane extends JPanel implements UIO {
     volatile int isNotified = 0;
     @Override
     public UIInfo getUIInfo() { return uiinfo; }
-    
+    public void onClose() {}
+
     public void decorateUI() {
       if (owner != null) owner.decorateTabLabel(this);
       repaint();
@@ -673,6 +693,7 @@ public class UISimpleTabPane extends JPanel implements UIO {
       isNotified = level;
       repaint();
     }
+    
     
     @Override
     public void paint(Graphics og) {
