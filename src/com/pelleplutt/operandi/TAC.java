@@ -38,7 +38,7 @@ public abstract class TAC {
       if (dbgResolveRefs) return "(" + t.toString() + ")";
       return "["+Integer.toString(ffrag.ir.indexOf(t)) +"]";
     } else {
-      return t.toString();
+      return t.toString() + "(" + t.getClass().getSimpleName() + ")";
     }
   }
   
@@ -399,7 +399,7 @@ public abstract class TAC {
       super(e); this.ret = ret;
       emptyReturn = ret == null;
     }
-    public String toString() {return "RET " + (emptyReturn ? "" : ref(ret));}
+    public String toString() {return "RET " + (emptyReturn ? "<NOTHING>" : ref(ret));}
   }
   
   public static class TACCall extends TAC {

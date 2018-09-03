@@ -622,6 +622,7 @@ public class CodeGenFront {
         }
         newBlock();
         add(lExit);
+        return null;
       } else {
         TACLabel lElse = new TACLabel(e, label+"_ifelse");
         TAC cond = genIR(e.operands.get(0), parentEblk, info);
@@ -647,8 +648,8 @@ public class CodeGenFront {
         }
         newBlock();
         add(lExit);
+        return iffalsegoto;
       }
-      return null;
     }
     
     else if (e.op == OP_FOR) {

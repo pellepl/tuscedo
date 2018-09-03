@@ -74,7 +74,7 @@ public class Grammar {
           "arrderef:      sym | dot | arrderef | call | arrdecl | str | range , val | str | range | blok | rel_op | op | return\n" +
           "assign:        sym | arrderef | dot , op | call | val | str | range | nil | assign | blok | rel_op | if\n" +
           "arrdecl:       maparg*\n" +
-          "return:        op | val | str | range | nil | assign | blok | rel_op\n" +
+          "return:        op | val | str | range | nil | assign | blok | rel_op | if\n" +
           "assign_op:     sym | arrderef | dot , op | call | val | assign | rel_op\n" +
           "assign_op_add: sym | arrderef | dot , str\n" +
           "OP_PLUSEQ:     sym | arrderef | dot , blok\n" +
