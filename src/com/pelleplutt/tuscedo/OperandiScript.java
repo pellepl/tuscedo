@@ -914,7 +914,7 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(1);
       }
     });
-    setExtDef(FN_SERIAL_ON_RX, "(<filter>, <func>) - executes function when filter is matched on a serial line of data, the function arguments will be (line, filter), if func is nil the filter is cleared",
+    setExtDef(FN_SERIAL_ON_RX, "(<filter>, <func>) - executes function when regex filter is matched on a serial line of data, the function arguments will be (line, filter, (groups)*), if func is nil the filter is cleared",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 2) return null;
@@ -924,7 +924,11 @@ public class OperandiScript implements Runnable, Disposable {
         if (args[1].type == Processor.TNIL) {
           currentWA.removeSerialFilter(args[0].asString());
         } else {
-          currentWA.registerSerialFilter(args[0].asString(), args[1].i);
+          try {
+            currentWA.registerSerialFilter(args[0].asString(), args[1].i);
+          } catch (RuntimeException re) {
+            throw new ProcessorError("bad regex: " + re.getCause().getMessage());
+          }
         }
         return null;
       }

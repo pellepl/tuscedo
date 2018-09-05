@@ -1,57 +1,22 @@
 package com.pelleplutt.tuscedo.ui;
 
-import java.awt.BorderLayout;
-import java.awt.CardLayout;
-import java.awt.Color;
-import java.awt.Point;
-import java.awt.Window;
-import java.awt.event.ActionEvent;
-import java.awt.event.AdjustmentEvent;
-import java.awt.event.AdjustmentListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
+import java.util.regex.*;
 
-import javax.swing.AbstractAction;
-import javax.swing.BorderFactory;
-import javax.swing.BoundedRangeModel;
-import javax.swing.DefaultListModel;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
-import javax.swing.JWindow;
-import javax.swing.SwingUtilities;
-import javax.swing.text.BadLocationException;
+import javax.swing.*;
+import javax.swing.text.*;
 
-import com.pelleplutt.Essential;
-import com.pelleplutt.operandi.proc.Processor;
-import com.pelleplutt.operandi.proc.Processor.M;
-import com.pelleplutt.tuscedo.OperandiScript;
-import com.pelleplutt.tuscedo.ProcessGroup;
-import com.pelleplutt.tuscedo.ProcessGroupInfo;
-import com.pelleplutt.tuscedo.Serial;
-import com.pelleplutt.tuscedo.Settings;
-import com.pelleplutt.tuscedo.Tuscedo;
-import com.pelleplutt.util.AppSystem;
-import com.pelleplutt.util.AppSystem.Disposable;
-import com.pelleplutt.util.FastTermPane;
-import com.pelleplutt.util.FastTextPane;
-import com.pelleplutt.util.Log;
-import com.pelleplutt.util.io.Port;
+import com.pelleplutt.*;
+import com.pelleplutt.operandi.proc.*;
+import com.pelleplutt.operandi.proc.Processor.*;
+import com.pelleplutt.tuscedo.*;
+import com.pelleplutt.util.*;
+import com.pelleplutt.util.AppSystem.*;
+import com.pelleplutt.util.io.*;
 
 /**
  * Major workarea.
@@ -1271,10 +1236,18 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   
   void handleSerialLine(String s) {
     for (RxFilter f : serialFilters) {
-      if (s.contains(f.filter)) {
+      Matcher m = f.pattern.matcher(s);
+      if (m.find()) {
         List<M> umargs = new ArrayList<M>();
         umargs.add(new M(s));
         umargs.add(new M(f.filter));
+        do {
+          int groups = m.groupCount();
+          for (int g = 1; g <= groups; g++) {
+            umargs.add(new M(m.group(g)));
+          }
+          
+        } while (m.find());
         script.runFunc(this, f.addr, umargs);
       }
     }
@@ -1317,9 +1290,15 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   }
   
   public void addSerialFilter(String filter, int address) {
+    try {
+      Pattern.compile(filter);
+    } catch (PatternSyntaxException exception) {
+      throw new RuntimeException(exception);
+    }
     RxFilter f = new RxFilter();
     f.filter = filter;
     f.addr = address;
+    f.pattern = Pattern.compile(filter);
     removeSerialFilter(filter);
     serialFilters.add(f);
   }
@@ -1576,6 +1555,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   } // class View
   
   public static class RxFilter {
+    public Pattern pattern;
     public String filter;
     public int addr;
   }
