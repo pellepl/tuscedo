@@ -1,12 +1,13 @@
 package com.pelleplutt.tuscedo.ui;
 
-import org.joml.AxisAngle4f;
-import org.joml.Matrix3f;
-import org.joml.Matrix4f;
-import org.joml.Quaternionf;
-import org.joml.Vector3f;
+import java.lang.Math;
+import java.util.*;
 
-public class RenderSpec {
+import org.joml.*;
+
+import com.pelleplutt.tuscedo.*;
+
+public class RenderSpec implements UIO {
   public static final int PRIMITIVE_SOLID = 0;
   public static final int PRIMITIVE_WIREFRAME = 1;
   public static final int PRIMITIVE_DOTS = 2;
@@ -57,10 +58,15 @@ public class RenderSpec {
   public boolean disableShadows;
   public boolean checkered;
 
+  int vao_sculptureGL, vbo_sculptureGL, vbo_sculptureArrIxGL;
+  int numSculptureVertices;
+  int numSculptureNormals;
+  int numSculptureIndices;
 
-  
   private static int __id = 1;
   public final int id = __id++;
+  
+  private volatile int __iter = 0;
 
   public void cameraUpdate(float dx, float dy, float droll)  {
     if (dx != 0 || dy != 0 || droll != 0) {
@@ -120,4 +126,48 @@ public class RenderSpec {
     playerPos.add(vmove);
   }
   
+  boolean finalized = false;
+  public void finalize() {
+    if (!finalized) {
+      finalized = true;
+      Tuscedo.scene3d.registerForCleaning(this);
+    }
+  }
+
+  final UIInfo uiinfo;
+  public RenderSpec() {
+    uiinfo = new UIInfo(this, "3drenderspec" + __id, "renderspec" + __id);
+    UIInfo.fireEventOnCreated(uiinfo);
+  }
+
+  @Override
+  public UIInfo getUIInfo() {
+    return uiinfo;
+  }
+
+  @Override
+  public void repaint() {
+  }
+
+  @Override
+  public void decorateUI() {
+  }
+
+  @Override
+  public void onClose() {
+  }
+  
+  List<RenderSpec> children = new ArrayList<RenderSpec>();
+  RenderSpec next() {
+    if (__iter >= children.size()) {
+      return null;
+    }
+    int i = __iter;
+    __iter++;
+    return children.get(i);
+  }
+  RenderSpec first() {
+    __iter = 0;
+    return this;
+  }
 }

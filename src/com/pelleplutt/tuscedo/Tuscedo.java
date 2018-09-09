@@ -186,7 +186,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     UI3DPanel gp = new UI3DPanel(w, h, model);
     Tab t = stp.createTab(null, gp);
     stp.selectTab(t);
-    return gp.getUIInfo().getId();
+    return gp.getRenderSpec().getUIInfo().getId();
   }
   public String addCanvasTab(UISimpleTabPane stp, int w, int h) {
     UICanvasPanel cp = new UICanvasPanel(w, h);
@@ -364,7 +364,6 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     }
   } // main
   
-  static final Object renderLock = new Object();
   static boolean rendering = false;
   static RenderSpec renderSpec;
   
