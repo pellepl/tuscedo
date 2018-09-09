@@ -15,6 +15,8 @@ import java.awt.image.*;
 import java.io.*;
 import java.lang.Math;
 import java.nio.*;
+import java.util.*;
+import java.util.List;
 
 import org.joml.*;
 import org.lwjgl.*;
@@ -118,8 +120,6 @@ public class Scene3D {
   int iLocSmoothOrFlatColorGL;
   int iLocShadowsGL;
   int iLocCheckeredGL;
-  int vao_sculptureGL, vbo_sculptureGL;
-  int vbo_sculptureArrIxGL;
   int texModelGrid;
 
   int progGridGL;
@@ -614,11 +614,10 @@ public class Scene3D {
   
   private void handleRenderSpec(RenderSpec rs) {
     boolean newSpec = false;
-    boolean newModel = false;
-    boolean newModelData = false;
+    boolean calcModel = false;
     if (lastRenderSpecId != rs.id) {
       lastRenderSpecId = rs.id;
-      newModel = newSpec = true;
+      newSpec = true;
     }
     
     if (newSpec || rs.dimensionDirty) {
@@ -629,21 +628,21 @@ public class Scene3D {
       rs.dimensionDirty = false;
     }
     
-    newModel |= rs.modelDirty;
-    newModelData = rs.modelDataDirty;
+    calcModel |= rs.modelDirty;
+    calcModel |= rs.modelDataDirty;
     rs.modelDirty = false;
     rs.modelDataDirty = false;
     
     // clear previous vaos and vbos when new model
-    if (newModel || newModelData) {
-      if (vao_sculptureGL != 0) {
-        glDeleteVertexArrays(vao_sculptureGL);
+    if (calcModel) {
+      if (rs.vao_sculptureGL != 0) {
+        glDeleteVertexArrays(rs.vao_sculptureGL);
       }
-      if (vbo_sculptureArrIxGL != 0) {
-        glDeleteBuffers(vbo_sculptureArrIxGL);
+      if (rs.vbo_sculptureArrIxGL != 0) {
+        glDeleteBuffers(rs.vbo_sculptureArrIxGL);
       }
-      if (vbo_sculptureGL != 0) {
-        glDeleteBuffers(vbo_sculptureGL);
+      if (rs.vbo_sculptureGL != 0) {
+        glDeleteBuffers(rs.vbo_sculptureGL);
       }
       // sculpture data
       Modeller3D sculpture = null;
@@ -689,23 +688,19 @@ public class Scene3D {
       }
       indices.flip();
       
-      vao_sculptureGL = glGenVertexArrays();
-      glBindVertexArray(vao_sculptureGL);
-      vbo_sculptureGL = glGenBuffers();
-      glBindBuffer(GL_ARRAY_BUFFER, vbo_sculptureGL);
+      rs.vao_sculptureGL = glGenVertexArrays();
+      glBindVertexArray(rs.vao_sculptureGL);
+      rs.vbo_sculptureGL = glGenBuffers();
+      glBindBuffer(GL_ARRAY_BUFFER, rs.vbo_sculptureGL);
       glBufferData(GL_ARRAY_BUFFER, verticesNormals, GL_STATIC_DRAW);
 
-      vbo_sculptureArrIxGL = glGenBuffers();
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_sculptureArrIxGL);
+      rs.vbo_sculptureArrIxGL = glGenBuffers();
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, rs.vbo_sculptureArrIxGL);
       glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices, GL_STATIC_DRAW);
       
       // setup shader data inputs
       glUseProgram(progModelGL);
 
-      glBindVertexArray(vao_sculptureGL);
-      glBindBuffer(GL_ARRAY_BUFFER, vbo_sculptureGL);
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_sculptureArrIxGL);
-      
       int attrPart_pos = glGetAttribLocation(progModelGL, "position");
       glEnableVertexAttribArray(attrPart_pos);
       glVertexAttribPointer(attrPart_pos, 3, GL_FLOAT, false, 7 * 4, 0);
@@ -725,7 +720,28 @@ public class Scene3D {
   }
   public void render(RenderSpec rs) {
     int mode;
+    glGetError(); // clear gl error
+    try {
+    if (!deadRenderSpecs.isEmpty()) {
+      synchronized (deadRenderSpecs) {
+        while(!deadRenderSpecs.isEmpty()) {
+          RenderSpec deadrs = deadRenderSpecs.remove(0);
+          if (deadrs.vao_sculptureGL != 0) {
+            glDeleteVertexArrays(deadrs.vao_sculptureGL);
+          }
+          if (deadrs.vbo_sculptureArrIxGL != 0) {
+            glDeleteBuffers(deadrs.vbo_sculptureArrIxGL);
+          }
+          if (deadrs.vbo_sculptureGL != 0) {
+            glDeleteBuffers(deadrs.vbo_sculptureGL);
+          }
+          deadrs.vao_sculptureGL = deadrs.vbo_sculptureArrIxGL = deadrs.vbo_sculptureGL = 0;
+          glerr();
+        }
+      }
+    }
     handleRenderSpec(rs);
+    glerr();
 
     // calc global viewing matrices
     _playerPos.set(rs.playerPos);
@@ -749,7 +765,6 @@ public class Scene3D {
     glUseProgram(progShadowGL);
     glUniformMatrix4fv(mLocShadowLightProjGL, false,  fbLightProj);
     glUniformMatrix4fv(mLocShadowModelGL, false, fbModel);
-    glBindVertexArray(vao_sculptureGL);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo_depthMap);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texShadowMap, 0);
     glDrawBuffer(GL_NONE);
@@ -758,10 +773,14 @@ public class Scene3D {
     glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
+    glBindVertexArray(rs.vao_sculptureGL);
+    glBindBuffer(GL_ARRAY_BUFFER, rs.vbo_sculptureGL);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, rs.vbo_sculptureArrIxGL);
     mode = GL_TRIANGLES;
     if (rs.primitive == RenderSpec.PRIMITIVE_WIREFRAME) mode = GL_LINES;
     else if (rs.primitive == RenderSpec.PRIMITIVE_DOTS) mode = GL_POINTS;
     glDrawElements(mode, numSculptureIndices, GL_UNSIGNED_INT, 0);
+    glerr();
 
     // setup GL view
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -778,7 +797,8 @@ public class Scene3D {
     } else {
       glDisable(GL_CULL_FACE);
     }
-    
+    glerr();
+
     // paint skybox
     glUseProgram(progSkyboxGL);
     glBindVertexArray(vao_skyboxGL);
@@ -792,7 +812,6 @@ public class Scene3D {
 
     // paint sculpture
     glUseProgram(progModelGL);
-    glBindVertexArray(vao_sculptureGL);
     glUniformMatrix4fv(mLocViewProjectionGL, false, fbViewProj);
     glUniformMatrix4fv(mLocLightSpaceGL, false, fbLightProj);
     glUniform3f(vLocPlayerPosGL, rs.playerPos.x, rs.playerPos.y, rs.playerPos.z);
@@ -807,6 +826,9 @@ public class Scene3D {
     mModel.get(fbModel);
     glUniformMatrix4fv(mLocModelGL, false, fbModel);
     glBindTexture(GL_TEXTURE_2D, texShadowMap);
+    glBindVertexArray(rs.vao_sculptureGL);
+    glBindBuffer(GL_ARRAY_BUFFER, rs.vbo_sculptureGL);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, rs.vbo_sculptureArrIxGL);
     mode = GL_TRIANGLES;
     if (rs.primitive == RenderSpec.PRIMITIVE_WIREFRAME) mode = GL_LINES;
     else if (rs.primitive == RenderSpec.PRIMITIVE_DOTS) mode = GL_POINTS;
@@ -846,6 +868,7 @@ public class Scene3D {
     
     // coda
 
+    } catch (GLError err) { err.printStackTrace(); }
     glfwSwapBuffers(window);
     glfwPollEvents();
   
@@ -858,8 +881,7 @@ public class Scene3D {
   static void glerr(String prefix) {
     int err = glGetError();
     if (err != 0) {
-      System.out.println(prefix + "GLERROR:" + Integer.toHexString(err));
-      throw new Error();
+      throw new GLError(err);
     }
     
   }
@@ -1005,4 +1027,15 @@ public class Scene3D {
   static final String[] SKYBOX_NAMES = {
       "posx.jpg", "negx.jpg", "posy.jpg", "negy.jpg", "posz.jpg", "negz.jpg"
   };
+
+  List<RenderSpec> deadRenderSpecs = new ArrayList<RenderSpec>();
+  public void registerForCleaning(RenderSpec renderSpec) {
+    synchronized (deadRenderSpecs) {
+      deadRenderSpecs.add(renderSpec);
+    }
+  }
+  
+  static class GLError extends Error {
+    public GLError(int err) {super("GL error 0x" + Integer.toHexString(err)); }
+  }
 }

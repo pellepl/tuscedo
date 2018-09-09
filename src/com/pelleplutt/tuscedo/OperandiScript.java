@@ -1,55 +1,29 @@
 package com.pelleplutt.tuscedo;
 
-import static com.pelleplutt.tuscedo.OperandiIRQHandler.IRQ_BLOCK_SYSTEM;
-import static com.pelleplutt.tuscedo.OperandiIRQHandler.IRQ_SYSTEM_TIMER;
+import static com.pelleplutt.tuscedo.OperandiIRQHandler.*;
 
-import java.awt.Point;
-import java.awt.Window;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.awt.*;
+import java.io.*;
+import java.nio.charset.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 
-import com.pelleplutt.Essential;
+import com.pelleplutt.*;
+import com.pelleplutt.operandi.*;
 import com.pelleplutt.operandi.Compiler;
-import com.pelleplutt.operandi.CompilerError;
-import com.pelleplutt.operandi.Executable;
-import com.pelleplutt.operandi.Source;
-import com.pelleplutt.operandi.proc.ByteCode;
-import com.pelleplutt.operandi.proc.ExtCall;
-import com.pelleplutt.operandi.proc.MListMap;
-import com.pelleplutt.operandi.proc.MMapRef;
-import com.pelleplutt.operandi.proc.MSerializer;
-import com.pelleplutt.operandi.proc.MSet;
-import com.pelleplutt.operandi.proc.Processor;
-import com.pelleplutt.operandi.proc.Processor.M;
-import com.pelleplutt.operandi.proc.ProcessorError;
-import com.pelleplutt.operandi.proc.ProcessorError.ProcessorFinishedError;
-import com.pelleplutt.tuscedo.Tuscedo.TuscedoTabPane;
-import com.pelleplutt.tuscedo.ui.Scene3D;
-import com.pelleplutt.tuscedo.ui.UI3DPanel;
-import com.pelleplutt.tuscedo.ui.UICanvasPanel;
-import com.pelleplutt.tuscedo.ui.UICommon;
-import com.pelleplutt.tuscedo.ui.UIGraphPanel;
-import com.pelleplutt.tuscedo.ui.UIGraphPanel.SampleSet;
-import com.pelleplutt.tuscedo.ui.UIInfo;
-import com.pelleplutt.tuscedo.ui.UIInfo.UIListener;
-import com.pelleplutt.tuscedo.ui.UIO;
-import com.pelleplutt.tuscedo.ui.UISimpleTabPane;
-import com.pelleplutt.tuscedo.ui.UISimpleTabPane.Tab;
-import com.pelleplutt.tuscedo.ui.UIWorkArea;
-import com.pelleplutt.util.AppSystem;
-import com.pelleplutt.util.AppSystem.Disposable;
-import com.pelleplutt.util.Log;
-import com.pelleplutt.util.io.Port;
+import com.pelleplutt.operandi.proc.*;
+import com.pelleplutt.operandi.proc.Processor.*;
+import com.pelleplutt.operandi.proc.ProcessorError.*;
+import com.pelleplutt.tuscedo.Tuscedo.*;
+import com.pelleplutt.tuscedo.ui.*;
+import com.pelleplutt.tuscedo.ui.UIGraphPanel.*;
+import com.pelleplutt.tuscedo.ui.UIInfo.*;
+import com.pelleplutt.tuscedo.ui.UISimpleTabPane.*;
+import com.pelleplutt.util.*;
+import com.pelleplutt.util.AppSystem.*;
+import com.pelleplutt.util.io.*;
 
 public class OperandiScript implements Runnable, Disposable {
   public static final String VAR_SERIAL = "ser";
@@ -1661,6 +1635,7 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("set_model_heightmap_color", "graph3d:set_model_heightmap_color", comp);
         addFunc("set_model_cloud", "graph3d:set_model_cloud", comp);
         addFunc("set_model_cloud_color", "graph3d:set_model_cloud_color", comp);
+        addFunc("join", "graph3d:join", comp);
         addFunc("blit", "graph3d:blit", comp);
       }
     };
@@ -1775,7 +1750,7 @@ public class OperandiScript implements Runnable, Disposable {
             model);
         UI3DPanel ui = ((UI3DPanel)Tuscedo.inst().getUIObject(id).getUI()); 
         ui.getUIInfo().setName(name);
-        
+        // TODO add renderspec here, return that instead (see graph());
         MObj mobj = create3DMUIO();
         M mui = new M(mobj);
         addUIMembers(mobj, ui);
@@ -1866,6 +1841,26 @@ public class OperandiScript implements Runnable, Disposable {
         if (args.length > 1) isolevel = args[1].asFloat();
         if (args.length > 2) faceted = args[2].asInt() != 0;
         cp.setPointCloudColor(convPointCloudColor(args[0]), isolevel, faceted);
+        return null;
+      }
+    });
+    setExtDef("graph3d:join", "(<graph3d>, ...) - join this 3D graph with another, or others",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+
+        RenderSpec rs = (RenderSpec)getUIOByScriptId(p.getMe());
+        if (rs == null) return null;
+
+        UI3DPanel src = ((UI3DPanel)rs.getUIInfo().getParent().getUI());
+        
+        for (int i = 0; i < args.length; i++) {
+          RenderSpec rschild = (RenderSpec)getUIOByScriptId(args[i]);
+          if (rschild == null) continue;
+          UI3DPanel child = ((UI3DPanel)rschild.getUIInfo().getParent().getUI());
+          child.removeRenderSpec(rschild);
+          src.addRenderSpec(rschild);
+        }
         return null;
       }
     });

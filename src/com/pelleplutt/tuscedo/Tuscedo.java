@@ -364,7 +364,6 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     }
   } // main
   
-  static final Object renderLock = new Object();
   static boolean rendering = false;
   static RenderSpec renderSpec;
   

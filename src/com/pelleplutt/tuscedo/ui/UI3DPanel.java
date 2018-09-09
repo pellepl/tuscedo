@@ -4,13 +4,16 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
 import java.awt.image.*;
+import java.util.*;
+import java.util.List;
 
 import javax.swing.*;
 
 import com.pelleplutt.tuscedo.*;
 import com.pelleplutt.tuscedo.Timer;
+import com.pelleplutt.tuscedo.ui.UIInfo.*;
 
-public class UI3DPanel extends JPanel implements UIO {
+public class UI3DPanel extends JPanel implements UIO, UIListener {
   static final int MOVE_UP = (1<<0);
   static final int MOVE_DOWN = (1<<1);
   static final int MOVE_LEFT = (1<<2);
@@ -53,6 +56,7 @@ public class UI3DPanel extends JPanel implements UIO {
       timerEntry.stop();
       timerEntry = null;
     }
+    renderSpec.finalize();
   }
   
   Timer.Entry timerEntry = null;
@@ -277,6 +281,8 @@ public class UI3DPanel extends JPanel implements UIO {
     renderSpec.height = h;
     renderSpec.dimensionDirty = true;
     renderSpec.lightPos.set(-60, 200, 300);
+
+    addRenderSpec(renderSpec);
   }
   public void decorateUI() {
     UICommon.decorateScrollPane(scrl);
@@ -473,4 +479,47 @@ public class UI3DPanel extends JPanel implements UIO {
     blit();
     revalidate();
   }
+  
+  List<RenderSpec> specs = new ArrayList<RenderSpec>();
+  
+  public void addRenderSpec(RenderSpec spec) {
+    if (!specs.contains(spec)) {
+      specs.add(spec);
+      spec.getUIInfo().addListener(this);
+      getUIInfo().addChild(spec);
+    }
+    blit();
+  }
+  
+  public void removeRenderSpec(RenderSpec spec) {
+    if (specs.contains(spec)) {
+      specs.remove(spec);
+      getUIInfo().removeChild(spec);
+    }
+    blit();
+  }
+
+  @Override
+  public void onRemoved(UIO parent, UIO child) {
+    if (child instanceof RenderSpec) {
+      removeRenderSpec((RenderSpec) child);
+    }
+    if (specs.isEmpty()) {
+      child.getUIInfo().removeListener(UI3DPanel.this);
+      getUIInfo().close();
+    }
+  }
+  @Override
+  public void onAdded(UIO parent, UIO child) {
+  }
+  @Override
+  public void onClosed(UIO parent, UIO child) {
+  }
+  @Override
+  public void onCreated(UIInfo obj) {
+  }
+  @Override
+  public void onEvent(UIO obj, Object event) {
+  }
+
 }
