@@ -59,14 +59,10 @@ public class RenderSpec implements UIO {
   public boolean checkered;
 
   int vao_sculptureGL, vbo_sculptureGL, vbo_sculptureArrIxGL;
-<<<<<<< HEAD
   int numSculptureVertices;
   int numSculptureNormals;
   int numSculptureIndices;
 
-=======
-  
->>>>>>> d0a6863b10cd2cf226779f3550f7fb792143a25f
   private static int __id = 1;
   public final int id = __id++;
   
