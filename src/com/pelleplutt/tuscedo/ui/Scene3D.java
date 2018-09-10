@@ -769,6 +769,9 @@ public class Scene3D {
     glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
+    glBindVertexArray(rs.vao_sculptureGL);
+    glBindBuffer(GL_ARRAY_BUFFER, rs.vbo_sculptureGL);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, rs.vbo_sculptureArrIxGL);
     mode = GL_TRIANGLES;
     if (rs.primitive == RenderSpec.PRIMITIVE_WIREFRAME) mode = GL_LINES;
     else if (rs.primitive == RenderSpec.PRIMITIVE_DOTS) mode = GL_POINTS;
@@ -827,6 +830,9 @@ public class Scene3D {
     glUniform1i(iLocCheckeredGL, rs.checkered ? 1 : 0);
 
     glBindTexture(GL_TEXTURE_2D, texShadowMap);
+    glBindVertexArray(rs.vao_sculptureGL);
+    glBindBuffer(GL_ARRAY_BUFFER, rs.vbo_sculptureGL);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, rs.vbo_sculptureArrIxGL);
     mode = GL_TRIANGLES;
     if (rs.primitive == RenderSpec.PRIMITIVE_WIREFRAME) mode = GL_LINES;
     else if (rs.primitive == RenderSpec.PRIMITIVE_DOTS) mode = GL_POINTS;
