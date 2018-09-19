@@ -38,7 +38,7 @@ public class UICanvasPanel extends JPanel implements UIO {
     setLayout(new BorderLayout());
     add(scrl, BorderLayout.CENTER);
     UICommon.defineCommonActions(renderer, JComponent.WHEN_IN_FOCUSED_WINDOW);
-    uiinfo.registerCallbacks(this, renderer);
+    uiinfo.registerInteractionCallbacks(this, renderer);
   }
 
   public void decorateUI() {

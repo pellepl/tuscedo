@@ -126,10 +126,10 @@ public class RenderSpec implements UIO {
     playerPos.add(vmove);
   }
   
-  boolean finalized = false;
-  public void finalize() {
-    if (!finalized) {
-      finalized = true;
+  boolean glfinalized = false;
+  public void glfinalize() {
+    if (!glfinalized) {
+      glfinalized = true;
       Tuscedo.scene3d.registerForCleaning(this);
     }
   }
@@ -155,6 +155,13 @@ public class RenderSpec implements UIO {
 
   @Override
   public void onClose() {
+  }
+  
+  public void modelRotate(float a, float x, float y, float z) {
+    modelMatrix.rotate(a, x, y, z);
+    for (RenderSpec rs : children) {
+      rs.modelMatrix.rotate(a, x, y, z);
+    }
   }
   
   List<RenderSpec> children = new ArrayList<RenderSpec>();

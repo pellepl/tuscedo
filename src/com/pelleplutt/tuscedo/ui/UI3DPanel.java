@@ -56,7 +56,12 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
       timerEntry.stop();
       timerEntry = null;
     }
-    renderSpec.finalize();
+    for (RenderSpec rs : specs) {
+      UIInfo parent = rs.getUIInfo().getParent();
+      if (parent == null) {
+        rs.glfinalize();
+      }
+    }
   }
   
   Timer.Entry timerEntry = null;
@@ -99,16 +104,16 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
         renderSpec.cameraUpdate(0, 0, 10f);
       }
       if ((keys & MODEL_ROLL_LEFT) != 0) {
-        renderSpec.modelMatrix.rotate(-0.02f, 0f, 1f, 0f);
+        renderSpec.modelRotate(-0.02f, 0f, 1f, 0f);
       }
       else if ((keys & MODEL_ROLL_RIGHT) != 0) {
-        renderSpec.modelMatrix.rotate(0.02f, 0f, 1f, 0f);
+        renderSpec.modelRotate(0.02f, 0f, 1f, 0f);
       }
       if ((keys & MODEL_PITCH_UP) != 0) {
-        renderSpec.modelMatrix.rotate(-0.02f, 1f, 0f, 0f);
+        renderSpec.modelRotate(-0.02f, 1f, 0f, 0f);
       }
       else if ((keys & MODEL_PITCH_DOWN) != 0) {
-        renderSpec.modelMatrix.rotate(0.02f, 1f, 0f, 0f);
+        renderSpec.modelRotate(0.02f, 1f, 0f, 0f);
       }
       if ((keys & (MOVE_ROLL_RIGHT | MOVE_ROLL_LEFT)) == 0) {
         renderSpec.cameraUpdate(0,0,0);
@@ -153,7 +158,7 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
   }
   
   public UI3DPanel(int w, int h, float[][] model) {
-    uiinfo = new UIInfo(this, "3d" + __id, null);
+    uiinfo = new UIInfo(this, "3d" + __id, "3d"+__id);
     UIInfo.fireEventOnCreated(uiinfo);
 
     __id++;
@@ -493,12 +498,11 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
   }
   
   public void removeRenderSpec(RenderSpec spec) {
-    if (specs.contains(spec)) {
-      specs.remove(spec);
+    if (specs.contains(spec) && spec.getUIInfo().getParentUI() == this) {
       getUIInfo().removeChild(spec);
       renderSpec.children.remove(spec);
     }
-    blit();
+
   }
   
   public RenderSpec getRenderSpec() {
@@ -507,12 +511,12 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
 
   @Override
   public void onRemoved(UIO parent, UIO child) {
+    child.getUIInfo().removeListener(UI3DPanel.this);
     if (child instanceof RenderSpec) {
       removeRenderSpec((RenderSpec) child);
-    }
-    if (specs.isEmpty()) {
-      child.getUIInfo().removeListener(UI3DPanel.this);
-      getUIInfo().close();
+      if (child == renderSpec) {
+        SwingUtilities.invokeLater(new Runnable() { public void run() { getUIInfo().close(); } } );
+      }
     }
   }
   @Override

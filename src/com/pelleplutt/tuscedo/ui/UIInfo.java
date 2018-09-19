@@ -176,10 +176,10 @@ public class UIInfo {
   }
   
   public String asString() {
-    return getId() + " [" + getName() + "] : " + getUI().getClass().getSimpleName();
+    return "<" + getId() + ":[" + getName() + "]:" + getUI().getClass().getSimpleName() + ">";
   }
 
-  public void registerCallbacks(UIO uio, JComponent c) {
+  public void registerInteractionCallbacks(UIO uio, JComponent c) {
     c.setFocusable(true);
     c.addMouseListener(mouseHandler);
     c.addKeyListener(new KeyListener() {

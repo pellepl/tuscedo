@@ -715,7 +715,6 @@ public class Scene3D {
     render(defspec);
   }
   public synchronized void render(RenderSpec rs) {
-    System.out.println("RENDERING**********");
     int mode;
     RenderSpec currs;
     glGetError(); // clear gl error
@@ -724,18 +723,19 @@ public class Scene3D {
       synchronized (deadRenderSpecs) {
         while(!deadRenderSpecs.isEmpty()) {
           RenderSpec deadrs = deadRenderSpecs.remove(0);
-          // TODO fix this! when having joined 3d graphs this ruins it
-//          if (deadrs.vao_sculptureGL != 0) {
-//            glDeleteVertexArrays(deadrs.vao_sculptureGL);
-//          }
-//          if (deadrs.vbo_sculptureArrIxGL != 0) {
-//            glDeleteBuffers(deadrs.vbo_sculptureArrIxGL);
-//          }
-//          if (deadrs.vbo_sculptureGL != 0) {
-//            glDeleteBuffers(deadrs.vbo_sculptureGL);
-//          }
-//          deadrs.vao_sculptureGL = deadrs.vbo_sculptureArrIxGL = deadrs.vbo_sculptureGL = 0;
-          glerr();
+          if (deadrs.getUIInfo().getParent() == null) {
+            if (deadrs.vao_sculptureGL != 0) {
+              glDeleteVertexArrays(deadrs.vao_sculptureGL);
+            }
+            if (deadrs.vbo_sculptureArrIxGL != 0) {
+              glDeleteBuffers(deadrs.vbo_sculptureArrIxGL);
+            }
+            if (deadrs.vbo_sculptureGL != 0) {
+              glDeleteBuffers(deadrs.vbo_sculptureGL);
+            }
+            deadrs.vao_sculptureGL = deadrs.vbo_sculptureArrIxGL = deadrs.vbo_sculptureGL = 0;
+            glerr();
+          }
         }
       }
     }
@@ -1046,7 +1046,7 @@ public class Scene3D {
   List<RenderSpec> deadRenderSpecs = new ArrayList<RenderSpec>();
   public void registerForCleaning(RenderSpec renderSpec) {
     synchronized (deadRenderSpecs) {
-      deadRenderSpecs.add(renderSpec);
+      if (!deadRenderSpecs.contains(renderSpec)) deadRenderSpecs.add(renderSpec);
     }
   }
   
