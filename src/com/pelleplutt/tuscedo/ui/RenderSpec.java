@@ -177,4 +177,8 @@ public class RenderSpec implements UIO {
     __iter = 0;
     return this;
   }
+
+  public Matrix4f getModelMatrix() {
+    return modelMatrix;
+  }
 }

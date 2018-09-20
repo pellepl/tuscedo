@@ -1637,6 +1637,10 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("set_model_cloud_color", "graph3d:set_model_cloud_color", comp);
         addFunc("join", "graph3d:join", comp);
         addFunc("blit", "graph3d:blit", comp);
+        addFunc("model_rotate", "graph3d:model_rotate", comp);
+        addFunc("model_translate", "graph3d:model_translate", comp);
+        addFunc("model_scale", "graph3d:model_scale", comp);
+        addFunc("model_reset", "graph3d:model_reset", comp);
       }
     };
   }
@@ -1866,10 +1870,49 @@ public class OperandiScript implements Runnable, Disposable {
     setExtDef("graph3d:blit", "() - blits changes to graph",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        UI3DPanel cp = (UI3DPanel)getUIOByScriptId(p.getMe());
+        UI3DPanel cp = (UI3DPanel)(getUIOByScriptId(p.getMe()).getUIInfo().getParentUI());
         if (cp == null) return null;
         cp.blit();
         return null;
+      }
+    });
+    setExtDef("graph3d:model_rotate", "(<angle>, <x>,<y>,<z>) - rotates model <angle> radians around vector <x><y><z>",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 4)  return null;
+        RenderSpec rs = (RenderSpec)getUIOByScriptId(p.getMe());
+        if (rs == null) return null;
+        rs.getModelMatrix().rotate(args[0].asFloat(), args[1].asFloat(), args[2].asFloat(), args[3].asFloat());
+        return p.getMe();
+      }
+    });
+    setExtDef("graph3d:model_translate", "(<dx>,<dy>,<dz>) - translates model",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 3)  return null;
+        RenderSpec rs = (RenderSpec)getUIOByScriptId(p.getMe());
+        if (rs == null) return null;
+        rs.getModelMatrix().translate(args[0].asFloat(), args[1].asFloat(), args[2].asFloat());
+        return p.getMe();
+      }
+    });
+    setExtDef("graph3d:model_scale", "(<sx>,<sy>,<sz>) - scales model",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 3)  return null;
+        RenderSpec rs = (RenderSpec)getUIOByScriptId(p.getMe());
+        if (rs == null) return null;
+        rs.getModelMatrix().scale(args[0].asFloat(), args[1].asFloat(), args[2].asFloat());
+        return p.getMe();
+      }
+    });
+    setExtDef("graph3d:model_reset", "() - resets modelmatrix",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        RenderSpec rs = (RenderSpec)getUIOByScriptId(p.getMe());
+        if (rs == null) return null;
+        rs.getModelMatrix().identity();
+        return p.getMe();
       }
     });
   }
