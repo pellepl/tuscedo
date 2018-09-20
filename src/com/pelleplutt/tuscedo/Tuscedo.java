@@ -290,6 +290,8 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     }
   }
   
+  static boolean no3d = false;
+
   public static void main(String[] args) {
     try {
       UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -348,6 +350,8 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
         doCli = true;
       } else if (args[i].equals("--noterm")) {
         noterm = true;
+      } else if (args[i].equals("--no3d")) {
+        no3d = true;
       }
     }
     if (doCli) {
@@ -358,9 +362,11 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
           Tuscedo.inst().create(null);
         }
       });
-      scene3d.init();
-      scene3d.render();
-      render3dloop();
+      if (!no3d) {
+        scene3d.init();
+        scene3d.render();
+        render3dloop();
+      }
     }
   } // main
   
@@ -386,6 +392,9 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   
   // called from another thread, commence 3d rendering and wait until finished
   public BufferedImage render3d(RenderSpec rs) {
+    if (no3d) {
+      throw new RuntimeException("3D disabled");
+    }
     synchronized (scene3d) {
       // if a rendering is already ongoing, wait till finished
       while (running && rendering) {
