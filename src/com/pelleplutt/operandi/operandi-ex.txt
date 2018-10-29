@@ -51,10 +51,10 @@ Arguments can also be accessed by $<argnum>
   }
   
 Lambdas, or anonymous functions, are declared like this
-  l = { println("hello world") };
+  l = { println("hello world"); };
   
 Lamdas takes anonymous arguments
-  l = { println("hello world, I'm " + $0) };
+  l = { println("hello world, I'm " + $0); };
   l("Alex");
 
 Lambas as iterators - $0 is the set entry, and $1 is the set index

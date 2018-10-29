@@ -94,6 +94,7 @@ import com.pelleplutt.operandi.TAC.TACVar;
 
 public class CodeGenFront {
   public static boolean dbg = false;
+  public static boolean dbgDot = false;
   static int label = 0;
   static int anonIx = 0;
   List<FrontFragment> ffrags = new ArrayList<FrontFragment>();
@@ -118,7 +119,7 @@ public class CodeGenFront {
     genIR(eblk, eblk, new Info());
     if (dbg) printIR(System.out);
     genCFG(ffrags);
-    //printDot(System.out);
+    if (dbgDot) printDot(System.out);
     List<Module> res = gather(src);
     return res;
   }
@@ -158,7 +159,7 @@ public class CodeGenFront {
   
   void printContext(PrintStream out, FrontFragment ffrag) {
     int bix = 0;
-    System.out.println("CONTEXT " + ffrag.module + "" + ffrag.name);
+    out.println("CONTEXT " + ffrag.module + "" + ffrag.name);
     for (Block block : ffrag.blocks) {
       out.println("======================================== " + bix);
       bix++;

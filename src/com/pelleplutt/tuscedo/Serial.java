@@ -86,6 +86,17 @@ public class Serial implements SerialStreamProvider, Tickable {
     }
   }
   
+  public void openStdin() throws Exception {
+    synchronized (LOCK_SERIAL) {
+      serialIn = System.in;
+      serialOut = System.out;
+      serialRun = true;
+      serialPump = new Thread(serialEaterRunnable, "stdin");
+      serialPump.setDaemon(true);
+      serialPump.start();
+    }
+  }
+  
   public void closeSerial() {
     //Log.println("closing attached streams");
     synchronized(attachedSerialIOs) {

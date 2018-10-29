@@ -496,8 +496,12 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
           portSetting.baud + " " + portSetting.databits + 
           Port.parityToString(portSetting.parity).charAt(0) + portSetting.stopbits + "...\n", 
           UICommon.STYLE_GENERIC_INFO);
-      
-      serial.open(portSetting);
+
+      if (portSetting.portName.equals("stdio")) {
+        serial.openStdin();
+      } else {
+        serial.open(portSetting);
+      }
       
       views[ISTATE_INPUT].ftp.addText("Connected\n", UICommon.STYLE_GENERIC_INFO);
       if (istate == ISTATE_OPEN_SERIAL) enterInputState(ISTATE_INPUT);

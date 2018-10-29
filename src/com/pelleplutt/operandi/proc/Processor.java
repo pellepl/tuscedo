@@ -2123,6 +2123,7 @@ public class Processor implements ByteCode {
       if (s.equals("gra") || all) Grammar.dbg = ena;
       if (s.equals("str") || all) StructAnalysis.dbg = ena;
       if (s.equals("fro") || all) CodeGenFront.dbg = ena;
+      if (s.equals("frogra") || all) CodeGenFront.dbgDot = ena;
       if (s.equals("bak") || all) CodeGenBack.dbg = ena;
       if (s.equals("lin") || all) Linker.dbg = ena;
     }
@@ -2157,6 +2158,7 @@ public class Processor implements ByteCode {
         out.println("  fro : " + CodeGenFront.dbg);
         out.println("  bak : " + CodeGenBack.dbg);
         out.println("  lin : " + Linker.dbg);
+        out.println("  frogra : " + CodeGenFront.dbgDot);
       } else {
         List<String> areas = new ArrayList<String>();
         for (M marg : args) {
