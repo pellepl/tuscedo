@@ -1154,6 +1154,7 @@ public class OperandiScript implements Runnable, Disposable {
       @Override
       public void init(UIWorkArea wa, Compiler comp) {
         addFunc("add", "graph:add", comp);
+        addFunc("tag", "graph:tag", comp);
         addFunc("data", "graph:data", comp);
         addFunc("zoom_all", "graph:zoom_all", comp);
         addFunc("zoom", "graph:zoom", comp);
@@ -1227,6 +1228,16 @@ public class OperandiScript implements Runnable, Disposable {
             ss.addSample(args[0].ref.get(i).asFloat());
           }
         }
+        return null;
+      }
+    });
+    setExtDef("graph:tag", "(<tag>) - tags last value",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
+        if (ss == null) return null;
+        ss.addTag(ss.getSampleCount()-1, args[0].asString());
         return null;
       }
     });
