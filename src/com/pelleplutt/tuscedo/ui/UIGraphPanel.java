@@ -161,7 +161,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     }
     
     public void addTag(int sampleIx, String tag) {
-      tags.put(sampleIx, tag);
+      String p = tags.get(sampleIx);
+      tags.put(sampleIx, (p == null ? "" : p+ " ") + tag);
     }
 
     protected void addSampleInternal(double sample) {
