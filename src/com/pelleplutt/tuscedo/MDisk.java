@@ -3,12 +3,16 @@ package com.pelleplutt.tuscedo;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileFilter;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -20,16 +24,19 @@ import com.pelleplutt.operandi.proc.ExtCall;
 import com.pelleplutt.operandi.proc.MListMap;
 import com.pelleplutt.operandi.proc.MSet;
 import com.pelleplutt.operandi.proc.Processor;
+import com.pelleplutt.operandi.proc.Processor.M;
 import com.pelleplutt.operandi.proc.ProcessorError;
 import com.pelleplutt.tuscedo.ui.UIWorkArea;
 import com.pelleplutt.util.AppSystem;
 
 public class MDisk extends MObj {
+  
+  public static final String KEY_STREAM_ID = ".stream";
   public MDisk(UIWorkArea wa, Compiler comp) {
     super(wa, comp, "disk");
   }
 
-  public void init(UIWorkArea wa, com.pelleplutt.operandi.Compiler comp) {
+  public void init(UIWorkArea wa, Compiler comp) {
     this.workarea = wa;
     addFunc("read", OperandiScript.FN_DISK_READ, comp);
     addFunc("readb", OperandiScript.FN_DISK_READB, comp);
@@ -43,6 +50,7 @@ public class MDisk extends MObj {
     addFunc("cp", OperandiScript.FN_DISK_COPY, comp);
     addFunc("rm", OperandiScript.FN_DISK_RM, comp);
     addFunc("touch", OperandiScript.FN_DISK_TOUCH, comp);
+    addFunc("open", OperandiScript.FN_DISK_OPEN, comp);
   }
   
   public static void createDiskFunctions(OperandiScript os) {
@@ -229,6 +237,83 @@ public class MDisk extends MObj {
         return null;
       }
     });
+    os.setExtDef(OperandiScript.FN_DISK_OPEN, "(<path>) - opens a file",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args.length < 1) return null;
+        String src = args[0].asString();
+        InputStream is = null;
+        if (src.equals("///stdin") || src.equals("///stdio")) {
+          is = System.in;
+        } else if (src.equals(Settings.inst().string(Settings.BASH_CONNECTION_STREAM_STRING))) {
+          is = os.currentWA.getSerial().getSerialInputStream();
+        } else {
+          try {
+            is = new FileInputStream(src);
+          } catch (FileNotFoundException e) {}
+        }
+        if (is == null) return null;
+        
+        MObj mobj = new MObj(os.currentWA, os.comp, "file") {
+          @Override
+          public void init(UIWorkArea wa, Compiler comp) {
+            addFunc("read", OperandiScript.FN_FILE_READ, comp);
+            addFunc("readline", OperandiScript.FN_FILE_READLINE, comp);
+            addFunc("close", OperandiScript.FN_FILE_CLOSE, comp);
+          }
+        };
+        int filestreamIx = os.filestreams.size();
+        os.filestreams.add(is);
+        mobj.putIntern(KEY_STREAM_ID, new M(filestreamIx));
+        M mfile = new M(mobj);
+        return mfile;
+      }
+    });
   }
-
+  public static void createFileFunctions(OperandiScript os) {
+    os.setExtDef(OperandiScript.FN_FILE_READ, "(file) - returns a byte from a file", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args.length < 1) return null;
+        int hdl = args[0].asInt();
+        if (hdl >= os.filestreams.size()) return null;
+        if (os.filestreams.get(hdl) == null) return null;
+        int res = -1;
+        try {
+          res = os.filestreams.get(hdl).read();
+        } catch (Throwable t) {}
+        return new M(res);
+      }
+    });
+    os.setExtDef(OperandiScript.FN_FILE_READLINE, "(file) - return a line from a file", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args.length < 1) return null;
+        int hdl = args[0].asInt();
+        if (hdl >= os.filestreams.size()) return null;
+        if (os.filestreams.get(hdl) == null) return null;
+        int res = -1;
+        try {
+          res = os.filestreams.get(hdl).read();
+        } catch (Throwable t) {}
+        return new M(res);
+      }
+    });
+    os.setExtDef(OperandiScript.FN_FILE_CLOSE, "(file) - closes a file", 
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args.length < 1) return null;
+        int hdl = args[0].asInt();
+        if (hdl >= os.filestreams.size()) return null;
+        if (os.filestreams.get(hdl) == null) return null;
+        try {
+          os.filestreams.get(hdl).close();
+        } catch (Throwable t) {}
+        os.filestreams.set(hdl, null);
+        return null;
+      }
+    });
+  }
 }
+
+  

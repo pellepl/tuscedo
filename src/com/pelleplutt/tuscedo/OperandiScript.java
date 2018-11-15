@@ -66,6 +66,11 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_DISK_RM =  VAR_DISK + ":rm";
   public static final String FN_DISK_MKDIR =  VAR_DISK + ":mkdir";
   public static final String FN_DISK_TOUCH =  VAR_DISK + ":touch";
+  public static final String FN_DISK_OPEN =  VAR_DISK + ":open";
+
+  public static final String FN_FILE_READ = "file:read";
+  public static final String FN_FILE_READLINE = "file:readline";
+  public static final String FN_FILE_CLOSE = "file:readline";
 
   public static final String FN_UI_CLOSE = "ui:close";
   public static final String FN_UI_GET_NAME = "ui:get_name";
@@ -104,6 +109,8 @@ public class OperandiScript implements Runnable, Disposable {
   volatile byte[] logMatch;
   volatile int logMatchIx;
   volatile int logParseIx;
+
+  List<InputStream> filestreams = new ArrayList<InputStream>();
 
   public static final int PROC_HALT = 1;
   
@@ -495,6 +502,7 @@ public class OperandiScript implements Runnable, Disposable {
     MNet.createNetFunctions(this);
     MSys.createSysFunctions(this);
     MDisk.createDiskFunctions(this);
+    MDisk.createFileFunctions(this);
     getIRQHandler().createIRQFunctions(this);
     
     setExtHelp("rand", "() - return random 32-bit number");
