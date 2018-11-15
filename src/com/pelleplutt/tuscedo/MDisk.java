@@ -270,12 +270,17 @@ public class MDisk extends MObj {
       }
     });
   }
+  
   public static void createFileFunctions(OperandiScript os) {
     os.setExtDef(OperandiScript.FN_FILE_READ, "(file) - returns a byte from a file", 
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args.length < 1) return null;
-        int hdl = args[0].asInt();
+        M me = p.getMe();
+        if (me == null || me.type != Processor.TSET) return null;
+        M handle = me.ref.get(new M(KEY_STREAM_ID));
+        if (handle == null || handle.type != Processor.TINT) return null;
+        int hdl = handle.asInt();
+        
         if (hdl >= os.filestreams.size()) return null;
         if (os.filestreams.get(hdl) == null) return null;
         int res = -1;
@@ -288,27 +293,38 @@ public class MDisk extends MObj {
     os.setExtDef(OperandiScript.FN_FILE_READLINE, "(file) - return a line from a file", 
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args.length < 1) return null;
-        int hdl = args[0].asInt();
+        M me = p.getMe();
+        if (me == null || me.type != Processor.TSET) return null;
+        M handle = me.ref.get(new M(KEY_STREAM_ID));
+        if (handle == null || handle.type != Processor.TINT) return null;
+        int hdl = handle.asInt();
+
         if (hdl >= os.filestreams.size()) return null;
-        if (os.filestreams.get(hdl) == null) return null;
-        int res = -1;
+        InputStream is = os.filestreams.get(hdl);
+        if (is == null) return null;
+        StringBuilder sb = new StringBuilder();
+        int c = -1;
         try {
-          res = os.filestreams.get(hdl).read();
+          while ((c = is.read()) >= 0) {
+            if (c == '\n') break;
+            sb.append((char)c);
+          }
         } catch (Throwable t) {}
-        return new M(res);
+        return sb.length() == 0 && c < 0 ? null : new M(sb.toString());
       }
     });
     os.setExtDef(OperandiScript.FN_FILE_CLOSE, "(file) - closes a file", 
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args.length < 1) return null;
-        int hdl = args[0].asInt();
+        M me = p.getMe();
+        if (me == null || me.type != Processor.TSET) return null;
+        M handle = me.ref.get(new M(KEY_STREAM_ID));
+        if (handle == null || handle.type != Processor.TINT) return null;
+        int hdl = handle.asInt();
+
         if (hdl >= os.filestreams.size()) return null;
         if (os.filestreams.get(hdl) == null) return null;
-        try {
-          os.filestreams.get(hdl).close();
-        } catch (Throwable t) {}
+        AppSystem.closeSilently(os.filestreams.get(hdl));
         os.filestreams.set(hdl, null);
         return null;
       }

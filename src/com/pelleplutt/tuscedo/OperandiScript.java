@@ -70,7 +70,7 @@ public class OperandiScript implements Runnable, Disposable {
 
   public static final String FN_FILE_READ = "file:read";
   public static final String FN_FILE_READLINE = "file:readline";
-  public static final String FN_FILE_CLOSE = "file:readline";
+  public static final String FN_FILE_CLOSE = "file:close";
 
   public static final String FN_UI_CLOSE = "ui:close";
   public static final String FN_UI_GET_NAME = "ui:get_name";
@@ -110,7 +110,7 @@ public class OperandiScript implements Runnable, Disposable {
   volatile int logMatchIx;
   volatile int logParseIx;
 
-  List<InputStream> filestreams = new ArrayList<InputStream>();
+  List<InputStream> filestreams;
 
   public static final int PROC_HALT = 1;
   
@@ -171,11 +171,21 @@ public class OperandiScript implements Runnable, Disposable {
     defhelp.put(name, help);
   }
   
+  void initFilestreams() {
+    if (filestreams != null) {
+      for (InputStream i : filestreams) {
+        if (i != null) AppSystem.closeSilently(i);
+      }
+    }
+    filestreams = new ArrayList<InputStream>();
+  }
+  
   void procReset() {
     exe = pexe = null;
     running = false;
     halted = false;
     lastSrcDbg = null;
+    initFilestreams();
     Processor.addCommonExtdefs(extDefs);
     setExtDef("println", "(...) - prints arguments with newline", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
