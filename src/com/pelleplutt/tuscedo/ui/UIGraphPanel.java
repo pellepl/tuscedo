@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Event;
 import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
@@ -129,6 +130,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     double selMin, selMax, selSum;
     int selCount;
     boolean hidden;
+    boolean tagsHidden;
     int colIndex;
 
     public SampleSet(String name) {
@@ -625,6 +627,12 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       } else if (e.getActionCommand().equals("Show")) {
         set.hidden = false;
         repaint();
+      } else if (e.getActionCommand().equals("Show tags")) {
+        set.tagsHidden = false;
+        repaint();
+      } else if (e.getActionCommand().equals("Hide tags")) {
+        set.tagsHidden = true;
+        repaint();
       } else if (e.getActionCommand().equals("Export")) {
         File f = UIUtil.selectFile(renderer,
             "Export graph \"" + set.getUIInfo().getName() + "\"", "Export");
@@ -638,6 +646,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     JMenuItem i;
     ActionListener graphAction = new GraphAction(s);
     m.add(i = new JMenuItem(s.hidden ? "Show" : "Hide"));
+    i.addActionListener(graphAction);
+    m.add(i = new JMenuItem(s.tagsHidden ? "Show tags" : "Hide tags"));
     i.addActionListener(graphAction);
     m.add(i = new JMenuItem("Export"));
     i.addActionListener(graphAction);
@@ -682,6 +692,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
 
       int origoY = (int) (magVer * -minGSample);
 
+      // grid
       if (paintGrid) {
         double visValuesInView = vph / magVer;
         int log10 = (int) Math.log10(visValuesInView);
@@ -725,6 +736,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         return;
       }
 
+      // samples
       if (samples.isEmpty())
         return;
 
@@ -747,20 +759,42 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         break;
       }
       
-      for (Map.Entry<Integer, String> e : tags.subMap(startSample, endSample).entrySet()) {
-        int gx = (int) (e.getKey() * magHor);
-        int gy = hh - (int) (magVer * (samples.get(e.getKey()) - minGSample));
-        int ymin = hh - origoY;
-//        int ymax = gy;
-//        if (ymax < ymin) {
-//          int t = ymin;
-//          ymin = ymax;
-//          ymax = t;
-//        }
-        g.setColor(colGraphMark[colIx]);
-        g.drawString(e.getValue(), gx+2, vpy+vph-4);
-        g.setColor(colGraphFade[colIx]);
-        g.drawLine(gx, ymin, gx, gy);
+      // tags
+      if (tags != null) {
+        Map<Integer, String> submap = tags.subMap(startSample, endSample);
+        int tagCount = submap.size();
+        if (tagCount > 500)
+          return;
+        int occupied[] = new int[4];
+        FontMetrics fm = getFontMetrics(getFont());
+        for (Map.Entry<Integer, String> e : submap.entrySet()) {
+          int gx = (int) (e.getKey() * magHor);
+          int gy = hh - (int) (magVer * (samples.get(e.getKey()) - minGSample));
+          int ymin = hh - origoY;
+          if (tagCount < 30) {
+            int tagline = 0;
+            int tw = fm.stringWidth(e.getValue());
+            g.setColor(colGraphMark[colIx]);
+            int min = Integer.MAX_VALUE;
+            for (int i = 0; i< occupied.length; i++) {
+              if (occupied[i] < gx) {
+                tagline = i;
+                break;
+              }
+              if (occupied[i] < min) {
+                min = occupied[i];
+                tagline = i;
+              }
+            }
+            g.drawString(e.getValue(), gx+2, vpy+vph-4 - tagline*fm.getHeight());
+            occupied[tagline] = gx+tw;
+            g.setColor(colGraphFade[colIx]);
+            g.drawLine(gx, gy, gx, vpy+vph-4 - tagline*fm.getHeight());
+          } else {
+            g.setColor(colGraphFade[colIx]);
+            g.drawLine(gx, ymin, gx, gy);
+          }
+        }
       }
     }
 
@@ -787,7 +821,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
           maxSample, magHor, magVer, 0);
       for (SampleSet set : sets) {
         if (!set.hidden) {
-          paint(g, set.samples, set.tags, set.mul, set.offs, set.graphType, false, ww, hh, vpw, vph,
+          paint(g, set.samples, set.tagsHidden ? null : set.tags, set.mul, set.offs, set.graphType, false, ww, hh, vpw, vph,
               vpx, vpy, minSample, maxSample, magHor, magVer,
               set.colIndex % colGraph.length);
         }
