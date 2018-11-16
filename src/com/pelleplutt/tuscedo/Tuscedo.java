@@ -217,9 +217,10 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     
     @Override
     public void tabRemoved(UISimpleTabPane tp, Tab t, Component content) {
-      if (content instanceof UIWorkArea) {
-        AppSystem.dispose((UIWorkArea)content);
-      }
+// on evacuation , will shutdown operandi script = bad 
+//      if (content instanceof UIWorkArea) {
+//        AppSystem.dispose((UIWorkArea)content);
+//      }
     }
     @Override
     public void tabPaneEmpty(UISimpleTabPane pane) {

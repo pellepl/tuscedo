@@ -130,6 +130,7 @@ public class OperandiScript implements Runnable, Disposable {
     t.start();
   }
   
+  
   @Override
   public void run() {
     while (!killed) {
@@ -2172,6 +2173,7 @@ public class OperandiScript implements Runnable, Disposable {
   public void dispose() {
     running = false;
     synchronized (q) {
+      new NullPointerException("killing " + debug).printStackTrace();
       killed = true;
       q.notifyAll();
     }
