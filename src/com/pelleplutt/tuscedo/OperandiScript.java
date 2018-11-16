@@ -2173,7 +2173,6 @@ public class OperandiScript implements Runnable, Disposable {
   public void dispose() {
     running = false;
     synchronized (q) {
-      new NullPointerException("killing " + debug).printStackTrace();
       killed = true;
       q.notifyAll();
     }
