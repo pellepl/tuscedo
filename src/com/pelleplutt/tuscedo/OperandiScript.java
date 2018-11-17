@@ -4,11 +4,14 @@ import static com.pelleplutt.tuscedo.OperandiIRQHandler.*;
 
 import java.awt.*;
 import java.io.*;
+import java.lang.Math;
 import java.nio.charset.*;
 import java.util.*;
 import java.util.List;
 
 import javax.swing.*;
+
+import org.joml.*;
 
 import com.pelleplutt.*;
 import com.pelleplutt.operandi.*;
@@ -1668,6 +1671,7 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("join", "graph3d:join", comp);
         addFunc("blit", "graph3d:blit", comp);
         addFunc("model_rotate", "graph3d:model_rotate", comp);
+        addFunc("model_rotate_quat", "graph3d:model_rotate_quat", comp);
         addFunc("model_translate", "graph3d:model_translate", comp);
         addFunc("model_scale", "graph3d:model_scale", comp);
         addFunc("model_reset", "graph3d:model_reset", comp);
@@ -1864,7 +1868,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("graph3d:set_model_cloud_color", "(<cloud>, <isolevel>) - sets colored point cloud data model (array of arrays of arrays of 4 float vector [height, red, green, blue]))",
+    setExtDef("graph3d:set_model_cloud_color", "(<cloud>, <isolevel>) - sets colored point cloud data model (array of arrays of arrays of 4 float vector [weight, red, green, blue]))",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UI3DPanel cp = (UI3DPanel)(getUIOByScriptId(p.getMe()).getUIInfo().getParentUI());
@@ -1913,6 +1917,16 @@ public class OperandiScript implements Runnable, Disposable {
         RenderSpec rs = (RenderSpec)getUIOByScriptId(p.getMe());
         if (rs == null) return null;
         rs.getModelMatrix().rotate(args[0].asFloat(), args[1].asFloat(), args[2].asFloat(), args[3].asFloat());
+        return p.getMe();
+      }
+    });
+    setExtDef("graph3d:model_rotate_quat", "(<x>i,<y>j,<z>k,<w>) - rotates model according to given quaternion",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 4)  return null;
+        RenderSpec rs = (RenderSpec)getUIOByScriptId(p.getMe());
+        if (rs == null) return null;
+        rs.getModelMatrix().rotate(new Quaternionf(args[0].asFloat(), args[1].asFloat(), args[2].asFloat(), args[3].asFloat()));
         return p.getMe();
       }
     });
