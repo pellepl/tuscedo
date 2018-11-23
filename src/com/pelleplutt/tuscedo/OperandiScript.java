@@ -1672,6 +1672,7 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("blit", "graph3d:blit", comp);
         addFunc("model_rotate", "graph3d:model_rotate", comp);
         addFunc("model_rotate_quat", "graph3d:model_rotate_quat", comp);
+        addFunc("model_lookat", "graph3d:model_lookat", comp);
         addFunc("model_translate", "graph3d:model_translate", comp);
         addFunc("model_scale", "graph3d:model_scale", comp);
         addFunc("model_reset", "graph3d:model_reset", comp);
@@ -1927,6 +1928,18 @@ public class OperandiScript implements Runnable, Disposable {
         RenderSpec rs = (RenderSpec)getUIOByScriptId(p.getMe());
         if (rs == null) return null;
         rs.getModelMatrix().rotate(new Quaternionf(args[0].asFloat(), args[1].asFloat(), args[2].asFloat(), args[3].asFloat()));
+        return p.getMe();
+      }
+    });
+    setExtDef("graph3d:model_lookat", "(<xdir>,<ydir>,<zdir>,<xup>,<yup>,<zup>) - rotates model according to given look at vector",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 4)  return null;
+        RenderSpec rs = (RenderSpec)getUIOByScriptId(p.getMe());
+        if (rs == null) return null;
+        rs.getModelMatrix().lookAlong(
+            args[0].asFloat(), args[1].asFloat(), args[2].asFloat(),
+            args[3].asFloat(), args[4].asFloat(), args[5].asFloat());
         return p.getMe();
       }
     });
