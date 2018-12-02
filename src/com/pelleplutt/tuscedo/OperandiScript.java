@@ -510,7 +510,7 @@ public class OperandiScript implements Runnable, Disposable {
     createGraphFunctions();
     createCanvasFunctions();
     create3DFunctions();
-    createUIFunctions();
+    createGenericUIFunctions();
     createTuscedoTabPaneFunctions();
     createSerialFunctions();
     MNet.createNetFunctions(this);
@@ -1098,7 +1098,7 @@ public class OperandiScript implements Runnable, Disposable {
     });
   }
 
-  private void addUIMembers(MObj mobj, UIO uio) {
+  private void addGenericUIMembers(MObj mobj, UIO uio) {
     mobj.putIntern(KEY_UI_ID, new M(uio.getUIInfo().getId()));
     M f;
     f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_GET_ID));
@@ -1157,6 +1157,8 @@ public class OperandiScript implements Runnable, Disposable {
       mobj = createCanvasMUIO();
     } else if (uio instanceof UI3DPanel) {
       mobj = create3DMUIO();
+    } else if (uio instanceof RenderSpec.Marker) {
+      mobj = create3DMarkerMUIO();
     } else if (uio instanceof TuscedoTabPane) {
       mobj = createTuscedoTabPaneMUIO();
     } else {
@@ -1167,7 +1169,7 @@ public class OperandiScript implements Runnable, Disposable {
       };
     }
     M mui = new M(mobj);
-    addUIMembers(mobj, uio);
+    addGenericUIMembers(mobj, uio);
     return mui;
   }
     
@@ -1233,7 +1235,7 @@ public class OperandiScript implements Runnable, Disposable {
         ui.getUIInfo().setName(name);
         MObj mobj = createGraphMUIO();
         M mui = new M(mobj);
-        addUIMembers(mobj, ui);
+        addGenericUIMembers(mobj, ui);
         return mui;
       }
     });
@@ -1549,7 +1551,7 @@ public class OperandiScript implements Runnable, Disposable {
         
         MObj mobj = createCanvasMUIO();
         M mui = new M(mobj);
-        addUIMembers(mobj, ui);
+        addGenericUIMembers(mobj, ui);
         addOperandiUIListener(ui);
         return mui;
       }
@@ -1676,6 +1678,8 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("model_translate", "graph3d:model_translate", comp);
         addFunc("model_scale", "graph3d:model_scale", comp);
         addFunc("model_reset", "graph3d:model_reset", comp);
+        addFunc("mark", "graph3d:mark", comp);
+        addFunc("unmark", "graph3d:unmark", comp);
       }
     };
   }
@@ -1791,7 +1795,7 @@ public class OperandiScript implements Runnable, Disposable {
         ui.getUIInfo().setName(name);
         MObj mobj = create3DMUIO();
         M mui = new M(mobj);
-        addUIMembers(mobj, ui);
+        addGenericUIMembers(mobj, ui);
         return mui;
       }
     });
@@ -1972,9 +1976,133 @@ public class OperandiScript implements Runnable, Disposable {
         return p.getMe();
       }
     });
+    setExtDef("graph3d:mark", "(x,y,z(,scale)(,red,green,blue)) - sets and returns a 3d mark",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        RenderSpec rs = (RenderSpec)getUIOByScriptId(p.getMe());
+        if (rs == null || args.length < 3) return null;
+        float scale = (args.length == 4 || args.length >= 7) ? args[3].asFloat() : 1f;
+        float r = args.length == 6 ? args[3].asFloat() : (args.length >= 7 ? args[4].asFloat() : 1f);
+        float g = args.length == 6 ? args[4].asFloat() : (args.length >= 7 ? args[5].asFloat() : 1f);
+        float b = args.length == 6 ? args[5].asFloat() : (args.length >= 7 ? args[6].asFloat() : 0f);
+        RenderSpec.Marker mark = rs.addMarker(args[0].asFloat(), args[1].asFloat(), args[2].asFloat(), scale, r, g, b);
+        MObj mobj = create3DMarkerMUIO(mark);
+        M mui = new M(mobj);
+        return mui;
+      }
+    });
+    setExtDef("graph3d:unmark", "(mark) - removes a 3d mark",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        RenderSpec rs = (RenderSpec)getUIOByScriptId(p.getMe());
+        if (rs == null || args.length < 1) return null;
+        RenderSpec.Marker marker = null;
+        M m = args[0];
+        if (m.type == Processor.TSET && m.ref instanceof MObj && ((MObj)m.ref).user instanceof RenderSpec.Marker) {
+          marker = (RenderSpec.Marker)((MObj)m.ref).user;
+        }
+        if (marker == null) return null;
+        rs.removeMarker(marker);
+        return null;
+      }
+    });
+    
+    setExtDef("graph3dmarker:get_pos", "() - returns marker position as a vector", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        M m = p.getMe();
+        RenderSpec.Marker marker = null;
+        if (m.type == Processor.TSET && m.ref instanceof MObj && ((MObj)m.ref).user instanceof RenderSpec.Marker) {
+          marker = (RenderSpec.Marker)((MObj)m.ref).user;
+        }
+        if (marker == null) return null;
+        MListMap arr = new MListMap();
+        arr.add(new Processor.M(marker.x()));
+        arr.add(new Processor.M(marker.y()));
+        arr.add(new Processor.M(marker.z()));
+        return new Processor.M(arr);
+      }
+    });
+    setExtDef("graph3dmarker:set_pos", "(x,y,z) - sets marker position", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        M m = p.getMe();
+        RenderSpec.Marker marker = null;
+        if (m.type == Processor.TSET && m.ref instanceof MObj && ((MObj)m.ref).user instanceof RenderSpec.Marker) {
+          marker = (RenderSpec.Marker)((MObj)m.ref).user;
+        }
+        if (marker == null || args.length < 3) return null;
+        marker.setPos(args[0].asFloat(), args[1].asFloat(), args[2].asFloat());
+        return null;
+      }
+    });
+    setExtDef("graph3dmarker:get_color", "() - returns marker color as an rgb vector", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        M m = p.getMe();
+        RenderSpec.Marker marker = null;
+        if (m.type == Processor.TSET && m.ref instanceof MObj && ((MObj)m.ref).user instanceof RenderSpec.Marker) {
+          marker = (RenderSpec.Marker)((MObj)m.ref).user;
+        }
+        if (marker == null) return null;
+        MListMap arr = new MListMap();
+        arr.add(new Processor.M(marker.r()));
+        arr.add(new Processor.M(marker.g()));
+        arr.add(new Processor.M(marker.b()));
+        return new Processor.M(arr);
+      }
+    });
+    setExtDef("graph3dmarker:set_color", "(r,g,b) - sets marker color", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        M m = p.getMe();
+        RenderSpec.Marker marker = null;
+        if (m.type == Processor.TSET && m.ref instanceof MObj && ((MObj)m.ref).user instanceof RenderSpec.Marker) {
+          marker = (RenderSpec.Marker)((MObj)m.ref).user;
+        }
+        if (marker == null || args.length < 3) return null;
+        marker.setColor(args[0].asFloat(), args[1].asFloat(), args[2].asFloat());
+        return null;
+      }
+    });
+    setExtDef("graph3dmarker:get_scale", "() - returns marker scale", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        M m = p.getMe();
+        RenderSpec.Marker marker = null;
+        if (m.type == Processor.TSET && m.ref instanceof MObj && ((MObj)m.ref).user instanceof RenderSpec.Marker) {
+          marker = (RenderSpec.Marker)((MObj)m.ref).user;
+        }
+        if (marker == null) return null;
+        return new Processor.M(marker.scale());
+      }
+    });
+    setExtDef("graph3dmarker:set_scale", "(scale) - sets marker scale", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        M m = p.getMe();
+        RenderSpec.Marker marker = null;
+        if (m.type == Processor.TSET && m.ref instanceof MObj && ((MObj)m.ref).user instanceof RenderSpec.Marker) {
+          marker = (RenderSpec.Marker)((MObj)m.ref).user;
+        }
+        if (marker == null || args.length < 1) return null;
+        marker.setScale(args[0].asFloat());
+        return null;
+      }
+    });
+  }
+  
+  private MObj create3DMarkerMUIO(RenderSpec.Marker mark) {
+    MObj mo = new MObj(currentWA, comp, "graph3dmarker") {
+      @Override
+      public void init(UIWorkArea wa, Compiler comp) {
+        addFunc("get_pos", "graph3dmarker:get_pos", comp);
+        addFunc("set_pos", "graph3dmarker:set_pos", comp);
+        addFunc("get_color", "graph3dmarker:get_color", comp);
+        addFunc("set_color", "graph3dmarker:set_color", comp);
+        addFunc("get_scale", "graph3dmarker:get_scale", comp);
+        addFunc("set_scale", "graph3dmarker:set_scale", comp);
+      }
+    };
+    mo.user = mark;
+    return mo;
   }
 
-  private void createUIFunctions() {
+  private void createGenericUIFunctions() {
     setExtDef(FN_UI_CLOSE,  "() - closes this ui instance", 
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {

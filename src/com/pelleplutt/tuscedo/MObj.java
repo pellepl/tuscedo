@@ -14,6 +14,7 @@ public abstract class MObj implements MSet {
   UIWorkArea workarea;
   Map<String, M> map = new HashMap<String, M>();
   String type;
+  public Object user;
   
   public MObj(UIWorkArea wa, com.pelleplutt.operandi.Compiler comp, String type) {
     this.workarea = wa;

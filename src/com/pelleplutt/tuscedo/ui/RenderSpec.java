@@ -214,5 +214,26 @@ public class RenderSpec implements UIO {
     public void setScale(float s) {
       scale = s;
     }
+    public float x() {
+      return pos.x;
+    }
+    public float y() {
+      return pos.y;
+    }
+    public float z() {
+      return pos.z;
+    }
+    public float r() {
+      return color.x;
+    }
+    public float g() {
+      return color.y;
+    }
+    public float b() {
+      return color.z;
+    }
+    public float scale() {
+      return scale;
+    }
   }
 }
