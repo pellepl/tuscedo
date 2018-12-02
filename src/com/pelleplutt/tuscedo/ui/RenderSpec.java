@@ -62,6 +62,8 @@ public class RenderSpec implements UIO {
   int numSculptureVertices;
   int numSculptureNormals;
   int numSculptureIndices;
+  
+  List<Marker> markers = new ArrayList<Marker>(); 
 
   private static int __id = 1;
   public final int id = __id++;
@@ -180,5 +182,37 @@ public class RenderSpec implements UIO {
 
   public Matrix4f getModelMatrix() {
     return modelMatrix;
+  }
+  
+  public Marker addMarker(float x, float y, float z, float scale, float r, float g, float b) {
+    Marker m = new Marker(x,y,z,scale,r,g,b);
+    markers.add(m);
+    return m;
+  }
+  
+  public void removeMarker(Marker m) {
+    markers.remove(m);
+  }
+  
+  public static class Marker {
+    float scale = 1f;
+    Vector3f pos = new Vector3f();
+    Vector4f color = new Vector4f(1,1,0,1);
+    public Marker(float x, float y, float z, float scale, float r, float g, float b) {
+      pos.x = x; pos.y = y; pos.z = z;
+      this.scale = scale;
+      color.x = r;
+      color.y = g;
+      color.z = b;
+    }
+    public void setPos(float x, float y, float z) {
+      pos.x = x; pos.y = y; pos.z = z;
+    }
+    public void setColor(float r, float g, float b) {
+      color.x = r; color.y = g; color.z = b;
+    }
+    public void setScale(float s) {
+      scale = s;
+    }
   }
 }

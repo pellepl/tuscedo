@@ -130,9 +130,14 @@ public class Scene3D {
   int vao_gridGL, vbo_gridGL;
   int vbo_gridArrIxGL;
 
+  int progMarkGL;
+  int mLocMarkModelGL;
+  int mLocMarkViewProjectionGL;
+  int vLocMarkColorGL;
+
   int progSkyboxGL;
   int mLocSkyboxViewProjectionGL;
-  int vao_skyboxGL;
+  int vao_emptyGL;
   int texSkybox;
 
   int progTestGL;
@@ -190,7 +195,7 @@ public class Scene3D {
     // obtain uniform locations for shader variables
     mLocShadowModelGL = glGetUniformLocation(progShadowGL, "model");
     mLocShadowLightProjGL = glGetUniformLocation(progShadowGL, "mLightSpace");
-    
+
     // MODEL SHADERS
     
     vertexShader = createShader(GL_VERTEX_SHADER, "" 
@@ -492,14 +497,53 @@ public class Scene3D {
     
     // obtain uniform locations for shader variables
     mLocSkyboxViewProjectionGL = glGetUniformLocation(progSkyboxGL, "viewproj");
-    vao_skyboxGL = glGenVertexArrays();
+    vao_emptyGL = glGenVertexArrays();
     // create texture
     texSkybox = glGenTextures();
     glBindTexture(GL_TEXTURE_CUBE_MAP, texSkybox);
     //loadSkyboxTextures("skyboxes/maskonaive2");
     calcSkyboxTextures(new Color(8,8,64), new Color(0,0,8));
+    
+    
+    // MARK SHADERS
 
-  
+    vertexShader = createShader(GL_VERTEX_SHADER, "" 
+        +"#version 330 core \n" 
+        +""
+        +"uniform vec4 color; \n"
+        +"uniform mat4 model; \n"
+        +"uniform mat4 viewproj; \n"
+        +"out vec4 vOVertexColor; \n"
+        +""
+        +"void main() { \n"
+        +"  vec3[6] verts = vec3[6]( \n"
+        +"    vec3(-1.0, 0.0, 0.0), vec3( 1.0, 0.0, 0.0),  \n"
+        +"    vec3( 0.0,-1.0, 0.0), vec3( 0.0, 1.0, 0.0),  \n"
+        +"    vec3( 0.0, 0.0,-1.0), vec3( 0.0, 0.0, 1.0));  \n"
+        +"  vOVertexColor = color; \n"
+        +"  gl_Position = viewproj * model * vec4(verts[gl_VertexID], 1); \n"
+        +"} \n"
+        );
+    fragmentShader = createShader(GL_FRAGMENT_SHADER, "" 
+        +"#version 330 core \n" 
+        +""
+        +"in vec4 vOVertexColor; \n"
+        +""
+        +"out vec4 fragColor; \n" 
+        +""
+        +"void main() {\n"
+        +"  fragColor = vOVertexColor; \n"
+        +"} \n"
+        );
+    progMarkGL = createProgram(vertexShader, fragmentShader);
+    
+    // obtain uniform locations for shader variables
+    mLocMarkModelGL = glGetUniformLocation(progMarkGL, "model");
+    mLocMarkViewProjectionGL = glGetUniformLocation(progMarkGL, "viewproj");
+    vLocMarkColorGL = glGetUniformLocation(progMarkGL, "color");
+
+
+    
     // TEST SHADERS
     
     vertexShader = createShader(GL_VERTEX_SHADER, "" 
@@ -741,7 +785,7 @@ public class Scene3D {
     }
     handleRenderSpec(rs);
     glerr();
-
+    
     // calc global viewing matrices
     _playerPos.set(rs.playerPos);
     _playerPos.negate();
@@ -808,7 +852,7 @@ public class Scene3D {
 
     // paint skybox
     glUseProgram(progSkyboxGL);
-    glBindVertexArray(vao_skyboxGL);
+    glBindVertexArray(vao_emptyGL);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, texSkybox);
     glDisable(GL_DEPTH_TEST);
@@ -846,6 +890,27 @@ public class Scene3D {
       glBindBuffer(GL_ARRAY_BUFFER, currs.vbo_sculptureGL);
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, currs.vbo_sculptureArrIxGL);
       glDrawElements(mode, currs.numSculptureIndices, GL_UNSIGNED_INT, 0);
+      glerr();
+      currs = currs.next();
+    }
+
+    // paint markers
+    glUseProgram(progMarkGL);
+    glBindVertexArray(vao_emptyGL);
+    currs = rs.first();
+    while (currs != null) {
+      Matrix4f markModel = new Matrix4f();
+      for (RenderSpec.Marker m : rs.markers) {
+        markModel.identity();
+        markModel.translate(m.pos);
+        markModel.scale(m.scale);
+        mModel.set(markModel);
+        mModel.get(fbModel);
+        glUniformMatrix4fv(mLocMarkModelGL, false, fbModel);
+        glUniformMatrix4fv(mLocMarkViewProjectionGL, false, fbViewProj);
+        glUniform4f(vLocMarkColorGL, m.color.x, m.color.y, m.color.z, 1f);
+        glDrawArrays(GL_LINES, 0, 6);
+      }
       glerr();
       currs = currs.next();
     }
