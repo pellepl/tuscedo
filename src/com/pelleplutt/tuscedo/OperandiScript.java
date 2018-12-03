@@ -1157,8 +1157,6 @@ public class OperandiScript implements Runnable, Disposable {
       mobj = createCanvasMUIO();
     } else if (uio instanceof UI3DPanel) {
       mobj = create3DMUIO();
-    } else if (uio instanceof RenderSpec.Marker) {
-      mobj = create3DMarkerMUIO();
     } else if (uio instanceof TuscedoTabPane) {
       mobj = createTuscedoTabPaneMUIO();
     } else {
