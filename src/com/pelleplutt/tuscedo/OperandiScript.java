@@ -1673,6 +1673,7 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("model_rotate", "graph3d:model_rotate", comp);
         addFunc("model_rotate_quat", "graph3d:model_rotate_quat", comp);
         addFunc("model_lookat", "graph3d:model_lookat", comp);
+        addFunc("model_set", "graph3d:model_set", comp);
         addFunc("model_translate", "graph3d:model_translate", comp);
         addFunc("model_scale", "graph3d:model_scale", comp);
         addFunc("model_reset", "graph3d:model_reset", comp);
@@ -1942,6 +1943,24 @@ public class OperandiScript implements Runnable, Disposable {
         rs.getModelMatrix().lookAlong(
             args[0].asFloat(), args[1].asFloat(), args[2].asFloat(),
             args[3].asFloat(), args[4].asFloat(), args[5].asFloat());
+        return p.getMe();
+      }
+    });
+    setExtDef("graph3d:model_set", "([[m00,m01,m02,m03],..]>) - sets model matrix to given 4x4 matrix",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 1)  return null;
+        RenderSpec rs = (RenderSpec)getUIOByScriptId(p.getMe());
+        if (rs == null) return null;
+        MSet setRows = args[0].ref;
+        float m[] = new float[4*4];
+        for (int i = 0; i < setRows.size(); i++) {
+          MSet setCol = setRows.get(i).ref;
+          for (int j = 0; j < setCol.size(); j++) {
+            m[j*4+i] = setCol.get(j).asFloat();
+          }
+        }
+        rs.getModelMatrix().set(m);
         return p.getMe();
       }
     });
