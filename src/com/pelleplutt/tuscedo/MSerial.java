@@ -14,9 +14,11 @@ public class MSerial extends MObj {
     addFunc("disconnect", OperandiScript.FN_SERIAL_DISCONNECT, comp);
     addFunc("connect", OperandiScript.FN_SERIAL_CONNECT, comp);
     addFunc("tx", OperandiScript.FN_SERIAL_TX, comp);
+    addFunc("save", OperandiScript.FN_SERIAL_SAVE, comp);
     addFunc("on_rx", OperandiScript.FN_SERIAL_ON_RX, comp);
     addFunc("on_rx_clear", OperandiScript.FN_SERIAL_ON_RX_CLEAR, comp);
     addFunc("on_rx_list", OperandiScript.FN_SERIAL_ON_RX_LIST, comp);
+    addFunc("on_rx_replay", OperandiScript.FN_SERIAL_ON_RX_REPLAY, comp);
     addFunc("log_start", OperandiScript.FN_SERIAL_LOG_START, comp);
     addFunc("log_stop", OperandiScript.FN_SERIAL_LOG_STOP, comp);
     addFunc("log_await", OperandiScript.FN_SERIAL_LOG_AWAIT, comp);

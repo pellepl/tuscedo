@@ -40,9 +40,11 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_SERIAL_DISCONNECT = VAR_SERIAL + ":disconnect";
   public static final String FN_SERIAL_CONNECT = VAR_SERIAL + ":connect";
   public static final String FN_SERIAL_TX = VAR_SERIAL + ":tx";
+  public static final String FN_SERIAL_SAVE = VAR_SERIAL + ":save";
   public static final String FN_SERIAL_ON_RX = VAR_SERIAL + ":on_rx";
   public static final String FN_SERIAL_ON_RX_CLEAR = VAR_SERIAL + ":on_rx_clear";
   public static final String FN_SERIAL_ON_RX_LIST = VAR_SERIAL + ":on_rx_list";
+  public static final String FN_SERIAL_ON_RX_REPLAY = VAR_SERIAL + ":on_rx_replay";
   public static final String FN_SERIAL_LOG_START = VAR_SERIAL + ":log_start";
   public static final String FN_SERIAL_LOG_AWAIT = VAR_SERIAL + ":log_await";
   public static final String FN_SERIAL_LOG_STOP = VAR_SERIAL + ":log_stop";
@@ -910,6 +912,14 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(1);
       }
     });
+    setExtDef(FN_SERIAL_SAVE, "(<filename>) - stores (selection of) serial log",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) return null;
+        String path = args[0].asString();
+        return new M(AppSystem.writeFile(new File(path), currentWA.getSerialView().getSelectedText()) ? 0 : -1);
+      }
+    });
     setExtDef(FN_SERIAL_ON_RX, "(<filter>, <func>) - executes function when regex filter is matched on a serial line of data, the function arguments will be (line, filter, (groups)*), if func is nil the filter is cleared",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
@@ -949,6 +959,26 @@ public class OperandiScript implements Runnable, Disposable {
           listMap.put(f.filter, new M(func));
         }
         return new M(listMap);
+      }
+    });
+    setExtDef(FN_SERIAL_ON_RX_REPLAY, "(<log>) - runs given text through filters, or whole log if none given",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+         String text;
+         if (args.length > 0) {
+           text = args[0].asString();
+         } else {
+           text = currentWA.getSerialView().getSelectedText();
+         }
+         BufferedReader bufReader = new BufferedReader(new StringReader(text));
+         String line;
+         try {
+           while((line = bufReader.readLine()) != null) {
+             currentWA.handleSerialLine(line);
+           }
+         } catch (IOException ignore) {}
+
+         return null;
       }
     });
     setExtDef(FN_SERIAL_LOG_START, "() - starts logging the serial input",
@@ -1192,6 +1222,7 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("min", "graph:min", comp);
         addFunc("max", "graph:max", comp);
         addFunc("join", "graph:join", comp);
+        addFunc("save", "graph:save", comp);
       }
     };
   }
@@ -1431,6 +1462,15 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
+    setExtDef("graph:save", "(<path>) - saves graph data set to file",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
+        if (ss == null || args.length == 0) return null;
+        return new M(ss.export(new File(args[0].asString())) ? 0 : -1);
+      }
+    });
+
   }
   
   int parseGraphType(M a) {

@@ -696,6 +696,10 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     return curView;
   }
   
+  public View getSerialView() {
+    return views[ISTATE_INPUT];
+  }
+  
   public static final String ANSI_RESET = "\u001B[0m";
   public static final String ANSI_BLACK = "\u001B[30m";
   public static final String ANSI_RED = "\u001B[31;1m";
@@ -1238,7 +1242,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     } while (nlix >= 0);
   }
   
-  void handleSerialLine(String s) {
+  public void handleSerialLine(String s) {
     for (RxFilter f : serialFilters) {
       Matcher m = f.pattern.matcher(s);
       if (m.find()) {
@@ -1504,6 +1508,17 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       
       setLayout(new BorderLayout());
       add(mainScrollPane, BorderLayout.CENTER);
+    }
+    
+    public String getText() {
+      return ftp.getText();
+    }
+    
+    /** Returns whole log if none selected */
+    public String getSelectedText() {
+      String s = ftp.getSelectedText();
+      if (s == null) s = ftp.getText();
+      return s;
     }
     
     public void cycleSplit() {

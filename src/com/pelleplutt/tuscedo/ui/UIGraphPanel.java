@@ -307,14 +307,14 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       selActive = false;
     }
 
-    public void export(File f) {
+    public boolean export(File f) {
       StringBuilder sb = new StringBuilder();
       String nl = System.lineSeparator();
       for (int ix = 0; ix < samples.size(); ix++) {
         String tag = tags.get(ix);
         sb.append(samples.get(ix) + (tag == null ? "" : "\t# " + tag) + nl);
       }
-      AppSystem.writeFile(f, sb.toString());
+      return AppSystem.writeFile(f, sb.toString());
     }
 
     public List<Double> getSamples() {
