@@ -236,4 +236,26 @@ public class RenderSpec implements UIO {
       return scale;
     }
   }
+  
+  public static class Vector extends Marker {
+    Vector3f dir = new Vector3f();
+    public Vector(float x, float y, float z, float dx, float dy, float dz, float scale, float r, float g, float b) {
+      super(x,y,z,scale,r,g,b);
+      dir.x = dx;
+      dir.y = dy;
+      dir.z = dz;
+    }
+    public void setPos(float x, float y, float z) {
+      dir.x = x; dir.y = y; dir.z = z;
+    }
+    public float dx() {
+      return dir.x;
+    }
+    public float dy() {
+      return dir.y;
+    }
+    public float dz() {
+      return dir.z;
+    }
+  }
 }

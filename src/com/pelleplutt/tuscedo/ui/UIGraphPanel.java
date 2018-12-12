@@ -131,17 +131,31 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     int selCount;
     boolean hidden;
     boolean tagsHidden;
-    int colIndex;
+    Color colMain;
+    Color colFade;
+    Color colMark;
 
+    
     public SampleSet(String name) {
       uiinfo = new UIInfo(this, "samples" + __id, name);
       UIInfo.fireEventOnCreated(uiinfo);
-      colIndex = __id;
+      colMain = colGraph[__id % colGraph.length];
+      colFade = colGraphFade[__id % colGraph.length];
+      colMark = colGraphMark[__id % colGraph.length];
       __id++;
     }
 
     public void setGraphType(int type) {
       graphType = type;
+    }
+    
+    public void setColor(int color) {
+      int r = (color >> 16) & 0xff;
+      int g = (color >> 8) & 0xff;
+      int b = color & 0xff;
+      colMain = new Color(r,g,b, 192);
+      colFade = new Color(r,g,b, 98);
+      colMark = new Color(Math.min(255, 64+r), Math.min(255, 64+g), Math.min(255, 64+b), 240);
     }
 
     public void addSample(double sample) {
@@ -683,7 +697,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     public void paint(Graphics2D g, List<Double> samples, TreeMap<Integer, String> tags, double mul, double offs,
         int graphType, boolean paintGrid, int ww, int hh, int vpw, int vph,
         int vpx, int vpy, double minSample, double maxSample, double magHor,
-        double magVer, int colIx) {
+        double magVer, Color colMain, Color colFade, Color colMark) {
       double minGSample = minSample; // Math.min(0, minSample);
       double minViewSample = Math.max(minGSample,
           maxSample - (vpy + vph) / magVer);
@@ -743,19 +757,19 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       int startSample = (int) Math.max(0, vpx / magHor - 1);
       int endSample = (int) Math.min(samples.size() - 1,
           ((vpx + vpw) / magHor) + 1);
-      g.setColor(colGraph[colIx]);
+      g.setColor(colMain);
       switch (graphType) {
       case GRAPH_BAR:
         paintGraphBar(g, samples, mul, offs, minGSample, origoY, startSample,
-            endSample, vpx, vpw, hh, colIx);
+            endSample, vpx, vpw, hh, colMain, colFade, colMark);
         break;
       case GRAPH_LINE:
         paintGraphLine(g, samples, mul, offs, minGSample, origoY, startSample,
-            endSample, vpx, vpw, hh, colIx);
+            endSample, vpx, vpw, hh, colMain, colFade, colMark);
         break;
       case GRAPH_PLOT:
         paintGraphPlot(g, samples, mul, offs, minGSample, origoY, startSample,
-            endSample, vpx, vpw, hh, colIx);
+            endSample, vpx, vpw, hh, colMain, colFade, colMark);
         break;
       }
       
@@ -774,7 +788,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
           if (tagCount < 30) {
             int tagline = 0;
             int tw = fm.stringWidth(e.getValue());
-            g.setColor(colGraphMark[colIx]);
+            g.setColor(colMark);
             int min = Integer.MAX_VALUE;
             for (int i = 0; i< occupied.length; i++) {
               if (occupied[i] < gx) {
@@ -788,10 +802,10 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
             }
             g.drawString(e.getValue(), gx+2, vpy+vph-4 - tagline*fm.getHeight());
             occupied[tagline] = gx+tw;
-            g.setColor(colGraphFade[colIx]);
+            g.setColor(colFade);
             g.drawLine(gx, gy, gx, vpy+vph-4 - tagline*fm.getHeight());
           } else {
-            g.setColor(colGraphFade[colIx]);
+            g.setColor(colFade);
             g.drawLine(gx, ymin, gx, gy);
           }
         }
@@ -818,12 +832,12 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
 
       // sample sets
       paint(g, null, null, 0, 0, 0, true, ww, hh, vpw, vph, vpx, vpy, minSample,
-          maxSample, magHor, magVer, 0);
+          maxSample, magHor, magVer, null,null,null);
       for (SampleSet set : sets) {
         if (!set.hidden) {
           paint(g, set.samples, set.tagsHidden ? null : set.tags, set.mul, set.offs, set.graphType, false, ww, hh, vpw, vph,
               vpx, vpy, minSample, maxSample, magHor, magVer,
-              set.colIndex % colGraph.length);
+              set.colMain, set.colFade, set.colMark);
         }
       }
 
@@ -858,7 +872,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         if (set.isDetailed()) {
           hhv_inc = hhv * 5;
         }
-        paintLegend(g, set, xv, yv, wwv, hhv, set.colIndex % colGraph.length);
+        paintLegend(g, set, xv, yv, wwv, hhv);
         xv -= wwv + 2;
         if (xv < vpx + 100) {
           xv = vpx + vpw - wwv - 2;
@@ -870,13 +884,12 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
 
     Rectangle _clipR = new Rectangle();
 
-    void paintLegend(Graphics2D g, SampleSet set, int x, int y, int w, int h,
-        int c) {
+    void paintLegend(Graphics2D g, SampleSet set, int x, int y, int w, int h) {
       int bh = set.isDetailed() ? h * 5 : h;
-      g.setColor(colGraphFade[c]);
+      g.setColor(set.colFade);
       g.fillRect(x, y, w, bh);
       if (!set.hidden) {
-        g.setColor(colGraph[c]);
+        g.setColor(set.colMain);
       }
       g.drawRect(x, y, w, bh);
       g.getClipBounds(_clipR);
@@ -896,7 +909,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
 
     void paintGraphBar(Graphics2D g, List<Double> samples, double mul, double offs,
         double minGSample, int origoY, int startSample, int endSample, int vpx,
-        int vpw, int hh, int colIx) {
+        int vpw, int hh, Color colMain, Color colFade, Color colMark) {
       int gw = (int) (magHor);
       for (int i = startSample; i <= endSample; i++) {
         int gx = (int) (i * magHor);
@@ -913,23 +926,23 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
             && (selAllX || (i > selMinXSample && i < selMaxXSample))
             && (selAllY || (s > selMinYSample && s < selMaxYSample));
         if (sel) {
-          g.setColor(colGraphMark[colIx]);
+          g.setColor(colMark);
           if (gw < 3) {
             g.drawLine(gx - 1, ymin, gx - 1, ymax);
             g.drawLine(gx, ymin, gx, ymax);
             g.drawLine(gx + 1, ymin, gx + 1, ymax);
           } else {
             g.drawRect(gx, ymin, gw, ymax - ymin);
-            g.setColor(colGraph[colIx]);
+            g.setColor(colMain);
             g.fillRect(gx + 1, ymin + 1, gw - 1, ymax - ymin - 1);
           }
         } else {
-          g.setColor(colGraph[colIx]);
+          g.setColor(colMain);
           if (gw < 3) {
             g.drawLine(gx, ymin, gx, ymax);
           } else {
             g.drawRect(gx, ymin, gw, ymax - ymin);
-            g.setColor(colGraphFade[colIx]);
+            g.setColor(colFade);
             g.fillRect(gx + 1, ymin + 1, gw - 1, ymax - ymin - 1);
           }
         }
@@ -941,7 +954,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
 
     void paintGraphLine(Graphics2D g, List<Double> samples, double mul, double offs,
         double minGSample, int origoY, int startSample, int endSample, int vpx,
-        int vpw, int hh, int colIx) {
+        int vpw, int hh, Color colMain, Color colFade, Color colMark) {
       if (startSample >= samples.size())
         return;
       int prevGAvgY = hh - (int) (magVer
@@ -975,15 +988,15 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
           fillPY[2] = gMaxY;
           fillPX[3] = prevGX;
           fillPY[3] = prevGMaxY;
-          g.setColor(colGraphFade[colIx]);
+          g.setColor(colFade);
           g.fillPolygon(fillPX, fillPY, 4);
           if (selActive && (selAllX || (i > selMinXSample && i < selMaxXSample))
               && (selAllY || (s > selMinYSample && s < selMaxYSample))) {
-            g.setColor(colGraphMark[colIx]);
+            g.setColor(colMark);
             g.drawLine(prevGX, prevGAvgY - 1, gx, gAvgY - 1);
             g.drawLine(prevGX, prevGAvgY + 1, gx, gAvgY + 1);
           } else {
-            g.setColor(colGraph[colIx]);
+            g.setColor(colMain);
           }
           g.drawLine(prevGX, prevGAvgY, gx, gAvgY);
           prevGX = gx;
@@ -1000,17 +1013,17 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
 
     void paintGraphPlot(Graphics2D g, List<Double> samples, double mul, double offs,
         double minGSample, int origoY, int startSample, int endSample, int vpx,
-        int vpw, int hh, int colIx) {
+        int vpw, int hh, Color colMain, Color colFade, Color colMark) {
       for (int i = startSample; i <= endSample; i++) {
         double s = (samples.get(i) + offs) * mul;
         int gx = (int) (i * magHor);
         int gy = hh - (int) (magVer * (s - minGSample));
         if (selActive && (selAllX || (i > selMinXSample && i < selMaxXSample))
             && (selAllY || (s > selMinYSample && s < selMaxYSample))) {
-          g.setColor(colGraphMark[colIx]);
+          g.setColor(colMark);
           g.fillRect(gx - 2, gy - 2, 5, 5);
         } else {
-          g.setColor(colGraph[colIx]);
+          g.setColor(colMain);
           g.fillRect(gx - 1, gy - 1, 3, 3);
         }
       }

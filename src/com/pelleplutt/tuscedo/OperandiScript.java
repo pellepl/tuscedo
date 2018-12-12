@@ -1214,6 +1214,7 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("zoom_y", "graph:zoom_y", comp);
         addFunc("set_type", "graph:type", comp);
         addFunc("count", "graph:count", comp);
+        addFunc("set_color", "graph:set_color", comp);
         addFunc("scroll_x", "graph:scroll_x", comp);
         addFunc("scroll_y", "graph:scroll_y", comp);
         addFunc("scroll_sample", "graph:scroll_sample", comp);
@@ -1363,6 +1364,16 @@ public class OperandiScript implements Runnable, Disposable {
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
         if (ss == null) return null;
         return new M(ss.getSampleCount());
+      }
+    });
+    setExtDef("graph:set_color", "(x) - sets graph color",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
+        if (ss == null || args.length == 0) return null;
+        ss.setColor(args[0].asInt());
+        ss.repaint();
+        return null;
       }
     });
     setExtDef("graph:get","(<index>) - returns sample at index", 
