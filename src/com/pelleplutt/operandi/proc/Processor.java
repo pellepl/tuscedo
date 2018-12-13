@@ -104,7 +104,7 @@ public class Processor implements ByteCode {
   public M[] getMemory() {
     return memory;
   }
-  
+
   public void reset() {
     sp = memory.length - 1;
     if (args == null) args = new String[0];

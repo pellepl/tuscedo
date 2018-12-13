@@ -130,7 +130,7 @@ public class OperandiIRQHandler implements IRQHandler {
             "    f = __IRQ" + sirq + "_consume();\n"+
             "    f();\n" +
             "  }\n" +
-            "}\n"));
+            "}\n"), null);
         registerIRQ(block, irq, op.lookupFunc("irq.func.__IRQ" + sirq + "_handler"));
       }
     }

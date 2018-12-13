@@ -149,7 +149,7 @@ public class OperandiScript implements Runnable, Disposable {
         try {
           rr.wa.onScriptStart(proc);
           if (rr.src != null) {
-            doRunScript(rr.wa, rr.src);
+            doRunScript(rr.wa, rr.src, rr.strargs);
           } else {
             doCallAddress(rr.wa, rr.callAddr, rr.args);
           }
@@ -582,7 +582,7 @@ public class OperandiScript implements Runnable, Disposable {
     for (File f : files) {
       String s = AppSystem.readFile(f);
       if (s != null) {
-        runScript(wa, f, s);
+        runScript(wa, f, s, null);
       }
     }
   }
@@ -592,29 +592,38 @@ public class OperandiScript implements Runnable, Disposable {
       resetForce();
       runOperandiInitScripts(wa);
     } else if (s.startsWith("#load ")) {
-      String fullpath = s.substring("#load ".length()).trim();
+      int pathEnd = s.indexOf('(');
+      boolean gotArgs = true;
+      if (pathEnd < 0 || s.lastIndexOf(')') < 0 ) {
+        pathEnd = s.length()-1;
+        gotArgs = false;
+      }
+      String fullpath = s.substring("#load ".length(),pathEnd).trim();
       int pathDelim = fullpath.lastIndexOf(File.separator);
       String path = pathDelim >= 0 ? fullpath.substring(0, pathDelim) : ".";
       String file = pathDelim >= 0 ? fullpath.substring(pathDelim+1) : fullpath;
       List<File> files = AppSystem.findFiles(path, file, false);
-      System.out.println(path + " " + file + " " + files);
+      String argString = gotArgs ? s.substring(pathEnd+1, s.length()-2) : "";
+      String[] argsString = argString.split(",");
+      
+      System.out.println(path + " " + file + " " + files + " (" + argString + ")");
       for (File f : files) {
         String scr = AppSystem.readFile(f);
         if (scr != null) {
-          runScript(wa, f, scr);
+          runScript(wa, f, scr, argsString);
         }
       }
     } else {
       synchronized (q) {
-        q.add(new RunRequest(wa, new Source.SourceString("cli", s)));
+        q.add(new RunRequest(wa, new Source.SourceString("cli", s), null));
         q.notifyAll();
       }
     }
   }
   
-  public void runScript(UIWorkArea wa, File f, String s) {
+  public void runScript(UIWorkArea wa, File f, String s, String[] args) {
     synchronized (q) {
-      q.add(new RunRequest(wa, new Source.SourceFile(f, s)));
+      q.add(new RunRequest(wa, new Source.SourceFile(f, s), args));
       q.notifyAll();
     }
   }
@@ -626,7 +635,7 @@ public class OperandiScript implements Runnable, Disposable {
     }
   }
   
-  void doRunScript(UIWorkArea wa, Source src) {
+  void doRunScript(UIWorkArea wa, Source src, String[] args) {
     currentWA = wa;
     currentView = wa == null ? null : wa.getCurrentView();
     proc.reset();
@@ -647,7 +656,7 @@ public class OperandiScript implements Runnable, Disposable {
       }
       return;
     }
-    proc.setExe(exe);
+    proc.setExe(exe, args);
     injectAppVariablesValues(wa, comp, proc);
     runProcessor();
   }
@@ -2405,8 +2414,9 @@ public class OperandiScript implements Runnable, Disposable {
     public final Source src;
     public final int callAddr;
     public List<M> args;
-    public RunRequest(UIWorkArea wa, Source src) {
-      this.wa = wa; this.src = src; this.callAddr = 0; this.args = null;
+    public String[] strargs;
+    public RunRequest(UIWorkArea wa, Source src, String[] strargs) {
+      this.wa = wa; this.src = src; this.callAddr = 0; this.strargs = strargs;
     }
     public RunRequest(UIWorkArea wa, int addr, List<M> args) {
       this.wa = wa; this.src = null; this.callAddr = addr; this.args = args;

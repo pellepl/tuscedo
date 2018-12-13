@@ -187,7 +187,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     Tab t = stp.createTab(null, gp);
     stp.selectTab(t);
     return gp.getRenderSpec().getUIInfo().getId();
-  }
+  } // TODO PETER args
   public String addCanvasTab(UISimpleTabPane stp, int w, int h) {
     UICanvasPanel cp = new UICanvasPanel(w, h);
     Tab t = stp.createTab(null, cp);
@@ -344,7 +344,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
           tmpwa = new UIWorkArea();
           tmpwa.build();
           tmpwa.getScript().currentWA = tmpwa;
-          tmpwa.getScript().runScript(tmpwa, new File(args[i]), args[i]);
+          tmpwa.getScript().runScript(tmpwa, new File(args[i]), args[i], null);
         }
         doGui = false;
       } else if (args[i].equals("--nogui")) {
