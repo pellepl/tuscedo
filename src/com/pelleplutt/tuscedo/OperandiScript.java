@@ -1233,6 +1233,8 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("max", "graph:max", comp);
         addFunc("join", "graph:join", comp);
         addFunc("save", "graph:save", comp);
+        addFunc("show", "graph:show", comp);
+        addFunc("show_tags", "graph:show_tags", comp);
       }
     };
   }
@@ -1294,13 +1296,17 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("graph:tag", "(<tag>) - tags last value",
+    setExtDef("graph:tag", "(<tag>, (<sampleIndex>)) - tags sampleIndex, or last value",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
         if (ss == null) return null;
-        ss.addTag(ss.getSampleCount()-1, args[0].asString());
+        int ix = ss.getSampleCount()-1;
+        if (args.length > 1) {
+          ix = args[1].asInt();
+        }
+        ss.addTag(ix, args[0].asString());
         return null;
       }
     });
@@ -1488,6 +1494,24 @@ public class OperandiScript implements Runnable, Disposable {
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
         if (ss == null || args.length == 0) return null;
         return new M(ss.export(new File(args[0].asString())) ? 0 : -1);
+      }
+    });
+    setExtDef("graph:show", "(<0|1>) - shows/hides graph",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
+        if (ss == null || args.length == 0) return null;
+        ss.setHidden(args[0].asInt() == 0);
+        return null;
+      }
+    });
+    setExtDef("graph:show_tags", "(<0|1>) - shows/hides tags",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
+        if (ss == null || args.length == 0) return null;
+        ss.setTagsHidden(args[0].asInt() == 0);
+        return null;
       }
     });
 

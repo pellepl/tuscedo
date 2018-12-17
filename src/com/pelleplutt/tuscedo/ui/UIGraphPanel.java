@@ -59,6 +59,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   boolean translationDragging, transVeri, transHori;
   int transAnchorX, transAnchorY;
   int transAnchorH, transAnchorV;
+  int cursor = -1;
   List<SampleSet> sets = new ArrayList<SampleSet>();
   static int __id = 0;
   final UIInfo uiinfo;
@@ -145,6 +146,15 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       __id++;
     }
 
+    public void setHidden(boolean hidden) {
+      this.hidden = hidden;
+      if (hidden) tagsHidden = true;
+    }
+    
+    public void setTagsHidden(boolean hidden) {
+      tagsHidden = hidden;
+    }
+    
     public void setGraphType(int type) {
       graphType = type;
     }
@@ -178,7 +188,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     
     public void addTag(int sampleIx, String tag) {
       String p = tags.get(sampleIx);
-      tags.put(sampleIx, (p == null ? "" : p+ " ") + tag);
+      tags.put(sampleIx, (p == null ? "" : p + " ") + tag);
     }
 
     protected void addSampleInternal(double sample) {
@@ -623,6 +633,10 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     selActive = false;
     repaint();
   }
+  
+  public void setCursor(int sampleIx) {
+    cursor = sampleIx;
+  }
 
   class GraphAction implements ActionListener {
     public SampleSet set;
@@ -880,6 +894,12 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
           hhv_inc = hhv;
         }
       }
+      
+      // cursor
+      if (cursor >= 0) {
+        // TODO PETER
+      }
+      
     }
 
     Rectangle _clipR = new Rectangle();
@@ -1167,6 +1187,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       if (e.getButton() == MouseEvent.BUTTON1) {
         if (selectionDragging) {
           select(dragVeri, dragHori, selAnchorX, selAnchorY, selEndX, selEndY);
+        } else {
+          setCursor((int)(selAnchorX / magHor));
         }
         selectionDraggingTriggered = false;
         selectionDragging = false;
