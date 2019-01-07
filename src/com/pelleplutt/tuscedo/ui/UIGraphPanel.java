@@ -70,6 +70,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   public void onClose() {}
 
   boolean userZoomed = false;
+  boolean gotoIndex  = false;
+  String gotoIndexString = "";
 
   boolean selActive, selAllX, selAllY;
   double selMinYSample, selMaxYSample;
@@ -489,7 +491,45 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         new AbstractAction() {
           @Override
           public void actionPerformed(ActionEvent e) {
-            unselect();
+            if (gotoIndex) {
+              gotoIndex = false;
+              repaint();
+            } else {
+              unselect();
+            }
+          }
+        });
+    UICommon.defineAnonAction(renderer, "index.goto", "ctrl+g", when,
+        new AbstractAction() {
+          @Override
+          public void actionPerformed(ActionEvent e) {
+            gotoIndex = true;
+            gotoIndexString = "";
+            repaint();
+          }
+        });
+    for (int i = 0; i < 10; i++) {
+      final int key = i;
+      UICommon.defineAnonAction(renderer, "user.press."+i, ""+i, when,
+          new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+              userPress(""+key);
+            }
+          });
+    }
+    UICommon.defineAnonAction(renderer, "user.press.back", "back_space", when,
+        new AbstractAction() {
+          @Override
+          public void actionPerformed(ActionEvent e) {
+            userPress("back_space");
+          }
+        });
+    UICommon.defineAnonAction(renderer, "user.press.enter", "enter", when,
+        new AbstractAction() {
+          @Override
+          public void actionPerformed(ActionEvent e) {
+            userPress("enter");
           }
         });
     UICommon.defineCommonActions(renderer, JComponent.WHEN_IN_FOCUSED_WINDOW);
@@ -510,6 +550,22 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         oldH = getHeight();
       }
     });
+  }
+  
+  public void userPress(String k) {
+    if (gotoIndex) {
+      if (k.equals("back_space")) {
+        if (gotoIndexString.length() > 0) gotoIndexString = gotoIndexString.substring(0, gotoIndexString.length()-1);
+      } else if (k.equals("enter")) {
+        gotoIndex = false;
+        try {
+          scrollToSampleX(Integer.parseInt(gotoIndexString));
+        } catch (Throwable t) {}
+      } else {
+        gotoIndexString += k;
+      }
+      repaint();
+    }
   }
   
   public void decorateUI() {
@@ -788,13 +844,13 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       }
       
       // tags
+      FontMetrics fm = getFontMetrics(getFont());
       if (tags != null) {
         Map<Integer, String> submap = tags.subMap(startSample, endSample);
         int tagCount = submap.size();
         if (tagCount > 500)
           return;
         int occupied[] = new int[4];
-        FontMetrics fm = getFontMetrics(getFont());
         for (Map.Entry<Integer, String> e : submap.entrySet()) {
           int gx = (int) (e.getKey() * magHor);
           int gy = hh - (int) (magVer * (samples.get(e.getKey()) - minGSample));
@@ -823,6 +879,16 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
             g.drawLine(gx, ymin, gx, gy);
           }
         }
+      }
+      
+      if (gotoIndex) {
+        int tw = fm.stringWidth(gotoIndexString) + 12;
+        g.setColor(Color.white);
+        int xx = vpx+(vpw-tw)/2;
+        int yy = vpy + (vph-fm.getHeight() + 4)/2;
+        g.fillRect(xx, yy, tw, fm.getHeight() + 4);
+        g.setColor(Color.black);
+        g.drawString(gotoIndexString, xx+6, yy + fm.getHeight() + 2);
       }
     }
 
