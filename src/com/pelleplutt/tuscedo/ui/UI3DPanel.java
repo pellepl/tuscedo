@@ -173,6 +173,7 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
     scrl.getViewport().setScrollMode(JViewport.SIMPLE_SCROLL_MODE); // fix artefacts 
     setLayout(new BorderLayout());
     add(scrl, BorderLayout.CENTER);
+    add(new UISlider(), BorderLayout.SOUTH);
     decorateUI();
     
     renderer.addMouseListener(mouseCtrl);

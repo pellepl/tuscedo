@@ -175,7 +175,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   public String addGraphTab(UISimpleTabPane stp, List<Float> vals) {
     UIGraphPanel gp = new UIGraphPanel("");
     Tab t = stp.createTab(null, gp);
-    stp.selectTab(t);
+//    stp.selectTab(t);
     if (vals != null) {
       for (float s : vals) gp.addSample(s);
     }
