@@ -32,7 +32,11 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JViewport;
+import javax.swing.SwingUtilities;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 
+import com.pelleplutt.tuscedo.Tuscedo;
 import com.pelleplutt.tuscedo.ui.UIInfo.UIListener;
 import com.pelleplutt.util.AppSystem;
 import com.pelleplutt.util.UIUtil;
@@ -61,6 +65,14 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   int transAnchorH, transAnchorV;
   int cursor = -1;
   List<SampleSet> sets = new ArrayList<SampleSet>();
+  List<UIGraphPanel> links = new ArrayList<UIGraphPanel>();
+  double linkedOldMagHor = 0;
+  double linkedOldMagVer = 0;
+  int linkedOldx = 0;
+  int linkedOldy = 0;
+  int linkedOldw = 0;
+  int linkedOldh = 0;
+  
   static int __id = 0;
   final UIInfo uiinfo;
 
@@ -550,6 +562,78 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         oldH = getHeight();
       }
     });
+    scrl.getViewport().addChangeListener(new ChangeListener() {
+      @Override
+      public void stateChanged(ChangeEvent e) {
+        if (linkedOldMagHor != magHor || linkedOldMagVer != magVer) {
+          linkedOldMagHor = magHor;
+          linkedOldMagVer = magVer;
+          SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+              for (UIGraphPanel u : links) {
+                u.linkedMagUpdate(magHor, magVer);
+              }
+            }
+          });
+        }
+        Rectangle vr = scrl.getViewport().getVisibleRect();
+        if (scrl.getHorizontalScrollBar().getValue() != linkedOldx ||
+            scrl.getVerticalScrollBar().getValue() != linkedOldy) {
+          linkedOldx = scrl.getHorizontalScrollBar().getValue();
+          linkedOldy = scrl.getVerticalScrollBar().getValue();
+          SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+              for (UIGraphPanel u : links) {
+                u.linkedPosUpdate(linkedOldx, linkedOldy);
+              }
+            }
+          });
+        }
+        if (vr.width != linkedOldw || vr.height != linkedOldh) {
+          linkedOldw = vr.width;
+          linkedOldh = vr.height;
+          SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+              for (UIGraphPanel u : links) {
+                u.linkedDimUpdate(vr.width, vr.height);
+              }
+            }
+          });
+        }
+      }
+    });
+  }
+  
+  void linkedMagUpdate(double hor, double ver) {
+    magHor = linkedOldMagHor = hor;
+    magVer = linkedOldMagVer = ver;
+    repaint();
+  }
+  
+  void linkedDimUpdate(int w, int h) {
+    linkedOldw = w;
+    linkedOldw = h;
+    scrl.setSize(w, h);
+  }
+  
+  void linkedPosUpdate(int x, int y) {
+    linkedOldx = x;
+    linkedOldy = y;
+    scrl.getHorizontalScrollBar().setValue(x);
+    scrl.getVerticalScrollBar().setValue(y);
+  }
+  
+  public void linkOtherGraphPanel(UIGraphPanel u) {
+    links.add(u);
+    u.links.add(this);
+  }
+  
+  public void unlinkOtherGraphPanel(UIGraphPanel u) {
+    links.remove(u);
+    u.links.remove(this);
   }
   
   public void userPress(String k) {
@@ -725,7 +809,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     }
   };
 
-  void openMenu(MouseEvent e, SampleSet s) {
+  void openSampleSetMenu(MouseEvent e, SampleSet s) {
     JPopupMenu m = new JPopupMenu(s.getUIInfo().getName());
     JMenuItem i;
     ActionListener graphAction = new GraphAction(s);
@@ -740,6 +824,67 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     m.show(renderer, e.getX(), e.getY());
   }
 
+  GraphMenuActionListener graphMenuActionListener = new GraphMenuActionListener(); 
+
+  void openGraphMenu(MouseEvent e) {
+    JPopupMenu m = new JPopupMenu("GRAPH");
+    JMenuItem i;
+    m.add(i = new JMenuItem("Show all"));
+    i.addActionListener(graphMenuActionListener);
+    m.add(i = new JMenuItem("Hide all"));
+    i.addActionListener(graphMenuActionListener);
+    List<UIO> res = new ArrayList<UIO>();
+    Tuscedo.inst().getUiComponents(res, UIGraphPanel.class);
+    res.remove(this);
+    for (UIO uio : res) {
+      if (links.contains(uio)) {
+        m.add(i = new JMenuItem("Unlink " + uio.getUIInfo().getFirstName()));
+      } else {
+        m.add(i = new JMenuItem("Link " + uio.getUIInfo().getFirstName()));
+      }
+      i.addActionListener(graphMenuActionListener);
+    }
+    m.show(renderer, e.getX(), e.getY());
+  }
+  
+  class GraphMenuActionListener implements ActionListener {
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      if (e.getActionCommand().equals("Show all")) {
+        for (SampleSet set : sets) {
+          set.hidden = false;
+        }
+        repaint();
+      } else if (e.getActionCommand().equals("Hide all")) {
+        for (SampleSet set : sets) {
+          set.hidden = true;
+        }
+        repaint();
+      } else if (e.getActionCommand().startsWith("Link ")) {
+        List<UIO> res = new ArrayList<UIO>();
+        Tuscedo.inst().getUiComponents(res, UIGraphPanel.class);
+        res.remove(UIGraphPanel.this);
+        for (UIO uio : res) {
+          if (uio.getUIInfo().getFirstName().equals(e.getActionCommand().substring("Link ".length()))) {
+            linkOtherGraphPanel((UIGraphPanel)uio);
+            break;
+          }
+        }
+      } else if (e.getActionCommand().startsWith("Unlink ")) {
+        List<UIO> res = new ArrayList<UIO>();
+        Tuscedo.inst().getUiComponents(res, UIGraphPanel.class);
+        res.remove(UIGraphPanel.this);
+        for (UIO uio : res) {
+          if (uio.getUIInfo().getFirstName().equals(e.getActionCommand().substring("Unlink ".length()))) {
+            unlinkOtherGraphPanel((UIGraphPanel)uio);
+            break;
+          }
+        }
+      }
+    }
+  }
+  
   void expandSelection(int dx, int dy) {
     if (dx != 0)
       selEndX += dx;
@@ -1221,7 +1366,9 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       } else if (e.getButton() == MouseEvent.BUTTON3) {
         SampleSet s = clickedLegend(e.getX(), e.getY());
         if (s != null) {
-          openMenu(e, s);
+          openSampleSetMenu(e, s);
+        } else {
+          openGraphMenu(e);
         }
       }
     }
