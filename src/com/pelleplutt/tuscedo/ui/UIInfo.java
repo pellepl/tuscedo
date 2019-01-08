@@ -175,6 +175,19 @@ public class UIInfo {
     void onEvent(UIO obj, Object event);
   }
   
+  public static class UIAdapter implements UIListener {
+    @Override
+    public void onRemoved(UIO parent, UIO child) {}
+    @Override
+    public void onAdded(UIO parent, UIO child) {}
+    @Override
+    public void onClosed(UIO parent, UIO child) {}
+    @Override
+    public void onCreated(UIInfo obj) {}
+    @Override
+    public void onEvent(UIO obj, Object event) {}
+  }
+  
   public String asString() {
     return "<" + getId() + ":[" + getName() + "]:" + getUI().getClass().getSimpleName() + ">";
   }

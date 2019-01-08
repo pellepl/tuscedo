@@ -25,14 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import javax.swing.AbstractAction;
-import javax.swing.JComponent;
-import javax.swing.JMenuItem;
-import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
-import javax.swing.JScrollPane;
-import javax.swing.JViewport;
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
@@ -609,14 +602,16 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   
   void linkedMagUpdate(double hor, double ver) {
     magHor = linkedOldMagHor = hor;
-    magVer = linkedOldMagVer = ver;
+    //magVer = linkedOldMagVer = ver;
+    renderer.recalcSize(getMaxSample(), getMinSample(), magHor, magVer,
+        getSampleCount());
     repaint();
   }
   
   void linkedDimUpdate(int w, int h) {
     linkedOldw = w;
     linkedOldw = h;
-    scrl.setSize(w, h);
+//    scrl.setSize(w, h);
   }
   
   void linkedPosUpdate(int x, int y) {
@@ -626,9 +621,26 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     scrl.getVerticalScrollBar().setValue(y);
   }
   
-  public void linkOtherGraphPanel(UIGraphPanel u) {
+  private void setupLink(UIGraphPanel u) {
     links.add(u);
-    u.links.add(this);
+    u.getUIInfo().addListener(new UIInfo.UIAdapter() {
+      @Override
+      public void onRemoved(UIO parent, UIO child) {
+        links.remove(child);
+        u.getUIInfo().removeListener(this);
+      }
+      @Override
+      public void onClosed(UIO parent, UIO child) {
+        links.remove(child);
+        u.getUIInfo().removeListener(this);
+      }
+    });
+  }
+  
+  public void linkOtherGraphPanel(UIGraphPanel u) {
+    if (links.contains(u)) return;
+    setupLink(u);
+    u.setupLink(this);
   }
   
   public void unlinkOtherGraphPanel(UIGraphPanel u) {
@@ -836,6 +848,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     List<UIO> res = new ArrayList<UIO>();
     Tuscedo.inst().getUiComponents(res, UIGraphPanel.class);
     res.remove(this);
+    if (!res.isEmpty()) m.add(new JSeparator());
     for (UIO uio : res) {
       if (links.contains(uio)) {
         m.add(i = new JMenuItem("Unlink " + uio.getUIInfo().getFirstName()));
