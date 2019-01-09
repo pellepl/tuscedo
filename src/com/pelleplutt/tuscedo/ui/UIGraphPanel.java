@@ -56,7 +56,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   boolean translationDragging, transVeri, transHori;
   int transAnchorX, transAnchorY;
   int transAnchorH, transAnchorV;
-  int cursor = -1;
+  int cursorX = -1;
+  double cursorY = -1;
   List<SampleSet> sets = new ArrayList<SampleSet>();
   List<UIGraphPanel> links = new ArrayList<UIGraphPanel>();
   double linkedOldMagHor = 0;
@@ -109,6 +110,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   }
   Color colSelEdge = new Color(0, 255, 255, 128);
   Color colSelArea = new Color(0, 255, 255, 64);
+  Color colCursor = new Color(0, 255, 255, 192);
 
   public static class SampleSet implements UIO {
     List<Double> samples = new ArrayList<Double>();
@@ -139,6 +141,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     int selCount;
     boolean hidden;
     boolean tagsHidden;
+    boolean highlighted;
     Color colMain;
     Color colFade;
     Color colMark;
@@ -350,6 +353,14 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
 
     public List<Double> getSamples() {
       return samples;
+    }
+
+    public boolean isHighlighted() {
+      return highlighted;
+    }
+    
+    public void setHighlighted(boolean b) {
+      highlighted = b;
     }
   } // class SampleSet
 
@@ -602,7 +613,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   
   void linkedMagUpdate(double hor, double ver) {
     magHor = linkedOldMagHor = hor;
-    //magVer = linkedOldMagVer = ver;
+//    magVer = linkedOldMagVer = ver;
     renderer.recalcSize(getMaxSample(), getMinSample(), magHor, magVer,
         getSampleCount());
     repaint();
@@ -618,7 +629,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     linkedOldx = x;
     linkedOldy = y;
     scrl.getHorizontalScrollBar().setValue(x);
-    scrl.getVerticalScrollBar().setValue(y);
+//    scrl.getVerticalScrollBar().setValue(y);
   }
   
   private void setupLink(UIGraphPanel u) {
@@ -786,8 +797,9 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     repaint();
   }
   
-  public void setCursor(int sampleIx) {
-    cursor = sampleIx;
+  public void setCursor(int sampleIx, double val ) {
+    cursorX = sampleIx;
+    cursorY = val;
   }
 
   class GraphAction implements ActionListener {
@@ -841,6 +853,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   void openGraphMenu(MouseEvent e) {
     JPopupMenu m = new JPopupMenu("GRAPH");
     JMenuItem i;
+    m.add(i = new JMenuItem("Zoom all"));
+    i.addActionListener(graphMenuActionListener);
     m.add(i = new JMenuItem("Show all"));
     i.addActionListener(graphMenuActionListener);
     m.add(i = new JMenuItem("Hide all"));
@@ -874,6 +888,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
           set.hidden = true;
         }
         repaint();
+      } else if (e.getActionCommand().equals("Zoom all")) {
+        zoomAll(true, true, new Point(0,0));
       } else if (e.getActionCommand().startsWith("Link ")) {
         List<UIO> res = new ArrayList<UIO>();
         Tuscedo.inst().getUiComponents(res, UIGraphPanel.class);
@@ -922,7 +938,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       setSize(__d);
     }
 
-    public void paint(Graphics2D g, List<Double> samples, TreeMap<Integer, String> tags, double mul, double offs,
+    public void paintSet(Graphics2D g, List<Double> samples, TreeMap<Integer, String> tags, double mul, double offs,
         int graphType, boolean paintGrid, int ww, int hh, int vpw, int vph,
         int vpx, int vpy, double minSample, double maxSample, double magHor,
         double magVer, Color colMain, Color colFade, Color colMark) {
@@ -1038,16 +1054,6 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
           }
         }
       }
-      
-      if (gotoIndex) {
-        int tw = fm.stringWidth(gotoIndexString) + 12;
-        g.setColor(Color.white);
-        int xx = vpx+(vpw-tw)/2;
-        int yy = vpy + (vph-fm.getHeight() + 4)/2;
-        g.fillRect(xx, yy, tw, fm.getHeight() + 4);
-        g.setColor(Color.black);
-        g.drawString(gotoIndexString, xx+6, yy + fm.getHeight() + 2);
-      }
     }
 
     @Override
@@ -1069,13 +1075,13 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       g.fillRect(0, 0, ww, hh);
 
       // sample sets
-      paint(g, null, null, 0, 0, 0, true, ww, hh, vpw, vph, vpx, vpy, minSample,
+      paintSet(g, null, null, 0, 0, 0, true, ww, hh, vpw, vph, vpx, vpy, minSample,
           maxSample, magHor, magVer, null,null,null);
       for (SampleSet set : sets) {
         if (!set.hidden) {
-          paint(g, set.samples, set.tagsHidden ? null : set.tags, set.mul, set.offs, set.graphType, false, ww, hh, vpw, vph,
+          paintSet(g, set.samples, set.tagsHidden ? null : set.tags, set.mul, set.offs, set.graphType, false, ww, hh, vpw, vph,
               vpx, vpy, minSample, maxSample, magHor, magVer,
-              set.colMain, set.colFade, set.colMark);
+              set.highlighted ? set.colMark : set.colMain, set.colFade, set.colMark);
         }
       }
 
@@ -1119,11 +1125,28 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         }
       }
       
+      FontMetrics fm = getFontMetrics(getFont());
       // cursor
-      if (cursor >= 0) {
-        // TODO PETER
+      if (cursorX >= 0) {
+        String str = cursorX + " , " + decFormat.format(cursorY);
+        int gx = (int) (cursorX * magHor);
+        int gy = hh - (int) (magVer * (cursorY - minSample));
+        g.setColor(colCursor);
+        g.drawLine(gx,gy-4,gx,gy+4);
+        g.drawLine(gx-4,gy,gx+4,gy);
+        g.drawString(str, gx+8, gy + fm.getHeight()/2);
       }
-      
+
+      // goto input
+      if (gotoIndex) {
+        int tw = fm.stringWidth(gotoIndexString) + 12;
+        g.setColor(Color.white);
+        int xx = vpx+(vpw-tw)/2;
+        int yy = vpy + (vph-fm.getHeight() + 4)/2;
+        g.fillRect(xx, yy, tw, fm.getHeight() + 4);
+        g.setColor(Color.black);
+        g.drawString(gotoIndexString, xx+6, yy + fm.getHeight() + 2);
+      }
     }
 
     Rectangle _clipR = new Rectangle();
@@ -1368,6 +1391,9 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         dragHori = (e.getModifiers() & Event.SHIFT_MASK) != 0;
         selAnchorX = e.getX();
         selAnchorY = e.getY();
+        double minGSample = getMinSample();
+        int hh = renderer.getHeight();
+        setCursor((int)(selAnchorX / magHor), (hh - selAnchorY) / magVer + minGSample);
       } else if (e.getButton() == MouseEvent.BUTTON2) {
         translationDraggingTriggered = true;
         transVeri = (e.getModifiers() & Event.CTRL_MASK) != 0;
@@ -1395,6 +1421,9 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         dragHori = (e.getModifiers() & Event.SHIFT_MASK) != 0;
         selEndX = e.getX();
         selEndY = e.getY();
+        double minGSample = getMinSample();
+        int hh = renderer.getHeight();
+        setCursor((int)(selEndX / magHor), (hh - selEndY) / magVer + minGSample);
         repaint();
       } else if (translationDraggingTriggered || translationDragging) {
         translationDraggingTriggered = false;
@@ -1413,8 +1442,11 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       if (e.getButton() == MouseEvent.BUTTON1) {
         if (selectionDragging) {
           select(dragVeri, dragHori, selAnchorX, selAnchorY, selEndX, selEndY);
+          cursorX = -1;
         } else {
-          setCursor((int)(selAnchorX / magHor));
+          double minGSample = getMinSample();
+          int hh = renderer.getHeight();
+          setCursor((int)(selAnchorX / magHor), (hh - selAnchorY) / magVer + minGSample);
         }
         selectionDraggingTriggered = false;
         selectionDragging = false;
@@ -1459,14 +1491,21 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     public void mouseClicked(MouseEvent e) {
       if (e.getButton() == MouseEvent.BUTTON1 && !e.isConsumed()
           && e.getClickCount() == 2) {
-        zoomAll((e.getModifiers() & Event.SHIFT_MASK) == 0,
-            (e.getModifiers() & Event.CTRL_MASK) == 0, e.getPoint());
+        SampleSet s = clickedLegend(e.getX(), e.getY());
+        if (s == null) {
+          zoomAll((e.getModifiers() & Event.SHIFT_MASK) == 0,
+              (e.getModifiers() & Event.CTRL_MASK) == 0, e.getPoint());
+        } else {
+          s.setHighlighted(!s.isHighlighted());
+        }
+        cursorX = -1;
       } else if (e.getButton() == MouseEvent.BUTTON1 && !e.isConsumed()
           && e.getClickCount() == 1) {
         SampleSet s = clickedLegend(e.getX(), e.getY());
         if (s != null) {
           s.setDetailed(!s.isDetailed());
           repaint();
+          cursorX = -1;
           return;
         }
         if (!selectionDragging) {
