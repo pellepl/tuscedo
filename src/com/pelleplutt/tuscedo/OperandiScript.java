@@ -527,6 +527,8 @@ public class OperandiScript implements Runnable, Disposable {
     setExtHelp("byte", "(<x>) - returns x as a byte");
     setExtHelp("strstr", "(<string>, <pattern>(, <fromindex>)) - returns first index of pattern in string, or -1");
     setExtHelp("strstrr", "(<string>, <pattern>(, <fromindex>)) - returns last index of pattern in string, or -1");
+    setExtHelp("strextract", "(<string>, <pattern1>, <pattern2>, ...) - returns a vector of strings");
+    setExtHelp("strreplace", "(<string>, <map>) - returns a string where all occurences of map keys are replaced with corresponding value");
     setExtHelp("lines", "(<string>) - returns an array of lines");
     setExtHelp("atoi", "(<x>) - returns x as a number");
     

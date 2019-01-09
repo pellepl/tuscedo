@@ -1,29 +1,13 @@
 package com.pelleplutt.operandi.proc;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintStream;
-import java.io.StringReader;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.*;
+import java.nio.charset.*;
+import java.util.*;
+import java.util.regex.*;
 
-import com.pelleplutt.operandi.AST;
-import com.pelleplutt.operandi.CodeGenBack;
-import com.pelleplutt.operandi.CodeGenFront;
+import com.pelleplutt.operandi.*;
 import com.pelleplutt.operandi.Compiler;
-import com.pelleplutt.operandi.CompilerError;
-import com.pelleplutt.operandi.Executable;
-import com.pelleplutt.operandi.Grammar;
-import com.pelleplutt.operandi.Linker;
-import com.pelleplutt.operandi.Source;
-import com.pelleplutt.operandi.StructAnalysis;
-import com.pelleplutt.operandi.proc.ProcessorError.ProcessorBreakpointError;
-import com.pelleplutt.operandi.proc.ProcessorError.ProcessorFinishedError;
+import com.pelleplutt.operandi.proc.ProcessorError.*;
 
 public class Processor implements ByteCode {
   public static final int VERSION = 0x00000002;
@@ -266,6 +250,8 @@ public class Processor implements ByteCode {
     extDefs.put("byte", new EC_byte());
     extDefs.put("strstr", new EC_strstr());
     extDefs.put("strstrr", new EC_strstrr());
+    extDefs.put("strextract", new EC_strextract());
+    extDefs.put("strreplace", new EC_strreplace());
     extDefs.put("lines", new EC_lines());
     extDefs.put("atoi", new EC_atoi());
     extDefs.put("__dbg", new EC_dbg(out));
@@ -2333,7 +2319,58 @@ public class Processor implements ByteCode {
       }
     }
   }
-  
+  static class EC_strextract extends ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length < 2) {
+        return null;
+      } else {
+        MListMap mlist = new MListMap();
+        mlist.makeArr();
+        String str = args[0].asString();
+        for (int i = 1; i < args.length; i++) {
+          try {
+            String pattern = args[i].asString();
+            Pattern pat = Pattern.compile("(" + pattern + ")");
+            Matcher mat = pat.matcher(str);
+            if (mat.find()) {
+              mlist.add(new M(mat.group(1)));
+              str = str.replaceFirst(pattern, "");
+            }
+          } catch (Throwable t) {}
+        }
+        mlist.insert(0, new M(str));
+        return new M(mlist);
+      }
+    }
+  }
+  static class EC_strreplace extends ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length != 2) {
+        return null;
+      } else {
+        MListMap mlist = new MListMap();
+        mlist.makeArr();
+        String str = args[0].asString();
+        M mset = args[1];
+        if (mset.type == TSET) {
+          MSet set = mset.ref;
+          int len = set.size();
+          if (set.getType() == MSet.TMAP) {
+            for (int i = 0; i < len; i++) {
+              String key = set.getElement(i).ref.get(0).asString();
+              String val = set.getElement(i).ref.get(1).asString();
+              str = str.replaceAll(key, val);
+            }
+          } else {
+            throw new ProcessorError("expected a map");
+          }
+        } else {
+          throw new ProcessorError("expected a map");
+        }
+        return new M(str);
+      }
+    }
+  }
   static class EC_lines extends ExtCall {
     public Processor.M exe(Processor p, Processor.M[] args) {
       if (args == null || args.length != 1) {
