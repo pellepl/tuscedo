@@ -19,6 +19,10 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+
 import com.pelleplutt.operandi.Compiler;
 import com.pelleplutt.operandi.proc.ExtCall;
 import com.pelleplutt.operandi.proc.MListMap;
@@ -40,6 +44,7 @@ public class MDisk extends MObj {
     this.workarea = wa;
     addFunc("read", OperandiScript.FN_DISK_READ, comp);
     addFunc("readb", OperandiScript.FN_DISK_READB, comp);
+    addFunc("read_audio", OperandiScript.FN_DISK_READAUDIO, comp);
     addFunc("write", OperandiScript.FN_DISK_WRITE, comp);
     addFunc("writeb", OperandiScript.FN_DISK_WRITEB, comp);
     addFunc("mkdir", OperandiScript.FN_DISK_MKDIR, comp);
@@ -80,6 +85,56 @@ public class MDisk extends MObj {
         return new Processor.M(arr);
       }
     });
+    os.setExtDef(OperandiScript.FN_DISK_READAUDIO, "(<filename>) - returns file as an audio struct",
+        new ExtCall() {
+      @SuppressWarnings("unchecked")
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args.length < 1) return null;
+        try {
+        String path = args[0].asString();
+        
+        File file = new File(path);
+        AudioInputStream ais = AudioSystem.getAudioInputStream(file);
+        AudioFormat format = ais.getFormat();
+        float range = (float)Math.pow(2, format.getSampleSizeInBits()) / 2;
+        int bytesPerSample = format.getSampleSizeInBits()/8;
+        int availBytes = (int) file.length();
+        int frameCount = availBytes / format.getFrameSize();
+        
+        MListMap mres = new MListMap();
+        mres.put("sample_bits", new Processor.M( format.getSampleSizeInBits()));
+        mres.put("channels", new Processor.M(format.getChannels()));
+        mres.put("frames", new Processor.M(frameCount));
+        mres.put("frequency", new Processor.M(format.getFrameRate()));
+
+        MListMap mdataall = new MListMap();
+        mres.put("data", new Processor.M(mdataall));
+        MListMap mdata[] = new MListMap[format.getChannels()];
+        for (int i = 0; i < format.getChannels(); i++) {
+          mdata[i] = new MListMap();
+          mdataall.add(new M(mdata[i]));
+        }
+        
+        byte[] frame = new byte[format.getFrameSize()];
+        while (ais.read(frame) == frame.length) {
+          int fix = 0;
+          for (int ch = 0; ch < format.getChannels(); ch++) {
+            long spl = 0;
+            for (int s = 0; s < bytesPerSample; s++) {
+              spl |= (frame[fix++]) << ((bytesPerSample-s-1) * 8);
+            }
+            float fspl = ((long)spl) / range;
+            mdata[ch].add(new M(fspl));
+          }
+        }
+        return new Processor.M(mres);
+        } catch (Exception ioe) {
+          ioe.printStackTrace();
+          throw new ProcessorError(ioe.getMessage());
+        }
+      }
+    });
+
     os.setExtDef(OperandiScript.FN_DISK_WRITE, "(<filename>, <string>) - writes file as a string", 
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {

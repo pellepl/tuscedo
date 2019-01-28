@@ -20,6 +20,8 @@ import com.pelleplutt.operandi.proc.*;
 import com.pelleplutt.operandi.proc.Processor.*;
 import com.pelleplutt.operandi.proc.ProcessorError.*;
 import com.pelleplutt.tuscedo.Tuscedo.*;
+import com.pelleplutt.tuscedo.math.Complex;
+import com.pelleplutt.tuscedo.math.Fft;
 import com.pelleplutt.tuscedo.ui.*;
 import com.pelleplutt.tuscedo.ui.UIGraphPanel.*;
 import com.pelleplutt.tuscedo.ui.UIInfo.*;
@@ -63,6 +65,7 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_DISK_FIND_FILE =  VAR_DISK + ":find_file";
   public static final String FN_DISK_READ =  VAR_DISK + ":read";
   public static final String FN_DISK_READB =  VAR_DISK + ":readb";
+  public static final String FN_DISK_READAUDIO =  VAR_DISK + ":read_audio";
   public static final String FN_DISK_WRITE =  VAR_DISK + ":write";
   public static final String FN_DISK_WRITEB =  VAR_DISK + ":writeb";
   public static final String FN_DISK_STAT =  VAR_DISK + ":stat";
@@ -506,6 +509,62 @@ public class OperandiScript implements Runnable, Disposable {
     setExtDef("wfi", "(<x>) - waits for interrupt given milliseconds", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         return new M(awaitIRQ(args.length > 0 ? args[0].asInt() : 0) ? 1 : 0);
+      }
+    });
+    setExtDef("fft", "(<array>) - performs an fft of array", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length != 1 || args[0].type != Processor.TSET) {
+          return null;
+        }
+        int sz = args[0].ref.size();
+        Complex d[] = new Complex[sz];
+        for (int f = 0; f < sz; f++) {
+          if (args[0].ref.get(f).type == Processor.TSET) {
+            d[f] = new Complex(args[0].ref.get(f).ref.get(0).asFloat(), args[0].ref.get(f).ref.get(1).asFloat());
+          } else {
+            d[f] = new Complex(args[0].ref.get(f).asFloat(), 0);
+          }
+        }
+        Complex r[] = Fft.fft(d);
+        MListMap mr = new MListMap();
+        mr.makeArr();
+        for (int f = 0; f < sz; f++) {
+          MListMap mc = new MListMap();
+          mc.makeArr();
+          mc.add(new M((float)r[f].getReal()));
+          mc.add(new M((float)r[f].getImaginary()));
+          mr.add(new M(mc));
+          
+        }
+        return new M(mr);
+      }
+    });
+    setExtDef("ifft", "(<array>) - performs an inverse fft of array", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length != 1 || args[0].type != Processor.TSET) {
+          return null;
+        }
+        int sz = args[0].ref.size();
+        Complex d[] = new Complex[sz];
+        for (int f = 0; f < sz; f++) {
+          if (args[0].ref.get(f).type == Processor.TSET) {
+            d[f] = new Complex(args[0].ref.get(f).ref.get(0).asFloat(), args[0].ref.get(f).ref.get(1).asFloat());
+          } else {
+            d[f] = new Complex(args[0].ref.get(f).asFloat(), 0);
+          }
+        }
+        Complex r[] = Fft.ifft(d);
+        MListMap mr = new MListMap();
+        mr.makeArr();
+        for (int f = 0; f < sz; f++) {
+          MListMap mc = new MListMap();
+          mc.makeArr();
+          mc.add(new M((float)r[f].getReal()));
+          mc.add(new M((float)r[f].getImaginary()));
+          mr.add(new M(mc));
+          
+        }
+        return new M(mr);
       }
     });
 
