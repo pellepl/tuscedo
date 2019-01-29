@@ -170,14 +170,22 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   }
   
   public String addGraphTab(UISimpleTabPane stp) {
-    return addGraphTab(stp, null);
+    return addGraphTab(stp);
   }
-  public String addGraphTab(UISimpleTabPane stp, List<Float> vals) {
+  public String addGraphTab(UISimpleTabPane stp, List<List<Float>> vals, String name) {
     UIGraphPanel gp = new UIGraphPanel("");
     Tab t = stp.createTab(null, gp);
     stp.selectTab(t);
     if (vals != null) {
-      for (float s : vals) gp.addSample(s);
+      for (int i = 0; i < vals.size(); i++) {
+        if (i == 0) {
+          gp.addSamplesFloat(vals.get(i));
+        } else {
+          UIGraphPanel.SampleSet ss = gp.newSampleSet();
+          gp.addSamplesFloat(vals.get(i), i);
+          ss.getUIInfo().setName(name + ("" + (i+1)));
+        }
+      }
     }
     gp.zoomAll(true, true, new Point());
     return gp.getSampleSet(0).getUIInfo().getId();

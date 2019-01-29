@@ -692,6 +692,13 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     repaint();
   }
 
+  public SampleSet newSampleSet() {
+    SampleSet set;
+    addSampleSet(set = new SampleSet(this.getName()));
+    set.uiinfo.setName(getSampleSet(0).getUIInfo().getName());
+    return set;
+  }
+
   public void removeSampleSet(SampleSet set) {
     if (sets.contains(set)) {
       sets.remove(set);
@@ -714,6 +721,32 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   public void addSamples(List<Double> samples) {
     for (double d : samples) {
       sets.get(0).addSampleInternal(d);
+    }
+    sampleUpdate();
+  }
+
+  public void addSamplesFloat(List<Float> samples) {
+    for (double d : samples) {
+      sets.get(0).addSampleInternal(d);
+    }
+    sampleUpdate();
+  }
+
+  public void addSample(double sample, int set) {
+    sets.get(set).addSampleInternal(sample);
+    sampleUpdate();
+  }
+
+  public void addSamples(List<Double> samples, int set) {
+    for (double d : samples) {
+      sets.get(set).addSampleInternal(d);
+    }
+    sampleUpdate();
+  }
+
+  public void addSamplesFloat(List<Float> samples, int set) {
+    for (double d : samples) {
+      sets.get(set).addSampleInternal(d);
     }
     sampleUpdate();
   }

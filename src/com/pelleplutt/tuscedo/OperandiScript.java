@@ -1331,23 +1331,23 @@ public class OperandiScript implements Runnable, Disposable {
   }
   
   private void createGraphFunctions() {
-    setExtDef("graph", "((<name>,),<data>,...,(<line|plot|bar>)) - opens a graph view", 
+    setExtDef("graph", "(<name>,(<data>,...,(<line|plot|bar>))) - opens a graph view", 
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         String name = "GRAPH";
         int type = UIGraphPanel.GRAPH_LINE;
-        List<Float> vals = null;
+        List<List<Float>> valVals = new ArrayList<List<Float>>();
         if (args != null) {
           if (args.length > 0) {
             name = args[0].asString();
           }
           for (int i = 1; i < args.length; i++) {
             if (args[i].type == Processor.TSET) {
-              vals = new ArrayList<Float>();
+              List<Float> vals = new ArrayList<Float>();
+              valVals.add(vals);
               MSet set = args[i].ref;
               for (int x = 0; x < set.size(); x++) {
-                M val = set.get(x);
-                vals.add(val.asFloat());
+                vals.add(set.get(x).asFloat());
               }
             }
             else if (args[i].type == Processor.TSTR) {
@@ -1361,7 +1361,7 @@ public class OperandiScript implements Runnable, Disposable {
           Tuscedo.inst().create(currentWA);
           t = UISimpleTabPane.getTabByComponent(currentWA);
         }
-        String id = Tuscedo.inst().addGraphTab(t.getPane(), vals);
+        String id = Tuscedo.inst().addGraphTab(t.getPane(), valVals, name);
         SampleSet ui = ((SampleSet)Tuscedo.inst().getUIObject(id).getUI()); 
         ui.setGraphType(type);
         ui.getUIInfo().setName(name);
