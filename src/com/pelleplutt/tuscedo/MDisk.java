@@ -96,7 +96,7 @@ public class MDisk extends MObj {
         File file = new File(path);
         AudioInputStream ais = AudioSystem.getAudioInputStream(file);
         AudioFormat format = ais.getFormat();
-        float range = (float)Math.pow(2, format.getSampleSizeInBits()) / 2;
+        float range = (float)Math.pow(2, format.getSampleSizeInBits())/2.f;
         int bytesPerSample = format.getSampleSizeInBits()/8;
         int availBytes = (int) file.length();
         int frameCount = availBytes / format.getFrameSize();
@@ -116,15 +116,16 @@ public class MDisk extends MObj {
         }
         
         byte[] frame = new byte[format.getFrameSize()];
+        final int shift = 64 - bytesPerSample*8;
         while (ais.read(frame) == frame.length) {
           int fix = 0;
           for (int ch = 0; ch < format.getChannels(); ch++) {
             long spl = 0;
             for (int s = 0; s < bytesPerSample; s++) {
-              spl |= (frame[fix++]) << ((bytesPerSample-s-1) * 8);
+              spl |= ((frame[fix++]) & 0xff) << (s*8);//((bytesPerSample-s-1) * 8);
             }
-            float fspl = ((long)spl) / range;
-            mdata[ch].add(new M(fspl));
+            spl = ((spl << shift) >> shift); // sign extend
+            mdata[ch].add(new M((float)(((long)spl) / range)));
           }
         }
         return new Processor.M(mres);

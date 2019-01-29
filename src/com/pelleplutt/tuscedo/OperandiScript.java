@@ -21,6 +21,7 @@ import com.pelleplutt.operandi.proc.Processor.*;
 import com.pelleplutt.operandi.proc.ProcessorError.*;
 import com.pelleplutt.tuscedo.Tuscedo.*;
 import com.pelleplutt.tuscedo.math.Complex;
+import com.pelleplutt.tuscedo.math.Emd;
 import com.pelleplutt.tuscedo.math.Fft;
 import com.pelleplutt.tuscedo.ui.*;
 import com.pelleplutt.tuscedo.ui.UIGraphPanel.*;
@@ -565,6 +566,35 @@ public class OperandiScript implements Runnable, Disposable {
           
         }
         return new M(mr);
+      }
+    });
+    setExtDef("emd", "(<array>, <order>, <iterations>, <locality>) - performs an empirical mode decomposition of array", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 1 || args[0].type != Processor.TSET) {
+          return null;
+        }
+        int order = 5, iterations = 20, locality = 0;
+        if (args.length > 1) order = args[1].asInt();
+        if (args.length > 2) iterations = args[2].asInt();
+        if (args.length > 3) locality = args[3].asInt();
+        int sz = args[0].ref.size();
+        float d[] = new float[sz];
+        for (int f = 0; f < sz; f++) {
+          d[f] = args[0].ref.get(f).asFloat();
+        }
+        Emd.EmdData res = Emd.decompose(d,  order, iterations, locality);
+        MListMap mres = new MListMap();
+        MListMap mresdecompositions[] = new MListMap[order];
+        for (int i = 0; i < order; i++) {
+          mresdecompositions[i] = new MListMap();
+          mres.add(new M(mresdecompositions[i]));
+        }
+        for (int f = 0; f < sz; f++) {
+          for (int i = 0; i < order; i++) {
+            mresdecompositions[i].add(new M(res.imfs[i][f]));
+          }
+        }
+        return new M(mres);
       }
     });
 

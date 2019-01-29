@@ -167,10 +167,10 @@ public class Emd {
   }
 
   public static class EmdData {
-    protected int iterations, order, locality;
-    protected int[] minPoints, maxPoints;
-    protected float[] min, max, residue;
-    protected float[][] imfs;
-    protected int size, minSize, maxSize;
+    public int iterations, order, locality;
+    public int[] minPoints, maxPoints;
+    public float[] min, max, residue;
+    public float[][] imfs;
+    public int size, minSize, maxSize;
   }
 }
