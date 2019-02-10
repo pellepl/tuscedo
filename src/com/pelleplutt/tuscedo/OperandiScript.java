@@ -617,6 +617,8 @@ public class OperandiScript implements Runnable, Disposable {
     setExtHelp("strstr", "(<string>, <pattern>(, <fromindex>)) - returns first index of pattern in string, or -1");
     setExtHelp("strstrr", "(<string>, <pattern>(, <fromindex>)) - returns last index of pattern in string, or -1");
     setExtHelp("strextract", "(<string>, <pattern1>, <pattern2>, ...) - returns a vector of strings");
+    setExtHelp("strnum", "(<string>) - returns first found number in string, or nil if none");
+    setExtHelp("strnums", "(<string>) - returns a vector of all found numbers in given string");
     setExtHelp("strreplace", "(<string>, <map>) - returns a string where all occurences of map keys are replaced with corresponding value");
     setExtHelp("lines", "(<string>) - returns an array of lines");
     setExtHelp("atoi", "(<x>) - returns x as a number");

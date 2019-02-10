@@ -1,0 +1,51 @@
+module graph;
+
+/**
+   Will create a graph collecting values from each line from log.
+   It will collect each found float or int value in order, up to at most same
+   amount as the length of names array.
+   
+   Example: graph.from_log(
+              "x:1 y:2 z:2\nx:3 y:55 z:98\n",
+              ["Yaw", "Pitch", "Roll"],
+              [0xff0000, 0x00ff00, 0x0000ff]);
+   @param log     some log string
+   @param names   array of names, naming each graph by index
+   @param colors  array of colors, coloring each graph by index (may be nil)
+   @return        array of graphs
+*/
+func from_log(log, names, colors) {
+  if (names == nil) {
+    return nil;
+  }
+  if (len(names) == 0) {
+    return nil;
+  }
+
+  names_len = len(names); 
+
+  sets = (0#names_len-1)[{return [];}];
+  
+  log_lines = lines(log);
+  
+  for (line in log_lines) {
+    vals = strnums(line);
+    for (n in 0#(min(len(vals), names_len)-1)) {
+      sets[n] += vals[n];
+    }
+  }
+  
+  graphs = [];
+  for (n in 0#(names_len-1)) {
+    graphs += graph(names[n], sets[n]);
+    if (n < len(colors)) {
+      graphs[n].set_color(colors[n]);
+    }
+  }
+  
+  for (n in 1#(names_len-1)) {
+    graphs[0].join(graphs[n]);
+  }
+  
+  return graphs;
+}

@@ -251,6 +251,8 @@ public class Processor implements ByteCode {
     extDefs.put("strstr", new EC_strstr());
     extDefs.put("strstrr", new EC_strstrr());
     extDefs.put("strextract", new EC_strextract());
+    extDefs.put("strnum", new EC_strnum());
+    extDefs.put("strnums", new EC_strnums());
     extDefs.put("strreplace", new EC_strreplace());
     extDefs.put("lines", new EC_lines());
     extDefs.put("atoi", new EC_atoi());
@@ -2343,13 +2345,77 @@ public class Processor implements ByteCode {
       }
     }
   }
+  static class EC_strnum extends ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length < 1) {
+        return null;
+      } else {
+        String str = args[0].asString();
+        boolean inNumber = false;
+        StringBuilder numstr = new StringBuilder();
+        for (int i = 0; i < str.length(); i++) {
+          char c = str.charAt(i);
+          if (!inNumber && (c == '-' || c == '+' || c == '.' || (c >= '0' && c <= '9'))) {
+            inNumber = true;
+          }
+          if (inNumber && (c < '0' || c > '9') && c != '.' && c != 'e' && c != 'E' && c != '+' && c != '-') {
+            inNumber = false;
+            break;
+          }
+          if (inNumber) numstr.append(c);
+        }
+        float f = Float.NaN;
+        try {
+          f = Float.valueOf(numstr.toString());
+        } catch (Throwable t) {}
+        return Float.isNaN(f) ? null : new M(f);
+      }
+    }
+  }
+  static class EC_strnums extends ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+      if (args == null || args.length < 1) {
+        return null;
+      } else {
+        String str = args[0].asString();
+        boolean inNumber = false;
+        StringBuilder numstr = new StringBuilder();
+        MListMap mlist = new MListMap();
+        mlist.makeArr();
+        for (int i = 0; i < str.length(); i++) {
+          char c = str.charAt(i);
+          if (!inNumber && (c == '-' || c == '+' || c == '.' || (c >= '0' && c <= '9'))) {
+            inNumber = true;
+          }
+          if (inNumber && (c < '0' || c > '9') && c != '.' && c != 'e' && c != 'E' && c != '+' && c != '-') {
+            inNumber = false;
+            float f = Float.NaN;
+            try {
+              f = Float.valueOf(numstr.toString());
+              mlist.add(new M(f));
+              inNumber = false;
+              numstr = new StringBuilder();
+            } catch (Throwable t) {}
+          }
+          if (inNumber) numstr.append(c);
+        }
+        if (inNumber) {
+          inNumber = false;
+          float f = Float.NaN;
+          try {
+            f = Float.valueOf(numstr.toString());
+            mlist.add(new M(f));
+          } catch (Throwable t) {}
+        }
+        return new M(mlist);
+      }
+    }
+  }
   static class EC_strreplace extends ExtCall {
     public Processor.M exe(Processor p, Processor.M[] args) {
       if (args == null || args.length != 2) {
         return null;
       } else {
-        MListMap mlist = new MListMap();
-        mlist.makeArr();
         String str = args[0].asString();
         M mset = args[1];
         if (mset.type == TSET) {
