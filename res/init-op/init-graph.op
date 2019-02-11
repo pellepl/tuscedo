@@ -30,6 +30,7 @@ func from_log(log, names, colors) {
   
   for (line in log_lines) {
     vals = strnums(line);
+    if (vals == nil | len(vals) == 0) continue;
     for (n in 0#(min(len(vals), names_len)-1)) {
       sets[n] += vals[n];
     }
@@ -41,10 +42,6 @@ func from_log(log, names, colors) {
     if (n < len(colors)) {
       graphs[n].set_color(colors[n]);
     }
-  }
-  
-  for (n in 1#(names_len-1)) {
-    graphs[0].join(graphs[n]);
   }
   
   return graphs;
