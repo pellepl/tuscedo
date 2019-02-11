@@ -12,9 +12,10 @@ module graph;
    @param log     some log string
    @param names   array of names, naming each graph by index
    @param colors  array of colors, coloring each graph by index (may be nil)
+   @param filter  only lines containing string in filter is included (may be nil)
    @return        array of graphs
 */
-func from_log(log, names, colors) {
+func from_log(log, names, colors, filter) {
   if (names == nil) {
     return nil;
   }
@@ -29,6 +30,9 @@ func from_log(log, names, colors) {
   log_lines = lines(log);
   
   for (line in log_lines) {
+    if (filter != nil) {
+      if (strstr(line, filter) < 0) continue;
+    }
     vals = strnums(line);
     if (vals == nil | len(vals) == 0) continue;
     for (n in 0#(min(len(vals), names_len)-1)) {
