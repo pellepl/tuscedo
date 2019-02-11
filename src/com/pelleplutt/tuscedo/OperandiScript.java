@@ -1561,24 +1561,36 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)ss.getMax());
       }
     });
+    
+    
     setExtDef("graph:join", "(<graph>, ...) - join this graph with another, or others",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
-
         SampleSet sssrc = (SampleSet)getUIOByScriptId(p.getMe());
         if (sssrc == null) return null;
-
-        UIGraphPanel src = ((UIGraphPanel)sssrc.getUIInfo().getParent().getUI());
-        
         for (int i = 0; i < args.length; i++) {
-          SampleSet ssover = (SampleSet)getUIOByScriptId(args[i]);
-          if (ssover == null) continue;
-          UIGraphPanel over = ((UIGraphPanel)ssover.getUIInfo().getParent().getUI());
-          over.removeSampleSet(ssover);
-          src.addSampleSet(ssover);
+          recurseJoin(sssrc, args[i]);
         }
-        return null;
+        return p.getMe();
+      }
+      void recurseJoin(SampleSet sssrc, Processor.M joiner) {
+        if (joiner.type == Processor.TSET && joiner.ref.getType() == MListMap.TARR) {
+          for (int i = 0; i < joiner.ref.size(); i++) {
+            recurseJoin(sssrc, joiner.ref.get(i));
+          }
+        } else {
+          UIO uioover = getUIOByScriptId(joiner);
+          if (uioover == null) return;
+          if (uioover instanceof SampleSet) {
+            SampleSet ssover = (SampleSet)uioover;
+            if (ssover == sssrc) return;
+            UIGraphPanel over = ((UIGraphPanel)ssover.getUIInfo().getParent().getUI());
+            over.removeSampleSet(ssover);
+            UIGraphPanel src = ((UIGraphPanel)sssrc.getUIInfo().getParent().getUI());
+            src.addSampleSet(ssover);
+          }
+        }
       }
     });
     setExtDef("graph:save", "(<path>) - saves graph data set to file",
