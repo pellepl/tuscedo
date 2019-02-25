@@ -465,6 +465,21 @@ public abstract class TAC {
       this.step = step;
       this.to = to;
     }
+    void rec(TAC t, TAC d, int sp) {
+      if (t instanceof TACRangeLen) { 
+        ((TACRangeLen)t).setDerefee(d,sp);
+      } else if (t instanceof TACOp) {
+        rec(((TACOp)t).left, d, sp); 
+        rec(((TACOp)t).right, d, sp); 
+      } else if (t instanceof TACUnaryOp) {
+        rec(((TACUnaryOp)t).operand, d, sp); 
+      } 
+    }
+    public void setDerefee(TAC d) {
+      rec(from, d, 0);
+      rec(step, d, 1);
+      rec(to, d, 1 + (stepDefined ? 1 : 0));
+    }
     public String toString() {return "RANGE";}
   }
   
@@ -484,6 +499,16 @@ public abstract class TAC {
       super(e);
     }
     public String toString() {return "ARGV";}
+  }
+  public static class TACRangeLen extends TAC {
+    TAC derefee; int stackPos;
+    public TACRangeLen(ASTNode e) {
+      super(e);
+    }
+    public void setDerefee(TAC d, int derefeeStackPos) {derefee = d; stackPos = derefeeStackPos; }
+    public TAC getDerefee() {return derefee;}
+    public int getDerefeeStackPos() {return stackPos;}
+    public String toString() {return "RANGELEN";}
   }
   public static class TACArgNbr extends TAC {
     int arg;

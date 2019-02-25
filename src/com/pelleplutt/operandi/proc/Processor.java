@@ -255,6 +255,8 @@ public class Processor implements ByteCode {
     extDefs.put("strnums", new EC_strnums());
     extDefs.put("strreplace", new EC_strreplace());
     extDefs.put("lines", new EC_lines());
+    extDefs.put("sort", new EC_sort());
+    extDefs.put("group", new EC_group());
     extDefs.put("atoi", new EC_atoi());
     extDefs.put("__dbg", new EC_dbg(out));
     extDefs.put("__dumpstack", new EC_dumpstack());
@@ -1849,6 +1851,46 @@ public class Processor implements ByteCode {
     return argv;
   }
   
+  public static class MComparator implements Comparator<M> {
+    int ix = -1;
+    M member = null;
+    boolean comp = true; // compare or group
+    
+    public static final MComparator RAWCOMP = new MComparator(-1, null, true);
+
+    public MComparator(int ix, M member, boolean comp) {
+      this.ix = ix;
+      this.member = member;
+      this.comp = comp;
+    }
+    
+    int rawCompare(M o1, M o2) {
+      if (o1.type == TSTR || o2.type == TSTR) return o1.asString().compareTo(o2.asString()); 
+      if (!comp && (o1.type == TSET || o2.type == TSET)) return Integer.MAX_VALUE; 
+      return Double.compare(o1.asNumeratorComparable(), o2.asNumeratorComparable());
+    }
+    
+    @Override
+    public int compare(M o1, M o2) {
+      if (ix < 0 && member == null) return rawCompare(o1, o2);
+      if (o1.type == TSET && o2.type == TSET) {
+        if (ix >= 0) {
+          if (o1.ref.size() > ix && o2.ref.size() > ix) {
+            return rawCompare(o1.ref.get(ix), o2.ref.get(ix));
+          } else {
+            return rawCompare(o1, o2);
+          }
+        } else {
+          M mo1 = o1.ref.get(member);
+          M mo2 = o2.ref.get(member);
+          return rawCompare(mo1 != null ? mo1 : o1, mo2 != null ? mo2 : o2);
+        }
+      } else {
+        return rawCompare(o1, o2);
+      }
+    }
+  };
+  
   public static class M {
     public byte type;
     public MSet ref;
@@ -1948,6 +1990,25 @@ public class Processor implements ByteCode {
         return 0;
       }
     }
+    
+    public double asNumeratorComparable() {
+      switch(type) {
+      case TSTR:
+      case TNIL:
+        return 0;
+      case TANON:
+      case TFUNC:
+      case TINT:
+        return i;
+      case TFLOAT:
+        return f;
+      case TSET:
+        return ref.size();
+      default:
+        return 0;
+      }
+    }
+
 
     public String toString() {
       switch(type) {
@@ -2471,6 +2532,64 @@ public class Processor implements ByteCode {
           }
         } catch (IOException ignore) {}
         return new M(mlist);
+      }
+    }
+  }
+  
+  static class EC_sort extends ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+    if (args == null || args.length == 0 || args[0].type != TSET || ((args[0].ref.getType()) != MSet.TARR) || !(args[0].ref instanceof MListMap)) {
+        return null;
+      } else {
+        MListMap arr = (MListMap)args[0].ref;
+        Comparator<M> c = MComparator.RAWCOMP;
+        if (args.length > 1) {
+          if (args[1].type == TINT)
+            c = new MComparator(args[1].i, null, true);
+          else
+            c = new MComparator(-1, args[1], true);
+        }
+        Collections.sort(arr.arr, c);
+        return new M(args[0].ref);
+      }
+    }
+  }
+
+  static class EC_group extends ExtCall {
+    public Processor.M exe(Processor p, Processor.M[] args) {
+    if (args == null || args.length == 0 || args[0].type != TSET || ((args[0].ref.getType()) != MSet.TARR) || !(args[0].ref instanceof MListMap)) {
+        return null;
+      } else {
+        MListMap arr = (MListMap)args[0].ref;
+        Comparator<M> c = new MComparator(-1, null, false);
+        if (args.length > 1) {
+          if (args[1].type == TINT)
+            c = new MComparator(args[1].i, null, false);
+          else
+            c = new MComparator(-1, args[1], false);
+        }
+        
+        MListMap res = new MListMap();
+        res.makeArr();
+
+        for (int i = 0; i < arr.size(); i++) {
+          M cand = arr.get(i);
+          MListMap bin = null;
+          for (int j = 0; j < res.size(); j++) {
+            MListMap binCand = (MListMap)res.get(j).ref;
+            if (c.compare(cand, binCand.get(0)) == 0) {
+              bin = binCand;
+              break;
+            }
+          }
+          if (bin == null) {
+            bin = new MListMap();
+            res.add(new M(bin));
+          }
+          bin.add(cand);
+        }
+        
+        return new M(res);
       }
     }
   }

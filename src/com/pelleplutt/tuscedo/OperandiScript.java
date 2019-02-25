@@ -621,7 +621,9 @@ public class OperandiScript implements Runnable, Disposable {
     setExtHelp("strnums", "(<string>) - returns a vector of all found numbers in given string");
     setExtHelp("strreplace", "(<string>, <map>) - returns a string where all occurences of map keys are replaced with corresponding value");
     setExtHelp("lines", "(<string>) - returns an array of lines");
-    setExtHelp("atoi", "(<x>) - returns x as a number");
+    setExtHelp("atoi", "(<x>(, <base>)) - returns x as a number");
+    setExtHelp("sort", "(<array>, (<key> | <ix>)) - sorts given array, either by natural order or by given key/index when array contains sets");
+    setExtHelp("group", "(<array>, (<key> | <ix>)) - returns given array grouped either by natural order or by given key/index when array contains sets");
     
     comp = new Compiler(extDefs, 0x4000, 0x0000);
     proc.reset();

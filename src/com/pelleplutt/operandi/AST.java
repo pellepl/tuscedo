@@ -92,6 +92,7 @@ public class AST implements Lexer.Emitter {
   final static int OP_SYMBOL       = __id++;
   final static int OP_ARGC         = __id++;
   final static int OP_ARGV         = __id++;
+  final static int OP_RANGELEN     = __id++;
   final static int OP_ARG          = __id++;
   final static int OP_ME           = __id++;
   
@@ -189,6 +190,7 @@ public class AST implements Lexer.Emitter {
       new Op("*^0", OP_SYMBOL),
       new Op("$argc", OP_ARGC),
       new Op("$argv", OP_ARGV),
+      new Op("$l", OP_RANGELEN),
       new Op("$*%", OP_ARG),
       new Op("me", OP_ME),
       
@@ -333,7 +335,7 @@ public class AST implements Lexer.Emitter {
     } 
     
     else if (tokix == OP_SYMBOL 
-        || tokix == OP_ARGC || tokix == OP_ARGV || tokix == OP_ARG 
+        || tokix == OP_ARGC || tokix == OP_ARGV || tokix == OP_ARG || tokix == OP_RANGELEN 
         || tokix == OP_ME) {
       onSymbol(new String(symdata, 0, len));
     }
@@ -551,6 +553,7 @@ public class AST implements Lexer.Emitter {
         prevTokix == OP_BRACKETC || 
         prevTokix == OP_SYMBOL || 
         prevTokix == OP_ARGV || 
+        prevTokix == OP_RANGELEN || 
         prevTokix == OP_ARG || 
         prevTokix == OP_ME || 
         isString(prevTokix) || 
@@ -825,7 +828,7 @@ public class AST implements Lexer.Emitter {
   }
   
   public static boolean isArithmeticOperand(int op) {
-    return op == OP_SYMBOL || op == OP_ARG || op == OP_ARGC || op == OP_ARGV || op == OP_DOT || 
+    return op == OP_SYMBOL || op == OP_ARG || op == OP_ARGC || op == OP_ARGV || op == OP_RANGELEN || op == OP_DOT || 
         isString(op) || isNumber(op) ||
         op == OP_PARENC || op == OP_BRACKETC || op == OP_PLUS2 || op == OP_MINUS2;
   }

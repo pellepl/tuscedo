@@ -60,6 +60,7 @@ import com.pelleplutt.operandi.TAC.TACMapTuple;
 import com.pelleplutt.operandi.TAC.TACNil;
 import com.pelleplutt.operandi.TAC.TACOp;
 import com.pelleplutt.operandi.TAC.TACRange;
+import com.pelleplutt.operandi.TAC.TACRangeLen;
 import com.pelleplutt.operandi.TAC.TACReturn;
 import com.pelleplutt.operandi.TAC.TACSet;
 import com.pelleplutt.operandi.TAC.TACSetDeref;
@@ -470,6 +471,9 @@ public class CodeGenBack implements ByteCode {
       pushValue(tac, frag);
     }
     else if (tac instanceof TACArgNbr) {
+      pushValue(tac, frag);
+    }
+    else if (tac instanceof TACRangeLen) {
       pushValue(tac, frag);
     }
     else if (tac instanceof TACNil) {
@@ -893,7 +897,14 @@ public class CodeGenBack implements ByteCode {
       pushValue(((TACMapTuple) a).val, frag);
       sp--;
       addCode(frag, stackInfo() + a, ITUP_CRE);
-
+    }
+    else if (a instanceof TACRangeLen) {
+      sp = sp + 1;
+      addCode(frag, stackInfo() + "dereferenced set", ICPY, ((TACRangeLen)a).getDerefeeStackPos());
+      sp = sp - 1 + 1;
+      addCode(frag, stackInfo() + "length-1", ISET_SZ);
+      sp = sp - 1 + 1;
+      addCode(frag, stackInfo() + "-1", ISUB_Q1);
     }
     else if (a instanceof TACOp) {
       // already on stack

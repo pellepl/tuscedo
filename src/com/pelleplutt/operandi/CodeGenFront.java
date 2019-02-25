@@ -83,6 +83,8 @@ import com.pelleplutt.operandi.TAC.TACInt;
 import com.pelleplutt.operandi.TAC.TACLabel;
 import com.pelleplutt.operandi.TAC.TACNil;
 import com.pelleplutt.operandi.TAC.TACOp;
+import com.pelleplutt.operandi.TAC.TACRange;
+import com.pelleplutt.operandi.TAC.TACRangeLen;
 import com.pelleplutt.operandi.TAC.TACReturn;
 import com.pelleplutt.operandi.TAC.TACSetDeref;
 import com.pelleplutt.operandi.TAC.TACSetRead;
@@ -391,6 +393,10 @@ public class CodeGenFront {
       TAC tderefer = genIR(ederefer, parentEblk, new Info());
       setReferenced(tderefer);
       TAC tderef = new TACSetDeref(e, tderefee, tderefer);
+      if (tderefer instanceof TACRange) {
+        ((TACRange)tderefer).setDerefee(tderefee);
+        setReferenced(tderefee);
+      }
 
       if (ederefee.op != OP_DOT && ederefee.op != OP_ADEREF) {
         // last dereference
@@ -406,6 +412,7 @@ public class CodeGenFront {
       }
       
       info.trace.pop();
+      
       return tderef;      
       
     } else if (e.op == OP_SYMBOL || e.op == OP_ADECL || e.op == OP_RANGE || AST.isString(e.op)) {
@@ -971,7 +978,7 @@ public class CodeGenFront {
         TAC eto = genIR(e.operands.get(1), parentEblk, info);
         add(eto);
         setReferenced(eto);
-        r = new TAC.TACRange((ASTNodeRange)e, efrom, eto); 
+        r = new TAC.TACRange((ASTNodeRange)e, efrom, eto);
       } else {
         TAC efrom = genIR(e.operands.get(0), parentEblk, info); 
         add(efrom);
@@ -1075,6 +1082,7 @@ public class CodeGenFront {
     try {num = Integer.parseInt(isym); } catch(Throwable t) {isNumeric=false;}
          if (isym.equals("argc")) return new TACArgc(e);
     else if (isym.equals("argv")) return new TACArgv(e);
+    else if (isym.equals("l"))    return new TACRangeLen(e);
     else if (isNumeric)           return new TACArgNbr(e, num);
     else throw new CompilerError("not implemented $" + isym);
   }
