@@ -35,6 +35,7 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String VAR_SERIAL = "ser";
   public static final String VAR_DISK = "disk";
   public static final String VAR_NET = "net";
+  public static final String VAR_AUDIO = "audio";
   public static final String VAR_SYSTEM = "sys";
   public static final String VAR_CONF = "conf";
   public static final String VAR_INFO = "__info";
@@ -608,6 +609,7 @@ public class OperandiScript implements Runnable, Disposable {
     MSys.createSysFunctions(this);
     MDisk.createDiskFunctions(this);
     MDisk.createFileFunctions(this);
+    MAudio.createAudioFunctions(this);
     getIRQHandler().createIRQFunctions(this);
     
     setExtHelp("rand", "() - return random 32-bit number");
@@ -2575,6 +2577,7 @@ public class OperandiScript implements Runnable, Disposable {
     appVariables.put(VAR_CONF, m);
     appVariables.put(VAR_DISK, m);
     appVariables.put(VAR_INFO, m);
+    appVariables.put(VAR_AUDIO, m);
   }
   void injectAppVariables(Compiler comp) {
     for (String var : appVariables.keySet()) {
@@ -2595,6 +2598,8 @@ public class OperandiScript implements Runnable, Disposable {
         val = new M(new MConf(wa, comp));
       } else if (var.equals(VAR_DISK)) {
         val = new M(new MDisk(wa, comp));
+      } else if (var.equals(VAR_AUDIO)) {
+        val = new M(new MAudio(wa, comp));
       } else if (var.equals(VAR_INFO)) {
         val = new M(new MMapRef(defhelp));
       } else {
