@@ -307,6 +307,12 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     } catch (Throwable ignore) {
     }
     
+    if (System.getProperty("os.name").indexOf("indow") > 0) {
+      UICommon.COMMON_FONT = "lucida console";
+    } else {
+      UICommon.COMMON_FONT = Font.MONOSPACED;
+    }
+    
     // purejavacomm
     
 //    @SuppressWarnings("rawtypes")

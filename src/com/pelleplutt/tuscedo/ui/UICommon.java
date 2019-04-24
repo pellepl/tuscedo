@@ -11,7 +11,8 @@ import com.pelleplutt.tuscedo.Settings.*;
 import com.pelleplutt.util.*;
 
 public class UICommon {
-  public static Font font = new Font(Font.MONOSPACED, Font.PLAIN, 11);
+  public static String COMMON_FONT = Font.MONOSPACED;
+  public static Font font = new Font(COMMON_FONT, Font.PLAIN, 11);
 
   public static Color colBashDbgFg;
   public static Color colBashFg;
@@ -79,19 +80,19 @@ public class UICommon {
   
   static {
     Settings s = Settings.inst();
-    s.listenTrig("col_gen_bg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_gen_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colGenericBg = new Color(val);
         uiUpdate();
       }
     });
-    s.listenTrig("col_text_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_text_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colTextFg = new Color(val);
         uiUpdate();
       }
     });
-    s.listenTrig("col_input_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_input_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colInputFg = new Color(val);
         if (STYLE_CONN_IN == null) STYLE_CONN_IN = new FastTextPane.Style(STYLE_ID_CONN_IN, colInputFg, null, false);
@@ -99,19 +100,19 @@ public class UICommon {
         uiUpdate();
       }
     });
-    s.listenTrig("col_input_bg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_input_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colInputBg = new Color(val);
         uiUpdate();
       }
     });
-    s.listenTrig("col_input_bash_bg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_input_bash_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colInputBashBg = new Color(val);
         uiUpdate();
       }
     });
-    s.listenTrig("col_bash_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_bash_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colBashFg = new Color(val);
         if (STYLE_BASH_INPUT == null) STYLE_BASH_INPUT = new FastTextPane.Style(STYLE_ID_BASH_INPUT, colBashFg, null, false);
@@ -119,7 +120,7 @@ public class UICommon {
         uiUpdate();
       }
     });
-    s.listenTrig("col_bash_dbg_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_bash_dbg_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colBashDbgFg = new Color(val);
         if (STYLE_BASH_DBG == null) STYLE_BASH_DBG = new FastTextPane.Style(STYLE_ID_BASH_DBG, colBashDbgFg, null, false);
@@ -127,7 +128,7 @@ public class UICommon {
         uiUpdate();
       }
     });
-    s.listenTrig("col_op_out_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_op_out_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colOpOut = new Color(val);
         if (STYLE_OP_OUT == null) STYLE_OP_OUT = new FastTextPane.Style(STYLE_ID_OP_OUT, colOpOut, null, false);
@@ -135,7 +136,7 @@ public class UICommon {
         uiUpdate();
       }
     });
-    s.listenTrig("col_op_in_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_op_in_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colOpIn = new Color(val);
         if (STYLE_OP_IN == null) STYLE_OP_IN = new FastTextPane.Style(STYLE_ID_OP_IN, colOpIn, null, false);
@@ -143,7 +144,7 @@ public class UICommon {
         uiUpdate();
       }
     });
-    s.listenTrig("col_op_err_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_op_err_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colOpErr = new Color(val);
         if (STYLE_OP_ERR == null) STYLE_OP_ERR = new FastTextPane.Style(STYLE_ID_OP_ERR, colOpErr, null, false);
@@ -151,7 +152,7 @@ public class UICommon {
         uiUpdate();
       }
     });
-    s.listenTrig("col_op_dbg_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_op_dbg_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colOpDbg = new Color(val);
         if (STYLE_OP_DBG == null) STYLE_OP_DBG = new FastTextPane.Style(STYLE_ID_OP_DBG, colOpDbg, null, false);
@@ -159,7 +160,7 @@ public class UICommon {
         uiUpdate();
       }
     });
-    s.listenTrig("col_process_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_process_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colProcessFg = new Color(val);
         if (STYLE_BASH_OUT == null) STYLE_BASH_OUT = new FastTextPane.Style(STYLE_ID_BASH_OUT, colProcessFg, null, false);
@@ -167,7 +168,7 @@ public class UICommon {
         uiUpdate();
       }
     });
-    s.listenTrig("col_process_err_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_process_err_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colProcessErrFg = new Color(val);
         if (STYLE_BASH_ERR == null) STYLE_BASH_ERR = new FastTextPane.Style(STYLE_ID_BASH_ERR, colProcessErrFg, null, false);
@@ -175,7 +176,7 @@ public class UICommon {
         uiUpdate();
       }
     });
-    s.listenTrig("col_find_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_find_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colFindFg = new Color(val);
         if (STYLE_FIND == null) STYLE_FIND = new FastTextPane.Style(STYLE_ID_FIND, colFindFg, colFindBg, false);
@@ -183,7 +184,7 @@ public class UICommon {
         uiUpdate();
       }
     });
-    s.listenTrig("col_find_bg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_find_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colFindBg = new Color(val);
         if (STYLE_FIND == null) STYLE_FIND = new FastTextPane.Style(STYLE_ID_FIND, colFindFg, colFindBg, false);
@@ -191,7 +192,7 @@ public class UICommon {
         uiUpdate();
       }
     });
-    s.listenTrig("col_find_mark_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_find_mark_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colFindMarkFg = new Color(val);
         if (STYLE_FIND_MARK == null) STYLE_FIND_MARK = new FastTextPane.Style(STYLE_ID_FIND_MARK, colFindMarkFg, colFindMarkBg, true);
@@ -199,7 +200,7 @@ public class UICommon {
         uiUpdate();
       }
     });
-    s.listenTrig("col_gen_info_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_gen_info_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colGenericInfoFg = new Color(val);
         if (STYLE_GENERIC_INFO == null) STYLE_GENERIC_INFO = new FastTextPane.Style(STYLE_ID_GENERIC_INFO, colGenericInfoFg, null, true);
@@ -207,7 +208,7 @@ public class UICommon {
         uiUpdate();
       }
     });
-    s.listenTrig("col_gen_err_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_gen_err_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colGenericErrFg = new Color(val);
         if (STYLE_GENERIC_ERR == null) STYLE_GENERIC_ERR = new FastTextPane.Style(STYLE_ID_GENERIC_ERR, colGenericErrFg, null, true);
@@ -216,80 +217,86 @@ public class UICommon {
       }
     });
     
-    s.listenTrig("scrollbar_w.int", new ModCallback<Integer>() {
+    s.listenTrigInt("scrollbar_w.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         uiUpdate();
       }
     });
-    s.listenTrig("scrollbar_h.int", new ModCallback<Integer>() {
+    s.listenTrigInt("scrollbar_h.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         uiUpdate();
       }
     });
 
-    s.listenTrig("col_tab_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_tab_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colTabFg = new Color(val);
         uiUpdate();
       }
     });
-    s.listenTrig("col_tab_bg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_tab_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colTabBg = new Color(val);
         uiUpdate();
       }
     });
-    s.listenTrig("col_tab_sel_bg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_tab_sel_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colTabSelBg = new Color(val);
         uiUpdate();
       }
     });
-    s.listenTrig("col_tab_nonsel_bg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_tab_nonsel_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colTabNonSelBg = new Color(val);
         uiUpdate();
       }
     });
-    s.listenTrig("col_tab_notifynew_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_tab_notifynew_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colTabNotifyNewFg = new Color(val);
         uiUpdate();
       }
     });
-    s.listenTrig("col_tab_notifyold_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_tab_notifyold_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colTabNotifyOldFg = new Color(val);
         uiUpdate();
       }
     });
-    s.listenTrig("col_scrollbar_l_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_scrollbar_l_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colScrollBarLFg = new Color(val);
         uiUpdate();
       }
     });
-    s.listenTrig("col_scrollbar_d_fg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_scrollbar_d_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colScrollBarDFg = new Color(val);
         uiUpdate();
       }
     });
-    s.listenTrig("col_scrollbar_l_bg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_scrollbar_l_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colScrollBarLBg = new Color(val);
         uiUpdate();
       }
     });
-    s.listenTrig("col_scrollbar_d_bg.int", new ModCallback<Integer>() {
+    s.listenTrigInt("col_scrollbar_d_bg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colScrollBarDBg = new Color(val);
         uiUpdate();
       }
     });
-    s.listenTrig("font_size.int", new ModCallback<Integer>() {
+    s.listenTrigInt("font_size.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
-        font = new Font(Font.MONOSPACED, Font.PLAIN, val);
+        font = new Font(font.getFontName(), Font.PLAIN, val);
+        uiUpdate();
+      }
+    });
+    s.listenTrigString("font_name.string", new ModCallback<String>() {
+      public void modified(String key, String val) {
+        font = new Font(val, Font.PLAIN, font.getSize());
         uiUpdate();
       }
     });
