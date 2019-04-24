@@ -13,6 +13,7 @@ import java.util.Properties;
 import java.util.Set;
 
 import com.pelleplutt.Essential;
+import com.pelleplutt.tuscedo.ui.UICommon;
 import com.pelleplutt.util.Log;
 
 public class Settings {
@@ -116,6 +117,8 @@ public class Settings {
     props.setProperty("tab_drag_ghost.int", Integer.toString(0));
     
     props.setProperty("font_size.int", Integer.toString(11));
+
+    props.setProperty("font_name.string", UICommon.COMMON_FONT);
   }
   
   public void saveSettings() {
@@ -156,6 +159,9 @@ public class Settings {
   public void setString(String key, String s) {
     Log.println(key+"="+s);
     props.setProperty(key, s);
+    if (cbString.containsKey(key)) {
+      cbString.get(key).modified(key,  s);
+    }
   }
   
   public int integer(String s) {
@@ -268,10 +274,16 @@ public class Settings {
   }
   
   Map<String, ModCallback<Integer>> cbInt = new HashMap<String, ModCallback<Integer>>(); 
+  Map<String, ModCallback<String>> cbString = new HashMap<String, ModCallback<String>>(); 
   
-  public void listenTrig(String key, ModCallback<Integer> cb) {
+  public void listenTrigInt(String key, ModCallback<Integer> cb) {
     cbInt.put(key, cb);
     cb.modified(key, integer(key));
+  }
+  
+  public void listenTrigString(String key, ModCallback<String> cb) {
+    cbString.put(key, cb);
+    cb.modified(key, string(key));
   }
   
   public static interface ModCallback<E> {

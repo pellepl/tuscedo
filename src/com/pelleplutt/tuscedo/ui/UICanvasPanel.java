@@ -52,7 +52,7 @@ public class UICanvasPanel extends JPanel implements UIO {
       _g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
           RenderingHints.VALUE_ANTIALIAS_ON);
       _g.setColor(color);
-      _g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 10));
+      _g.setFont(new Font(UICommon.COMMON_FONT, Font.PLAIN, 10));
     }
     return _g;
   }
