@@ -17,6 +17,11 @@ import com.pelleplutt.util.io.Port;
 import com.pelleplutt.util.io.PortConnector;
 
 public class Serial implements SerialStreamProvider, Tickable {
+  public static final int HW_FLOW_OFF = 0;
+  public static final int HW_FLOW_CONST_HI = 1;
+  public static final int HW_FLOW_CONST_LO = 2;
+  public static final int HW_FLOW_FLANK_HI = 3;
+  public static final int HW_FLOW_FLANK_LO = 4;
   PortConnector serial;
   InputStream serialIn;
   OutputStream serialOut;
@@ -25,6 +30,10 @@ public class Serial implements SerialStreamProvider, Tickable {
   volatile boolean serialRunning;
   List<OutputStream> attachedSerialIOs = new ArrayList<OutputStream>();
   Port setting;
+  int hwFlowRTS = HW_FLOW_OFF;
+  int hwFlowDTR = HW_FLOW_OFF;
+  boolean rts = false;
+  boolean dtr = false;
   
   final Object LOCK_SERIAL = new Object();
 
@@ -38,6 +47,11 @@ public class Serial implements SerialStreamProvider, Tickable {
     serial = PortConnector.getPortConnector();
   }
   
+  public void setHwFlowControl(int rts, int dtr) {
+    this.hwFlowRTS = rts;
+    this.hwFlowDTR = dtr;
+  }
+  
   public boolean isConnected() {
     return serialRunning;
   }
@@ -49,8 +63,10 @@ public class Serial implements SerialStreamProvider, Tickable {
   public void transmit(String s) {
     if (serialRunning) {
       try {
+        beforeTransmit();
         serialOut.write(s.getBytes());
         serialOut.flush();
+        afterTransmit();
       } catch (IOException e) {
         e.printStackTrace();
       }
@@ -60,12 +76,37 @@ public class Serial implements SerialStreamProvider, Tickable {
   public void transmit(byte b[]) {
     if (serialRunning) {
       try {
+        beforeTransmit();
         serialOut.write(b);
         serialOut.flush();
+        afterTransmit();
       } catch (IOException e) {
         e.printStackTrace();
       }
     }
+  }
+  
+  void flowControl(boolean pre) throws IOException {
+    if (hwFlowDTR == HW_FLOW_OFF && hwFlowRTS == HW_FLOW_OFF) return;
+    boolean rtshigh = this.rts;
+    boolean dtrhigh = this.dtr;
+    if (hwFlowDTR == HW_FLOW_CONST_HI)      dtrhigh = true;
+    else if (hwFlowDTR == HW_FLOW_CONST_LO) dtrhigh = false;
+    else if (hwFlowDTR == HW_FLOW_FLANK_HI) dtrhigh = pre;
+    else if (hwFlowDTR == HW_FLOW_FLANK_LO) dtrhigh = !pre;
+    if (hwFlowRTS == HW_FLOW_CONST_HI)      rtshigh = true;
+    else if (hwFlowRTS == HW_FLOW_CONST_LO) rtshigh = false;
+    else if (hwFlowRTS == HW_FLOW_FLANK_HI) rtshigh = pre;
+    else if (hwFlowRTS == HW_FLOW_FLANK_LO) rtshigh = !pre;
+    serial.setRTSDTR(rtshigh, dtrhigh);
+  }
+  
+  void beforeTransmit() throws IOException {
+    flowControl(true);
+  }
+  
+  void afterTransmit() throws IOException {
+    flowControl(false);
   }
   
   public String[] getDevices() {
@@ -240,5 +281,11 @@ public class Serial implements SerialStreamProvider, Tickable {
     if (serialRunning) {
       SwingUtilities.invokeLater(pushSerialToLogRunnable);
     }
+  }
+
+  public void setRTSDTR(boolean rtshigh, boolean dtrhigh) throws IOException {
+    rts = rtshigh;
+    dtr = dtrhigh;
+    serial.setRTSDTR(rtshigh, dtrhigh);
   }
 }

@@ -55,6 +55,8 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_SERIAL_LOG_GET = VAR_SERIAL + ":log_get";
   public static final String FN_SERIAL_LOG_SIZE = VAR_SERIAL + ":log_size";
   public static final String FN_SERIAL_LOG_CLEAR = VAR_SERIAL + ":log_clear";
+  public static final String FN_SERIAL_SET_RTS_DTR = VAR_SERIAL + ":set_rts_dtr";
+  public static final String FN_SERIAL_SET_HW_FLOW_CONTROL = VAR_SERIAL + ":set_hw_flow";
   
   public static final String FN_NET_IFC = VAR_NET + ":ifc";
   public static final String FN_NET_GET = VAR_NET + ":get";
@@ -954,6 +956,26 @@ public class OperandiScript implements Runnable, Disposable {
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         return new M(currentWA.getConnectionInfo());
+      }
+    });
+    setExtDef(FN_SERIAL_SET_RTS_DTR, "(<rts>, <dtr>) - sets rts and dtr lines high or low",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        boolean rtshigh = args.length > 0 && (args[0].asInt() == 1 || args[0].asString().equals("on") || args[0].asString().equals("high") || args[0].asString().equals("true"));
+        boolean dtrhigh = args.length > 1 && (args[1].asInt() == 1 || args[1].asString().equals("on") || args[1].asString().equals("high") || args[1].asString().equals("true"));
+        try {
+          currentWA.getSerial().setRTSDTR(rtshigh, dtrhigh);
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+        return null;
+      }
+    });
+    setExtDef(FN_SERIAL_SET_HW_FLOW_CONTROL, "(<rts-setting>, <dtr-setting>) - 0:disable, 1:constant low, 2:constant high, 3:low flank during send, 4:high flank during send",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        currentWA.getSerial().setHwFlowControl(args[0].asInt(), args[1].asInt());
+        return null;
       }
     });
     setExtDef(FN_SERIAL_DISCONNECT, "() - disconnects current serial connection",
