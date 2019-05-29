@@ -419,7 +419,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   }
 
   protected void findAllOccurences(String regex, boolean isRegex) {
-    String text = curView.ftp.getText();
+    String text = curView.ftp.getText(false);
     Pattern pat = Pattern.compile(isRegex ? regex : Pattern.quote(regex));
     Matcher mat = pat.matcher(text);
     findResult = new ArrayList<OffsetSpan>();
@@ -515,6 +515,8 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       res=true;
     } catch (Exception e) {
       views[ISTATE_INPUT].ftp.addText("Failed [" + e.getMessage() + "]\n", UICommon.STYLE_GENERIC_ERR);
+      e.printStackTrace();
+      Log.printStackTrace(e);
     } finally {
       input[ISTATE_OPEN_SERIAL].setEnabled(true);
       updateTitle();
