@@ -463,24 +463,23 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
+    setExtDef("__help_add", "(<module>, <func>, <description>) - adds description to help", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        defhelp.put(args[0].asString() + "." + args[1].asString(), args[2].asString());
+        return null;
+      }
+    });
     setExtDef("__help", "() - dumps help struct", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args.length > 0) {
-          String help = defhelp.get(args[0].asString());
-          if (help != null) {
-            currentWA.appendViewText(currentWA.getCurrentView(), args[0].asString() + help + "\n",
-                UICommon.STYLE_OP_DBG);
-          }
-        } else {
+        if (args.length > 0 && args[0].asString().equals("func")) {
           List<String> h = new ArrayList<>();
           for (String k : extDefs.keySet()) {
-            if (k.contains(":"))
+            if (k.contains(":") || k.contains("."))
               continue;
             String help = defhelp.get(k);
             if (help == null)
               help = "";
             h.add(k + help);
-
           }
           h.sort(null);
           for (String s : h)
@@ -488,17 +487,41 @@ public class OperandiScript implements Runnable, Disposable {
           h.clear();
 
           for (String k : extDefs.keySet()) {
-            if (!k.contains(":"))
-              continue;
-            String help = defhelp.get(k);
-            if (help == null)
-              help = "";
-            h.add(k + help);
+            if (k.contains(":")) {
+              String help = defhelp.get(k);
+              if (help == null)
+                help = "";
+              h.add(k + help);
+            }
           }
           h.sort(null);
           for (String s : h)
             currentWA.appendViewText(currentWA.getCurrentView(), s + "\n", UICommon.STYLE_OP_DBG);
           h.clear();
+
+          for (Object key : defhelp.keySet()) {
+            String k = key.toString();
+            if (k.contains(".")) {
+              String help = defhelp.get(k);
+              if (help == null)
+                help = "";
+              h.add(k+"\n"+help);
+            }
+          }
+          h.sort(null);
+          for (String s : h)
+            currentWA.appendViewText(currentWA.getCurrentView(), s + "\n", UICommon.STYLE_OP_DBG);
+          h.clear();
+        } else if (args.length > 0 && args[0].asString().equals("lang")) {
+          try {
+            String s = new String(AppSystem.getAppResource("init-op/operandi-ex.txt"));
+            currentWA.appendViewText(currentWA.getCurrentView(), "\n" + s + "\n", UICommon.STYLE_OP_DBG);
+          } catch (Throwable e) {
+            e.printStackTrace();
+          }
+        } else {
+          currentWA.appendViewText(currentWA.getCurrentView(), "Please use __help(\"func\") or __help(\"lang\")\n",
+              UICommon.STYLE_OP_DBG);
         }
         return null;
       }

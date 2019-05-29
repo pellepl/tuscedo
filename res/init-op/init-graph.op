@@ -1,20 +1,20 @@
 module graph;
 
-/**
-   Will create a graph collecting values from each line from log.
+__help_add("graph", "from_log(log, names, colors, filter)", 
+"   Will create a graph collecting values from each line from log.
    It will collect each found float or int value in order, up to at most same
    amount as the length of names array.
    
    Example: graph.from_log(
-              "x:1 y:2 z:2\nx:3 y:55 z:98\n",
-              ["Yaw", "Pitch", "Roll"],
+              'x:1 y:2 z:2\\nx:3 y:55 z:98\\n',
+              ['Yaw', 'Pitch', 'Roll'],
               [0xff0000, 0x00ff00, 0x0000ff]);
    @param log     some log string
    @param names   array of names, naming each graph by index
    @param colors  array of colors, coloring each graph by index (may be nil)
    @param filter  only lines containing string in filter is included (may be nil)
    @return        array of graphs
-*/
+");
 func from_log(log, names, colors, filter) {
   if (names == nil) {
     return nil;
