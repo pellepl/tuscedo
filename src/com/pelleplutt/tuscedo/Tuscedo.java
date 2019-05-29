@@ -15,6 +15,8 @@ import com.pelleplutt.*;
 import com.pelleplutt.tuscedo.ui.*;
 import com.pelleplutt.tuscedo.ui.UISimpleTabPane.*;
 import com.pelleplutt.util.*;
+import com.pelleplutt.util.AppSystem.*;
+import com.pelleplutt.util.io.*;
 
 public class Tuscedo implements Runnable, UIInfo.UIListener {
   public static boolean noterm = false;
@@ -36,6 +38,12 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     UIInfo.addGlobalListener(this);
     timer = new Timer();
     AppSystem.addDisposable(timer);
+    AppSystem.addDisposable(new Disposable() {
+      @Override
+      public void dispose() {
+        PortConnector.getPortConnector().dispose();
+      }
+    });
     registerTickable(new Tickable() {
       @Override
       public void tick() {
