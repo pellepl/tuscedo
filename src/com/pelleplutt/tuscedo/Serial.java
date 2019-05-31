@@ -7,7 +7,9 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.swing.SwingUtilities;
 
@@ -34,6 +36,7 @@ public class Serial implements SerialStreamProvider, Tickable {
   int hwFlowDTR = HW_FLOW_OFF;
   boolean rts = false;
   boolean dtr = false;
+  Map<String, String[]> deviceExtraInfo = new HashMap<String, String[]>();
   
   final Object LOCK_SERIAL = new Object();
 
@@ -110,7 +113,15 @@ public class Serial implements SerialStreamProvider, Tickable {
   }
   
   public String[] getDevices() {
-    return serial.getDevices();
+    deviceExtraInfo.clear();
+    String[] rawDeviceNames = serial.getDevices();
+    List<String>deviceNameList = new ArrayList<String>();
+    for (String s : rawDeviceNames) {
+      String[] i = s.split("\t");
+      deviceNameList.add(i[0]);
+      deviceExtraInfo.put(i[0], i);
+    }
+    return (String[])deviceNameList.toArray(new String[deviceNameList.size()]);
   }
 
   public void open(Port portSetting) throws Exception {
@@ -287,5 +298,9 @@ public class Serial implements SerialStreamProvider, Tickable {
     rts = rtshigh;
     dtr = dtrhigh;
     serial.setRTSDTR(rtshigh, dtrhigh);
+  }
+
+  public String[] getExtraInfo(String port) {
+    return deviceExtraInfo.get(port);
   }
 }

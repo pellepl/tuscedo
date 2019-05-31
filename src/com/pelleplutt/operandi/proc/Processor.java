@@ -18,7 +18,10 @@ public class Processor implements ByteCode {
   public static final int TSTR = 3;
   public static final int TFUNC = 4;
   public static final int TANON = 5;
-  public static final int TSET = 6; // must be last, MSet.TYPES must be bigger than TSET 
+  public static final int TSET = 6; // must be last, MSet.TYPES must be bigger than TSET
+  
+  public static final int PC_IFUNC_INDICATOR = 0xff800000;
+  public static final int PC_IFUNC_OFFSET = 0xff000000;
   
   static final int TO_CHAR = -1;
   
@@ -31,8 +34,8 @@ public class Processor implements ByteCode {
     "nil", "int", "float", "string", "func", "anon", "set"
   };
   
-  public final static int IFUNC_SET_VISITOR_IX = 0;
-  final static int[] IFUNC_OFFS = new int[1];
+  public final static int ROM_IFUNC_SET_VISITOR_IX = 0;
+  final static int[] ROM_IFUNC_OFFS = new int[1];
 
   final byte[] code_internal_funcs;
 
@@ -65,8 +68,8 @@ public class Processor implements ByteCode {
     ByteArrayOutputStream ifcbuf = new ByteArrayOutputStream();
     byte[] ifc;
     try {
-      IFUNC_OFFS[IFUNC_SET_VISITOR_IX] = ifcbuf.size();
-      ifc = assemble(IFUNC_SET_VISITOR_ASM);
+      ROM_IFUNC_OFFS[ROM_IFUNC_SET_VISITOR_IX] = ifcbuf.size();
+      ifc = assemble(ASM_ROM_IFUNC_SET_VISITOR);
       ifcbuf.write(ifc);
     } catch (IOException ignore) {}
     code_internal_funcs = ifcbuf.toByteArray();
@@ -161,8 +164,8 @@ public class Processor implements ByteCode {
   public void stepInstr(PrintStream out) {
     String procInfo = getProcInfo();
     String disasm;
-    if ((pc & 0xff800000) != 0) {
-      disasm = Assembler.disasm(code_internal_funcs, pc - 0xff000000);
+    if ((pc & PC_IFUNC_INDICATOR) != 0) {
+      disasm = Assembler.disasm(code_internal_funcs, pc - PC_IFUNC_OFFSET);
     } else {
       disasm = Assembler.disasm(code, pc);
     }
@@ -177,8 +180,8 @@ public class Processor implements ByteCode {
     stepProc();
     String procInfo = getProcInfo();
     String disasm;
-    if ((pc & 0xff800000) != 0) {
-      disasm = Assembler.disasm(code_internal_funcs, pc - 0xff000000);
+    if ((pc & PC_IFUNC_INDICATOR) != 0) {
+      disasm = Assembler.disasm(code_internal_funcs, pc - PC_IFUNC_OFFSET);
     } else {
       disasm = Assembler.disasm(code, pc);
     }
@@ -380,7 +383,7 @@ public class Processor implements ByteCode {
   int pcodetoi(int addr, int bytes) {
     byte c[];
     if ((addr & 0xff80000)!=0) {
-      addr -= 0xff000000;
+      addr -= PC_IFUNC_OFFSET;
       c = code_internal_funcs;
     } else {
       c = code;
@@ -391,7 +394,7 @@ public class Processor implements ByteCode {
   int pcodetos(int addr, int bytes) {
     byte c[];
     if ((addr & 0xff80000)!=0) {
-      addr -= 0xff000000;
+      addr -= PC_IFUNC_OFFSET;
       c = code_internal_funcs;
     } else {
       c = code;
@@ -600,7 +603,7 @@ public class Processor implements ByteCode {
     if (mset.type == TSET) {
       if (mix.type == TSET) {
         derefSetArgSet(mset.ref, mix.ref);
-      } else if (mix.type == TANON) {
+      } else if (mix.type == TANON || mix.type == TFUNC) {
         derefSetArgAnon(mset.ref, mix);
       } else {
         push((mset.ref).get(mix));
@@ -608,7 +611,7 @@ public class Processor implements ByteCode {
     } else if (mset.type == TSTR) {
       if (mix.type == TSET) {
         derefStringArgSet(mset.str, mix.ref);
-      } else if (mix.type == TANON) {
+      } else if (mix.type == TANON || mix.type == TFUNC) {
         derefStringArgAnon(mset.str, mix);
       } else {
         int ix = mix.asInt();
@@ -626,7 +629,7 @@ public class Processor implements ByteCode {
             res = (res << 1) | ( (mset.i & (1 << mdrf.asInt())) >>> mdrf.asInt() );
           }
         }
-      } else if (mix.type == TANON) {
+      } else if (mix.type == TANON || mix.type == TFUNC) {
         throw new ProcessorError("cannot dereference integers with mutators");
       } else {
         int ix = mix.asInt();
@@ -660,7 +663,7 @@ public class Processor implements ByteCode {
     push(set);
     push(2);
     // the assembled function IFUNC_SET_VISITOR_ASM
-    push(0xff000000 | IFUNC_OFFS[IFUNC_SET_VISITOR_IX]);
+    push(PC_IFUNC_OFFSET | ROM_IFUNC_OFFS[ROM_IFUNC_SET_VISITOR_IX]);
     call();
   }
   
@@ -669,7 +672,7 @@ public class Processor implements ByteCode {
     push(string);
     push(2);
     // the assembled function IFUNC_SET_VISITOR_ASM
-    push(0xff000000 | IFUNC_OFFS[IFUNC_SET_VISITOR_IX]);
+    push(PC_IFUNC_OFFSET | ROM_IFUNC_OFFS[ROM_IFUNC_SET_VISITOR_IX]);
     call();
   }
   
@@ -1491,14 +1494,14 @@ public class Processor implements ByteCode {
     if (sp < exe.getStackTop()) {
       throw new ProcessorError("stack overflow");
     }
-    if ((pc & 0xff800000) == 0) {
+    if ((pc & PC_IFUNC_INDICATOR) == 0) {
       instr = (int)(code[pc] & 0xff);
       if (pc < 0 || pc >= code.length) {
         throw new ProcessorError(String.format("bad instruction address 0x%08x", pc));
       }
     }
     else {
-      instr = (int)(code_internal_funcs[pc - 0xff000000] & 0xff);
+      instr = (int)(code_internal_funcs[pc - PC_IFUNC_OFFSET] & 0xff);
     }
     pc++;
     switch (instr) {
@@ -2084,7 +2087,7 @@ public class Processor implements ByteCode {
     return Assembler.assemble(s);
   }
   
-  static final String IFUNC_SET_VISITOR_ASM =
+  static final String ASM_ROM_IFUNC_SET_VISITOR =
       //func setVisitor(set, visitor) {
       //  res = (if isstr(set) nil else t[]);
       //  for (i in set) {

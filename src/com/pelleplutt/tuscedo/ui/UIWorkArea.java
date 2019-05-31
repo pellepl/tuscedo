@@ -128,6 +128,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   
   JWindow winSug;
   JList<String> winSugList;
+  String[] winSugListXtra = null;
   final UIInfo uiinfo;
   static int __id = 0;
   
@@ -341,6 +342,49 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     UICommon.decorateScrollPane(winSugListSp);
     //sp.setBorder(BorderFactory.createLineBorder(colTextFg, 1));
     winSug.add(winSugListSp, BorderLayout.CENTER);
+    winSugList.setCellRenderer(new WinSugListCellRenderer() );
+  }
+  
+  class WinSugListCellRenderer extends DefaultListCellRenderer {
+
+    private static final long serialVersionUID = -7799441088157759804L;
+    private JLabel label;
+    private JLabel labelXtra;
+    JPanel p = new JPanel(new BorderLayout());
+
+    WinSugListCellRenderer() {
+      label = new JLabel();
+      label.setOpaque(true);
+      labelXtra = new JLabel();
+      labelXtra.setOpaque(true);
+      p.add(label, BorderLayout.CENTER);
+      p.add(labelXtra, BorderLayout.EAST);
+    }
+
+    @Override
+    public Component getListCellRendererComponent(JList<?> list, 
+        Object value, int index, boolean selected, boolean expanded) {
+      label.setText(value.toString());
+      if (winSugListXtra != null && winSugListXtra.length >= index && winSugListXtra[index] != null) {
+        labelXtra.setText(winSugListXtra[index]);
+      } else {
+        labelXtra.setText("");
+      }
+      label.setFont(UICommon.font);
+      labelXtra.setFont(UICommon.font);
+      if (selected) {
+        label.setBackground(list.getSelectionBackground());
+        label.setForeground(list.getSelectionForeground());
+        labelXtra.setBackground(list.getSelectionBackground());
+        labelXtra.setForeground(Color.gray);
+      } else {
+        label.setBackground(list.getBackground());
+        label.setForeground(list.getForeground());
+        labelXtra.setBackground(list.getBackground());
+        labelXtra.setForeground(Color.gray);
+      }
+      return p;
+    }
   }
 
   public void setInfo(String s) {
@@ -582,6 +626,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   }
   
   void actionInputEnter(boolean shift) {
+    winSugListXtra = null;
     if (winSug.isVisible()) {
       input[istate].setFilterNewLine(false);
       input[istate].setText(winSugList.getSelectedValue());
@@ -876,6 +921,27 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       return;
     }
     String[] arr = s.toArray(new String[s.size()]);
+    String[] arrXtra = null;
+    
+    if (istate == ISTATE_OPEN_SERIAL) {
+      List<String> l = new ArrayList<String>();
+      boolean haveExtraSerialInfo = true;
+      for (String suggestion : s) {
+        String[] serialExtraInfo = serial.getExtraInfo(suggestion); 
+        if (serialExtraInfo == null) {
+          haveExtraSerialInfo = false;
+          break;
+        } else {
+          StringBuilder sb = new StringBuilder();
+          for (int i = 1; i < serialExtraInfo.length; i++) sb.append(" " + serialExtraInfo[i]);
+          l.add(sb.toString());
+        }
+        if (haveExtraSerialInfo) {
+          arrXtra = (String[])l.toArray(new String[l.size()]);
+        }
+      }
+    }
+    
     Window w = SwingUtilities.getWindowAncestor(input[istate]);
     Point p = w.getLocation();
     Point p2 = SwingUtilities.convertPoint(input[istate], 0,0, w);
@@ -884,14 +950,19 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     p.x += p2.x;
     p.y += p2.y;
     p.y -= h;
-    showSuggestionWindow(p.x, p.y, input[istate].getWidth(), h, arr);
+    showSuggestionWindow(p.x, p.y, input[istate].getWidth(), h, arr, arrXtra);
   }
   
+  
   void showSuggestionWindow(int x, int y, int w, int h, String items[]) {
+    showSuggestionWindow(x, y, w, h, items, null);
+  }
+  void showSuggestionWindow(int x, int y, int w, int h, String items[], String extraItems[]) {
     DefaultListModel<String> lm = new DefaultListModel<String>();
     for (String item : items) {
       lm.addElement(item);
     }
+    winSugListXtra = extraItems;
     winSugList.setModel(lm);
     winSugList.setSelectedIndex(items.length-1);
     winSugList.ensureIndexIsVisible(items.length-1);
@@ -910,6 +981,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     for (String item : items) {
       lm.addElement(item);
     }
+    winSugListXtra = null;
     winSugList.setModel(lm);
     winSugList.setSelectedIndex(items.size()-1);
     winSugList.ensureIndexIsVisible(items.size()-1);
