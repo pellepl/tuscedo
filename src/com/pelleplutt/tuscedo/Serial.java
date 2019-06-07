@@ -240,6 +240,7 @@ public class Serial implements SerialStreamProvider, Tickable {
               for (OutputStream o : attachedSerialIOs) {
                 try {
                   o.write(b);
+                  o.flush();
                 } catch (IOException ioe) {
                 }
               }

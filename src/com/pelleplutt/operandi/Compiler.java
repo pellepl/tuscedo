@@ -180,7 +180,6 @@ public class Compiler {
           if (cp == '\\') {
               saw_backslash = false;
               newstr.append('\\');
-              newstr.append('\\');
               continue; /* switch */
           }
 
@@ -397,11 +396,6 @@ public class Compiler {
 
           }
           saw_backslash = false;
-      }
-
-      /* weird to leave one at the end */
-      if (saw_backslash) {
-          newstr.append('\\');
       }
 
       return newstr.toString();

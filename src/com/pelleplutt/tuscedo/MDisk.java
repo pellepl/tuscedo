@@ -64,7 +64,8 @@ public class MDisk extends MObj {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args.length < 1) return null;
         String path = args[0].asString();
-        return new Processor.M(AppSystem.readFile(new File(path)));
+        String content = AppSystem.readFile(new File(path));
+        return content == null ? null : new Processor.M(content);
       }
     });
     os.setExtDef(OperandiScript.FN_DISK_READB, "(<filename>) - returns a file as a byte array",

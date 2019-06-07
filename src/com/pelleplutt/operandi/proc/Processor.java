@@ -2056,6 +2056,16 @@ public class Processor implements ByteCode {
     }
   }
   
+  String clamp(M m) {
+    if (m.type == TSTR) {
+      String s = m.str.replace('\r', ' ').replace('\n', ' ');
+      if (s.length() > 32) s = s.substring(0,32) + "...";
+      return "s\'" + s + "'";
+    } else {
+      return m.toString();
+    }
+  }
+  
   String getStack() {
     StringBuilder sb = new StringBuilder("{ ");
     int ix = sp+1;
@@ -2075,7 +2085,7 @@ public class Processor implements ByteCode {
           argc--;
           sb.append('A');
         }
-        sb.append(memory[ix] + "  ");
+        sb.append(clamp(memory[ix]) + "  ");
         ix++;
       }
     }
@@ -2372,7 +2382,7 @@ public class Processor implements ByteCode {
         res.type = TINT;
         M str = args[0];
         M pat = args[1];
-        int from = 0;
+        int from = str.asString().length();
         if (args.length == 3) {
           from = args[2].asInt();
         }

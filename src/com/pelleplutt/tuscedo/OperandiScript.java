@@ -117,7 +117,7 @@ public class OperandiScript implements Runnable, Disposable {
   final Object logLock = new Object();
   volatile Thread logThread;
   InputStream login;
-  ByteArrayOutputStream log;
+  volatile ByteArrayOutputStream log;
   volatile byte[] logMatch;
   volatile int logMatchIx;
   volatile int logParseIx;
@@ -1150,10 +1150,11 @@ public class OperandiScript implements Runnable, Disposable {
               try {
                 while (logThread != null && (c = login.read()) != -1) {
                   log.write(c);
-                  if (logMatch != null) {
-                    if (logMatch[logMatchIx] == (byte)c) {
+                  byte[] localMatch = logMatch;
+                  if (localMatch != null) {
+                    if (localMatch[logMatchIx] == (byte)c) {
                       logMatchIx++;
-                      if (logMatchIx >= logMatch.length) {
+                      if (logMatchIx >= localMatch.length) {
                         synchronized (logLock) {
                           logMatchIx = 0;
                           logMatch = null;
@@ -1167,7 +1168,9 @@ public class OperandiScript implements Runnable, Disposable {
                   }
                 }
               } catch (IOException e) {}
-              AppSystem.dispose(this);
+              finally {
+                AppSystem.dispose(this);
+              }
             }
             
             @Override
@@ -1193,7 +1196,7 @@ public class OperandiScript implements Runnable, Disposable {
         String s = null;
         synchronized (logLock) {
           s = log == null ? "" : log.toString();
-          logThread = null;
+          if (logThread != null) logThread.interrupt();
           AppSystem.closeSilently(log);
           log = null;
           AppSystem.closeSilently(login);
@@ -1209,7 +1212,7 @@ public class OperandiScript implements Runnable, Disposable {
         String await = args[0].asString();
         int timeout = args.length > 1 ? args[1].asInt() : 0;
         synchronized (logLock) {
-          if (logThread == null) return new M(-1);
+          if (logThread == null || log == null) return new M(-1);
           
           logMatch = await.getBytes();
           logMatchIx = 0;
