@@ -238,7 +238,7 @@ public class StructAnalysis {
     else if (e.op == OP_FOR) {
       if (e.operands.size() == 4) {
         // for (x;y;z) w
-        analyseRecurse(e.operands.get(0), scopeStack, e, false, loop);
+        analyseRecurse(e.operands.get(0), scopeStack, e, false, loop); // for (x;y;z) <-- may declare x -> false
         analyseRecurse(e.operands.get(1), scopeStack, e, true, loop);
         analyseRecurse(e.operands.get(2), scopeStack, e, true, loop);
         analyseRecurse(e.operands.get(3), scopeStack, e, false, true);
@@ -258,7 +258,7 @@ public class StructAnalysis {
       analyseRecurse(e.operands.get(1), scopeStack, e, true, loop);  // x in Y
     }
     else if (e.op == OP_WHILE) {
-      analyseRecurse(e.operands.get(0), scopeStack, e, true, loop);
+      analyseRecurse(e.operands.get(0), scopeStack, e, true, loop); // while (x) <-- does not declare x -> true
       analyseRecurse(e.operands.get(1), scopeStack, e, true, true);
     }
     else if (e.op == OP_BREAK) {

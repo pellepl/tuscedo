@@ -66,6 +66,21 @@ public class Loops {
     assertEquals("9876543210", Processor.compileAndRun(false, false, sA).str); 
   }
   @Test
+  public void testWhileSimple2() {
+    String sA;
+    sA = 
+        "res = '';\n" +
+        "func w(x) { \n" + 
+        "  while (x) {\n" +
+        "    res += --x;\n" +
+        "  }\n" +
+        "}\n" +
+        "w(10);\n" +
+        "return res;\n" + 
+        "";
+    assertEquals("9876543210", Processor.compileAndRun(false, false, sA).str); 
+  }
+  @Test
   public void testWhile() {
     String sA;
     sA = 
