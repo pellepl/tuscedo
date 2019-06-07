@@ -258,7 +258,7 @@ public class StructAnalysis {
       analyseRecurse(e.operands.get(1), scopeStack, e, true, loop);  // x in Y
     }
     else if (e.op == OP_WHILE) {
-      analyseRecurse(e.operands.get(0), scopeStack, e, false, loop);
+      analyseRecurse(e.operands.get(0), scopeStack, e, true, loop);
       analyseRecurse(e.operands.get(1), scopeStack, e, true, true);
     }
     else if (e.op == OP_BREAK) {
