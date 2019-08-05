@@ -1,10 +1,14 @@
 package com.pelleplutt.tuscedo;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -15,6 +19,7 @@ import javax.swing.SwingUtilities;
 
 import com.pelleplutt.tuscedo.ui.UIWorkArea;
 import com.pelleplutt.util.AppSystem;
+import com.pelleplutt.util.Log;
 import com.pelleplutt.util.io.Port;
 import com.pelleplutt.util.io.PortConnector;
 
@@ -28,6 +33,7 @@ public class Serial implements SerialStreamProvider, Tickable {
   InputStream serialIn;
   OutputStream serialOut;
   Thread serialPump;
+  volatile Runnable onClose = null;
   volatile boolean serialRun;
   volatile boolean serialRunning;
   List<OutputStream> attachedSerialIOs = new ArrayList<OutputStream>();
@@ -124,7 +130,9 @@ public class Serial implements SerialStreamProvider, Tickable {
     return (String[])deviceNameList.toArray(new String[deviceNameList.size()]);
   }
 
-  public void open(Port portSetting) throws Exception {
+  boolean isSerial = false;
+  
+  public void openSerial(Port portSetting) throws Exception {
     synchronized (LOCK_SERIAL) {
       setting = portSetting;
       serial.connect(portSetting);
@@ -135,6 +143,7 @@ public class Serial implements SerialStreamProvider, Tickable {
       serialPump = new Thread(serialEaterRunnable, "serial:" + portSetting.portName);
       serialPump.setDaemon(true);
       serialPump.start();
+      isSerial = true;
     }
   }
   
@@ -146,10 +155,80 @@ public class Serial implements SerialStreamProvider, Tickable {
       serialPump = new Thread(serialEaterRunnable, "stdin");
       serialPump.setDaemon(true);
       serialPump.start();
+      isSerial = false;
     }
   }
   
-  public void closeSerial() {
+  public void openSocket(String server, int port) throws Exception  {
+    synchronized (LOCK_SERIAL) {
+      Socket s = new Socket(server, port);
+      serialIn = s.getInputStream();
+      serialOut = s.getOutputStream();
+      serialRun = true;
+      serialPump = new Thread(serialEaterRunnable, "socket:" + server + ":" + port);
+      serialPump.setDaemon(true);
+      serialPump.start();
+      isSerial = false;
+    }
+  }
+  
+  public void openFile(String file) throws Exception  {
+    synchronized (LOCK_SERIAL) {
+      File f = new File(file);
+      serialIn = new FileInputStream(f);
+      serialOut = null;
+      serialRun = true;
+      serialPump = new Thread(serialEaterRunnable, "file:" + file);
+      serialPump.setDaemon(true);
+      serialPump.start();
+      isSerial = false;
+    }
+  }
+  
+  public void openJlinkRTT(String idOrArgs) throws Exception {
+    synchronized (LOCK_SERIAL) {
+      String exe = Settings.inst().string("exe_jlink.string");
+      String args = Settings.inst().string("exe_jlink_args.string");
+      if (args == null) args = "";
+      if (exe == null || exe.trim().length() == 0) {
+        throw new FileNotFoundException("No path to jlink set. Please issue conf.exe_jlink=\"<path>\" in script mode.");
+      }
+      if (idOrArgs != null && idOrArgs.trim().length() > 0) {
+        if (!idOrArgs.contains("-")) {
+          args += "-SelectEmuBySN " + idOrArgs;
+        } else {
+          args += idOrArgs;
+        }
+      }
+      JLinkProc proc = new JLinkProc(exe, args);
+      AppSystem.addDisposable(proc);
+
+
+      proc.start(new JLinkProc.Callback() {
+        @Override
+        public void onConnected(JLinkProc p) {
+          serialIn = p.getInputStream();
+          serialOut = p.getOutputStream();
+          serialRun = true;
+          serialPump = new Thread(serialEaterRunnable, "rtt:" + idOrArgs);
+          serialPump.setDaemon(true);
+          serialPump.start();
+          isSerial = false;
+        }
+
+        @Override
+        public void onClosed(JLinkProc p, Throwable t) {
+          if (t != null) t.printStackTrace();
+          AppSystem.dispose(p);
+          Serial.this.close();
+        }
+      });
+      
+    }
+    
+  }
+  
+  public void close() {
     //Log.println("closing attached streams");
     synchronized(attachedSerialIOs) {
       for (OutputStream o : attachedSerialIOs) {
@@ -158,9 +237,19 @@ public class Serial implements SerialStreamProvider, Tickable {
       attachedSerialIOs.clear();
     }
     //Log.println("closing serial streams, running " + serialRunning);
+    
+    if (onClose != null) {
+      try {
+        onClose.run();
+      } catch (Throwable t) {
+        t.printStackTrace();
+      }
+      onClose = null;
+    }
+    
     synchronized (LOCK_SERIAL) {
       if (serialIn != null) {
-        serial.disconnectSilently();
+        if (isSerial) serial.disconnectSilently();
         serialIn = null;
         serialOut = null;
         serialRun = false;
@@ -168,6 +257,7 @@ public class Serial implements SerialStreamProvider, Tickable {
           //Log.println("await close serial streams..");
           AppSystem.waitSilently(LOCK_SERIAL, 1000);
         }
+        isSerial = false; 
       }
     }
     //Log.println("serial closed");

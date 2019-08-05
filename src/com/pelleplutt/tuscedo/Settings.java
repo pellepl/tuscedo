@@ -114,6 +114,11 @@ public class Settings {
     props.setProperty("scrollbar_w.int", Integer.toString(6));
     props.setProperty("scrollbar_h.int", Integer.toString(6));
 
+    props.setProperty("col_div_main.int", Integer.toString(0xf0f000));
+    props.setProperty("col_div_sec.int", Integer.toString(0xa0a000));
+    props.setProperty("div_size.int", Integer.toString(2));
+
+    
     props.setProperty("tab_drag_ghost.int", Integer.toString(0));
     
     props.setProperty("font_size.int", Integer.toString(11));
@@ -157,7 +162,6 @@ public class Settings {
   }
   
   public void setString(String key, String s) {
-    Log.println(key+"="+s);
     props.setProperty(key, s);
     if (cbString.containsKey(key)) {
       cbString.get(key).modified(key,  s);
@@ -173,8 +177,7 @@ public class Settings {
   }
   
   public void setInt(String key, int i) {
-    Log.println(key+"="+i);
-    props.setProperty(key, new Integer(i).toString());
+    props.setProperty(key, Integer.toString(i));
     if (cbInt.containsKey(key)) {
       cbInt.get(key).modified(key,  i);
     }

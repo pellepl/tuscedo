@@ -1009,7 +1009,7 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(res);
       }
     });
-    setExtDef(FN_SERIAL_CONNECT, "(<serialparams>) - connects to serial, returns non-zero on success",
+    setExtDef(FN_SERIAL_CONNECT, "(<serialparams>) - connects to serial, returns non-zero on success. Supports \"<serial>@115200/8N1\" format, but also \"stdio\", \"sock://<server>:<port>\", and \"file://<path>\".",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return new M(0);
@@ -1261,6 +1261,7 @@ public class OperandiScript implements Runnable, Disposable {
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         synchronized (logLock) {
+          if (log == null) return null;
           if (args.length == 0) return new M(log.toString());
           byte[] data = log.toByteArray();
           int offs = args[0].asInt();

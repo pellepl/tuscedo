@@ -32,10 +32,9 @@ import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
-import com.pelleplutt.Essential;
 import com.pelleplutt.tuscedo.Settings;
 import com.pelleplutt.tuscedo.ui.UIInfo.UIListener;
-import com.pelleplutt.util.AppSystem;
+import com.pelleplutt.util.Log;
 import com.pelleplutt.util.UIUtil;
 
 public class UISimpleTabPane extends JPanel implements UIO {
@@ -79,7 +78,7 @@ public class UISimpleTabPane extends JPanel implements UIO {
     add(contentPanel, BorderLayout.CENTER);
     
     if (!panes.contains(UISimpleTabPane.this)) {
-      //System.out.println("register tabpane " + id);
+      System.out.println("register tabpane " + uiinfo.id);
       panes.add(UISimpleTabPane.this);
     }
   }
@@ -134,10 +133,11 @@ public class UISimpleTabPane extends JPanel implements UIO {
   }
   
   public static Tab getTabByComponent(Component c) {
+    Component oc = c;
     synchronized (panes) {
       for (UISimpleTabPane stp : panes) {
         for (Tab tab : stp.tabs) {
-          //System.out.println("check " + tab.id + " in pane " + stp.id);
+//          System.out.println("check " + tab.uiinfo.id + " in pane " + stp.uiinfo.id + " against " + c + " [" + tab.content + "]");
           if (tab.content == c) {
             return tab;
           }
@@ -156,6 +156,7 @@ public class UISimpleTabPane extends JPanel implements UIO {
           }
           c = c.getParent();
         }
+        c = oc;
       }
     }
     // no tab found, running gui-less?
@@ -398,13 +399,14 @@ public class UISimpleTabPane extends JPanel implements UIO {
     return new UISimpleTabPane();
   }
   
-  public void onEvacuationNewWindow(Window w) {
+  public JFrame onEvacuationCreateFrame() {
+    return null;
   }
 
   public void onEvacuationNewTab(Tab oldTab, Tab newTab) {
   }
 
-  public void evacuateTab(Tab tab, Point location) {
+  public void evacuateTabToNewFrame(Tab tab, Point location) {
     if (tab.owner.tabs.size() < 2) {
       Window w = SwingUtilities.windowForComponent(tab);
       w.setLocation(location);
@@ -433,25 +435,48 @@ public class UISimpleTabPane extends JPanel implements UIO {
         location);
   }
   
+  public UISimpleTabPane evacuateTabToAnotherPane(Tab tab, UISimpleTabPane newPane) {
+    List<UIInfo> children = new ArrayList<UIInfo>(tab.getUIInfo().children);
+    for (UIInfo cuio : children) {
+      tab.getUIInfo().removeChild(cuio);
+      cuio.removeListener(tab);
+    }
+
+    UISimpleTabPane.this.removeTab(tab, false, true);
+
+    if (newPane == null) newPane = onEvacuationCreateTabPane();
+    newPane.setFont(getFont());
+    
+    Tab newTab = newPane.createTab(null, tab.content);
+    for (UIInfo cuio : children) {
+      newTab.getUIInfo().addChild(cuio);
+      cuio.addListener(newTab);
+    }
+    newTab.setText(tab.getUIInfo().getName());
+    onEvacuationNewTab(tab, newTab);
+    
+    return newPane;
+  }
+  
   protected void createNewWindow(final UISimpleTabPane newPane, Dimension size, Point location) {
-    JFrame w = new JFrame();//SwingUtilities.getWindowAncestor(this));
-    onEvacuationNewWindow(w);
+    JFrame w = onEvacuationCreateFrame();
+    if (w == null) w = new JFrame();//SwingUtilities.getWindowAncestor(this));
+    
     w.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
     w.setSize(size == null ? new Dimension(400,300) : size);
-    w.getContentPane().setLayout(new BorderLayout());
-    w.getContentPane().add(newPane);
     if (location == null) {
       w.setLocationByPlatform(true);
     } else {
       w.setLocation(location);
     }
+    buildNewWindow(w, newPane);
     addWindowListener(newPane, w);
-    try {
-      w.setIconImage(AppSystem.loadImage("tuscedo.png"));
-      w.setTitle(Essential.name + " " + Essential.vMaj + "." + Essential.vMin + "." + Essential.vMic);
-    } catch (Throwable t) {}
-
     w.setVisible(true);
+  }
+  
+  protected void buildNewWindow(final JFrame w, final UISimpleTabPane tp) {
+    w.getContentPane().setLayout(new BorderLayout());
+    w.getContentPane().add(tp);
   }
   
   public void addWindowListener(final UISimpleTabPane stp, Window w) {
@@ -597,7 +622,7 @@ public class UISimpleTabPane extends JPanel implements UIO {
             }
             if (!relocated) {
               //System.out.println("no hit, evacuating");
-              evacuateTab(dragSource, me.getLocationOnScreen());
+              evacuateTabToNewFrame(dragSource, me.getLocationOnScreen());
             }
           }
           dragSource = null;
@@ -764,5 +789,9 @@ public class UISimpleTabPane extends JPanel implements UIO {
     public void tabRemoved(UISimpleTabPane tp, Tab t, Component content);
     public void tabPaneEmpty(UISimpleTabPane pane);
     public void tabSelected(UISimpleTabPane pane, Tab t);
+  }
+
+  public int getTabCount() {
+    return tabs.size();
   }
 }

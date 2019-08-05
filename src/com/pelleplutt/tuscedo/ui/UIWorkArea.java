@@ -158,8 +158,8 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
         UICommon.decorateFTP(views[i].ftpSec);
         UICommon.decorateScrollPane(views[i].mainScrollPane);
         UICommon.decorateScrollPane(views[i].secScrollPane);
-        UICommon.decorateSplitPane(views[i].splitHor);
-        UICommon.decorateSplitPane(views[i].splitVer);
+        UICommon.decorateSplitPane(views[i].splitHor, false);
+        UICommon.decorateSplitPane(views[i].splitVer, false);
       }
       if (input[i] != null) {
         UICommon.decorateHiliteLabel(inputLabel[i]);
@@ -278,6 +278,8 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       UICommon.defineAction(input[i], "input.bash", "ctrl+b", actionOpenBash);
       UICommon.defineAction(input[i], "input.complete", "ctrl+space", actionOpenCompletion);
       UICommon.defineAction(input[i], "log.input.split", "ctrl+w", actionSplit);
+      UICommon.defineAction(input[i], "log.input.splitouthor", "shift+ctrl+w", actionSplitOutHor);
+      UICommon.defineAction(input[i], "log.input.splitoutver", "alt+ctrl+w", actionSplitOutVer);
       UICommon.defineAction(input[i], "log.input.clear", "ctrl+l", actionClear);
       UICommon.defineAction(input[i], "log.input.pageup", "alt+page_up", actionLogPageUp);
       UICommon.defineAction(input[i], "log.input.pagedown", "alt+page_down", actionLogPageDown);
@@ -525,7 +527,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     boolean res = false;
     input[ISTATE_OPEN_SERIAL].setEnabled(false);
     try {
-      serial.closeSerial();
+      serial.close();
       Port portSetting = new Port();
       String defs[] = s.split(" ");
       portSetting.portName = defs[0];
@@ -550,8 +552,24 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
 
       if (portSetting.portName.equals("stdio")) {
         serial.openStdin();
+      } else if (portSetting.portName.startsWith("sock://")) {
+        String spec = portSetting.portName.substring(7);
+        int ix = spec.indexOf(':');
+        int port = -1;
+        try {
+          port = Integer.parseInt(spec.substring(ix+1));
+        } catch (Throwable t) {
+          views[ISTATE_INPUT].ftp.addText("Bad socket format sock://<server>:<port>\n", UICommon.STYLE_GENERIC_ERR);
+        }
+        if (port >= 0) serial.openSocket(spec.substring(0,ix), port);
+      } else if (portSetting.portName.startsWith("file://")) {
+        String spec = portSetting.portName.substring(7);
+        serial.openFile(spec);
+      } else if (portSetting.portName.startsWith("rtt://")) {
+        String spec = portSetting.portName.substring(6);
+        serial.openJlinkRTT(spec);
       } else {
-        serial.open(portSetting);
+        serial.openSerial(portSetting);
       }
       
       views[ISTATE_INPUT].ftp.addText("Connected\n", UICommon.STYLE_GENERIC_INFO);
@@ -1083,7 +1101,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   }
   
   public void closeSerial() {
-    serial.closeSerial();
+    serial.close();
   }
   
   AbstractAction actionOpenFind = new AbstractAction() {
@@ -1191,6 +1209,20 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     }
   };
 
+  AbstractAction actionSplitOutHor = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      curView.splitOut(true);
+    }
+  };
+
+  AbstractAction actionSplitOutVer = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      curView.splitOut(false);
+    }
+  };
+
   AbstractAction actionClear = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
@@ -1279,7 +1311,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   @Override
   public void dispose() {
     //Log.println("workarea close serial");
-    serial.closeSerial();
+    serial.close();
     Tuscedo.inst().deregisterTickable(serial);
     AppSystem.dispose(script);
     winSug.dispose();
@@ -1579,10 +1611,10 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
           new AutoAdjustmentListener(secScrollPane));
       
       splitVer = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
-      UICommon.decorateSplitPane(splitVer);
+      UICommon.decorateSplitPane(splitVer, false);
       splitVer.setDividerLocation(0);
       splitHor = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
-      UICommon.decorateSplitPane(splitHor);
+      UICommon.decorateSplitPane(splitHor, false);
       splitHor.setDividerLocation(100);
       
       curSplit = mainScrollPane;
@@ -1614,7 +1646,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
         splitVer.setBottomComponent(mainScrollPane);
         add(splitVer, BorderLayout.CENTER);
         revalidate();
-        splitVer.setDividerLocation(mainScrollPane.getHeight()/2);
+        splitVer.setDividerLocation(0.5);
         curSplit = splitVer;
       } else {
         remove(curSplit);
@@ -1622,8 +1654,41 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
         splitHor.setRightComponent(secScrollPane);
         add(splitHor, BorderLayout.CENTER);
         revalidate();
-        splitHor.setDividerLocation(mainScrollPane.getWidth()/2);
+        splitHor.setDividerLocation(0.5);
         curSplit = splitHor;
+      }
+    }
+    
+    public void splitOut(boolean hor) {
+      
+      UISimpleTabPane.Tab tab = UISimpleTabPane.getTabByComponent(this); 
+      UISimpleTabPane stp = tab.getPane();
+      if (stp.getTabCount() > 1) {
+        UIInfo uiinfo = getUIInfo();
+        UISplitPane split = null;
+        while (split == null && uiinfo.getParent() != null) {
+          if (uiinfo.getParentUI() instanceof UISplitPane) split = (UISplitPane)uiinfo.getParentUI();
+          uiinfo = uiinfo.getParent();
+        }
+        if (split != null) {
+          int orientation = hor ? JSplitPane.HORIZONTAL_SPLIT : JSplitPane.VERTICAL_SPLIT;
+          UISplitPane newSplit = new UISplitPane(orientation);
+          TuscedoTabPane ttp = new TuscedoTabPane();
+          stp.evacuateTabToAnotherPane(tab, ttp);
+          if (split.getBottomUI() == null) {
+            newSplit.setTopUI(ttp);
+            split.setOrientation(orientation);
+            split.setBottomUI(newSplit);
+          } else if (split.getTopUI() == null) { 
+            newSplit.setTopUI(ttp);
+            split.setOrientation(orientation);
+            split.setTopUI(newSplit);
+          } else {
+            newSplit.setTopUI(split.getBottomUI());
+            newSplit.setBottomUI(ttp);
+            split.setBottomUI(newSplit);
+          }
+        }
       }
     }
 

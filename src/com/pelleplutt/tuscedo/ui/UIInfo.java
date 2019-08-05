@@ -9,6 +9,8 @@ import java.util.List;
 
 import javax.swing.JComponent;
 
+import com.pelleplutt.util.Log;
+
 public class UIInfo {
   public static final String EVENT_MOUSE_PRESS = "evmousepress";
   public static final String EVENT_MOUSE_RELEASE = "evmouserelease";

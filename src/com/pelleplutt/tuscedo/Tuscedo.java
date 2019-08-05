@@ -130,13 +130,16 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     registerWindow(f);
     
     mainContainer = f.getContentPane();
+    
+    UISplitPane jsp = new UISplitPane(JSplitPane.HORIZONTAL_SPLIT);
+    UICommon.decorateSplitPane(jsp, true);
     TuscedoTabPane tabs = new TuscedoTabPane();
     tabs.setFont(UICommon.font);
-
     addWorkAreaTab(tabs, uiw);
-
-    mainContainer.add(tabs);
     tabs.addWindowListener(tabs, f);
+    jsp.setTopUI(tabs);
+    jsp.setBottomUI(null);
+    mainContainer.add(jsp);
     
     try {
       f.setIconImage(AppSystem.loadImage("tuscedo.png"));
@@ -215,46 +218,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     return uiobjects.get(id);
   }
   
-  public class TuscedoTabPane extends UISimpleTabPane implements UISimpleTabPane.TabListener {
-    public TuscedoTabPane() {
-      super();
-      this.addTabListener(this);
-    }
-    @Override
-    public UISimpleTabPane onEvacuationCreateTabPane() {
-      TuscedoTabPane ttp = new TuscedoTabPane();
-      return ttp;
-    }
-    
-    @Override
-    public void onEvacuationNewWindow(Window w) {
-      Tuscedo.inst().registerWindow(w);
-    }
-    
-    @Override
-    public void tabRemoved(UISimpleTabPane tp, Tab t, Component content) {
-// on evacuation , will shutdown operandi script = bad 
-//      if (content instanceof UIWorkArea) {
-//        AppSystem.dispose((UIWorkArea)content);
-//      }
-    }
-    @Override
-    public void tabPaneEmpty(UISimpleTabPane pane) {
-      pane.removeTabListener(this);
-      Window w = SwingUtilities.getWindowAncestor(pane);
-      if (w != null && w.isVisible()) {
-        w.dispatchEvent(new WindowEvent(w, WindowEvent.WINDOW_CLOSING));
-      }
-    }
-    @Override
-    public void tabSelected(UISimpleTabPane pane, Tab t) {
-      Component c = t.getContent();
-      if (c instanceof UIWorkArea) {
-        ((UIWorkArea)c).onTabSelected(t);
-      }
-    }
-  }
-  
+
   public static Scene3D scene3d = new Scene3D();
   
   static void checkInitScripts() {
@@ -465,7 +429,8 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
 
   @Override
   public void onRemoved(UIO parent, UIO child) {
-    //System.out.println("onRemoved  " + stringify(child.getUIInfo(), 0) + " from " + stringify(parent.getUIInfo(), 0));
+    Log.println("deregister " + child.getUIInfo().asString());
+    uiobjects.remove(child.getUIInfo().getId());
   }
 
   @Override
@@ -486,7 +451,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   @Override
   public void onCreated(UIInfo i) {
     uiobjects.put(i.getId(), i);
-//    System.out.println("onCreated  " + stringify(i, 0));
+    Log.println("register " + i.asString());
   }
 
   @Override

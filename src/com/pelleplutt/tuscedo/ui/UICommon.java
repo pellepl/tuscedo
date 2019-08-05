@@ -1,14 +1,37 @@
 package com.pelleplutt.tuscedo.ui;
 
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Paint;
+import java.awt.Rectangle;
+import java.awt.RenderingHints;
+import java.awt.event.ActionEvent;
 
-import javax.swing.*;
-import javax.swing.plaf.basic.*;
+import javax.swing.AbstractAction;
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JScrollBar;
+import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.JTextPane;
+import javax.swing.KeyStroke;
+import javax.swing.UIManager;
+import javax.swing.border.Border;
+import javax.swing.plaf.basic.BasicScrollBarUI;
+import javax.swing.plaf.basic.BasicSplitPaneDivider;
+import javax.swing.plaf.basic.BasicSplitPaneUI;
 
-import com.pelleplutt.tuscedo.*;
-import com.pelleplutt.tuscedo.Settings.*;
-import com.pelleplutt.util.*;
+import com.pelleplutt.tuscedo.Settings;
+import com.pelleplutt.tuscedo.Settings.ModCallback;
+import com.pelleplutt.tuscedo.Tuscedo;
+import com.pelleplutt.util.FastTextPane;
 
 public class UICommon {
   public static String COMMON_FONT = Font.MONOSPACED;
@@ -39,6 +62,8 @@ public class UICommon {
   public static Color colScrollBarDFg;
   public static Color colScrollBarLBg;
   public static Color colScrollBarDBg;
+  public static Color colDivMain = new Color(0xf0f000);
+  public static Color colDivSec = new Color(0xa0a000);
   public static Color colOpOut;
   public static Color colOpIn;
   public static Color colOpErr;
@@ -288,6 +313,23 @@ public class UICommon {
         uiUpdate();
       }
     });
+    s.listenTrigInt("col_div_main.int", new ModCallback<Integer>() {
+      public void modified(String key, Integer val) {
+        colDivMain = new Color(val);
+        uiUpdate();
+      }
+    });
+    s.listenTrigInt("col_div_sec.int", new ModCallback<Integer>() {
+      public void modified(String key, Integer val) {
+        colDivSec = new Color(val);
+        uiUpdate();
+      }
+    });
+    s.listenTrigInt("div_size.int", new ModCallback<Integer>() {
+      public void modified(String key, Integer val) {
+        uiUpdate();
+      }
+    });
     s.listenTrigInt("font_size.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         font = new Font(font.getFontName(), Font.PLAIN, val);
@@ -345,10 +387,26 @@ public class UICommon {
     sp.setVisible(true);
   }
   
-  public static void decorateSplitPane(JSplitPane sp) {
+  public static void decorateSplitPane(JSplitPane sp, final boolean main) {
     if (sp == null) return;
+    sp.setUI(new BasicSplitPaneUI() {
+      @Override
+      public BasicSplitPaneDivider createDefaultDivider() {
+        return new BasicSplitPaneDivider(this) {
+          public void setBorder(Border b) {
+          }
+
+          @Override
+          public void paint(Graphics g) {
+            g.setColor(main ? colDivMain : colDivSec);
+            g.fillRect(0, 0, getSize().width, getSize().height);
+            super.paint(g);
+          }
+        };
+      }
+    });
     sp.setBorder(null);
-    sp.setDividerSize(4);
+    sp.setDividerSize(Settings.inst().integer("div_size.int"));
   }
   
   public static void decorateTextEditor(JTextPane tp) {
@@ -476,7 +534,8 @@ public class UICommon {
     @Override
     public void actionPerformed(ActionEvent e) {
       Tuscedo.inst().addWorkAreaTab(
-          UISimpleTabPane.getTabByComponent((Component)e.getSource()).getPane(), null);
+          UISimpleTabPane.getTabByComponent((Component)e.getSource()).getPane(),
+          null);
     }
   };
   
