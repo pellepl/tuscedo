@@ -37,7 +37,8 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   static final int ISTATE_BASH = 4;
   static final int ISTATE_HEX = 5;
   static final int ISTATE_SCRIPT = 6;
-  static final int _ISTATE_NUM = 7;
+  static final int ISTATE_OPEN_STREAM = 7;
+  static final int _ISTATE_NUM = 8;
   
   public static final String PORT_ARG_BAUD = "baud:";
   public static final String PORT_ARG_DATABITS = "databits:";
@@ -205,6 +206,8 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
           List<String> sugs = null;
           if (istateNum == ISTATE_OPEN_SERIAL) {
             sugs = giveOpenSerialSuggestions(userInput);
+          } else if (istateNum == ISTATE_OPEN_STREAM) {
+            sugs = giveOpenStreamSuggestions(userInput);
           } else {
             sugs = giveInputBashSuggestions(userInput, istateNum);
           }
@@ -263,16 +266,17 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       input[i].setupHistory(histPath, 4096, 1024); // TODO configurable
       UICommon.defineCommonActions(input[i], JComponent.WHEN_FOCUSED);
       UICommon.defineAction(input[i], "input.find", "ctrl+f", actionOpenFind);
-      UICommon.defineAction(input[i], "input.findback", "ctrl+shift+f", actionOpenFindBack);
+      UICommon.defineAction(input[i], "input.findback", "shift+ctrl+f", actionOpenFindBack);
       UICommon.defineAction(input[i], "input.findregx", "alt+f", actionOpenFindRegex);
-      UICommon.defineAction(input[i], "input.findregxback", "alt+shift+f", actionOpenFindRegexBack);
+      UICommon.defineAction(input[i], "input.findregxback", "shift+alt+f", actionOpenFindRegexBack);
       UICommon.defineAction(input[i], "input.hex", "ctrl+h", actionOpenHex);
       UICommon.defineAction(input[i], "input.script", "ctrl+p", actionOpenScript);
       UICommon.defineAction(input[i], "input.inputclose", "escape", actionInputClose);
       UICommon.defineAction(input[i], "input.inputenter", "enter", actionInputEnter);
       UICommon.defineAction(input[i], "input.inputenterback", "shift+enter", actionInputEnterBack);
       UICommon.defineAction(input[i], "input.openserial", "ctrl+o", actionOpenSerialConfig);
-      UICommon.defineAction(input[i], "input.closeserial", "ctrl+shift+o", actionCloseSerial);
+      UICommon.defineAction(input[i], "input.closeserial", "shift+ctrl+o", actionCloseSerial);
+      UICommon.defineAction(input[i], "input.openstream", "alt+ctrl+o", actionOpenStreamConfig);
       UICommon.defineAction(input[i], "input.help", "f1", actionShowHelp);
       UICommon.defineAction(input[i], "input.closetab", "ctrl+d", actionCloseTab);
       UICommon.defineAction(input[i], "input.bash", "ctrl+b", actionOpenBash);
@@ -289,7 +293,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       UICommon.defineAction(input[i], "log.input.scrollright", "alt+right", actionLogRight);
       UICommon.defineAction(input[i], "log.input.home", "ctrl+home", actionLogHome);
       UICommon.defineAction(input[i], "log.input.end", "ctrl+end", actionLogEnd);
-      UICommon.defineAction(input[i], "log.input.xtermtoggle", "ctrl+shift+x", actionLogXtermToggle);
+      UICommon.defineAction(input[i], "log.input.xtermtoggle", "shift+ctrl+x", actionLogXtermToggle);
 
       
       inputLabel[i] = new JLabel();
@@ -411,12 +415,17 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     }
   }
   
+  Port currentPortSetting = null;
   public String getConnectionInfo() {
-    Port portSetting = serial.getSerialConfig();
+    Port portSetting = currentPortSetting; serial.getSerialConfig();
     if (portSetting != null) {
-      return portSetting.portName + "@" + portSetting.baud + "/" + 
-        portSetting.databits + Port.parityToString(portSetting.parity).charAt(0) + 
-        portSetting.stopbits;
+      if (portSetting.baud == Port.UNDEF) {
+        return portSetting.portName;
+      } else {
+        return portSetting.portName + "@" + portSetting.baud + "/" + 
+          portSetting.databits + Port.parityToString(portSetting.parity).charAt(0) + 
+          portSetting.stopbits;
+      }
     } else {
       return "";
     }
@@ -523,36 +532,29 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     }
   }
   
-  public boolean handleOpenSerial(String s) {
+  public boolean handleOpenStream(String s, boolean async) {
+    return handleOpenSerial(s, async);
+  }
+  
+  public boolean handleOpenSerial(String s, boolean async) {
     boolean res = false;
+    
     input[ISTATE_OPEN_SERIAL].setEnabled(false);
+    input[ISTATE_OPEN_STREAM].setEnabled(false);
+    Port portSetting = new Port();
+    Runnable opener = new Runnable() { public void run() {
     try {
       serial.close();
-      Port portSetting = new Port();
+      portSetting.baud = Port.UNDEF;
       String defs[] = s.split(" ");
       portSetting.portName = defs[0];
-      for (int i = 1; i < defs.length; i++) {
-        String d = defs[i];
-        if (d != null) {
-          if (d.startsWith(PORT_ARG_BAUD)) {
-            portSetting.baud = Integer.parseInt(d.substring(PORT_ARG_BAUD.length()));
-          } else if (d.startsWith(PORT_ARG_DATABITS)) {
-            portSetting.databits = Integer.parseInt(d.substring(PORT_ARG_DATABITS.length()));
-          } else if (d.startsWith(PORT_ARG_PARITY)) {
-            portSetting.parity = Port.parseParity(d.substring(PORT_ARG_PARITY.length()));
-          } else if (d.startsWith(PORT_ARG_STOPBITS)) {
-            portSetting.stopbits = Integer.parseInt(d.substring(PORT_ARG_STOPBITS.length()));
-          }
-        }
-      }
-      views[ISTATE_INPUT].ftp.addText("Opening " + portSetting.portName + " " + 
-          portSetting.baud + " " + portSetting.databits + 
-          Port.parityToString(portSetting.parity).charAt(0) + portSetting.stopbits + "...\n", 
-          UICommon.STYLE_GENERIC_INFO);
-
       if (portSetting.portName.equals("stdio")) {
+        views[ISTATE_INPUT].ftp.addText("Opening standard input...\n", 
+            UICommon.STYLE_GENERIC_INFO); 
         serial.openStdin();
       } else if (portSetting.portName.startsWith("sock://")) {
+        views[ISTATE_INPUT].ftp.addText("Opening socket " + portSetting.portName + "...\n", 
+            UICommon.STYLE_GENERIC_INFO); 
         String spec = portSetting.portName.substring(7);
         int ix = spec.indexOf(':');
         int port = -1;
@@ -562,26 +564,71 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
           views[ISTATE_INPUT].ftp.addText("Bad socket format sock://<server>:<port>\n", UICommon.STYLE_GENERIC_ERR);
         }
         if (port >= 0) serial.openSocket(spec.substring(0,ix), port);
+      } else if (portSetting.portName.startsWith("sockserv://")) {
+        views[ISTATE_INPUT].ftp.addText("Opening server socket " + portSetting.portName + "...\n", 
+            UICommon.STYLE_GENERIC_INFO); 
+        String portSpec = portSetting.portName.substring(11);
+        int port = -1;
+        try {
+          port = Integer.parseInt(portSpec);
+        } catch (Throwable t) {
+          views[ISTATE_INPUT].ftp.addText("Bad server socket format sockserv://<port>\n", UICommon.STYLE_GENERIC_ERR);
+        }
+        if (port >= 0) serial.openServerSocket(port);
       } else if (portSetting.portName.startsWith("file://")) {
+        views[ISTATE_INPUT].ftp.addText("Opening " + portSetting.portName + "...\n", 
+            UICommon.STYLE_GENERIC_INFO); 
         String spec = portSetting.portName.substring(7);
         serial.openFile(spec);
       } else if (portSetting.portName.startsWith("rtt://")) {
+        views[ISTATE_INPUT].ftp.addText("Opening jlink " + portSetting.portName + "...\n", 
+            UICommon.STYLE_GENERIC_INFO); 
         String spec = portSetting.portName.substring(6);
         serial.openJlinkRTT(spec);
       } else {
+        portSetting.baud = Port.BAUD_115200;
+        for (int i = 1; i < defs.length; i++) {
+          String d = defs[i];
+          if (d != null) {
+            if (d.startsWith(PORT_ARG_BAUD)) {
+              portSetting.baud = Integer.parseInt(d.substring(PORT_ARG_BAUD.length()));
+            } else if (d.startsWith(PORT_ARG_DATABITS)) {
+              portSetting.databits = Integer.parseInt(d.substring(PORT_ARG_DATABITS.length()));
+            } else if (d.startsWith(PORT_ARG_PARITY)) {
+              portSetting.parity = Port.parseParity(d.substring(PORT_ARG_PARITY.length()));
+            } else if (d.startsWith(PORT_ARG_STOPBITS)) {
+              portSetting.stopbits = Integer.parseInt(d.substring(PORT_ARG_STOPBITS.length()));
+            }
+          }
+        }
+        views[ISTATE_INPUT].ftp.addText("Opening " + portSetting.portName + " " + 
+            portSetting.baud + " " + portSetting.databits + 
+            Port.parityToString(portSetting.parity).charAt(0) + portSetting.stopbits + "...\n", 
+            UICommon.STYLE_GENERIC_INFO);
         serial.openSerial(portSetting);
       }
       
       views[ISTATE_INPUT].ftp.addText("Connected\n", UICommon.STYLE_GENERIC_INFO);
-      if (istate == ISTATE_OPEN_SERIAL) enterInputState(ISTATE_INPUT);
-      res=true;
+      if (istate == ISTATE_OPEN_SERIAL || istate == ISTATE_OPEN_STREAM) enterInputState(ISTATE_INPUT);
+      currentPortSetting = portSetting;
     } catch (Exception e) {
       views[ISTATE_INPUT].ftp.addText("Failed [" + e.getMessage() + "]\n", UICommon.STYLE_GENERIC_ERR);
       e.printStackTrace();
       Log.printStackTrace(e);
+      currentPortSetting = null;
     } finally {
       input[ISTATE_OPEN_SERIAL].setEnabled(true);
+      input[ISTATE_OPEN_STREAM].setEnabled(true);
       updateTitle();
+    }
+    }};
+    if (async) {
+      Thread t = new Thread(opener, "opener");
+      t.setDaemon(true);
+      t.start();
+    } else {
+      opener.run();
+      res = (currentPortSetting == portSetting);
     }
     return res;
   }
@@ -603,6 +650,9 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       break;
     case ISTATE_OPEN_SERIAL:
       inputLabel[istate].setText("OPEN SERIAL");
+      break;
+    case ISTATE_OPEN_STREAM:
+      inputLabel[istate].setText("OPEN STREAM");
       break;
     case ISTATE_BASH:
       inputLabel[istate].setText("BASH");
@@ -692,7 +742,10 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       break;
     }
     case ISTATE_OPEN_SERIAL:
-      handleOpenSerial(in);
+      handleOpenSerial(in, true);
+      break;
+    case ISTATE_OPEN_STREAM:
+      handleOpenStream(in, true);
       break;
     case ISTATE_BASH:
       if (input[istate].isLinkedToProcess() && curView.ftp.isTerminalMode()) {
@@ -894,6 +947,15 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     return null;
   }
 
+  List<String> giveOpenStreamSuggestions(final String in) {
+    if (in.startsWith("file://")) {
+      return bash[ISTATE_INPUT].suggestFileSystemCompletions("file://", 
+          in.substring("file://".length()), 
+          null, true, true);
+    }
+    return null;
+  }
+  
   void actionFind(boolean shift, boolean regex) {
     if (istate != ISTATE_FIND && !regex) {
       UIWorkArea.this.enterInputState(ISTATE_FIND);
@@ -1050,6 +1112,17 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     stp.selectTab(ix);
   }
   
+  void openStreamConfig() {
+    List<String> model = new ArrayList<String>();
+    model.add("file://");
+    model.add("rtt://");
+    model.add("sock://");
+    model.add("sockserv://");
+    model.add("stdio");
+    input[ISTATE_OPEN_STREAM].setSuggestions(model);
+    enterInputState(ISTATE_OPEN_STREAM);
+  }
+  
   void openSerialConfig() {
     String[] prevDev = prevSerialDevices;
     String[] devices = serial.getDevices();
@@ -1195,10 +1268,29 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     }
   };
 
+  AbstractAction actionOpenStreamConfig = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      openStreamConfig();
+    }
+  };
+
   AbstractAction actionCloseSerial= new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      closeSerial();
+      input[ISTATE_OPEN_SERIAL].setEnabled(false);
+      input[ISTATE_OPEN_STREAM].setEnabled(false);
+      Runnable closer = new Runnable() { public void run() {
+        try {
+          closeSerial();
+        } finally {
+          input[ISTATE_OPEN_SERIAL].setEnabled(true);
+          input[ISTATE_OPEN_STREAM].setEnabled(true);
+        }
+      }};
+      Thread t = new Thread(closer, "closer");
+      t.setDaemon(true);
+      t.start();
     }
   };
 
@@ -1440,6 +1532,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   public void onSerialDisconnect() {
     lineBuffer = new StringBuilder();
     views[ISTATE_INPUT].ftp.addText("Disconnected\n", UICommon.STYLE_GENERIC_INFO);
+    currentPortSetting = null;
     updateTitle();
   }
   

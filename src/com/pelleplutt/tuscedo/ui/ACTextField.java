@@ -133,7 +133,7 @@ public class ACTextField extends JTextPane implements CaretListener {
    */
   public void setForcedModel(boolean forced) {
     this.forced = forced;
-    forceSuggest();
+    if (forced) forceSuggest();
   }
   
   /**

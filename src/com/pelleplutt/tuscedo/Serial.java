@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
@@ -161,7 +162,10 @@ public class Serial implements SerialStreamProvider, Tickable {
   
   public void openSocket(String server, int port) throws Exception  {
     synchronized (LOCK_SERIAL) {
-      Socket s = new Socket(server, port);
+      final Socket s = new Socket(server, port);
+      onClose = new Runnable() { public void run() { try {
+        Log.println("close socket"); s.close();
+      } catch (IOException e) {} } };
       serialIn = s.getInputStream();
       serialOut = s.getOutputStream();
       serialRun = true;
@@ -169,6 +173,32 @@ public class Serial implements SerialStreamProvider, Tickable {
       serialPump.setDaemon(true);
       serialPump.start();
       isSerial = false;
+    }
+  }
+  
+  public void openServerSocket(int port) throws Exception {
+    synchronized (LOCK_SERIAL) {
+      final ServerSocket ss = new ServerSocket(port);
+      onClose = new Runnable() { public void run() { try {
+        Log.println("close server socket"); ss.close();
+      } catch (IOException e) {e.printStackTrace();} } };
+      try {
+        ss.setReuseAddress(true);
+        ss.setSoTimeout(3000);
+        final Socket s = ss.accept();
+        onClose = new Runnable() { public void run() { try {
+          Log.println("close server socket"); s.close(); ss.close();
+        } catch (IOException e) {e.printStackTrace();} } };
+        serialIn = s.getInputStream();
+        serialOut = s.getOutputStream();
+        serialRun = true;
+        serialPump = new Thread(serialEaterRunnable, "serversocket:" + port);
+        serialPump.setDaemon(true);
+        serialPump.start();
+        isSerial = false;
+      } finally {
+        ss.close();
+      }
     }
   }
   
@@ -200,7 +230,7 @@ public class Serial implements SerialStreamProvider, Tickable {
           args += idOrArgs;
         }
       }
-      JLinkProc proc = new JLinkProc(exe, args);
+      final JLinkProc proc = new JLinkProc(exe, args);
       AppSystem.addDisposable(proc);
 
 
@@ -224,8 +254,8 @@ public class Serial implements SerialStreamProvider, Tickable {
         }
       });
       
+      onClose = new Runnable() { public void run() { Log.println("close rtt proc"); AppSystem.dispose(proc); } };
     }
-    
   }
   
   public void close() {
@@ -253,9 +283,14 @@ public class Serial implements SerialStreamProvider, Tickable {
         serialIn = null;
         serialOut = null;
         serialRun = false;
-        while (serialRunning) {
-          //Log.println("await close serial streams..");
+        int spoonGuard = 8;
+        while (serialRunning && --spoonGuard > 0) {
+          Log.println("awaiting close serial streams..");
           AppSystem.waitSilently(LOCK_SERIAL, 1000);
+        }
+        if (spoonGuard == 0) {
+          Log.println("WARNING: close time out - lingering connection");
+          serialRunning = false;
         }
         isSerial = false; 
       }

@@ -1026,7 +1026,7 @@ public class OperandiScript implements Runnable, Disposable {
           else c2 += UIWorkArea.PORT_ARG_PARITY + Port.PARITY_NONE_S.toLowerCase();
           c=c2;
         }
-        boolean res = currentWA.handleOpenSerial(c);
+        boolean res = currentWA.handleOpenSerial(c, false);
         return new M(res ? 1 : 0);
       }
     });
