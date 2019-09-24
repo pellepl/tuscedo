@@ -25,11 +25,15 @@ import com.pelleplutt.util.io.Port;
 import com.pelleplutt.util.io.PortConnector;
 
 public class Serial implements SerialStreamProvider, Tickable {
-  public static final int HW_FLOW_OFF = 0;
-  public static final int HW_FLOW_CONST_HI = 1;
-  public static final int HW_FLOW_CONST_LO = 2;
-  public static final int HW_FLOW_FLANK_HI = 3;
-  public static final int HW_FLOW_FLANK_LO = 4;
+  public static final int USER_HW_FLOWOFF = 0;
+  public static final int USER_HW_FLOWCONST_HI = 1;
+  public static final int USER_HW_FLOWCONST_LO = 2;
+  public static final int USER_HW_FLOWFLANK_HI = 3;
+  public static final int USER_HW_FLOWFLANK_LO = 4;
+  public static final int FLOW_CTRL_NONE = 0;
+  public static final int FLOW_XON_XOFF = (1<<0);
+  public static final int FLOW_RTS_CTS = (1<<1);
+  public static final int FLOW_DSR_DTR = (1<<2);
   PortConnector serial;
   InputStream serialIn;
   OutputStream serialOut;
@@ -39,8 +43,9 @@ public class Serial implements SerialStreamProvider, Tickable {
   volatile boolean serialRunning;
   List<OutputStream> attachedSerialIOs = new ArrayList<OutputStream>();
   Port setting;
-  int hwFlowRTS = HW_FLOW_OFF;
-  int hwFlowDTR = HW_FLOW_OFF;
+  int userHwFlowRTS = USER_HW_FLOWOFF;
+  int userHwFlowDTR = USER_HW_FLOWOFF;
+  int flowctrl;
   boolean rts = false;
   boolean dtr = false;
   Map<String, String[]> deviceExtraInfo = new HashMap<String, String[]>();
@@ -57,9 +62,21 @@ public class Serial implements SerialStreamProvider, Tickable {
     serial = PortConnector.getPortConnector();
   }
   
-  public void setHwFlowControl(int rts, int dtr) {
-    this.hwFlowRTS = rts;
-    this.hwFlowDTR = dtr;
+  public void setFlowControl(int flowctrl) {
+    this.flowctrl = flowctrl;
+    setting.xonxoff = (flowctrl & FLOW_XON_XOFF) == FLOW_XON_XOFF;
+    setting.rtscts = (flowctrl & FLOW_RTS_CTS)  == FLOW_RTS_CTS;
+    setting.dsrdtr = (flowctrl & FLOW_DSR_DTR) == FLOW_DSR_DTR;
+    try {
+      serial.configure(setting);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+  
+  public void setUserHwFlowControl(int rts, int dtr) {
+    this.userHwFlowRTS = rts;
+    this.userHwFlowDTR = dtr;
   }
   
   public boolean isConnected() {
@@ -97,17 +114,17 @@ public class Serial implements SerialStreamProvider, Tickable {
   }
   
   void flowControl(boolean pre) throws IOException {
-    if (hwFlowDTR == HW_FLOW_OFF && hwFlowRTS == HW_FLOW_OFF) return;
+    if (userHwFlowDTR == USER_HW_FLOWOFF && userHwFlowRTS == USER_HW_FLOWOFF) return;
     boolean rtshigh = this.rts;
     boolean dtrhigh = this.dtr;
-    if (hwFlowDTR == HW_FLOW_CONST_HI)      dtrhigh = true;
-    else if (hwFlowDTR == HW_FLOW_CONST_LO) dtrhigh = false;
-    else if (hwFlowDTR == HW_FLOW_FLANK_HI) dtrhigh = pre;
-    else if (hwFlowDTR == HW_FLOW_FLANK_LO) dtrhigh = !pre;
-    if (hwFlowRTS == HW_FLOW_CONST_HI)      rtshigh = true;
-    else if (hwFlowRTS == HW_FLOW_CONST_LO) rtshigh = false;
-    else if (hwFlowRTS == HW_FLOW_FLANK_HI) rtshigh = pre;
-    else if (hwFlowRTS == HW_FLOW_FLANK_LO) rtshigh = !pre;
+    if (userHwFlowDTR == USER_HW_FLOWCONST_HI)      dtrhigh = true;
+    else if (userHwFlowDTR == USER_HW_FLOWCONST_LO) dtrhigh = false;
+    else if (userHwFlowDTR == USER_HW_FLOWFLANK_HI) dtrhigh = pre;
+    else if (userHwFlowDTR == USER_HW_FLOWFLANK_LO) dtrhigh = !pre;
+    if (userHwFlowRTS == USER_HW_FLOWCONST_HI)      rtshigh = true;
+    else if (userHwFlowRTS == USER_HW_FLOWCONST_LO) rtshigh = false;
+    else if (userHwFlowRTS == USER_HW_FLOWFLANK_HI) rtshigh = pre;
+    else if (userHwFlowRTS == USER_HW_FLOWFLANK_LO) rtshigh = !pre;
     serial.setRTSDTR(rtshigh, dtrhigh);
   }
   

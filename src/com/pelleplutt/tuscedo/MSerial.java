@@ -25,6 +25,7 @@ public class MSerial extends MObj {
     addFunc("log_get", OperandiScript.FN_SERIAL_LOG_GET, comp);
     addFunc("log_size", OperandiScript.FN_SERIAL_LOG_SIZE, comp);
     addFunc("set_rts_dtr", OperandiScript.FN_SERIAL_SET_RTS_DTR, comp);
-    addFunc("set_hw_flow", OperandiScript.FN_SERIAL_SET_HW_FLOW_CONTROL, comp);
+    addFunc("set_user_hw_flow", OperandiScript.FN_SERIAL_SET_USER_HW_FLOW_CONTROL, comp);
+    addFunc("set_flow_ctrl", OperandiScript.FN_SERIAL_SET_FLOW_CONTROL, comp);
   }
 }

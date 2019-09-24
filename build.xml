@@ -69,7 +69,7 @@
 				<exclude name="**/test/**" />
 			</fileset>
 		</copy>
-		<unzip src="./lib/lwjgl/lwjgl.zip" dest="./lib/lwjgl/unp" />
+		<unzip src="./lib/lwjgl/lwjgl-release-3.1.6-custom.zip" dest="./lib/lwjgl/unp" />
 	</target>
 	<target name="clean">
 		<delete dir="bin" />

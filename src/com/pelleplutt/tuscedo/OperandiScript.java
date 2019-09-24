@@ -56,7 +56,8 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_SERIAL_LOG_SIZE = VAR_SERIAL + ":log_size";
   public static final String FN_SERIAL_LOG_CLEAR = VAR_SERIAL + ":log_clear";
   public static final String FN_SERIAL_SET_RTS_DTR = VAR_SERIAL + ":set_rts_dtr";
-  public static final String FN_SERIAL_SET_HW_FLOW_CONTROL = VAR_SERIAL + ":set_hw_flow";
+  public static final String FN_SERIAL_SET_FLOW_CONTROL = VAR_SERIAL + ":set_hw_flow";
+  public static final String FN_SERIAL_SET_USER_HW_FLOW_CONTROL = VAR_SERIAL + ":set_user_hw_flow";
   
   public static final String FN_NET_IFC = VAR_NET + ":ifc";
   public static final String FN_NET_GET = VAR_NET + ":get";
@@ -994,10 +995,17 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef(FN_SERIAL_SET_HW_FLOW_CONTROL, "(<rts-setting>, <dtr-setting>) - 0:disable, 1:constant low, 2:constant high, 3:low flank during send, 4:high flank during send",
+    setExtDef(FN_SERIAL_SET_USER_HW_FLOW_CONTROL, "(<rts-setting>, <dtr-setting>) - 0:disable, 1:constant low, 2:constant high, 3:low flank during send, 4:high flank during send",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        currentWA.getSerial().setHwFlowControl(args[0].asInt(), args[1].asInt());
+        currentWA.getSerial().setUserHwFlowControl(args[0].asInt(), args[1].asInt());
+        return null;
+      }
+    });
+    setExtDef(FN_SERIAL_SET_FLOW_CONTROL, "(<setting>) - 0:none, 1:xon/xoff, 2:rts/cts, 3:xon/xoff+rts/cts, 4:dsr/dtr, 5:xon/xoff+dsr/dtr, 6:rts/cts+dsr/dtr, 7:xon/xoff+rts/cts+dsr/dtr",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        currentWA.getSerial().setFlowControl(args[0].asInt());
         return null;
       }
     });
