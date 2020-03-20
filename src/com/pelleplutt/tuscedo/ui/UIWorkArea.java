@@ -1730,6 +1730,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     public void cycleSplit() {
       if (curSplit == splitVer) {
         remove(curSplit);
+        Log.println("main");
         add(mainScrollPane, BorderLayout.CENTER);
         revalidate();
         curSplit = mainScrollPane;
@@ -1737,6 +1738,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
         remove(curSplit);
         splitVer.setTopComponent(secScrollPane);
         splitVer.setBottomComponent(mainScrollPane);
+        Log.println("vertical");
         add(splitVer, BorderLayout.CENTER);
         revalidate();
         splitVer.setDividerLocation(0.5);
@@ -1745,6 +1747,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
         remove(curSplit);
         splitHor.setLeftComponent(mainScrollPane);
         splitHor.setRightComponent(secScrollPane);
+        Log.println("horizontal");
         add(splitHor, BorderLayout.CENTER);
         revalidate();
         splitHor.setDividerLocation(0.5);

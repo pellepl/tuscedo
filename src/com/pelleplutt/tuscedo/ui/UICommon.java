@@ -526,8 +526,8 @@ public class UICommon {
     UICommon.defineAction(c, "common.tab.8", "ctrl+shift+8",when, actionSelTab[7]);
     UICommon.defineAction(c, "common.tab.9", "ctrl+shift+9",when, actionSelTab[8]);
     UICommon.defineAction(c, "common.tab.10", "ctrl+shift+0",when, actionSelTab[9]);
-    UICommon.defineAction(c, "common.tab.next", "ctrl+shift+plus",when, actionNextTab);
-    UICommon.defineAction(c, "common.tab.prev", "ctrl+shift+minus",when, actionPrevTab);
+    UICommon.defineAction(c, "common.tab.prev", "ctrl+page_up",when, actionPrevTab);
+    UICommon.defineAction(c, "common.tab.next", "ctrl+page_down",when, actionNextTab);
   }
   
   static AbstractAction actionAddTab = new AbstractAction() {
