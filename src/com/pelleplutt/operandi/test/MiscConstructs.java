@@ -216,4 +216,17 @@ public class MiscConstructs {
       "";
     assertEquals(22343, Processor.compileAndRun(false, false, sA).asInt()); 
   }
+
+
+  @Test
+  public void testArgNil() {
+    String sA;
+    sA = 
+      "func f(a,b) {return str(a) + str(b);}\n" +
+      "return f() + '/' + f('a') + '/' + f('a','b') + '/' + f('a','b','c');\n" +
+      "";
+    assertEquals("nilnil/anil/ab/ab", Processor.compileAndRun(false, false, sA).asString()); 
+  }
+
+
 }

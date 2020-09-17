@@ -511,7 +511,13 @@ public class Processor implements ByteCode {
   
   void load_fp() {
     int rel = pcodetos(pc++, 1);
-    push(peek((fp & ~0x80000000) - rel));
+    int argnbr = -rel - FRAME_SIZE - 1;
+    int argcount = peek((fp & ~0x80000000) + FRAME_3_ARGC).i;
+    if (argnbr >= argcount) {
+      push_nil();
+    } else {
+      push(peek((fp & ~0x80000000) - rel));
+    }
   }
   
   void sp_incr() {
