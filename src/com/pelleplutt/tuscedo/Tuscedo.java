@@ -30,7 +30,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   List <Tickable> tickables = new ArrayList<Tickable>();
   Map <String, UIInfo> uiobjects = new HashMap<String, UIInfo>();
   Timer timer;
-  
+
   private Tuscedo() {
     Thread t = new Thread(this, "commonticker");
     t.setDaemon(true);
@@ -63,23 +63,23 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     }
     return inst;
   }
-  
+
   public Timer getTimer() {
     return timer;
   }
-  
+
   public void registerTickable(Tickable t) {
     synchronized (tickables) {
       if (!tickables.contains(t)) tickables.add(t);
     }
   }
-  
+
   public void deregisterTickable(Tickable t) {
     synchronized (tickables) {
       tickables.remove(t);
     }
   }
-  
+
   public void registerWindow(Window w) {
     synchronized (windows) {
       windows.add(w);
@@ -101,7 +101,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       });
     }
   }
-  
+
   static int __winposx = Settings.inst().integer(Settings.WINDOW_POSX_INT);
   static int __winposy = Settings.inst().integer(Settings.WINDOW_POSY_INT);
 
@@ -126,11 +126,11 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       __winposx = 0;
       __winposy = 0;
     }
-    
+
     registerWindow(f);
-    
+
     mainContainer = f.getContentPane();
-    
+
     UISplitPane jsp = new UISplitPane(JSplitPane.HORIZONTAL_SPLIT);
     UICommon.decorateSplitPane(jsp, true);
     TuscedoTabPane tabs = new TuscedoTabPane();
@@ -140,14 +140,14 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     jsp.setTopUI(tabs);
     jsp.setBottomUI(null);
     mainContainer.add(jsp);
-    
+
     try {
       f.setIconImage(AppSystem.loadImage("tuscedo.png"));
     } catch (Throwable t) {}
     f.setTitle(Essential.name + " " + Essential.vMaj + "." + Essential.vMin + "." + Essential.vMic);
-    
+
     f.setVisible(true);
-    
+
     f.addComponentListener(new ComponentListener() {
       @Override
       public void componentShown(ComponentEvent e) {
@@ -169,7 +169,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       }
     });;
   }
-  
+
   public String addWorkAreaTab(UISimpleTabPane stp, UIWorkArea w) {
     if (w == null) w = new UIWorkArea();
     w.build();
@@ -179,7 +179,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     w.setStandardFocus();
     return w.getUIInfo().getId();
   }
-  
+
   public String addGraphTab(UISimpleTabPane stp) {
     return addGraphTab(stp);
   }
@@ -213,16 +213,16 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     stp.selectTab(t);
     return cp.getUIInfo().getId();
   }
-  
+
   public UIInfo getUIObject(String id) {
     return uiobjects.get(id);
   }
-  
+
 
   public static Scene3D scene3d = new Scene3D();
-  
+
   static void checkInitScripts() {
-    File initPath = new File(System.getProperty("user.home") + File.separator + 
+    File initPath = new File(System.getProperty("user.home") + File.separator +
         Essential.userSettingPath + File.separator);
     try {
       String initDeclaration = new String(AppSystem.getAppResource("init-op/init-declaration"));
@@ -248,7 +248,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       e.printStackTrace();
     }
   }
-  
+
   private static void cli() {
     UIWorkArea wa = new UIWorkArea();
     wa.build();
@@ -270,7 +270,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       input = "";
     }
   }
-  
+
   static boolean no3d = false;
 
   public static void main(String[] args) {
@@ -278,15 +278,15 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
     } catch (Throwable ignore) {
     }
-    
+
     if (System.getProperty("os.name").indexOf("indow") > 0) {
       UICommon.COMMON_FONT = "lucida console";
     } else {
       UICommon.COMMON_FONT = Font.MONOSPACED;
     }
-    
+
     // purejavacomm
-    
+
 //    @SuppressWarnings("rawtypes")
 //    Enumeration e = purejavacomm.CommPortIdentifier.getPortIdentifiers();
 //    while (e.hasMoreElements()) {
@@ -295,7 +295,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
 //        System.out.println(portId.getName());
 //      }
 //    }
-    
+
 /*    SerialPort port;
     try {
       port = (SerialPort) CommPortIdentifier.getPortIdentifier("ttyUSB3").open("tusc", 400);
@@ -356,10 +356,10 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       }
     }
   } // main
-  
+
   static boolean rendering = false;
   static RenderSpec renderSpec;
-  
+
   static void render3dloop() {
     // start render loop, must be in the main thread
     synchronized (scene3d) {
@@ -376,7 +376,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       }
     }
   }
-  
+
   // called from another thread, commence 3d rendering and wait until finished
   public BufferedImage render3d(RenderSpec rs) {
     if (no3d) {
@@ -400,7 +400,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       return scene3d.getImage();
     }
   }
-  
+
   public static void onExit() {
     AppSystem.disposeAll();
     inst.running = false;
@@ -440,9 +440,9 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
 
   @Override
   public void onClosed(UIO parent, UIO child) {
-//    System.out.println("onClosed   " + 
-//      stringify(child.getUIInfo(), 0) + 
-//      "  in  " + 
+//    System.out.println("onClosed   " +
+//      stringify(child.getUIInfo(), 0) +
+//      "  in  " +
 //      (parent == null ? "null":stringify(parent.getUIInfo(), 0)));
     uiobjects.remove(child.getUIInfo().getId());
     child.onClose();
@@ -457,7 +457,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   @Override
   public void onEvent(UIO obj, Object event) {
   }
-  
+
   private String stringify(UIInfo i, int level) {
     String s ="";
     while(level-- > 0) s+="  ";
@@ -476,7 +476,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     }
     return sb.toString();
   }
-  
+
   private void recurseFind(UIInfo i, List<UIO> res, Class<?> clz) {
     if (clz.isInstance(i.getUI())) res.add(i.getUI());
     for (UIInfo c : i.children) recurseFind(c, res, clz);
@@ -488,7 +488,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       }
     }
   }
-  
+
   private void recurseRepaint(UIInfo i) {
     for (UIInfo c : i.children) {
       c.getUI().repaint();

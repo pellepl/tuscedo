@@ -9,14 +9,12 @@ import java.util.List;
 
 import javax.swing.JComponent;
 
-import com.pelleplutt.util.Log;
-
 public class UIInfo {
   public static final String EVENT_MOUSE_PRESS = "evmousepress";
   public static final String EVENT_MOUSE_RELEASE = "evmouserelease";
   public static final String EVENT_KEY_PRESS = "evkeypress";
   public static final String EVENT_KEY_RELEASE = "evkeyrelease";
-  
+
   private UIO ui;
   final public String id;
   public String name;
@@ -26,7 +24,7 @@ public class UIInfo {
   public int mousepressx, mousepressy, mousepressb;
   public int mouserelx, mouserely, mouserelb;
   public int keypress, keyrel;
-  
+
   public UIInfo(UIO ui, String id, String name) {
     this.ui = ui;
     this.id = id;
@@ -34,7 +32,7 @@ public class UIInfo {
     this.children = new ArrayList<UIInfo>();
     this.closed = false;
   }
-  
+
   public UIO getUI() {
     return ui;
   }
@@ -123,14 +121,14 @@ public class UIInfo {
   public String toString() {
     return getName();
   }
-  
+
   List<UIListener> listeners = new ArrayList<UIListener>();
 
   public int irqMousePressAddr = 0;
   public int irqMouseReleaseAddr = 0;
   public int irqKeyPressAddr = 0;
   public int irqKeyReleaseAddr = 0;
-  
+
   static List<UIListener> glisteners = new ArrayList<UIListener>();
   public void addListener(UIListener l) {
     if (!listeners.contains(l)) listeners.add(l);
@@ -144,7 +142,7 @@ public class UIInfo {
   public static void removeGlobalListener(UIListener l) {
     if (glisteners.contains(l)) glisteners.remove(l);
   }
-  
+
   void fireEventOnRemoved(UIO parent, UIO child) {
     List<UIListener> lstnr = new ArrayList<UIListener>(listeners);
     for (UIListener l : lstnr) l.onRemoved(parent, child);
@@ -168,7 +166,7 @@ public class UIInfo {
     for (UIListener l : lstnr) l.onEvent(o, event);
     for (UIListener l : glisteners) l.onEvent(o, event);
   }
-  
+
   public interface UIListener {
     void onRemoved(UIO parent, UIO child);
     void onAdded(UIO parent, UIO child);
@@ -176,7 +174,7 @@ public class UIInfo {
     void onCreated(UIInfo obj);
     void onEvent(UIO obj, Object event);
   }
-  
+
   public static class UIAdapter implements UIListener {
     @Override
     public void onRemoved(UIO parent, UIO child) {}
@@ -189,7 +187,7 @@ public class UIInfo {
     @Override
     public void onEvent(UIO obj, Object event) {}
   }
-  
+
   public String asString() {
     return "<" + getId() + ":[" + getName() + "]:" + getUI().getClass().getSimpleName() + ">";
   }
