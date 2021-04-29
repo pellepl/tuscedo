@@ -19,7 +19,6 @@ import com.pelleplutt.operandi.Compiler;
 import com.pelleplutt.operandi.proc.*;
 import com.pelleplutt.operandi.proc.Processor.*;
 import com.pelleplutt.operandi.proc.ProcessorError.*;
-import com.pelleplutt.tuscedo.Tuscedo.*;
 import com.pelleplutt.tuscedo.math.Complex;
 import com.pelleplutt.tuscedo.math.Emd;
 import com.pelleplutt.tuscedo.math.Fft;
@@ -39,7 +38,7 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String VAR_SYSTEM = "sys";
   public static final String VAR_CONF = "conf";
   public static final String VAR_INFO = "__info";
-  
+
   public static final String FN_SERIAL_INFO = VAR_SERIAL + ":info";
   public static final String FN_SERIAL_DISCONNECT = VAR_SERIAL + ":disconnect";
   public static final String FN_SERIAL_CONNECT = VAR_SERIAL + ":connect";
@@ -58,7 +57,7 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_SERIAL_SET_RTS_DTR = VAR_SERIAL + ":set_rts_dtr";
   public static final String FN_SERIAL_SET_FLOW_CONTROL = VAR_SERIAL + ":set_hw_flow";
   public static final String FN_SERIAL_SET_USER_HW_FLOW_CONTROL = VAR_SERIAL + ":set_user_hw_flow";
-  
+
   public static final String FN_NET_IFC = VAR_NET + ":ifc";
   public static final String FN_NET_GET = VAR_NET + ":get";
   public static final String FN_NET_LOCALHOST = VAR_NET + ":localhost";
@@ -109,7 +108,7 @@ public class OperandiScript implements Runnable, Disposable {
   Map<String, ExtCall> extDefs = new HashMap<String, ExtCall>();
   volatile UIWorkArea currentWA;
   UIWorkArea.View currentView;
-  volatile boolean running; 
+  volatile boolean running;
   volatile boolean killed;
   volatile boolean halted;
   List<RunRequest> q = new ArrayList<RunRequest>();
@@ -126,9 +125,9 @@ public class OperandiScript implements Runnable, Disposable {
   List<InputStream> filestreams;
 
   public static final int PROC_HALT = 1;
-  
+
   static Map<String, M> appVariables = new HashMap<String, M>();
-  
+
   static {
     populateAppVariables();
   }
@@ -142,8 +141,8 @@ public class OperandiScript implements Runnable, Disposable {
     t.setDaemon(true);
     t.start();
   }
-  
-  
+
+
   @Override
   public void run() {
     while (!killed) {
@@ -152,7 +151,7 @@ public class OperandiScript implements Runnable, Disposable {
           AppSystem.waitSilently(q, 0);
         }
         if (q.isEmpty() || running) continue;
-        
+
         RunRequest rr = q.remove(0);
         try {
           rr.wa.onScriptStart(proc);
@@ -173,18 +172,18 @@ public class OperandiScript implements Runnable, Disposable {
   public OperandiIRQHandler getIRQHandler() {
     return irqHandler;
   }
-  
+
   Map<Object, String> defhelp = new HashMap<Object, String>();
-  
+
   public void setExtDef(String name, String help, ExtCall call) {
     extDefs.put(name, call);
     setExtHelp(name, help);
   }
-  
+
   public void setExtHelp(String name, String help) {
     defhelp.put(name, help);
   }
-  
+
   void initFilestreams() {
     if (filestreams != null) {
       for (InputStream i : filestreams) {
@@ -193,7 +192,7 @@ public class OperandiScript implements Runnable, Disposable {
     }
     filestreams = new ArrayList<InputStream>();
   }
-  
+
   void procReset() {
     exe = pexe = null;
     running = false;
@@ -562,7 +561,7 @@ public class OperandiScript implements Runnable, Disposable {
           mc.add(new M((float)r[f].getReal()));
           mc.add(new M((float)r[f].getImaginary()));
           mr.add(new M(mc));
-          
+
         }
         return new M(mr);
       }
@@ -590,7 +589,7 @@ public class OperandiScript implements Runnable, Disposable {
           mc.add(new M((float)r[f].getReal()));
           mc.add(new M((float)r[f].getImaginary()));
           mr.add(new M(mc));
-          
+
         }
         return new M(mr);
       }
@@ -631,13 +630,14 @@ public class OperandiScript implements Runnable, Disposable {
     createGenericUIFunctions();
     createTuscedoTabPaneFunctions();
     createSerialFunctions();
+    createWorkareaFunctions();
     MNet.createNetFunctions(this);
     MSys.createSysFunctions(this);
     MDisk.createDiskFunctions(this);
     MDisk.createFileFunctions(this);
     MAudio.createAudioFunctions(this);
     getIRQHandler().createIRQFunctions(this);
-    
+
     setExtHelp("rand", "() - return random 32-bit number");
     setExtHelp("randseed", "(<x>) - sets random seed");
     setExtHelp("cpy", "(<x>) - returns a copy of x");
@@ -652,14 +652,14 @@ public class OperandiScript implements Runnable, Disposable {
     setExtHelp("atoi", "(<x>(, <base>)) - returns x as a number");
     setExtHelp("sort", "(<array>, (<key> | <ix>)) - sorts given array, either by natural order or by given key/index when array contains sets");
     setExtHelp("group", "(<array>, (<key> | <ix>)) - returns given array grouped either by natural order or by given key/index when array contains sets");
-    
+
     comp = new Compiler(extDefs, 0x4000, 0x0000);
     proc.reset();
     proc.user = 0;
     irqHandler.reset();
     irqHandler.installIRQHandlers(this);
   }
-  
+
   float __maxrec(Processor.M m) {
     float max = Float.MIN_VALUE;
     if (m.type == Processor.TSET) {
@@ -692,13 +692,13 @@ public class OperandiScript implements Runnable, Disposable {
     if (me == null || me.type != Processor.TSET) return null;
     M uioId = me.ref.get(new M(KEY_UI_ID));
     if (uioId == null || uioId.type != Processor.TSTR) return null;
-    UIInfo inf = Tuscedo.inst().getUIObject(uioId.str); 
+    UIInfo inf = Tuscedo.inst().getUIObject(uioId.str);
     UIO uio = inf == null ? null : inf.getUI();
     return uio;
   }
-  
+
   public void runOperandiInitScripts(UIWorkArea wa) {
-    String path = System.getProperty("user.home") + File.separator + 
+    String path = System.getProperty("user.home") + File.separator +
         Essential.userSettingPath + File.separator;
     List<File> files = AppSystem.findFiles(path, "init-*.op", false);
     System.out.println("running operandi init-*.op files in " + path + ":" + files);
@@ -728,7 +728,7 @@ public class OperandiScript implements Runnable, Disposable {
       List<File> files = AppSystem.findFiles(path, file, false);
       String argString = gotArgs ? s.substring(pathEnd+1, s.length()-2) : "";
       String[] argsString = argString.split(",");
-      
+
       System.out.println(path + " " + file + " " + files + " (" + argString + ")");
       for (File f : files) {
         String scr = AppSystem.readFile(f);
@@ -743,21 +743,21 @@ public class OperandiScript implements Runnable, Disposable {
       }
     }
   }
-  
+
   public void runScript(UIWorkArea wa, File f, String s, String[] args) {
     synchronized (q) {
       q.add(new RunRequest(wa, new Source.SourceFile(f, s), args));
       q.notifyAll();
     }
   }
-  
+
   public void runFunc(UIWorkArea wa, int addr, List<M> args) {
     synchronized (q) {
       q.add(new RunRequest(wa, addr, args));
       q.notifyAll();
     }
   }
-  
+
   void doRunScript(UIWorkArea wa, Source src, String[] args) {
     currentWA = wa;
     currentView = wa == null ? null : wa.getCurrentView();
@@ -783,7 +783,7 @@ public class OperandiScript implements Runnable, Disposable {
     injectAppVariablesValues(wa, comp, proc);
     runProcessor();
   }
-  
+
   void doCallAddress(UIWorkArea wa, int addr, List<M> args) {
     currentWA = wa;
     currentView = wa.getCurrentView();
@@ -811,7 +811,7 @@ public class OperandiScript implements Runnable, Disposable {
           if (dbg != null) {
             int nestedIRQ = proc.getNestedIRQ();
             String irqInfo = nestedIRQ > 0 ? "[IRQ"+nestedIRQ+"] " : "";
-            currentWA.appendViewText(currentView, irqInfo + dbg + "\n", 
+            currentWA.appendViewText(currentView, irqInfo + dbg + "\n",
                 UICommon.STYLE_OP_DBG);
           }
           synchronized (q) {
@@ -824,7 +824,7 @@ public class OperandiScript implements Runnable, Disposable {
     } catch (ProcessorFinishedError pfe) {
       M m = pfe.getRet();
       if (m != null && m.type != Processor.TNIL) {
-        currentWA.appendViewText(currentView, m.asString() + "\n", 
+        currentWA.appendViewText(currentView, m.asString() + "\n",
             UICommon.STYLE_OP_OUT);
       }
     } catch (ProcessorError pe) {
@@ -839,7 +839,7 @@ public class OperandiScript implements Runnable, Disposable {
       running = false;
     }
   }
-  
+
   public void halt(boolean on) {
     lastSrcDbg = null;
     if (!running) return;
@@ -852,32 +852,32 @@ public class OperandiScript implements Runnable, Disposable {
       }
     }
   }
-  
+
   public void step() {
     synchronized (q) {
       q.notifyAll();
     }
   }
-  
+
   public void stepInstr() {
     synchronized (q) {
       stepInstr = true;
       q.notifyAll();
     }
   }
-  
+
   public void interrupt(int addr) {
-    currentWA.appendViewText(currentView, String.format("interrupt -> 0x%08x\n", addr), 
+    currentWA.appendViewText(currentView, String.format("interrupt -> 0x%08x\n", addr),
         UICommon.STYLE_OP_DBG);
     proc.raiseInterrupt(addr);
   }
-  
+
   public void reset() {
     if (running) {
       resetForce();
     }
   }
-  
+
   public void resetForce() {
     boolean wasRunning = running;
     running = false;
@@ -889,33 +889,33 @@ public class OperandiScript implements Runnable, Disposable {
     if (wasRunning) backtrace();
     procReset();
   }
-  
+
   public void dumpPC() {
-    currentWA.appendViewText(currentView, String.format("PC:0x%08x\n", proc.getPC()), 
+    currentWA.appendViewText(currentView, String.format("PC:0x%08x\n", proc.getPC()),
         UICommon.STYLE_OP_DBG);
   }
-  
+
   public void dumpFP() {
-    currentWA.appendViewText(currentView, String.format("FP:0x%08x\n", proc.getFP()), 
+    currentWA.appendViewText(currentView, String.format("FP:0x%08x\n", proc.getFP()),
         UICommon.STYLE_OP_DBG);
   }
-  
+
   public void dumpSP() {
-    currentWA.appendViewText(currentView, String.format("SP:0x%08x\n", proc.getSP()), 
+    currentWA.appendViewText(currentView, String.format("SP:0x%08x\n", proc.getSP()),
         UICommon.STYLE_OP_DBG);
   }
-  
+
   public void dumpSR() {
-    currentWA.appendViewText(currentView, String.format("SR:0x%08x\n", proc.getSR()), 
+    currentWA.appendViewText(currentView, String.format("SR:0x%08x\n", proc.getSR()),
         UICommon.STYLE_OP_DBG);
   }
-  
+
   public void dumpMe() {
     M me = proc.getMe();
-    currentWA.appendViewText(currentView, String.format("me:%s\n", me == null ? "nil" : me.asString()), 
+    currentWA.appendViewText(currentView, String.format("me:%s\n", me == null ? "nil" : me.asString()),
         UICommon.STYLE_OP_DBG);
   }
-  
+
   public void backtrace() {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     PrintStream ps = new PrintStream(baos);
@@ -924,7 +924,7 @@ public class OperandiScript implements Runnable, Disposable {
     AppSystem.closeSilently(ps);
     currentWA.appendViewText(currentView, bt, UICommon.STYLE_OP_DBG);
   }
-  
+
   public void dumpStack() {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     PrintStream ps = new PrintStream(baos);
@@ -933,7 +933,7 @@ public class OperandiScript implements Runnable, Disposable {
     AppSystem.closeSilently(ps);
     currentWA.appendViewText(currentView, bt, UICommon.STYLE_OP_DBG);
   }
-  
+
   public static final String DBG_HALT = "halt";
   public static final String DBG_HALT_SHORT = "h";
   public static final String DBG_CONT = "cont";
@@ -955,7 +955,7 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String DBG_V_SP = "sp";
   public static final String DBG_V_ME = "me";
   public static final String DBG_V_SR = "sr";
-  
+
   public void dumpDbgHelp() {
     currentWA.appendViewText(currentView,  ""
         + DBG_HALT + " (" + DBG_HALT_SHORT + ") - halt processor execution\n"
@@ -970,25 +970,27 @@ public class OperandiScript implements Runnable, Disposable {
         ,
         UICommon.STYLE_OP_DBG);
   }
-  
+
   //
   // specific functions
   //
-  
+
   private void createSerialFunctions() {
     setExtDef(FN_SERIAL_INFO, "() - returns current serial connection parameters",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        return new M(currentWA.getConnectionInfo());
+        UIWorkArea wa = ((MObj)p.getMe().ref).workarea;
+        return new M(wa.getConnectionInfo());
       }
     });
     setExtDef(FN_SERIAL_SET_RTS_DTR, "(<rts>, <dtr>) - sets rts and dtr lines high or low",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
+        UIWorkArea wa = ((MObj)p.getMe().ref).workarea;
         boolean rtshigh = args.length > 0 && (args[0].asInt() == 1 || args[0].asString().equals("on") || args[0].asString().equals("high") || args[0].asString().equals("true"));
         boolean dtrhigh = args.length > 1 && (args[1].asInt() == 1 || args[1].asString().equals("on") || args[1].asString().equals("high") || args[1].asString().equals("true"));
         try {
-          currentWA.getSerial().setRTSDTR(rtshigh, dtrhigh);
+          wa.getSerial().setRTSDTR(rtshigh, dtrhigh);
         } catch (IOException e) {
           e.printStackTrace();
         }
@@ -998,50 +1000,56 @@ public class OperandiScript implements Runnable, Disposable {
     setExtDef(FN_SERIAL_SET_USER_HW_FLOW_CONTROL, "(<rts-setting>, <dtr-setting>) - 0:disable, 1:constant low, 2:constant high, 3:low flank during send, 4:high flank during send",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        currentWA.getSerial().setUserHwFlowControl(args[0].asInt(), args[1].asInt());
+        UIWorkArea wa = ((MObj)p.getMe().ref).workarea;
+        wa.getSerial().setUserHwFlowControl(args[0].asInt(), args[1].asInt());
         return null;
       }
     });
     setExtDef(FN_SERIAL_SET_FLOW_CONTROL, "(<setting>) - 0:none, 1:xon/xoff, 2:rts/cts, 3:xon/xoff+rts/cts, 4:dsr/dtr, 5:xon/xoff+dsr/dtr, 6:rts/cts+dsr/dtr, 7:xon/xoff+rts/cts+dsr/dtr",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        currentWA.getSerial().setFlowControl(args[0].asInt());
+        UIWorkArea wa = ((MObj)p.getMe().ref).workarea;
+        wa.getSerial().setFlowControl(args[0].asInt());
         return null;
       }
     });
     setExtDef(FN_SERIAL_DISCONNECT, "() - disconnects current serial connection",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        String res = currentWA.getConnectionInfo();
-        currentWA.closeSerial();
+        UIWorkArea wa = ((MObj)p.getMe().ref).workarea;
+        String res = wa.getConnectionInfo();
+        wa.closeSerial();
         return new M(res);
       }
     });
     setExtDef(FN_SERIAL_CONNECT, "(<serialparams>) - connects to serial, returns non-zero on success. Supports \"<serial>@115200/8N1\" format, but also \"stdio\", \"sock://<server>:<port>\", and \"file://<path>\".",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
+        UIWorkArea wa = ((MObj)p.getMe().ref).workarea;
         if (args == null || args.length == 0)  return new M(0);
+        System.out.println("wa:" + wa.getUIInfo().id);
         String c = args[0].asString();
         int atIx = c.indexOf('@');
         int divIx = c.indexOf('/');
         if (atIx > 0 && divIx > 0) {
           String c2 = c.substring(0, atIx) + " ";
           c2 += UIWorkArea.PORT_ARG_BAUD + c.substring(atIx+1, divIx) + " ";
-          c2 += UIWorkArea.PORT_ARG_DATABITS + c.charAt(divIx+1) + " "; 
+          c2 += UIWorkArea.PORT_ARG_DATABITS + c.charAt(divIx+1) + " ";
           c2 += UIWorkArea.PORT_ARG_STOPBITS + c.charAt(divIx+3) + " ";
           if (c.charAt(divIx+2) == 'E') c2 += UIWorkArea.PORT_ARG_PARITY + Port.PARITY_EVEN_S.toLowerCase();
           else if (c.charAt(divIx+2) == 'O') c2 += UIWorkArea.PORT_ARG_PARITY + Port.PARITY_ODD_S.toLowerCase();
           else c2 += UIWorkArea.PORT_ARG_PARITY + Port.PARITY_NONE_S.toLowerCase();
           c=c2;
         }
-        boolean res = currentWA.handleOpenSerial(c, false);
+        boolean res = wa.handleOpenSerial(c, false);
         return new M(res ? 1 : 0);
       }
     });
     setExtDef(FN_SERIAL_TX, "(<string|data>) - transmits string, or raw byte if int, or raw bytes if array of ints",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        if (args == null || args.length == 0 || !currentWA.getSerial().isConnected()) return new M(0);
+        UIWorkArea wa = ((MObj)p.getMe().ref).workarea;
+        if (args == null || args.length == 0 || !wa.getSerial().isConnected()) return new M(0);
         if (args[0].type == Processor.TSET) {
           MSet set = args[0].ref;
           boolean bytify = true;
@@ -1056,17 +1064,17 @@ public class OperandiScript implements Runnable, Disposable {
             }
           }
           if (bytify) {
-            currentWA.transmit(baos.toByteArray());
+            wa.transmit(baos.toByteArray());
           } else {
             for (int i = 0; i < set.size(); i++) {
-              currentWA.transmit(set.get(i).asString());
+              wa.transmit(set.get(i).asString());
             }
           }
           AppSystem.closeSilently(baos);
         } else if (args[0].type == Processor.TINT && args[0].i >= 0 && args[0].i < 255) {
-          currentWA.transmit(new byte[]{(byte)args[0].i});
+          wa.transmit(new byte[]{(byte)args[0].i});
         } else {
-          currentWA.transmit(args[0].asString());
+          wa.transmit(args[0].asString());
         }
         return new M(1);
       }
@@ -1074,23 +1082,25 @@ public class OperandiScript implements Runnable, Disposable {
     setExtDef(FN_SERIAL_SAVE, "(<filename>) - stores (selection of) serial log",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
+        UIWorkArea wa = ((MObj)p.getMe().ref).workarea;
         if (args == null || args.length == 0) return null;
         String path = args[0].asString();
-        return new M(AppSystem.writeFile(new File(path), currentWA.getSerialView().getSelectedText()) ? 0 : -1);
+        return new M(AppSystem.writeFile(new File(path), wa.getSerialView().getSelectedText()) ? 0 : -1);
       }
     });
     setExtDef(FN_SERIAL_ON_RX, "(<filter>, <func>) - executes function when regex filter is matched on a serial line of data, the function arguments will be (line, filter, (groups)*), if func is nil the filter is cleared",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
+        UIWorkArea wa = ((MObj)p.getMe().ref).workarea;
         if (args == null || args.length < 2) return null;
         if (args[1].type != Processor.TFUNC && args[1].type != Processor.TANON && args[1].type != Processor.TNIL) {
           throw new ProcessorError("second argument must be function or nil");
         }
         if (args[1].type == Processor.TNIL) {
-          currentWA.removeSerialFilter(args[0].asString());
+          wa.removeSerialFilter(args[0].asString());
         } else {
           try {
-            currentWA.registerSerialFilter(args[0].asString(), args[1].i);
+            wa.registerSerialFilter(args[0].asString(), args[1].i);
           } catch (RuntimeException re) {
             throw new ProcessorError("bad regex: " + re.getCause().getMessage());
           }
@@ -1101,17 +1111,19 @@ public class OperandiScript implements Runnable, Disposable {
     setExtDef(FN_SERIAL_ON_RX_CLEAR, "() - clears all filters",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        currentWA.clearSerialFilters();
+        UIWorkArea wa = ((MObj)p.getMe().ref).workarea;
+        wa.clearSerialFilters();
         return null;
       }
     });
     setExtDef(FN_SERIAL_ON_RX_LIST, "() - returns current filters and corresponding functions",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-        List<UIWorkArea.RxFilter> filters = currentWA.getSerialFilters();
+        UIWorkArea wa = ((MObj)p.getMe().ref).workarea;
+        List<UIWorkArea.RxFilter> filters = wa.getSerialFilters();
         MListMap listMap = new MListMap();
         for (UIWorkArea.RxFilter f :filters) {
-          String func = comp.getLinker().lookupAddressFunction(f.addr);
+          String func = wa.getScript().comp.getLinker().lookupAddressFunction(f.addr);
           if (func == null) {
             func = String.format("0x%08x", f.addr);
           }
@@ -1123,17 +1135,18 @@ public class OperandiScript implements Runnable, Disposable {
     setExtDef(FN_SERIAL_ON_RX_REPLAY, "(<log>) - runs given text through filters, or whole log if none given",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
+        UIWorkArea wa = ((MObj)p.getMe().ref).workarea;
          String text;
          if (args.length > 0) {
            text = args[0].asString();
          } else {
-           text = currentWA.getSerialView().getSelectedText();
+           text = wa.getSerialView().getSelectedText();
          }
          BufferedReader bufReader = new BufferedReader(new StringReader(text));
          String line;
          try {
            while((line = bufReader.readLine()) != null) {
-             currentWA.handleSerialLine(line);
+             wa.handleSerialLine(line);
            }
          } catch (IOException ignore) {}
 
@@ -1143,6 +1156,7 @@ public class OperandiScript implements Runnable, Disposable {
     setExtDef(FN_SERIAL_LOG_START, "() - starts logging the serial input",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
+        UIWorkArea wa = ((MObj)p.getMe().ref).workarea;
         synchronized (logLock) {
           if (logThread != null) return null;
 
@@ -1150,7 +1164,7 @@ public class OperandiScript implements Runnable, Disposable {
           logParseIx = 0;
           logMatch = null;
           log = new ByteArrayOutputStream();
-          login = currentWA.getSerial().attachSerialIO();
+          login = wa.getSerial().attachSerialIO();
           DisposableRunnable task = new DisposableRunnable() {
             @Override
             public void run() {
@@ -1169,7 +1183,7 @@ public class OperandiScript implements Runnable, Disposable {
                           logParseIx = log.size();
                           logLock.notifyAll();
                         }
-                      }                          
+                      }
                     } else {
                       logMatchIx = 0;
                     }
@@ -1180,7 +1194,7 @@ public class OperandiScript implements Runnable, Disposable {
                 AppSystem.dispose(this);
               }
             }
-            
+
             @Override
             public void dispose() {
               synchronized (logLock) {
@@ -1221,7 +1235,7 @@ public class OperandiScript implements Runnable, Disposable {
         int timeout = args.length > 1 ? args[1].asInt() : 0;
         synchronized (logLock) {
           if (logThread == null || log == null) return new M(-1);
-          
+
           logMatch = await.getBytes();
           logMatchIx = 0;
 
@@ -1240,7 +1254,7 @@ public class OperandiScript implements Runnable, Disposable {
               logMatchIx = 0;
             }
           }
-          
+
           // no match, await trigger
           logParseIx = data.length;
           AppSystem.waitSilently(logLock, timeout);
@@ -1352,6 +1366,8 @@ public class OperandiScript implements Runnable, Disposable {
       mobj = create3DMUIO();
     } else if (uio instanceof TuscedoTabPane) {
       mobj = createTuscedoTabPaneMUIO();
+    } else if (uio instanceof UIWorkArea) {
+      mobj = createWorkareaMUIO((UIWorkArea)uio);
     } else {
       mobj = new MObj(currentWA, comp, "uiobject") {
         @Override
@@ -1363,7 +1379,7 @@ public class OperandiScript implements Runnable, Disposable {
     addGenericUIMembers(mobj, uio);
     return mui;
   }
-    
+
   private MObj createGraphMUIO() {
     return new MObj(currentWA, comp, "graph") {
       @Override
@@ -1392,9 +1408,9 @@ public class OperandiScript implements Runnable, Disposable {
       }
     };
   }
-  
+
   private void createGraphFunctions() {
-    setExtDef("graph", "(<name>,(<data>,...,(<line|plot|bar>))) - opens a graph view", 
+    setExtDef("graph", "(<name>,(<data>,...,(<line|plot|bar>))) - opens a graph view",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         String name = "GRAPH";
@@ -1418,14 +1434,14 @@ public class OperandiScript implements Runnable, Disposable {
             }
           }
         }
-        
+
         Tab t = UISimpleTabPane.getTabByComponent(currentWA);
         if (t == null) {
           Tuscedo.inst().create(currentWA);
           t = UISimpleTabPane.getTabByComponent(currentWA);
         }
         String id = Tuscedo.inst().addGraphTab(t.getPane(), valVals, name);
-        SampleSet ui = ((SampleSet)Tuscedo.inst().getUIObject(id).getUI()); 
+        SampleSet ui = ((SampleSet)Tuscedo.inst().getUIObject(id).getUI());
         ui.setGraphType(type);
         ui.getUIInfo().setName(name);
         MObj mobj = createGraphMUIO();
@@ -1545,7 +1561,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("graph:get","(<index>) - returns sample at index", 
+    setExtDef("graph:get","(<index>) - returns sample at index",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -1622,8 +1638,8 @@ public class OperandiScript implements Runnable, Disposable {
         return new M((float)ss.getMax());
       }
     });
-    
-    
+
+
     setExtDef("graph:join", "(<graph>, ...) - join this graph with another, or others",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
@@ -1682,7 +1698,7 @@ public class OperandiScript implements Runnable, Disposable {
     });
 
   }
-  
+
   int parseGraphType(M a) {
     int type = UIGraphPanel.GRAPH_LINE;
     if (a.asString().equalsIgnoreCase("plot")) {
@@ -1693,7 +1709,67 @@ public class OperandiScript implements Runnable, Disposable {
     }
     return type;
   }
-  
+
+  private MObj createWorkareaMUIO(UIWorkArea wa) {
+    return new MObj(wa, comp, "workarea") {
+      @Override
+      public void init(UIWorkArea wa, Compiler comp) {
+        addFunc("get_ser", "workarea:get_ser", comp);
+      }
+    };
+  }
+
+  private void createWorkareaFunctions() {
+    setExtDef("workarea", "(<name>,(<tab|split_v|split_h|window>)) - opens a new workarea",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        Tab t = UISimpleTabPane.getTabByComponent(currentWA);
+        if (t == null) {
+          Tuscedo.inst().create(currentWA);
+          t = UISimpleTabPane.getTabByComponent(currentWA);
+        }
+        String name = "WORKAREA";
+        String mode = "tab";
+        List<List<Float>> valVals = new ArrayList<List<Float>>();
+        if (args != null) {
+          if (args.length > 0) {
+            name = args[0].asString();
+          }
+          if (args.length > 1) {
+            mode = args[1].asString();
+          }
+        }
+        String id = Tuscedo.inst().addWorkAreaTab(t.getPane(), null);
+        UIO ui = Tuscedo.inst().getUIObject(id).getUI();
+        ui.getUIInfo().setName(name);
+        MObj mobj = createWorkareaMUIO((UIWorkArea)ui);
+        M mui = new M(mobj);
+        addGenericUIMembers(mobj, ui);
+
+        // TODO PETER get_ser does not work when wa is not a tab. Find out why!
+        if (mode.equals("split_v")) {
+          ((UIWorkArea)ui).getCurrentView().splitOut(false);
+        }
+        else if (mode.equals("split_h")) {
+          ((UIWorkArea)ui).getCurrentView().splitOut(true);
+        }
+        else if (mode.equals("window")) {
+          t.getPane().evacuateTabToNewFrame(t, null);
+        }
+        return mui;
+      }
+    });
+    setExtDef("workarea:get_ser", "() - returns the serial of the workarea",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIWorkArea wa = (UIWorkArea)getUIOByScriptId(p.getMe());
+        OperandiScript otherScript = wa.getScript();
+        int addr = otherScript.comp.getLinker().lookupVariableAddress(null, VAR_SERIAL);
+        return otherScript.proc.getMemory()[addr];
+      }
+    });
+  }
+
   private MObj createCanvasMUIO() {
     return new MObj(currentWA, comp, "canvas") {
       @Override
@@ -1711,7 +1787,7 @@ public class OperandiScript implements Runnable, Disposable {
       }
     };
   }
-  
+
   private void addOperandiUIListener(UIO ui) {
     ui.getUIInfo().addListener(new UIListener() {
       @Override
@@ -1787,16 +1863,16 @@ public class OperandiScript implements Runnable, Disposable {
             }
           }
         }
-        
+
         Tab tab = UISimpleTabPane.getTabByComponent(currentWA);
         if (tab == null) {
           Tuscedo.inst().create(currentWA);
           tab = UISimpleTabPane.getTabByComponent(currentWA);
         }
         String id = Tuscedo.inst().addCanvasTab(tab.getPane(), w, h);
-        UICanvasPanel ui = ((UICanvasPanel)Tuscedo.inst().getUIObject(id).getUI()); 
+        UICanvasPanel ui = ((UICanvasPanel)Tuscedo.inst().getUIObject(id).getUI());
         ui.getUIInfo().setName(name);
-        
+
         MObj mobj = createCanvasMUIO();
         M mui = new M(mobj);
         addGenericUIMembers(mobj, ui);
@@ -1904,7 +1980,7 @@ public class OperandiScript implements Runnable, Disposable {
       }
     });
   }
-  
+
   private MObj create3DMUIO() {
     return new MObj(currentWA, comp, "graph3d") {
       @Override
@@ -1955,7 +2031,7 @@ public class OperandiScript implements Runnable, Disposable {
     for (int y = 0; y < h; y++) {
       for (int x = 0; x < w; x++) {
         MSet mset = m.ref.get(y).ref.get(x).ref;
-        f[x][y] = new float[] {mset.get(0).asFloat(), 
+        f[x][y] = new float[] {mset.get(0).asFloat(),
             Scene3D.colToFloat(mset.get(1).asFloat(), mset.get(2).asFloat(), mset.get(3).asFloat())};
       }
     }
@@ -1988,7 +2064,7 @@ public class OperandiScript implements Runnable, Disposable {
       for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
           MSet mset = m.ref.get(z).ref.get(y).ref.get(x).ref;
-          f[x][y][z] = new float[] {mset.get(0).asFloat(), 
+          f[x][y][z] = new float[] {mset.get(0).asFloat(),
               Scene3D.colToFloat(mset.get(1).asFloat(), mset.get(2).asFloat(), mset.get(3).asFloat())};
         }
       }
@@ -2035,12 +2111,12 @@ public class OperandiScript implements Runnable, Disposable {
             }
           }
         }
-        
+
         w = ((w+99)/100)*100;
-        
-        String id = Tuscedo.inst().addGraph3dTab(tpane, w, h, 
+
+        String id = Tuscedo.inst().addGraph3dTab(tpane, w, h,
             model);
-        RenderSpec ui = ((RenderSpec)Tuscedo.inst().getUIObject(id).getUI()); 
+        RenderSpec ui = ((RenderSpec)Tuscedo.inst().getUIObject(id).getUI());
         ui.getUIInfo().setName(name);
         MObj mobj = create3DMUIO();
         M mui = new M(mobj);
@@ -2144,7 +2220,7 @@ public class OperandiScript implements Runnable, Disposable {
         if (rs == null) return null;
 
         UI3DPanel src = ((UI3DPanel)rs.getUIInfo().getParent().getUI());
-        
+
         for (int i = 0; i < args.length; i++) {
           RenderSpec rschild = (RenderSpec)getUIOByScriptId(args[i]);
           if (rschild == null) continue;
@@ -2273,7 +2349,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    
+
     setExtDef("graph3dmarker:get_pos", "() - returns marker position as a vector", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         M m = p.getMe();
@@ -2352,7 +2428,7 @@ public class OperandiScript implements Runnable, Disposable {
       }
     });
   }
-  
+
   private MObj create3DMarkerMUIO(RenderSpec.Marker mark) {
     MObj mo = new MObj(currentWA, comp, "graph3dmarker") {
       @Override
@@ -2370,7 +2446,7 @@ public class OperandiScript implements Runnable, Disposable {
   }
 
   private void createGenericUIFunctions() {
-    setExtDef(FN_UI_CLOSE,  "() - closes this ui instance", 
+    setExtDef(FN_UI_CLOSE,  "() - closes this ui instance",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO uio = getUIOByScriptId(p.getMe());
@@ -2378,7 +2454,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef(FN_UI_GET_ANCESTOR,  "() - returns ancestor of this ui instance", 
+    setExtDef(FN_UI_GET_ANCESTOR,  "() - returns ancestor of this ui instance",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO uio = getUIOByScriptId(p.getMe());
@@ -2388,7 +2464,7 @@ public class OperandiScript implements Runnable, Disposable {
         return createGenericMUIObj(parenInf.getUI());
       }
     });
-    setExtDef(FN_UI_GET_PARENT,  "() - returns parent of this ui instance", 
+    setExtDef(FN_UI_GET_PARENT,  "() - returns parent of this ui instance",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO uio = getUIOByScriptId(p.getMe());
@@ -2398,7 +2474,7 @@ public class OperandiScript implements Runnable, Disposable {
         return createGenericMUIObj(parenInf.getUI());
       }
     });
-    setExtDef(FN_UI_GET_CHILDREN,  "() - returns children of this ui instance", 
+    setExtDef(FN_UI_GET_CHILDREN,  "() - returns children of this ui instance",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO uio = getUIOByScriptId(p.getMe());
@@ -2411,7 +2487,7 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(msetc);
       }
     });
-    setExtDef(FN_UI_SET_NAME,  "(<name>) - sets name of this ui instance", 
+    setExtDef(FN_UI_SET_NAME,  "(<name>) - sets name of this ui instance",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0)  return null;
@@ -2426,7 +2502,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef(FN_UI_GET_NAME, "() - returns name of this ui instance", 
+    setExtDef(FN_UI_GET_NAME, "() - returns name of this ui instance",
          new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO uio = getUIOByScriptId(p.getMe());
@@ -2436,7 +2512,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef(FN_UI_GET_ID, "() - returns id of this ui instance", 
+    setExtDef(FN_UI_GET_ID, "() - returns id of this ui instance",
          new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO uio = getUIOByScriptId(p.getMe());
@@ -2541,9 +2617,9 @@ public class OperandiScript implements Runnable, Disposable {
       }
     };
   }
-  
+
   private void createTuscedoTabPaneFunctions() {
-    setExtDef("pane:set_pos", "(<x>, <y>) - sets position of this ui component", 
+    setExtDef("pane:set_pos", "(<x>, <y>) - sets position of this ui component",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 2)  return null;
@@ -2554,7 +2630,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("pane:get_pos",  "() - returns position of this ui component", 
+    setExtDef("pane:get_pos",  "() - returns position of this ui component",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         TuscedoTabPane tp= (TuscedoTabPane)getUIOByScriptId(p.getMe());
@@ -2566,7 +2642,7 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(l);
       }
     });
-    setExtDef("pane:set_size",  "(<w>, <h>) - sets size of this ui component", 
+    setExtDef("pane:set_size",  "(<w>, <h>) - sets size of this ui component",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length < 2)  return null;
@@ -2577,7 +2653,7 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef("pane:get_size",  "() - returns size of this ui component", 
+    setExtDef("pane:get_size",  "() - returns size of this ui component",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         TuscedoTabPane tp= (TuscedoTabPane)getUIOByScriptId(p.getMe());
@@ -2600,7 +2676,7 @@ public class OperandiScript implements Runnable, Disposable {
     }
   }
   class RunRequest {
-    public final UIWorkArea wa; 
+    public final UIWorkArea wa;
     public final Source src;
     public final int callAddr;
     public List<M> args;
@@ -2619,7 +2695,7 @@ public class OperandiScript implements Runnable, Disposable {
   public int lookupFunc(String f) {
     return comp.getLinker().lookupFunctionAddress(f);
   }
-  
+
   static void populateAppVariables() {
     appVariables.put("__appversion", new M(Essential.vMaj + "." + Essential.vMin + "." + Essential.vMic));
     appVariables.put("__appname", new M(Essential.name));
