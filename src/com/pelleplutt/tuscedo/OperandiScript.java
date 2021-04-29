@@ -1763,22 +1763,6 @@ public class OperandiScript implements Runnable, Disposable {
     setExtDef("workarea:get_ser", "() - returns the serial of the workarea",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
-
-
-
-
-        M me = p.getMe();
-        if (me == null || me.type != Processor.TSET)         currentWA.appendViewText(currentWA.getCurrentView(), "ME is null or not set\n", UICommon.STYLE_OP_DBG);
-        M uioId = me.ref.get(new M(KEY_UI_ID));
-        if (uioId == null || uioId.type != Processor.TSTR)          currentWA.appendViewText(currentWA.getCurrentView(), "uioid bad: " + uioId + "\n", UICommon.STYLE_OP_DBG);
-        currentWA.appendViewText(currentWA.getCurrentView(), "uioid:" + uioId.str + "\n", UICommon.STYLE_OP_DBG);
-        UIInfo inf = Tuscedo.inst().getUIObject(uioId.str);
-        if (inf == null)          currentWA.appendViewText(currentWA.getCurrentView(), "uio has not associated info\n", UICommon.STYLE_OP_DBG);
-    
-
-
-
-
         UIWorkArea wa = (UIWorkArea)getUIOByScriptId(p.getMe());
         OperandiScript otherScript = wa.getScript();
         int addr = otherScript.comp.getLinker().lookupVariableAddress(null, VAR_SERIAL);
