@@ -427,6 +427,7 @@ public class UISimpleTabPane extends JPanel implements UIO {
     Tab newTab = newPane.createTab(null, tab.content);
     for (UIInfo cuio : children) {
       newTab.getUIInfo().addChild(cuio);
+      UIInfo.fireEventOnCreated(cuio);
       cuio.addListener(newTab);
     }
     newTab.setText(tab.getUIInfo().getName());
@@ -450,6 +451,7 @@ public class UISimpleTabPane extends JPanel implements UIO {
     Tab newTab = newPane.createTab(null, tab.content);
     for (UIInfo cuio : children) {
       newTab.getUIInfo().addChild(cuio);
+      UIInfo.fireEventOnCreated(cuio);
       cuio.addListener(newTab);
     }
     newTab.setText(tab.getUIInfo().getName());
@@ -606,6 +608,7 @@ public class UISimpleTabPane extends JPanel implements UIO {
                   Tab evaTab = t.owner.createTab(null, dragSource.content);
                   for (UIInfo cuio : children) {
                     evaTab.getUIInfo().addChild(cuio);
+                    UIInfo.fireEventOnCreated(cuio);
                     cuio.addListener(evaTab);
                   }
                   evaTab.setText(dragSource.getUIInfo().getName());

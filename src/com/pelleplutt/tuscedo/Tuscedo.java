@@ -213,9 +213,18 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     stp.selectTab(t);
     return cp.getUIInfo().getId();
   }
-
+  
   public UIInfo getUIObject(String id) {
-    return uiobjects.get(id);
+    UIInfo uii = uiobjects.get(id);
+    if (uii == null) {
+      Log.println("WARN: tried to get uiinfo for id '" + id + "' but none found");
+      Log.println("existing ids:");
+      for (Entry<String, UIInfo> e: uiobjects.entrySet()) {
+        Log.println(e.getKey() + ":" + e.getValue());
+      }
+      new Error("null uiinfo").printStackTrace();
+    }
+    return uii;
   }
 
 
@@ -429,7 +438,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
 
   @Override
   public void onRemoved(UIO parent, UIO child) {
-    Log.println("deregister " + child.getUIInfo().asString());
+    Log.println("onRemoved " + child.getUIInfo().asString());
     uiobjects.remove(child.getUIInfo().getId());
   }
 
@@ -440,10 +449,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
 
   @Override
   public void onClosed(UIO parent, UIO child) {
-//    System.out.println("onClosed   " +
-//      stringify(child.getUIInfo(), 0) +
-//      "  in  " +
-//      (parent == null ? "null":stringify(parent.getUIInfo(), 0)));
+    Log.println("onClosed " + child.getUIInfo().asString());
     uiobjects.remove(child.getUIInfo().getId());
     child.onClose();
   }
@@ -451,7 +457,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   @Override
   public void onCreated(UIInfo i) {
     uiobjects.put(i.getId(), i);
-    Log.println("register " + i.asString());
+    Log.println("onCreated " + i.asString());
   }
 
   @Override
