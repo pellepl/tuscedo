@@ -271,6 +271,11 @@ public class UISimpleTabPane extends JPanel implements UIO {
     }
   }
 
+  public void moveTabBefore(String id, String beforeId) {
+    int ix = tabs.indexOf(getTab(beforeId));
+    if (ix < 0) return;
+    moveTabBefore(id, ix);
+  }
   public void moveTabBefore(String id, int index) {
     Tab t = getTab(id);
     if (t == null)
@@ -286,6 +291,11 @@ public class UISimpleTabPane extends JPanel implements UIO {
     computeLayout();
   }
 
+  public void moveTabAfter(String id, String afterId) {
+    int ix = tabs.indexOf(getTab(afterId));
+    if (ix < 0) return;
+    moveTabAfter(id, ix);
+  }
   public void moveTabAfter(String id, int index) {
     Tab t = getTab(id);
     if (t == null)

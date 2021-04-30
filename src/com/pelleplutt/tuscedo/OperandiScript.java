@@ -100,6 +100,14 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_UI_GET_KEY_PRESS = "ui:get_key_press";
   public static final String FN_UI_GET_KEY_RELEASE = "ui:get_key_release";
 
+  public static final String FN_UI_PLACE_TAB_BEFORE = "ui:place_tab_before";
+  public static final String FN_UI_PLACE_TAB_AFTER = "ui:place_tab_after";
+  public static final String FN_UI_PLACE_TAB_FIRST = "ui:place_tab_first";
+  public static final String FN_UI_PLACE_TAB_LAST = "ui:place_tab_last";
+  // TODO PETER
+  public static final String FN_UI_DETACH_WINDOW = "ui:detach_window";
+  public static final String FN_UI_DETACH_SPLIT = "ui:detach_split";
+  
   public static final String KEY_UI_ID = ".uio_id";
 
   Executable exe, pexe;
@@ -1360,6 +1368,18 @@ public class OperandiScript implements Runnable, Disposable {
     f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_GET_KEY_RELEASE));
     f.type = Processor.TFUNC;
     mobj.putIntern("get_key_release", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_PLACE_TAB_AFTER));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("place_tab_after", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_PLACE_TAB_BEFORE));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("place_tab_before", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_PLACE_TAB_FIRST));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("place_tab_first", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_PLACE_TAB_LAST));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("place_tab_last", f);
   }
 
   private M createGenericMUIObj(UIO uio) {
@@ -2475,6 +2495,17 @@ public class OperandiScript implements Runnable, Disposable {
     });
   }
 
+  static Component searchForComponentUpwards(UIO o) {
+    while (o != null && !(o instanceof Component)) {
+      if (o.getUIInfo().getParentUI() != null) {
+        o = o.getUIInfo().getParentUI();
+      } else {
+        o = null;
+      }
+    }
+    return o == null || !(o instanceof Component) ? null : (Component)o;
+  }
+
   private MObj create3DMarkerMUIO(RenderSpec.Marker mark) {
     MObj mo = new MObj(currentWA, comp, "graph3dmarker") {
       @Override
@@ -2648,7 +2679,52 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(ui.keyrel);
       }
     });
-
+    setExtDef(FN_UI_PLACE_TAB_AFTER, "(<ui>) - places this ui after given ui in tab order",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        UIO uio = getUIOByScriptId(p.getMe());
+        if (uio == null || !(uio instanceof Component)) return null;
+        UIO uioother = getUIOByScriptId(args[0]);
+        if (uioother == null || !(uioother instanceof Component)) return null;
+        Tab tthis = UISimpleTabPane.getTabByComponent(searchForComponentUpwards(uio));
+        Tab tthat = UISimpleTabPane.getTabByComponent(searchForComponentUpwards(uioother));
+        tthis.getPane().moveTabAfter(tthis.getID(), tthat.getID());
+        return null;
+      }
+    });
+    setExtDef(FN_UI_PLACE_TAB_BEFORE, "(<ui>) - places this ui before given ui in tab order",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        UIO uio = getUIOByScriptId(p.getMe());
+        if (uio == null || !(uio instanceof Component)) return null;
+        UIO uioother = getUIOByScriptId(args[0]);
+        if (uioother == null || !(uioother instanceof Component)) return null;
+        Tab tthis = UISimpleTabPane.getTabByComponent(searchForComponentUpwards(uio));
+        Tab tthat = UISimpleTabPane.getTabByComponent(searchForComponentUpwards(uioother));
+        tthis.getPane().moveTabBefore(tthis.getID(), tthat.getID());
+        return null;
+      }
+    });
+    setExtDef(FN_UI_PLACE_TAB_FIRST, "() - places this ui first in tab order",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO uio = getUIOByScriptId(p.getMe());
+        Tab tthis = UISimpleTabPane.getTabByComponent(searchForComponentUpwards(uio));
+        tthis.getPane().moveTabBefore(tthis.getID(), 0);
+        return null;
+      }
+    });
+    setExtDef(FN_UI_PLACE_TAB_LAST, "() - places this ui last in tab order",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO uio = getUIOByScriptId(p.getMe());
+        Tab tthis = UISimpleTabPane.getTabByComponent(searchForComponentUpwards(uio));
+        tthis.getPane().moveTabAfter(tthis.getID(), tthis.getPane().getTabCount()-1);
+        return null;
+      }
+    });
   }
 
 
