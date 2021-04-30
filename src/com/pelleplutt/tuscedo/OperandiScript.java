@@ -744,9 +744,16 @@ public class OperandiScript implements Runnable, Disposable {
     }
   }
 
-  public void runScript(UIWorkArea wa, File f, String s, String[] args) {
+  public void runScript(UIWorkArea wa, File f, String ignored, String[] args) {
     synchronized (q) {
-      q.add(new RunRequest(wa, new Source.SourceFile(f, s), args));
+      q.add(new RunRequest(wa, new Source.SourceFile(f, ignored), args));
+      q.notifyAll();
+    }
+  }
+
+  public void runScript(UIWorkArea wa, String src, String origin, String[] args) {
+    synchronized (q) {
+      q.add(new RunRequest(wa, new Source.SourceString(origin, src), args));
       q.notifyAll();
     }
   }
@@ -1715,6 +1722,9 @@ public class OperandiScript implements Runnable, Disposable {
       @Override
       public void init(UIWorkArea wa, Compiler comp) {
         addFunc("get_ser", "workarea:get_ser", comp);
+        addFunc("load_script", "workarea:load_script", comp);
+        addFunc("run_script", "workarea:run_script", comp);
+        addFunc("reset", "workarea:reset", comp);
       }
     };
   }
@@ -1730,7 +1740,6 @@ public class OperandiScript implements Runnable, Disposable {
         }
         String name = "WORKAREA";
         String mode = "tab";
-        List<List<Float>> valVals = new ArrayList<List<Float>>();
         if (args != null) {
           if (args.length > 0) {
             name = args[0].asString();
@@ -1746,14 +1755,11 @@ public class OperandiScript implements Runnable, Disposable {
         M mui = new M(mobj);
         addGenericUIMembers(mobj, ui);
 
-        // TODO PETER get_ser does not work when wa is not a tab. Find out why!
         if (mode.equals("split_v")) {
           ((UIWorkArea)ui).getCurrentView().splitOut(false);
-        }
-        else if (mode.equals("split_h")) {
+        } else if (mode.equals("split_h")) {
           ((UIWorkArea)ui).getCurrentView().splitOut(true);
-        }
-        else if (mode.equals("window")) {
+        } else if (mode.equals("window")) {
           Tab tw = UISimpleTabPane.getTabByComponent((UIWorkArea)ui);
           tw.getPane().evacuateTabToNewFrame(tw, null);
         }
@@ -1767,6 +1773,44 @@ public class OperandiScript implements Runnable, Disposable {
         OperandiScript otherScript = wa.getScript();
         int addr = otherScript.comp.getLinker().lookupVariableAddress(null, VAR_SERIAL);
         return otherScript.proc.getMemory()[addr];
+      }
+    });
+    setExtDef("workarea:load_script", "(<path>, ... <args>) - runs operandi script file in the work area",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) throw new ProcessorError("Must give arguments");
+        UIWorkArea wa = (UIWorkArea)getUIOByScriptId(p.getMe());
+        OperandiScript otherScript = wa.getScript();
+        File f = new File(args[0].asString());
+        if (!f.exists() || !f.isFile()) {
+          throw new ProcessorError("Script file '" + f.getAbsolutePath() + "' cannot be found.");
+        }
+        String[] sargs = new String[args.length-1];
+        for (int i = 1; i < args.length; i++) sargs[i-1] = args[i].asString();
+        otherScript.runScript(wa, f, ""/*ignored*/, sargs);
+        return null;
+      }
+    });
+    setExtDef("workarea:run_script", "(<script>, ... <args>) - runs operandi script in the work area",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) throw new ProcessorError("Must give arguments");
+        UIWorkArea wa = (UIWorkArea)getUIOByScriptId(p.getMe());
+        OperandiScript otherScript = wa.getScript();
+        String[] sargs = new String[args.length-1];
+        for (int i = 1; i < args.length; i++) sargs[i-1] = args[i].asString();
+        otherScript.runScript(wa, args[0].asString(), currentWA.getUIInfo().getId(), sargs);
+        return null;
+      }
+    });
+    setExtDef("workarea:reset", "() - resets this work areas processor",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIWorkArea wa = (UIWorkArea)getUIOByScriptId(p.getMe());
+        OperandiScript otherScript = wa.getScript();
+        otherScript.resetForce();
+        otherScript.runOperandiInitScripts(wa);
+        return null;
       }
     });
   }
