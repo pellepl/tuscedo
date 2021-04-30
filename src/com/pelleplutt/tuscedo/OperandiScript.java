@@ -1673,6 +1673,7 @@ public class OperandiScript implements Runnable, Disposable {
             over.removeSampleSet(ssover);
             UIGraphPanel src = ((UIGraphPanel)sssrc.getUIInfo().getParent().getUI());
             src.addSampleSet(ssover);
+            UIInfo.fireEventOnCreated(ssover.getUIInfo());
           }
         }
       }
