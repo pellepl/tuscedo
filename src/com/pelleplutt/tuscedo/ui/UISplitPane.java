@@ -27,7 +27,7 @@ public class UISplitPane extends JSplitPane implements UIO, UIListener {
   public UISplitPane(int orientation) {
     super(orientation);
     uiinfo = new UIInfo(this, "splitter" + (__id++), "");
-    UIInfo.fireEventOnCreated(uiinfo);
+    //UIInfo.fireEventOnCreated(uiinfo);
   }
 
   @Override

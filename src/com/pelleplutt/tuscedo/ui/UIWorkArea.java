@@ -193,7 +193,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
         public void gotSuggestions(List<String> suggestions) {
           onGotSuggestions(istateNum, suggestions);
           if (suggestions == null) {
-            setInfo(null);
+              setInfo(null);
           } else {
             int s = suggestions.size();
             if (s > 1) {

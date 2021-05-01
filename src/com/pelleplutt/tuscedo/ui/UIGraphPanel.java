@@ -859,9 +859,13 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         set.tagsHidden = true;
         repaint();
       } else if (e.getActionCommand().equals("Export")) {
-        File f = UIUtil.selectFile(renderer,
+        SwingUtilities.invokeLater(new Runnable() {
+          public void run() {
+            File f = UIUtil.selectFile(UIGraphPanel.this,
             "Export graph \"" + set.getUIInfo().getName() + "\"", "Export");
-        set.export(f);
+            set.export(f);
+          }
+        });
       }
     }
   };

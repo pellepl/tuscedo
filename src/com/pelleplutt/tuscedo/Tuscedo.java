@@ -83,7 +83,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   public void registerWindow(Window w) {
     synchronized (windows) {
       windows.add(w);
-      //Log.println("window registered " + windows.size());
+      Log.println("window registered " + windows.size());
       w.addWindowListener(new WindowAdapter() {
         @Override
         public void windowClosing(WindowEvent e) {
@@ -92,7 +92,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
             if (w == null) return;
             w.setVisible(false);
             windows.remove(w);
-            //Log.println("window deregistered " + windows.size());
+            Log.println("window deregistered " + windows.size());
             if (windows.isEmpty()) {
               Tuscedo.onExit();
             }
@@ -419,6 +419,10 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
         scene3d.notifyAll();
       }
     }
+    try {
+      Thread.sleep(60); // why? well - why not?
+    } catch (Throwable t) {}
+    System.exit(0);
   }
 
   @Override
@@ -440,6 +444,8 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   public void onRemoved(UIO parent, UIO child) {
     Log.println("onRemoved " + child.getUIInfo().asString());
     uiobjects.remove(child.getUIInfo().getId());
+    Log.println(uiobjects.size() + " uios left");
+    if (uiobjects.isEmpty()) onExit();
   }
 
   @Override

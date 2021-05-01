@@ -2720,7 +2720,8 @@ public class OperandiScript implements Runnable, Disposable {
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO uio = getUIOByScriptId(p.getMe());
-        Tab tthis = UISimpleTabPane.getTabByComponent(searchForComponentUpwards(uio));
+        if (uio == null || !(uio instanceof Component)) return null;
+        Tab tthis = UISimpleTabPane.getTabByComponent((Component)uio);
         tthis.getPane().moveTabAfter(tthis.getID(), tthis.getPane().getTabCount()-1);
         return null;
       }
