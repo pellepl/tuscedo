@@ -490,14 +490,13 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   }
 
   private void recurseFind(UIInfo i, List<UIO> res, Class<?> clz) {
+    System.out.println(i.getUI().getClass().getSimpleName());
     if (clz.isInstance(i.getUI())) res.add(i.getUI());
     for (UIInfo c : i.children) recurseFind(c, res, clz);
   }
   public void getUiComponents(List<UIO> res, Class<?> clz) {
     for (Entry<String, UIInfo> e : uiobjects.entrySet()) {
-      if (e.getValue().getParent() == null) {
-        recurseFind(e.getValue(), res, clz);
-      }
+      recurseFind(e.getValue(), res, clz);
     }
   }
 
