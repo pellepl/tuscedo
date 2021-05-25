@@ -1412,6 +1412,7 @@ public class OperandiScript implements Runnable, Disposable {
       @Override
       public void init(UIWorkArea wa, Compiler comp) {
         addFunc("add", "graph:add", comp);
+        addFunc("set_data", "graph:set_data", comp);
         addFunc("tag", "graph:tag", comp);
         addFunc("data", "graph:data", comp);
         addFunc("zoom_all", "graph:zoom_all", comp);
@@ -1517,6 +1518,24 @@ public class OperandiScript implements Runnable, Disposable {
           msetc.add(new M((float)d));
         }
         return new M(msetc);
+      }
+    });
+    setExtDef("graph:set_data", "(<data>) - replaces data of graph",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
+        if (ss == null) return null;
+        List<Double> set = new ArrayList<Double>();
+        if (args[0].type != Processor.TSET) {
+          set.add((double)args[0].asFloat());
+        } else {
+          for (int i = 0; i < args[0].ref.size(); i++) {
+            set.add((double)args[0].ref.get(i).asFloat());
+          }
+        }
+        ss.setSamples(set);
+        return null;
       }
     });
     setExtDef("graph:zoom_all", "() - makes all data visible",

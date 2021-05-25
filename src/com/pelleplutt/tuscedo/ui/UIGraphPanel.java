@@ -201,8 +201,20 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       tags.put(sampleIx, (p == null ? "" : p + " ") + tag);
     }
 
+    public void setSamples(List<Double> data) {
+      samples.clear();
+      for (double d : data) {
+        addSampleInternal(d);
+      }
+      UIInfo par = getUIInfo().getParent();
+      if (par != null && par.getUI() instanceof UIGraphPanel) {
+        ((UIGraphPanel) par.getUI()).sampleUpdate(false);
+      }
+    }
+
     protected void addSampleInternal(double sample) {
       if (samples.isEmpty()) {
+        sum = 0;
         minSample = sample;
         maxSample = sample;
       } else {
@@ -707,9 +719,17 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     repaint();
   }
 
+  protected void sampleUpdate(boolean updateMinMax) {
+    if (updateMinMax) {
+      renderer.recalcSize(getMaxSample(), getMinSample(), magHor, magVer,
+          getSampleCount());
+    } else {
+      renderer.recalcSize(magHor, magVer, getSampleCount());
+    }
+    repaint();
+  }
   protected void sampleUpdate() {
-    renderer.recalcSize(getMaxSample(), getMinSample(), magHor, magVer,
-        getSampleCount());
+    sampleUpdate(true);
     repaint();
   }
 
@@ -964,8 +984,14 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   class Renderer extends JPanel {
     Dimension __d = new Dimension();
 
+    double maxSpl = 10, minSpl = 0;
+    public void recalcSize(double magHor, double magVer, int samples) {
+      recalcSize(maxSpl, minSpl, magHor, magVer, samples);
+    }
     public void recalcSize(double maxSample, double minSample, double magHor,
         double magVer, int samples) {
+      maxSpl = maxSample;
+      minSpl = minSample;
       int h = (int) Math.round((maxSample - Math.min(0, minSample)) * magVer);
       int w = (int) Math.round(samples * magHor);
       __d.width = w;
