@@ -30,7 +30,7 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
   static final int MODEL_ROLL_RIGHT = (1<<13);
   static final int MODEL_PITCH_UP = (1<<14);
   static final int MODEL_PITCH_DOWN = (1<<15);
-  
+
   volatile int keys = 0;
   volatile BufferedImage pri;
   JScrollPane scrl;
@@ -39,15 +39,15 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
   Color color = Color.black;
   final UIInfo uiinfo;
   static int __id = 0;
-  
+
   static Cursor blankCursor;
   static {
     BufferedImage cursorImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
     blankCursor = Toolkit.getDefaultToolkit().createCustomCursor(cursorImg, new Point(0, 0), "blank cursor");
   }
-  
+
   RenderSpec renderSpec;
-  
+
   public UIInfo getUIInfo() {
     return uiinfo;
   }
@@ -63,7 +63,7 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
       }
     }
   }
-  
+
   Timer.Entry timerEntry = null;
   Runnable keyTask = new Runnable() {
     public void run() {
@@ -121,7 +121,7 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
       blit();
     }
   };
-  
+
   void triggerKeys(int oldmask, int newmask) {
     keys = newmask;
     if (oldmask == 0) {
@@ -138,16 +138,16 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
       }
     }
   }
-  
+
   void registerMotionKeys(String key, String actionName, final int keymask) {
-    UICommon.defineAnonAction(renderer, actionName + ".press", key, 
+    UICommon.defineAnonAction(renderer, actionName + ".press", key,
         JComponent.WHEN_IN_FOCUSED_WINDOW, true, new AbstractAction() {
       @Override
       public void actionPerformed(ActionEvent e) {
         triggerKeys(keys, keys |= keymask);
       }
     });
-    UICommon.defineAnonAction(renderer, actionName + ".release", key, 
+    UICommon.defineAnonAction(renderer, actionName + ".release", key,
         JComponent.WHEN_IN_FOCUSED_WINDOW, false, new AbstractAction() {
       @Override
       public void actionPerformed(ActionEvent e) {
@@ -156,7 +156,7 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
     });
 
   }
-  
+
   public UI3DPanel(int w, int h, float[][] model) {
     uiinfo = new UIInfo(this, "3d" + __id, "3d"+__id);
     UIInfo.fireEventOnCreated(uiinfo);
@@ -168,24 +168,24 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
     renderer.setMinimumSize(d);
     renderer.setPreferredSize(d);
     renderer.setMaximumSize(d);
-    scrl = new JScrollPane(renderer, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, 
+    scrl = new JScrollPane(renderer, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
         JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-    scrl.getViewport().setScrollMode(JViewport.SIMPLE_SCROLL_MODE); // fix artefacts 
+    scrl.getViewport().setScrollMode(JViewport.SIMPLE_SCROLL_MODE); // fix artefacts
     setLayout(new BorderLayout());
     add(scrl, BorderLayout.CENTER);
     add(new UISlider(), BorderLayout.SOUTH);
     decorateUI();
-    
+
     renderer.addMouseListener(mouseCtrl);
     renderer.addMouseMotionListener(mouseCtrl);
     renderer.addMouseWheelListener(mouseCtrl);
-    
+
     try {
       robot = new Robot();
     } catch (AWTException e) {
       e.printStackTrace();
     }
-    
+
     int when = JComponent.WHEN_IN_FOCUSED_WINDOW;
     UICommon.defineCommonActions(renderer, when);
 
@@ -293,7 +293,7 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
   public void decorateUI() {
     UICommon.decorateScrollPane(scrl);
   }
-  
+
   Robot robot;
   MouseAdapter mouseCtrl = new MouseAdapter() {
     Point clickPointScreen;
@@ -303,7 +303,7 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
     @Override
     public void mouseDragged(MouseEvent e) {
       UI3DPanel.this.setCursor(blankCursor);
-      int dx = e.getXOnScreen() - clickPointScreen.x; 
+      int dx = e.getXOnScreen() - clickPointScreen.x;
       int dy = e.getYOnScreen() - clickPointScreen.y;
       if (dx != 0 || dy != 0) {
         renderSpec.cameraUpdate(-dx*2f, -dy*2f, 0);
@@ -348,21 +348,21 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
     }
     return _g;
   }
-  
+
   public void setColor(int color) {
     Graphics2D g = getPriGraphics();
     this.color = new Color(color);
     g.setColor(this.color);
   }
-  
+
   public int getWidth() {
     return pri.getWidth();
   }
-  
+
   public int getHeight() {
     return pri.getHeight();
   }
-  
+
   class Renderer extends JPanel {
     public void paint(Graphics og) {
       Graphics2D g = (Graphics2D)og;
@@ -372,11 +372,17 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
     }
   }
 
+  volatile boolean rendering = false;
   public void blit() {
-    render();
-    repaint();
+    if (rendering) return;
+    rendering = true;
+    SwingUtilities.invokeLater(() -> {
+      render();
+      repaint();
+      rendering = false;
+    });
   }
-  
+
   static final AffineTransform flip = AffineTransform.getScaleInstance(1d, -1d);
   synchronized void render() {
     Graphics2D g = getPriGraphics();
@@ -417,16 +423,16 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
 //        , Math.toDegrees(t)
 //        ), 100, 60);
     g.setColor(Color.green);
-    g.drawLine(34, 34+24, 
-        (int)(34 + -renderSpec.vdirx.x * 32), 
+    g.drawLine(34, 34+24,
+        (int)(34 + -renderSpec.vdirx.x * 32),
         (int)(34 + 24 + -renderSpec.vdirx.y * 32));
     g.setColor(Color.red);
-    g.drawLine(34, 34+24, 
-        (int)(34 + -renderSpec.vdiry.x * 32), 
+    g.drawLine(34, 34+24,
+        (int)(34 + -renderSpec.vdiry.x * 32),
         (int)(34 + 24 + -renderSpec.vdiry.y * 32));
     g.setColor(Color.yellow);
-    g.drawLine(34, 34+24, 
-        (int)(34 + -renderSpec.vdirz.x * 32), 
+    g.drawLine(34, 34+24,
+        (int)(34 + -renderSpec.vdirz.x * 32),
         (int)(34 + 24 + -renderSpec.vdirz.y * 32));
   }
 
@@ -485,9 +491,9 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
     blit();
     revalidate();
   }
-  
+
   List<RenderSpec> specs = new ArrayList<RenderSpec>();
-  
+
   public void addRenderSpec(RenderSpec spec) {
     if (!specs.contains(spec)) {
       specs.add(spec);
@@ -497,7 +503,7 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
     }
     blit();
   }
-  
+
   public void removeRenderSpec(RenderSpec spec) {
     if (specs.contains(spec) && spec.getUIInfo().getParentUI() == this) {
       getUIInfo().removeChild(spec);
@@ -505,7 +511,7 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
     }
 
   }
-  
+
   public RenderSpec getRenderSpec() {
     return renderSpec;
   }
