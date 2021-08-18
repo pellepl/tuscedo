@@ -11,12 +11,12 @@ public class RenderSpec implements UIO {
   public static final int PRIMITIVE_SOLID = 0;
   public static final int PRIMITIVE_WIREFRAME = 1;
   public static final int PRIMITIVE_DOTS = 2;
-  
+
   public static final int MODEL_HEIGHTMAP = 0;        // float[w][d]=h
   public static final int MODEL_HEIGHTMAP_COLOR = 1;  // float[w][d]=[h,r,g,b]
   public static final int MODEL_POINTCLOUD = 2;       // float[w][d][h]=v
   public static final int MODEL_POINTCLOUD_COLOR = 3; // float[w][d][h]=[v,r,g,b]
-  
+
   boolean depthTest;
   boolean cullFaces;
   int primitive;
@@ -40,18 +40,18 @@ public class RenderSpec implements UIO {
   final Vector3f vdirz = new Vector3f(0,0,1);
   static final Vector3f VUP = new Vector3f(0,1,0);
   static final Vector3f VDOWN = new Vector3f(0,-1,0);
-  
+
   final Matrix4f modelMatrix = new Matrix4f();
 
   public int modeltype;
   public Object model;
-  
+
   public boolean modelDataDirty;
   public boolean modelDirty;
-  
+
   public float gridMul = 1;
   public float gridContrast = 0.25f;
-  
+
   public int smoothOrFlat = 1;
   public float isolevel;
   public boolean faceted;
@@ -62,12 +62,12 @@ public class RenderSpec implements UIO {
   int numSculptureVertices;
   int numSculptureNormals;
   int numSculptureIndices;
-  
-  List<Marker> markers = new ArrayList<Marker>(); 
+
+  List<Marker> markers = new ArrayList<Marker>();
 
   private static int __id = 1;
   public final int id = __id++;
-  
+
   private volatile int __iter = 0;
 
   public void cameraUpdate(float dx, float dy, float droll)  {
@@ -79,20 +79,20 @@ public class RenderSpec implements UIO {
       qyaw.set(aayaw);
       qpitch.set(aapitch);
       qroll.set(aaroll);
-      
+
       // apply to current direction
       qdir.mul(qroll).mul(qpitch).mul(qyaw);
       qdir.normalize();
-  
+
       // get base vectors of rotation
       qdir.get(qrotm);
       qrotm.getColumn(0, vdirx);
       qrotm.getColumn(1, vdiry);
       qrotm.getColumn(2, vdirz);
     }
-    
+
     if (droll != 0) return; // no autolevel when rolling
-    
+
     // auto leveling
     float s = (float)Math.atan2(vdirx.y, vdirx.x);
     float adj = 0;
@@ -100,7 +100,7 @@ public class RenderSpec implements UIO {
     else if  (s > Math.PI) adj = (float)Math.PI-s;   //  91..180  -> 180
     else if (s < 0 && s > -Math.PI) adj = -s;        // -90..0    -> 0
     else if  (s < -Math.PI) adj = (float)-Math.PI-s; // -180..-91 -> -180
-    
+
     //if (Math.abs(adj) < Math.PI/64f || Math.abs(adj) > 63f*Math.PI/64f) return;
     float adjFact = Math.max(0, Math.abs(vdiry.y)*2f - 1f);
     aaroll.set(adj*0.0013f*adjFact, 0,0,1); // 0.0013 derived heuristically
@@ -117,7 +117,7 @@ public class RenderSpec implements UIO {
     vmove.set(vdirz).mul(step);
     playerPos.sub(vmove);
   }
-  
+
   public void cameraStrafe(float step) {
     vmove.set(vdirx).mul(step);
     playerPos.add(vmove);
@@ -127,7 +127,11 @@ public class RenderSpec implements UIO {
     vmove.set(vdiry).mul(step);
     playerPos.add(vmove);
   }
-  
+
+  public void cameraPosition(float x, float y, float z) {
+    playerPos.set(x,y,z);
+  }
+
   boolean glfinalized = false;
   public void glfinalize() {
     if (!glfinalized) {
@@ -158,14 +162,14 @@ public class RenderSpec implements UIO {
   @Override
   public void onClose() {
   }
-  
+
   public void modelRotate(float a, float x, float y, float z) {
     modelMatrix.rotate(a, x, y, z);
     for (RenderSpec rs : children) {
       rs.modelMatrix.rotate(a, x, y, z);
     }
   }
-  
+
   List<RenderSpec> children = new ArrayList<RenderSpec>();
   RenderSpec next() {
     if (__iter >= children.size()) {
@@ -183,17 +187,17 @@ public class RenderSpec implements UIO {
   public Matrix4f getModelMatrix() {
     return modelMatrix;
   }
-  
+
   public Marker addMarker(float x, float y, float z, float scale, float r, float g, float b) {
     Marker m = new Marker(x,y,z,scale,r,g,b);
     markers.add(m);
     return m;
   }
-  
+
   public void removeMarker(Marker m) {
     markers.remove(m);
   }
-  
+
   public static class Marker {
     float scale = 1f;
     Vector3f pos = new Vector3f();
@@ -236,7 +240,7 @@ public class RenderSpec implements UIO {
       return scale;
     }
   }
-  
+
   public static class Vector extends Marker {
     Vector3f dir = new Vector3f();
     public Vector(float x, float y, float z, float dx, float dy, float dz, float scale, float r, float g, float b) {

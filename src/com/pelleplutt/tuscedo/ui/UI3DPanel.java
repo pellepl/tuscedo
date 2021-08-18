@@ -144,6 +144,7 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
         JComponent.WHEN_IN_FOCUSED_WINDOW, true, new AbstractAction() {
       @Override
       public void actionPerformed(ActionEvent e) {
+        if (!UI3DPanel.this.isFocusOwner()) return;
         triggerKeys(keys, keys |= keymask);
       }
     });
@@ -151,6 +152,7 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
         JComponent.WHEN_IN_FOCUSED_WINDOW, false, new AbstractAction() {
       @Override
       public void actionPerformed(ActionEvent e) {
+        if (!UI3DPanel.this.isFocusOwner()) return;
         triggerKeys(keys, keys &= ~keymask);
       }
     });
@@ -256,6 +258,76 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
         blit();
       }
     });
+    UICommon.defineAnonAction(renderer, "3d.mov.origo", "0", when, new AbstractAction() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        if (!UI3DPanel.this.isFocusOwner()) return;
+        renderSpec.cameraPosition(0, 0, 0);
+        renderSpec.qdir.identity();
+        renderSpec.cameraUpdate(0, 0, 0);
+        blit();
+      }
+    });
+    UICommon.defineAnonAction(renderer, "3d.mov.distlookforw", "1", when, new AbstractAction() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        if (!UI3DPanel.this.isFocusOwner()) return;
+        renderSpec.cameraPosition(0,5,200);
+        renderSpec.qdir.identity();
+        renderSpec.cameraUpdate(0, 0, 0);
+        blit();
+      }
+    });
+    UICommon.defineAnonAction(renderer, "3d.mov.distlookback", "2", when, new AbstractAction() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        if (!UI3DPanel.this.isFocusOwner()) return;
+        renderSpec.cameraPosition(0,5,-200);
+        renderSpec.qdir.identity().rotationY((float)Math.PI);
+        renderSpec.cameraUpdate(0, 0, 0);
+        blit();
+      }
+    });
+    UICommon.defineAnonAction(renderer, "3d.mov.distlookleft", "3", when, new AbstractAction() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        if (!UI3DPanel.this.isFocusOwner()) return;
+        renderSpec.cameraPosition(-200,5,0);
+        renderSpec.qdir.identity().rotationY((float)-Math.PI*0.5f);
+        renderSpec.cameraUpdate(0, 0, 0);
+        blit();
+      }
+    });
+    UICommon.defineAnonAction(renderer, "3d.mov.distlookright", "4", when, new AbstractAction() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        if (!UI3DPanel.this.isFocusOwner()) return;
+        renderSpec.cameraPosition(200,5,0);
+        renderSpec.qdir.identity().rotationY((float)Math.PI*0.5f);
+        renderSpec.cameraUpdate(0, 0, 0);
+        blit();
+      }
+    });
+    UICommon.defineAnonAction(renderer, "3d.mov.distlookup", "5", when, new AbstractAction() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        if (!UI3DPanel.this.isFocusOwner()) return;
+        renderSpec.cameraPosition(0,200,0);
+        renderSpec.qdir.identity().rotationX((float)-Math.PI*0.5f);
+        renderSpec.cameraUpdate(0, 0, 0);
+        blit();
+      }
+    });
+    UICommon.defineAnonAction(renderer, "3d.mov.distlookdown", "6", when, new AbstractAction() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        if (!UI3DPanel.this.isFocusOwner()) return;
+        renderSpec.cameraPosition(0,-200,0);
+        renderSpec.qdir.identity().rotationX((float)Math.PI*0.5f);
+        renderSpec.cameraUpdate(0, 0, 0);
+        blit();
+      }
+    });
     registerMotionKeys("w", "3d.mov.forw", MOVE_FORWARD);
     registerMotionKeys("s", "3d.mov.back", MOVE_BACK);
     registerMotionKeys("a", "3d.mov.left", MOVE_LEFT);
@@ -299,6 +371,7 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
     Point clickPointScreen;
     @Override
     public void mouseClicked(MouseEvent arg0) {
+      UI3DPanel.this.requestFocus();
     }
     @Override
     public void mouseDragged(MouseEvent e) {
