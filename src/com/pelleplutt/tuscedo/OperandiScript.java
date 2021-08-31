@@ -1453,6 +1453,8 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("save", "graph:save", comp);
         addFunc("show", "graph:show", comp);
         addFunc("show_tags", "graph:show_tags", comp);
+        addFunc("x_to_index", "graph:x_to_index", comp);
+        addFunc("y_to_value", "graph:y_to_value", comp);
       }
     };
   }
@@ -1772,6 +1774,25 @@ public class OperandiScript implements Runnable, Disposable {
         if (ss == null || args.length == 0) return null;
         ss.setTagsHidden(args[0].asInt() == 0);
         return null;
+      }
+    });
+
+    setExtDef("graph:x_to_index", "(x) - recalculates a mouse x coordinate to graph index",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
+        if (ss == null || args.length == 0) return null;
+        UIGraphPanel cp = (UIGraphPanel)(getUIOByScriptId(p.getMe()).getUIInfo().getParentUI());
+        return new M(cp.mouseXToIndex(args[0].asInt()));
+      }
+    });
+    setExtDef("graph:y_to_value", "(y) - recalculates a mouse y coordinate to graph value",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
+        if (ss == null || args.length == 0) return null;
+        UIGraphPanel cp = (UIGraphPanel)(getUIOByScriptId(p.getMe()).getUIInfo().getParentUI());
+        return new M(cp.mouseYToValue(args[0].asInt()));
       }
     });
 

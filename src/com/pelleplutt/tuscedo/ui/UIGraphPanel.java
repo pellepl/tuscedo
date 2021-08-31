@@ -199,7 +199,6 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     public void addTag(int sampleIx, String tag) {
       String p = tags.get(sampleIx);
       tags.put(sampleIx, (p == null ? "" : p + " ") + tag);
-      repaint();
     }
 
     public void clearTags() {
@@ -1428,6 +1427,16 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         scrl.getVerticalScrollBar().setValue((int) (noffsV * magVer));
       }
     }
+  }
+
+  public int mouseXToIndex(int x) {
+    return (int)(x / magHor);
+  }
+
+  public double mouseYToValue(int y) {
+    int hh = renderer.getHeight();
+    double minGSample = getMinSample();
+    return (hh - selAnchorY) / magVer + minGSample;
   }
 
   MouseAdapter mouseHandler = new MouseAdapter() {
