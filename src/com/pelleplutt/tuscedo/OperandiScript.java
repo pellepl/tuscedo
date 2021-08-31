@@ -1897,6 +1897,7 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("draw_oval", "canvas:draw_oval", comp);
         addFunc("fill_oval", "canvas:fill_oval", comp);
         addFunc("draw_text", "canvas:draw_text", comp);
+        addFunc("draw_image", "canvas:draw_image", comp);
         addFunc("get_width", "canvas:width", comp);
         addFunc("get_height", "canvas:height", comp);
         addFunc("blit", "canvas:blit", comp);
@@ -1990,8 +1991,13 @@ public class OperandiScript implements Runnable, Disposable {
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         String name = "CANVAS";
-        int w = 300;
-        int h = 200;
+        Tab tab = UISimpleTabPane.getTabByComponent(currentWA);
+        if (tab == null) {
+          Tuscedo.inst().create(currentWA);
+          tab = UISimpleTabPane.getTabByComponent(currentWA);
+        }
+        int w = tab.getWidth();
+        int h = tab.getHeight();
         if (args != null && args.length > 0) {
           if (args[0].type == Processor.TSTR) {
             name = args[0].asString();
@@ -2009,11 +2015,6 @@ public class OperandiScript implements Runnable, Disposable {
           }
         }
 
-        Tab tab = UISimpleTabPane.getTabByComponent(currentWA);
-        if (tab == null) {
-          Tuscedo.inst().create(currentWA);
-          tab = UISimpleTabPane.getTabByComponent(currentWA);
-        }
         String id = Tuscedo.inst().addCanvasTab(tab.getPane(), w, h);
         UICanvasPanel ui = ((UICanvasPanel)Tuscedo.inst().getUIObject(id).getUI());
         ui.getUIInfo().setName(name);
@@ -2096,6 +2097,19 @@ public class OperandiScript implements Runnable, Disposable {
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
         if (cp == null) return null;
         cp.drawText(args[0].asInt(), args[1].asInt(), args[2].asString());
+        return null;
+      }
+    });
+    setExtDef("canvas:draw_image", "(<path to image>,<x>,<y>,(<w>,<h>)) - draws image",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 3)  return null;
+        UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        if (args.length < 5) 
+          cp.drawImage(args[1].asInt(), args[2].asInt(), args[0].asString());
+        else
+          cp.drawImage(args[1].asInt(), args[2].asInt(), args[3].asInt(), args[4].asInt(), args[0].asString());
         return null;
       }
     });

@@ -3,6 +3,7 @@ package com.pelleplutt.tuscedo.ui;
 import java.awt.*;
 import java.awt.image.*;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 
 public class UICanvasPanel extends JPanel implements UIO {
@@ -104,6 +105,20 @@ public class UICanvasPanel extends JPanel implements UIO {
   public void drawText(int x, int y, String s) {
     Graphics2D g = getSecGraphics();
     g.drawString(s, x, y);
+  }
+  
+  public void drawImage(int x, int y, String path) {
+    Graphics2D g = getSecGraphics();
+    try {
+      g.drawImage(ImageIO.read(new java.io.File(path)), x, y, null);
+    } catch(Throwable t) {}
+  }
+  
+  public void drawImage(int x, int y, int w, int h, String path) {
+    Graphics2D g = getSecGraphics();
+    try {
+      g.drawImage(ImageIO.read(new java.io.File(path)), x, y, w, h, null);
+    } catch(Throwable t) {}
   }
   
   public void blit() {
