@@ -128,6 +128,10 @@ public class UIInfo {
   public int irqMouseReleaseAddr = 0;
   public int irqKeyPressAddr = 0;
   public int irqKeyReleaseAddr = 0;
+  public int funcMousePressAddr = 0;
+  public int funcMouseReleaseAddr = 0;
+  public int funcKeyPressAddr = 0;
+  public int funcKeyReleaseAddr = 0;
 
   static List<UIListener> glisteners = new ArrayList<UIListener>();
   public void addListener(UIListener l) {
@@ -163,8 +167,12 @@ public class UIInfo {
   }
   void fireEventGeneric(UIO o, Object event) {
     List<UIListener> lstnr = new ArrayList<UIListener>(listeners);
-    for (UIListener l : lstnr) l.onEvent(o, event);
-    for (UIListener l : glisteners) l.onEvent(o, event);
+    for (UIListener l : lstnr) {
+      l.onEvent(o, event);
+    }
+    for (UIListener l : glisteners) {
+      l.onEvent(o, event);
+    }
   }
 
   public interface UIListener {

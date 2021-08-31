@@ -199,6 +199,12 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     public void addTag(int sampleIx, String tag) {
       String p = tags.get(sampleIx);
       tags.put(sampleIx, (p == null ? "" : p + " ") + tag);
+      repaint();
+    }
+
+    public void clearTags() {
+      tags.clear();
+      repaint();
     }
 
     public void setSamples(List<Double> data) {
@@ -381,9 +387,9 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     UIInfo.fireEventOnCreated(uiinfo);
 
     __id++;
-    addSampleSet(new SampleSet(name));
 
     renderer = new Renderer();
+    addSampleSet(new SampleSet(name));
     scrl = new JScrollPane(renderer, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
         JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
     scrl.getViewport().setScrollMode(JViewport.SIMPLE_SCROLL_MODE); // fix
@@ -699,6 +705,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     if (!sets.contains(set)) {
       sets.add(set);
       set.getUIInfo().addListener(UIGraphPanel.this);
+      set.getUIInfo().registerInteractionCallbacks(this, renderer); // TODO PETER is this correct?
       getUIInfo().addChild(set);
     }
     repaint();
@@ -715,6 +722,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     if (sets.contains(set)) {
       sets.remove(set);
       getUIInfo().removeChild(set);
+      set.getUIInfo().removeListener(UIGraphPanel.this);
     }
     repaint();
   }

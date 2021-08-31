@@ -70,6 +70,7 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_DISK_READ =  VAR_DISK + ":read";
   public static final String FN_DISK_READB =  VAR_DISK + ":readb";
   public static final String FN_DISK_READAUDIO =  VAR_DISK + ":read_audio";
+  public static final String FN_DISK_READVIDEO =  VAR_DISK + ":read_video";
   public static final String FN_DISK_WRITE =  VAR_DISK + ":write";
   public static final String FN_DISK_WRITEB =  VAR_DISK + ":writeb";
   public static final String FN_DISK_STAT =  VAR_DISK + ":stat";
@@ -95,6 +96,10 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_UI_ON_MOUSE_RELEASE = "ui:on_mouse_release";
   public static final String FN_UI_ON_KEY_PRESS = "ui:on_key_press";
   public static final String FN_UI_ON_KEY_RELEASE = "ui:on_key_release";
+  public static final String FN_UI_MOUSE_PRESS_FUNC = "ui:mouse_press_func";
+  public static final String FN_UI_MOUSE_RELEASE_FUNC = "ui:mouse_release_func";
+  public static final String FN_UI_KEY_PRESS_FUNC = "ui:key_press_func";
+  public static final String FN_UI_KEY_RELEASE_FUNC = "ui:key_release_func";
   public static final String FN_UI_GET_MOUSE_PRESS = "ui:get_mouse_press";
   public static final String FN_UI_GET_MOUSE_RELEASE = "ui:get_mouse_release";
   public static final String FN_UI_GET_KEY_PRESS = "ui:get_key_press";
@@ -1356,6 +1361,20 @@ public class OperandiScript implements Runnable, Disposable {
     f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_ON_KEY_RELEASE));
     f.type = Processor.TFUNC;
     mobj.putIntern("on_key_release", f);
+
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_MOUSE_PRESS_FUNC));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("mouse_press_func", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_MOUSE_RELEASE_FUNC));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("mouse_release_func", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_KEY_PRESS_FUNC));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("key_press_func", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_KEY_RELEASE_FUNC));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("key_release_func", f);
+
     f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_GET_MOUSE_PRESS));
     f.type = Processor.TFUNC;
     mobj.putIntern("get_mouse_press", f);
@@ -1414,6 +1433,7 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("add", "graph:add", comp);
         addFunc("set_data", "graph:set_data", comp);
         addFunc("tag", "graph:tag", comp);
+        addFunc("remove_tags", "graph:remove_tags", comp);
         addFunc("data", "graph:data", comp);
         addFunc("zoom_all", "graph:zoom_all", comp);
         addFunc("zoom", "graph:zoom", comp);
@@ -1475,6 +1495,8 @@ public class OperandiScript implements Runnable, Disposable {
         MObj mobj = createGraphMUIO();
         M mui = new M(mobj);
         addGenericUIMembers(mobj, ui);
+        System.out.println("adding operandi ui listener to " + ui);
+        addOperandiUIListener(ui);
         return mui;
       }
     });
@@ -1505,6 +1527,15 @@ public class OperandiScript implements Runnable, Disposable {
           ix = args[1].asInt();
         }
         ss.addTag(ix, args[0].asString());
+        return null;
+      }
+    });
+    setExtDef("graph:remove_tags", "() - removes all tags",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
+        if (ss == null) return null;
+        ss.clearTags();
         return null;
       }
     });
@@ -1874,7 +1905,7 @@ public class OperandiScript implements Runnable, Disposable {
   }
 
   private void addOperandiUIListener(UIO ui) {
-    ui.getUIInfo().addListener(new UIListener() {
+    UIListener uil = new UIListener() {
       @Override
       public void onRemoved(UIO parent, UIO child) {
       }
@@ -1887,6 +1918,14 @@ public class OperandiScript implements Runnable, Disposable {
             .queue(OperandiIRQHandler.IRQ_BLOCK_UI, OperandiIRQHandler.IRQ_UI_MOUSE_PRESS)
             .trigger(addr);
           }
+          addr = uio.getUIInfo().funcMousePressAddr;
+          if (addr > 0) {
+            List<M> args = new ArrayList<M>(3);
+            args.add(new M(uio.getUIInfo().mousepressx));
+            args.add(new M(uio.getUIInfo().mousepressy));
+            args.add(new M(uio.getUIInfo().mousepressb));
+            OperandiScript.this.runFunc(currentWA, addr, args);
+          }
         }
         else if (event == UIInfo.EVENT_MOUSE_RELEASE) {
           int addr = uio.getUIInfo().irqMouseReleaseAddr;
@@ -1894,6 +1933,14 @@ public class OperandiScript implements Runnable, Disposable {
             OperandiScript.this.getIRQHandler()
             .queue(OperandiIRQHandler.IRQ_BLOCK_UI, OperandiIRQHandler.IRQ_UI_MOUSE_RELEASE)
             .trigger(addr);
+          }
+          addr = uio.getUIInfo().funcMouseReleaseAddr;
+          if (addr > 0) {
+            List<M> args = new ArrayList<M>(3);
+            args.add(new M(uio.getUIInfo().mousepressx));
+            args.add(new M(uio.getUIInfo().mousepressy));
+            args.add(new M(uio.getUIInfo().mousepressb));
+            OperandiScript.this.runFunc(currentWA, addr, args);
           }
         }
         else if (event == UIInfo.EVENT_KEY_PRESS) {
@@ -1903,6 +1950,12 @@ public class OperandiScript implements Runnable, Disposable {
             .queue(OperandiIRQHandler.IRQ_BLOCK_UI, OperandiIRQHandler.IRQ_UI_KEY_PRESS)
             .trigger(addr);
           }
+          addr = uio.getUIInfo().funcKeyPressAddr;
+          if (addr > 0) {
+            List<M> args = new ArrayList<M>(1);
+            args.add(new M(uio.getUIInfo().keypress));
+            OperandiScript.this.runFunc(currentWA, addr, args);
+          }
         }
         else if (event == UIInfo.EVENT_KEY_RELEASE) {
           int addr = uio.getUIInfo().irqKeyReleaseAddr;
@@ -1910,6 +1963,12 @@ public class OperandiScript implements Runnable, Disposable {
             OperandiScript.this.getIRQHandler()
             .queue(OperandiIRQHandler.IRQ_BLOCK_UI, OperandiIRQHandler.IRQ_UI_KEY_RELEASE)
             .trigger(addr);
+          }
+          addr = uio.getUIInfo().funcKeyReleaseAddr;
+          if (addr > 0) {
+            List<M> args = new ArrayList<M>(1);
+            args.add(new M(uio.getUIInfo().keyrel));
+            OperandiScript.this.runFunc(currentWA, addr, args);
           }
         }
       }
@@ -1922,7 +1981,8 @@ public class OperandiScript implements Runnable, Disposable {
       @Override
       public void onAdded(UIO parent, UIO child) {
       }
-    });
+    };
+    ui.getUIInfo().addListener(uil);
   }
 
   private void createCanvasFunctions() {
@@ -2618,12 +2678,21 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
-    setExtDef(FN_UI_ON_MOUSE_PRESS, "(<func>) - calls func on mouse press",
+    setExtDef(FN_UI_ON_MOUSE_PRESS, "(<func>) - calls func on mouse press via interrupt",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO cp = getUIOByScriptId(p.getMe());
         if (cp == null) return null;
         cp.getUIInfo().irqMousePressAddr = args[0].i;
+        return null;
+      }
+    });
+    setExtDef(FN_UI_MOUSE_PRESS_FUNC, "(<func>) - calls func on mouse press via script",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO cp = getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.getUIInfo().funcMousePressAddr = args[0].i;
         return null;
       }
     });
@@ -2636,6 +2705,15 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
+    setExtDef(FN_UI_MOUSE_RELEASE_FUNC, "(<func>) - calls func on mouse release via script",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO cp = getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.getUIInfo().funcMouseReleaseAddr = args[0].i;
+        return null;
+      }
+    });
     setExtDef(FN_UI_ON_KEY_PRESS, "(<func>) - calls func on key press",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
@@ -2645,12 +2723,30 @@ public class OperandiScript implements Runnable, Disposable {
         return null;
       }
     });
+    setExtDef(FN_UI_KEY_PRESS_FUNC, "(<func>) - calls func on key press via script",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO cp = getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.getUIInfo().funcKeyPressAddr = args[0].i;
+        return null;
+      }
+    });
     setExtDef(FN_UI_ON_KEY_RELEASE, "(<func>) - calls func on key release",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIO cp = getUIOByScriptId(p.getMe());
         if (cp == null) return null;
         cp.getUIInfo().irqKeyReleaseAddr = args[0].i;
+        return null;
+      }
+    });
+    setExtDef(FN_UI_KEY_RELEASE_FUNC, "(<func>) - calls func on key release via script",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO cp = getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        cp.getUIInfo().funcKeyReleaseAddr = args[0].i;
         return null;
       }
     });
