@@ -225,6 +225,7 @@ public class UIInfo {
       mousepressx = e.getX();
       mousepressy = e.getY();
       mousepressb = e.getButton();
+
       fireEventGeneric(ui, UIInfo.EVENT_MOUSE_PRESS);
     }
     @Override

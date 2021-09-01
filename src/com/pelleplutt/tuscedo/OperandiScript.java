@@ -109,8 +109,8 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_UI_PLACE_TAB_AFTER = "ui:place_tab_after";
   public static final String FN_UI_PLACE_TAB_FIRST = "ui:place_tab_first";
   public static final String FN_UI_PLACE_TAB_LAST = "ui:place_tab_last";
+  public static final String FN_UI_DETACH_TAB = "ui:detach_tab";
   // TODO PETER
-  public static final String FN_UI_DETACH_WINDOW = "ui:detach_window";
   public static final String FN_UI_DETACH_SPLIT = "ui:detach_split";
   
   public static final String KEY_UI_ID = ".uio_id";
@@ -1399,6 +1399,9 @@ public class OperandiScript implements Runnable, Disposable {
     f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_PLACE_TAB_LAST));
     f.type = Processor.TFUNC;
     mobj.putIntern("place_tab_last", f);
+    f = new Processor.M(comp.getLinker().lookupFunctionAddress(FN_UI_DETACH_TAB));
+    f.type = Processor.TFUNC;
+    mobj.putIntern("detach_tab", f);
   }
 
   private M createGenericMUIObj(UIO uio) {
@@ -1450,9 +1453,12 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("min", "graph:min", comp);
         addFunc("max", "graph:max", comp);
         addFunc("join", "graph:join", comp);
+        addFunc("link", "graph:link", comp);
+        addFunc("unlink", "graph:unlink", comp);
         addFunc("save", "graph:save", comp);
         addFunc("show", "graph:show", comp);
         addFunc("show_tags", "graph:show_tags", comp);
+        addFunc("set_cursor_x", "graph:set_cursor_x", comp);
         addFunc("x_to_index", "graph:x_to_index", comp);
         addFunc("y_to_value", "graph:y_to_value", comp);
       }
@@ -1750,6 +1756,49 @@ public class OperandiScript implements Runnable, Disposable {
         }
       }
     });
+
+    setExtDef("graph:link", "(<graph>, ...) - link this graph with another, or others",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        SampleSet sssrc = (SampleSet)getUIOByScriptId(p.getMe());
+        if (sssrc == null) return null;
+        UIGraphPanel src = ((UIGraphPanel)sssrc.getUIInfo().getParent().getUI());
+        for (int i = 0; i < args.length; i++) {
+          UIO uioover = getUIOByScriptId(args[i]);
+          if (uioover == null) continue;
+          if (uioover instanceof SampleSet) {
+            SampleSet ssover = (SampleSet)uioover;
+            if (ssover == sssrc) continue;
+            UIGraphPanel over = ((UIGraphPanel)ssover.getUIInfo().getParent().getUI());
+            src.linkOtherGraphPanel(over);
+          }
+        }
+        return p.getMe();
+      }
+    });
+
+    setExtDef("graph:unlink", "(<graph>, ...) - unlink this graph with another, or others",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0)  return null;
+        SampleSet sssrc = (SampleSet)getUIOByScriptId(p.getMe());
+        if (sssrc == null) return null;
+        UIGraphPanel src = ((UIGraphPanel)sssrc.getUIInfo().getParent().getUI());
+        for (int i = 0; i < args.length; i++) {
+          UIO uioover = getUIOByScriptId(args[i]);
+          if (uioover == null) continue;
+          if (uioover instanceof SampleSet) {
+            SampleSet ssover = (SampleSet)uioover;
+            if (ssover == sssrc) continue;
+            UIGraphPanel over = ((UIGraphPanel)ssover.getUIInfo().getParent().getUI());
+            src.unlinkOtherGraphPanel(over);
+          }
+        }
+        return p.getMe();
+      }
+    });
+
     setExtDef("graph:save", "(<path>) - saves graph data set to file",
         new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
@@ -1773,6 +1822,17 @@ public class OperandiScript implements Runnable, Disposable {
         SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
         if (ss == null || args.length == 0) return null;
         ss.setTagsHidden(args[0].asInt() == 0);
+        return null;
+      }
+    });
+
+    setExtDef("graph:set_cursor_x", "(x) - displays a cursor at given index",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
+        if (ss == null || args.length == 0) return null;
+        UIGraphPanel cp = (UIGraphPanel)(getUIOByScriptId(p.getMe()).getUIInfo().getParentUI());
+        cp.setUserCursorIndex(args[0].asInt());
         return null;
       }
     });
@@ -1853,7 +1913,7 @@ public class OperandiScript implements Runnable, Disposable {
           ((UIWorkArea)ui).getCurrentView().splitOut(true);
         } else if (mode.equals("window")) {
           Tab tw = UISimpleTabPane.getTabByComponent((UIWorkArea)ui);
-          tw.getPane().evacuateTabToNewFrame(tw, null);
+          tw.getPane().evacuateTabToNewFrame(tw, null, null);
         }
         return mui;
       }
@@ -1942,7 +2002,8 @@ public class OperandiScript implements Runnable, Disposable {
           }
           addr = uio.getUIInfo().funcMousePressAddr;
           if (addr > 0) {
-            List<M> args = new ArrayList<M>(3);
+            List<M> args = new ArrayList<M>(4);
+            args.add(new M(uio.getUIInfo().id));
             args.add(new M(uio.getUIInfo().mousepressx));
             args.add(new M(uio.getUIInfo().mousepressy));
             args.add(new M(uio.getUIInfo().mousepressb));
@@ -1958,7 +2019,8 @@ public class OperandiScript implements Runnable, Disposable {
           }
           addr = uio.getUIInfo().funcMouseReleaseAddr;
           if (addr > 0) {
-            List<M> args = new ArrayList<M>(3);
+            List<M> args = new ArrayList<M>(4);
+            args.add(new M(uio.getUIInfo().id));
             args.add(new M(uio.getUIInfo().mousepressx));
             args.add(new M(uio.getUIInfo().mousepressy));
             args.add(new M(uio.getUIInfo().mousepressb));
@@ -1974,7 +2036,8 @@ public class OperandiScript implements Runnable, Disposable {
           }
           addr = uio.getUIInfo().funcKeyPressAddr;
           if (addr > 0) {
-            List<M> args = new ArrayList<M>(1);
+            List<M> args = new ArrayList<M>(2);
+            args.add(new M(uio.getUIInfo().id));
             args.add(new M(uio.getUIInfo().keypress));
             OperandiScript.this.runFunc(currentWA, addr, args);
           }
@@ -1988,7 +2051,8 @@ public class OperandiScript implements Runnable, Disposable {
           }
           addr = uio.getUIInfo().funcKeyReleaseAddr;
           if (addr > 0) {
-            List<M> args = new ArrayList<M>(1);
+            List<M> args = new ArrayList<M>(2);
+            args.add(new M(uio.getUIInfo().id));
             args.add(new M(uio.getUIInfo().keyrel));
             OperandiScript.this.runFunc(currentWA, addr, args);
           }
@@ -2872,6 +2936,23 @@ public class OperandiScript implements Runnable, Disposable {
         UIO uio = getUIOByScriptId(p.getMe());
         Tab tthis = UISimpleTabPane.getTabByComponent(searchForComponentUpwards(uio));
         tthis.getPane().moveTabAfter(tthis.getID(), tthis.getPane().getTabCount()-1);
+        return null;
+      }
+    });
+    setExtDef(FN_UI_DETACH_TAB, "(x, y, (width, height)) - detaches ui to its own frame",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UIO uio = getUIOByScriptId(p.getMe());
+        Tab tthis = UISimpleTabPane.getTabByComponent(searchForComponentUpwards(uio));
+        int x = tthis.getLocationOnScreen().x;
+        int y = tthis.getLocationOnScreen().y;
+        Dimension sz = null;
+        if (args.length >= 1) x = args[0].asInt();
+        if (args.length >= 2) y = args[1].asInt();
+        if (args.length >= 4) {
+          sz = new Dimension(args[2].asInt(), args[3].asInt());
+        }
+        tthis.getPane().evacuateTabToNewFrame(tthis, new Point(x,y), sz);
         return null;
       }
     });

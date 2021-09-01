@@ -416,7 +416,7 @@ public class UISimpleTabPane extends JPanel implements UIO {
   public void onEvacuationNewTab(Tab oldTab, Tab newTab) {
   }
 
-  public void evacuateTabToNewFrame(Tab tab, Point location) {
+  public void evacuateTabToNewFrame(Tab tab, Point location, Dimension size) {
     if (tab.owner.tabs.size() < 2) {
       Window w = SwingUtilities.windowForComponent(tab);
       w.setLocation(location);
@@ -442,7 +442,8 @@ public class UISimpleTabPane extends JPanel implements UIO {
     }
     newTab.setText(tab.getUIInfo().getName());
     onEvacuationNewTab(tab, newTab);
-    createNewWindow(newPane, SwingUtilities.getWindowAncestor(this).getSize(), 
+    createNewWindow(newPane, 
+        size == null ? SwingUtilities.getWindowAncestor(this).getSize() : size, 
         location);
   }
   
@@ -635,7 +636,7 @@ public class UISimpleTabPane extends JPanel implements UIO {
             }
             if (!relocated) {
               //System.out.println("no hit, evacuating");
-              evacuateTabToNewFrame(dragSource, me.getLocationOnScreen());
+              evacuateTabToNewFrame(dragSource, me.getLocationOnScreen(), null);
             }
           }
           dragSource = null;

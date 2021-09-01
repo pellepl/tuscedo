@@ -21,6 +21,7 @@ import java.awt.event.MouseWheelEvent;
 import java.io.File;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -58,6 +59,10 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   int transAnchorH, transAnchorV;
   int cursorX = -1;
   double cursorY = -1;
+
+  int userCursorIndex = -1;
+  double userCursorValue = Double.NaN;
+
   List<SampleSet> sets = new ArrayList<SampleSet>();
   List<UIGraphPanel> links = new ArrayList<UIGraphPanel>();
   double linkedOldMagHor = 0;
@@ -862,6 +867,13 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     cursorY = val;
   }
 
+  public void setUserCursorIndex(int sampleIx) {
+    if (sampleIx == userCursorIndex)  return;
+    userCursorIndex = sampleIx;
+    repaint();
+
+  }
+
   class GraphAction implements ActionListener {
     public SampleSet set;
 
@@ -1095,33 +1107,37 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         if (tagCount > 500)
           return;
         int occupied[] = new int[4];
-        for (Map.Entry<Integer, String> e : submap.entrySet()) {
-          int gx = (int) (e.getKey() * magHor);
-          int gy = hh - (int) (magVer * (samples.get(e.getKey()) - minGSample));
-          int ymin = hh - origoY;
-          if (tagCount < 30) {
-            int tagline = 0;
-            int tw = fm.stringWidth(e.getValue());
-            g.setColor(colMark);
-            int min = Integer.MAX_VALUE;
-            for (int i = 0; i< occupied.length; i++) {
-              if (occupied[i] < gx) {
-                tagline = i;
-                break;
+        try {
+          for (Map.Entry<Integer, String> e : submap.entrySet()) {
+            int gx = (int) (e.getKey() * magHor);
+            int gy = hh - (int) (magVer * (samples.get(e.getKey()) - minGSample));
+            int ymin = hh - origoY;
+            if (tagCount < 30) {
+              int tagline = 0;
+              int tw = fm.stringWidth(e.getValue());
+              g.setColor(colMark);
+              int min = Integer.MAX_VALUE;
+              for (int i = 0; i< occupied.length; i++) {
+                if (occupied[i] < gx) {
+                  tagline = i;
+                  break;
+                }
+                if (occupied[i] < min) {
+                  min = occupied[i];
+                  tagline = i;
+                }
               }
-              if (occupied[i] < min) {
-                min = occupied[i];
-                tagline = i;
-              }
+              g.drawString(e.getValue(), gx+2, vpy+vph-4 - tagline*fm.getHeight());
+              occupied[tagline] = gx+tw;
+              g.setColor(colFade);
+              g.drawLine(gx, gy, gx, vpy+vph-4 - tagline*fm.getHeight());
+            } else {
+              g.setColor(colFade);
+              g.drawLine(gx, ymin, gx, gy);
             }
-            g.drawString(e.getValue(), gx+2, vpy+vph-4 - tagline*fm.getHeight());
-            occupied[tagline] = gx+tw;
-            g.setColor(colFade);
-            g.drawLine(gx, gy, gx, vpy+vph-4 - tagline*fm.getHeight());
-          } else {
-            g.setColor(colFade);
-            g.drawLine(gx, ymin, gx, gy);
           }
+        } catch (ConcurrentModificationException cme) {
+          /*ugly*/
         }
       }
     }
@@ -1205,6 +1221,15 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         g.drawLine(gx,gy-4,gx,gy+4);
         g.drawLine(gx-4,gy,gx+4,gy);
         g.drawString(str, gx+8, gy + fm.getHeight()/2);
+      }
+
+      // user index cursor
+      if (userCursorIndex >= 0) {
+        String str = userCursorIndex + "";
+        int gx = (int) (userCursorIndex * magHor);
+        g.setColor(colCursor);
+        g.drawLine(gx,0,gx,hh);
+        g.drawString(str, gx+8, fm.getHeight()/2);
       }
 
       // goto input
