@@ -32,7 +32,6 @@ public class TuscedoTabPane extends UISimpleTabPane implements UISimpleTabPane.T
   @Override
   public JFrame onEvacuationCreateFrame() {
     JFrame w = new JFrame();
-    Tuscedo.inst().registerWindow((Window)w);
     try {
       w.setIconImage(AppSystem.loadImage("tuscedo.png"));
       w.setTitle(Essential.name + " " + Essential.vMaj + "." + Essential.vMin + "." + Essential.vMic);
@@ -46,6 +45,7 @@ public class TuscedoTabPane extends UISimpleTabPane implements UISimpleTabPane.T
     Container mainContainer = f.getContentPane();
     
     UISplitPane jsp = new UISplitPane(JSplitPane.HORIZONTAL_SPLIT);
+    Tuscedo.inst().registerWindow((Window)f, jsp);
     UICommon.decorateSplitPane(jsp, true);
     tabs.setFont(UICommon.font);
     tabs.addWindowListener(tabs, f);

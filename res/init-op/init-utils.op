@@ -1,0 +1,56 @@
+module utils;
+
+__help_add("utils", "map_unstringify(str)", 
+"   Reads given string, finds key value pairs on form <key>=<value>. These are 
+   put in a map that is returned. Anything after a hash sign (#) is ignored
+   for the rest of line.
+   
+   Example: utils.map_unstringify(
+              'foo=bar\\nbaz=213\\ndoo=har #comment\\n'
+            )
+   @param str     some string
+   @return        map of key/value pairs
+");
+func map_unstringify(str) {
+  if (str == nil) {
+    return nil;
+  }
+  map_lines = lines(str);
+  m = [];
+
+  for (line in map_lines) {
+    d; c;
+    if ((d = strstr(line, "=")) <= 0) continue;
+    c = strstr(line, "#");
+    if (c == 0) continue;
+    if (c > 0) {
+      line = line[0#c-1];
+      if ((d = strstr(line, "=")) < 0) continue;
+    }
+    k = line[0#d-1];
+    v = line[d+1#len(line)-1];
+    m += (k:v);
+  }
+  
+  return m;
+}
+
+__help_add("utils", "map_stringify(map)", 
+"   Stringifies given map, creating value pairs on form <key>=<value> per line.
+   
+   Example: utils.map_parse([('foo':'bar'),('baz':123),('doo':'har')]);
+            )
+   @param map     some map
+   @return        string
+");
+func map_stringify(map) {
+  if (map == nil) {
+    return nil;
+  }
+  s = "";
+  for (e in map) {
+    s += e.key + "=" + e.val + "\n";
+  }
+  
+  return s;
+}

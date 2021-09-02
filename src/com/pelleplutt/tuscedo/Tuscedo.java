@@ -24,6 +24,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   Container mainContainer;
   static Tuscedo inst;
   static List<Window> windows = new ArrayList<Window>();
+  static Map<String, Window> windowForSplitPane = new HashMap<String, Window>();
   static volatile int __tabId;
   static volatile int __elementId;
   volatile boolean running = true;
@@ -80,10 +81,11 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     }
   }
 
-  public void registerWindow(Window w) {
+  public void registerWindow(Window w, UISplitPane sp) {
     synchronized (windows) {
       windows.add(w);
-      Log.println("window registered " + windows.size());
+      windowForSplitPane.put(sp.getUIInfo().getId(), w);
+      Log.println("window registered " + windows.size() + " on splitpane " + sp.getUIInfo().getId());
       w.addWindowListener(new WindowAdapter() {
         @Override
         public void windowClosing(WindowEvent e) {
@@ -127,7 +129,6 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
       __winposy = 0;
     }
 
-    registerWindow(f);
 
     mainContainer = f.getContentPane();
 
@@ -140,6 +141,7 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     jsp.setTopUI(tabs);
     jsp.setBottomUI(null);
     mainContainer.add(jsp);
+    registerWindow(f, jsp);
 
     try {
       f.setIconImage(AppSystem.loadImage("tuscedo.png"));
@@ -442,10 +444,25 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
 
   @Override
   public void onRemoved(UIO parent, UIO child) {
-    Log.println("onRemoved " + child.getUIInfo().asString());
+    Log.println("onRemoved " + child.getUIInfo().asString() + " parent:" + parent.getUIInfo().asString());
     uiobjects.remove(child.getUIInfo().getId());
     Log.println(uiobjects.size() + " uios left");
-    if (uiobjects.isEmpty()) onExit();
+    if (uiobjects.isEmpty()) {
+      onExit();
+    } else {
+      if (parent != null && parent instanceof UISplitPane) {
+        UISplitPane sp = ((UISplitPane)parent);
+        if (sp.getTopUI() == null && sp.getBottomUI() == null) {
+          Log.println("splitter " + sp.getUIInfo().getId() + " is empty, closing window");
+          Window w = windowForSplitPane.get(sp.getUIInfo().getId());
+          if (w != null) {
+            w.setVisible(false);
+            windows.remove(w);
+            w.dispose();
+          }
+        }
+      }
+    }
   }
 
   @Override
