@@ -112,7 +112,7 @@ public class OperandiScript implements Runnable, Disposable {
   public static final String FN_UI_DETACH_TAB = "ui:detach_tab";
   // TODO PETER
   public static final String FN_UI_DETACH_SPLIT = "ui:detach_split";
-  
+
   public static final String KEY_UI_ID = ".uio_id";
 
   Executable exe, pexe;
@@ -1981,6 +1981,7 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("draw_image", "canvas:draw_image", comp);
         addFunc("get_width", "canvas:width", comp);
         addFunc("get_height", "canvas:height", comp);
+        addFunc("get_rgb", "canvas:get_rgb", comp);
         addFunc("blit", "canvas:blit", comp);
       }
     };
@@ -2191,7 +2192,7 @@ public class OperandiScript implements Runnable, Disposable {
         if (args == null || args.length < 3)  return null;
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
         if (cp == null) return null;
-        if (args.length < 5) 
+        if (args.length < 5)
           cp.drawImage(args[1].asInt(), args[2].asInt(), args[0].asString());
         else
           cp.drawImage(args[1].asInt(), args[2].asInt(), args[3].asInt(), args[4].asInt(), args[0].asString());
@@ -2212,6 +2213,44 @@ public class OperandiScript implements Runnable, Disposable {
         UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
         if (cp == null) return null;
         return new Processor.M(cp.getHeight());
+      }
+    });
+    setExtDef("canvas:get_rgb", "(<x>,<y>(,<w>,<h>)) - returns pixel data as single integer for one pixel or as an array of ints [w][h]",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        UICanvasPanel cp = (UICanvasPanel)getUIOByScriptId(p.getMe());
+        if (cp == null) return null;
+        if (args == null || args.length < 2)  return null;
+        int x = args[0].asInt();
+        int y = args[1].asInt();
+        int w = 1;
+        int h = 1;
+        if (args.length >= 4) {
+          w = args[2].asInt();
+          h = args[3].asInt();
+        }
+        if (w == 0 || h == 0) {
+          return null;
+        }
+        int ww = cp.getWidth();
+        int hh = cp.getHeight();
+        if (w == 1 && h == 1) {
+          return new Processor.M(cp.getRGB(x, y));
+        }
+
+        MSet msetx = new MListMap();
+        for (int xx = x; xx < x+w; xx++) {
+          MSet msety = new MListMap();
+          msetx.add(new Processor.M(msety));
+          for (int yy = y; yy < y+h; yy++) {
+            if (xx < 0 || xx >= ww || yy < 0 || yy >= hh) {
+              msety.add(new Processor.M(0));
+            } else {
+              msety.add(new Processor.M(cp.getRGB(xx, yy)));
+            }
+          }
+        }
+        return new Processor.M(msetx);
       }
     });
     setExtDef("canvas:blit", "() - blits changes to canvas",
