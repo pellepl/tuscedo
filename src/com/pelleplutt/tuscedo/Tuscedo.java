@@ -335,15 +335,19 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     boolean doCli = false;
     boolean doGui = true;
     UIWorkArea tmpwa = null;
+    File scrFile = null;
+    String scrArgs[] = null;
     for (int i = 0; i < args.length; i++) {
       if (args[i].endsWith(".op")) {
-        if (tmpwa == null) {
+        scrArgs = new String[args.length - i - 1];
+        System.arraycopy(args, i+1, scrArgs, 0, scrArgs.length);
+        scrFile = new File(args[i]);
+        if (doCli) {
           tmpwa = new UIWorkArea();
           tmpwa.build();
           tmpwa.getScript().currentWA = tmpwa;
-          tmpwa.getScript().runScript(tmpwa, new File(args[i]), args[i], null);
+          tmpwa.getScript().runScript(tmpwa, scrFile, args[i], scrArgs);
         }
-        doGui = false;
       } else if (args[i].equals("--nogui")) {
         doCli = true;
       } else if (args[i].equals("--noterm")) {
@@ -354,10 +358,16 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     }
     if (doCli) {
       cli();
-    } else if (doGui ){
+    } else if (doGui) {
+      final File fscrFile = scrFile;
+      final String[] fscrArgs = scrArgs;
       EventQueue.invokeLater(new Runnable() {
         public void run() {
-          Tuscedo.inst().create(null);
+          UIWorkArea uiw = new UIWorkArea();
+          Tuscedo.inst().create(uiw);
+          if (fscrFile != null) {
+            uiw.getScript().runScript(uiw, fscrFile, fscrFile.getName(), fscrArgs);
+          }
         }
       });
       if (!no3d) {
@@ -507,7 +517,6 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
   }
 
   private void recurseFind(UIInfo i, List<UIO> res, Class<?> clz) {
-    System.out.println(i.getUI().getClass().getSimpleName());
     if (clz.isInstance(i.getUI())) res.add(i.getUI());
     for (UIInfo c : i.children) recurseFind(c, res, clz);
   }

@@ -335,6 +335,54 @@ public class OperandiScript implements Runnable, Disposable {
         return new M(min);
       }
     });
+    setExtDef("sum", "(...) - returns sum of values", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        }
+        float sum = 0;
+        M count  = new M(0);
+        for (M m : args) {
+          float v;
+          if (m.type == Processor.TSET) {
+            v = __sumrec(m, count);
+          } else {
+            v = m.asFloat();
+            count.i++;
+          }
+          sum += v;
+        }
+        MListMap r = new MListMap();
+        r.makeMap();
+        r.put("res", new Processor.M(sum));
+        r.put("n", count);
+        return new M(r);
+      }
+    });
+    setExtDef("avg", "(...) - returns average of values", new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length == 0) {
+          return null;
+        }
+        float sum = 0;
+        M count  = new M(0);
+        for (M m : args) {
+          float v;
+          if (m.type == Processor.TSET) {
+            v = __sumrec(m, count);
+          } else {
+            v = m.asFloat();
+            count.i++;
+          }
+          sum += v;
+        }
+        MListMap r = new MListMap();
+        r.makeMap();
+        r.put("res", new Processor.M((sum/(float)count.i)));
+        r.put("n", count);
+        return new M(r);
+      }
+    });
     setExtDef("sin", "(<x>) - returns sinus", new ExtCall() {
       public Processor.M exe(Processor p, Processor.M[] args) {
         if (args == null || args.length == 0) {
@@ -699,6 +747,20 @@ public class OperandiScript implements Runnable, Disposable {
       if (v < min) min = v;
     }
     return min;
+  }
+
+  float __sumrec(Processor.M m, Processor.M count) {
+    float sum = 0;
+    if (m.type == Processor.TSET) {
+      for (int f = 0; f < m.ref.size(); f++) {
+        float s = __sumrec(m.ref.get(f), count);
+        sum += s;
+      }
+    } else {
+      sum = m.asFloat();
+      count.i++;
+    }
+    return sum;
   }
 
   UIO getUIOByScriptId(M me) {
