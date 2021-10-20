@@ -70,7 +70,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   List<RxFilter> serialFilters = new ArrayList<RxFilter>();
   Map<String, SerialNotifierInfo> serialNotifiers = new HashMap<String, SerialNotifierInfo>();
 
-  static String[] prevSerialDevices;
+  String[] lastLookedupSerialDevices;
 
   static final int[] baudRates = {
       Port.BAUD_921600,
@@ -420,6 +420,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   }
 
   Port currentPortSetting = null;
+  Port disconnectedPortSetting = null;
   public String getConnectionInfo() {
     Port portSetting = currentPortSetting; serial.getSerialConfig();
     if (portSetting != null) {
@@ -891,7 +892,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     String pre = "";
 
     // get device part of the input
-    match = serialMatch(pre, restInput, prevSerialDevices, suggestions);
+    match = serialMatch(pre, restInput, lastLookedupSerialDevices, suggestions);
     if (match == null) {
       return suggestions.isEmpty() ? null : suggestions;
     }
@@ -1127,10 +1128,13 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     enterInputState(ISTATE_OPEN_STREAM);
   }
 
+  long lastSerialConfigOpen = System.currentTimeMillis();
   void openSerialConfig() {
-    String[] prevDev = prevSerialDevices;
+    long now = System.currentTimeMillis();
+    int previstate = this.istate;
+    String[] prevDev = lastLookedupSerialDevices;
     String[] devices = serial.getDevices();
-    prevSerialDevices = devices;
+    lastLookedupSerialDevices = devices;
 
     List<String> model = new ArrayList<String>();
     for (int d = 0; d < devices.length; d++) {
@@ -1175,6 +1179,19 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
         setInfo(sb.toString().trim());
       }
     }
+    if (previstate == ISTATE_OPEN_SERIAL && disconnectedPortSetting != null && now - lastSerialConfigOpen < 400) {
+      // if double tap open-serial-config then reconnect to last disconnected thing
+      String s = disconnectedPortSetting.portName + " " +
+      PORT_ARG_BAUD + disconnectedPortSetting.baud + " " +
+      PORT_ARG_DATABITS + disconnectedPortSetting.databits + " " +
+      PORT_ARG_STOPBITS + disconnectedPortSetting.stopbits + " " +
+      PORT_ARG_PARITY;
+      if (disconnectedPortSetting.parity == Port.PARITY_EVEN) s += Port.PARITY_EVEN_S.toLowerCase();
+      if (disconnectedPortSetting.parity == Port.PARITY_ODD) s += Port.PARITY_ODD_S.toLowerCase();
+      if (disconnectedPortSetting.parity == Port.PARITY_NO) s += Port.PARITY_NONE_S.toLowerCase();
+      handleOpenSerial(s, false);
+    }
+    lastSerialConfigOpen = now;
   }
 
   public void closeSerial() {
@@ -1546,7 +1563,8 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     return serialFilters;
   }
 
-  public void onSerialDisconnect() {
+  public void onSerialDisconnect(Port setting) {
+    disconnectedPortSetting = setting;
     lineBuffer = new StringBuilder();
     views[ISTATE_INPUT].ftp.addText("Disconnected\n", UICommon.STYLE_GENERIC_INFO);
     currentPortSetting = null;

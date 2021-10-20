@@ -1109,7 +1109,6 @@ public class OperandiScript implements Runnable, Disposable {
       public Processor.M exe(Processor p, Processor.M[] args) {
         UIWorkArea wa = ((MObj)p.getMe().ref).workarea;
         if (args == null || args.length == 0)  return new M(0);
-        System.out.println("wa:" + wa.getUIInfo().id);
         String c = args[0].asString();
         int atIx = c.indexOf('@');
         int divIx = c.indexOf('/');

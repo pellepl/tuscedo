@@ -49,19 +49,19 @@ public class Serial implements SerialStreamProvider, Tickable {
   boolean rts = false;
   boolean dtr = false;
   Map<String, String[]> deviceExtraInfo = new HashMap<String, String[]>();
-  
+
   final Object LOCK_SERIAL = new Object();
 
   byte serialBuf[] = new byte[256*64];
   volatile int serialBufIx = 0;
-  
+
   UIWorkArea area;
-  
+
   public Serial(UIWorkArea area) {
     this.area = area;
     serial = PortConnector.getPortConnector();
   }
-  
+
   public void setFlowControl(int flowctrl) {
     this.flowctrl = flowctrl;
     setting.xonxoff = (flowctrl & FLOW_XON_XOFF) == FLOW_XON_XOFF;
@@ -73,20 +73,20 @@ public class Serial implements SerialStreamProvider, Tickable {
       e.printStackTrace();
     }
   }
-  
+
   public void setUserHwFlowControl(int rts, int dtr) {
     this.userHwFlowRTS = rts;
     this.userHwFlowDTR = dtr;
   }
-  
+
   public boolean isConnected() {
     return serialRunning;
   }
-  
+
   public Port getSerialConfig() {
     return serialRunning ? setting : null;
   }
-  
+
   public void transmit(String s) {
     if (serialRunning) {
       try {
@@ -99,7 +99,7 @@ public class Serial implements SerialStreamProvider, Tickable {
       }
     }
   }
-  
+
   public void transmit(byte b[]) {
     if (serialRunning) {
       try {
@@ -112,7 +112,7 @@ public class Serial implements SerialStreamProvider, Tickable {
       }
     }
   }
-  
+
   void flowControl(boolean pre) throws IOException {
     if (userHwFlowDTR == USER_HW_FLOWOFF && userHwFlowRTS == USER_HW_FLOWOFF) return;
     boolean rtshigh = this.rts;
@@ -127,15 +127,15 @@ public class Serial implements SerialStreamProvider, Tickable {
     else if (userHwFlowRTS == USER_HW_FLOWFLANK_LO) rtshigh = !pre;
     serial.setRTSDTR(rtshigh, dtrhigh);
   }
-  
+
   void beforeTransmit() throws IOException {
     flowControl(true);
   }
-  
+
   void afterTransmit() throws IOException {
     flowControl(false);
   }
-  
+
   public String[] getDevices() {
     deviceExtraInfo.clear();
     String[] rawDeviceNames = serial.getDevices();
@@ -149,7 +149,7 @@ public class Serial implements SerialStreamProvider, Tickable {
   }
 
   boolean isSerial = false;
-  
+
   public void openSerial(Port portSetting) throws Exception {
     synchronized (LOCK_SERIAL) {
       setting = portSetting;
@@ -164,7 +164,7 @@ public class Serial implements SerialStreamProvider, Tickable {
       isSerial = true;
     }
   }
-  
+
   public void openStdin() throws Exception {
     synchronized (LOCK_SERIAL) {
       serialIn = System.in;
@@ -176,7 +176,7 @@ public class Serial implements SerialStreamProvider, Tickable {
       isSerial = false;
     }
   }
-  
+
   public void openSocket(String server, int port) throws Exception  {
     synchronized (LOCK_SERIAL) {
       final Socket s = new Socket(server, port);
@@ -192,7 +192,7 @@ public class Serial implements SerialStreamProvider, Tickable {
       isSerial = false;
     }
   }
-  
+
   public void openServerSocket(int port) throws Exception {
     synchronized (LOCK_SERIAL) {
       final ServerSocket ss = new ServerSocket(port);
@@ -218,7 +218,7 @@ public class Serial implements SerialStreamProvider, Tickable {
       }
     }
   }
-  
+
   public void openFile(String file) throws Exception  {
     synchronized (LOCK_SERIAL) {
       File f = new File(file);
@@ -231,7 +231,7 @@ public class Serial implements SerialStreamProvider, Tickable {
       isSerial = false;
     }
   }
-  
+
   public void openJlinkRTT(String idOrArgs) throws Exception {
     synchronized (LOCK_SERIAL) {
       String exe = Settings.inst().string("exe_jlink.string");
@@ -270,11 +270,11 @@ public class Serial implements SerialStreamProvider, Tickable {
           Serial.this.close();
         }
       });
-      
+
       onClose = new Runnable() { public void run() { Log.println("close rtt proc"); AppSystem.dispose(proc); } };
     }
   }
-  
+
   public void close() {
     //Log.println("closing attached streams");
     synchronized(attachedSerialIOs) {
@@ -284,7 +284,7 @@ public class Serial implements SerialStreamProvider, Tickable {
       attachedSerialIOs.clear();
     }
     //Log.println("closing serial streams, running " + serialRunning);
-    
+
     if (onClose != null) {
       try {
         onClose.run();
@@ -293,7 +293,7 @@ public class Serial implements SerialStreamProvider, Tickable {
       }
       onClose = null;
     }
-    
+
     synchronized (LOCK_SERIAL) {
       if (serialIn != null) {
         if (isSerial) serial.disconnectSilently();
@@ -309,19 +309,19 @@ public class Serial implements SerialStreamProvider, Tickable {
           Log.println("WARNING: close time out - lingering connection");
           serialRunning = false;
         }
-        isSerial = false; 
+        isSerial = false;
       }
     }
     //Log.println("serial closed");
   }
-  
+
   public void deattachSerialIO(OutputStream o) {
     synchronized (attachedSerialIOs) {
       //Log.println("deattach " + o);
       attachedSerialIOs.remove(o);
     }
   }
-  
+
   public InputStream attachSerialIO() {
     XPipedInputStream pis = null;
     try {
@@ -338,17 +338,17 @@ public class Serial implements SerialStreamProvider, Tickable {
     }
     return pis;
   }
-  
+
   @Override
   public InputStream getSerialInputStream() {
     return attachSerialIO();
   }
-  
+
   @Override
   public OutputStream getSerialOutputStream() {
     return serialOut;
   }
-  
+
   final Runnable pushSerialToLogRunnable = new Runnable() {
     @Override
     public void run() {
@@ -407,15 +407,15 @@ public class Serial implements SerialStreamProvider, Tickable {
         synchronized (LOCK_SERIAL) {
           serialRunning = false;
           serialRun = false;
-          area.onSerialDisconnect();
+          area.onSerialDisconnect(setting);
           //Log.println("serial thread dead, notify");
           LOCK_SERIAL.notifyAll();
         }
       }
     } // run
   };
-  
-  
+
+
   class XPipedInputStream extends PipedInputStream {
     public OutputStream attached;
     public XPipedInputStream(int buf) {
