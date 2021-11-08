@@ -1449,11 +1449,26 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     }
   }
 
-  public void onSerialData(byte[] b) {
+  boolean prevLineEndedWithNewLine = true;
+  public synchronized void onSerialData(long timestamp, byte[] b) {
     String s = new String(b);
+    boolean endsWithNewline = b[b.length-1] == '\n';
     if (views[ISTATE_INPUT].rawMode) {
-      views[ISTATE_INPUT].ftp.addText(s);
+      if (settings.integer("log_timestamp.int") != 0) {
+        String[] lines = s.split("\n");
+        boolean prefix = prevLineEndedWithNewLine;
+        for (int i = 0; i < lines.length; i++) {
+          boolean newLine = (i < lines.length-1) || endsWithNewline;
+          if (prefix) views[ISTATE_INPUT].ftp.addText(timestamp + "\t", UICommon.STYLE_TIMESTAMP);
+          views[ISTATE_INPUT].ftp.addText(lines[i] + (newLine ? "\n" : ""));
+          prefix = true;
+        }
+        prevLineEndedWithNewLine = endsWithNewline;
+      } else {
+        views[ISTATE_INPUT].ftp.addText(s);
+      }
     } else {
+      prevLineEndedWithNewLine = true;
       views[ISTATE_INPUT].xterm.stdout(b, b.length);
     }
     final UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent(UIWorkArea.this);

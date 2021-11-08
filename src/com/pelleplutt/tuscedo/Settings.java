@@ -18,10 +18,10 @@ import com.pelleplutt.util.Log;
 
 public class Settings {
   private static Settings _inst;
-  
+
   public final static String EX_LIST = "foo.list";
   public final static String EX_INT = "another.int";
-  
+
   public final static String SERIAL_NEWLINE_STRING = "serialnl.string";
   public final static String SCRIPT_PREFIX_STRING = "scriptprefix.string";
   public final static String BASH_PREFIX_STRING = "bashprefix.string";
@@ -42,23 +42,23 @@ public class Settings {
   public final static String WINDOW_DIMH_INT= "window.dim.h.int";
 
   public static final int MAX_LIST_ENTRIES = 9;
-  
+
   Properties props = new Properties();
-  File settingsFile = new File(System.getProperty("user.home") + File.separator + 
+  File settingsFile = new File(System.getProperty("user.home") + File.separator +
       Essential.userSettingPath + File.separator + Essential.settingsFile);
   File settingsPath = settingsFile.getParentFile();
-  
+
   public static Settings inst() {
     if (_inst == null) {
       _inst = new Settings();
     }
     return _inst;
   }
-  
+
   void defaultSettings() {
     props.setProperty(EX_LIST+".0", "def");
     props.setProperty(EX_INT, "0");
-    
+
     props.setProperty(SCRIPT_PREFIX_STRING, "@");
     props.setProperty(BASH_PREFIX_STRING, "$");
     props.setProperty(BASH_CHAIN_STRING, "&&");
@@ -80,6 +80,7 @@ public class Settings {
 
     props.setProperty("col_gen_bg.int", Integer.toString(0x000020));
     props.setProperty("col_text_fg.int", Integer.toString(0xffff80));
+    props.setProperty("col_timestamp_fg.int", Integer.toString(0xa0a000));
     props.setProperty("col_input_fg.int", Integer.toString(0x80ffff));
     props.setProperty("col_input_bg.int", Integer.toString(0x303040));
     props.setProperty("col_input_bash_bg.int", Integer.toString(0x404040));
@@ -110,7 +111,7 @@ public class Settings {
     props.setProperty("col_scrollbar_l_bg.int", Integer.toString(0x606060));
     props.setProperty("col_scrollbar_d_bg.int", Integer.toString(0x404040));
 
-    
+
     props.setProperty("scrollbar_w.int", Integer.toString(6));
     props.setProperty("scrollbar_h.int", Integer.toString(6));
 
@@ -118,25 +119,27 @@ public class Settings {
     props.setProperty("col_div_sec.int", Integer.toString(0xa0a000));
     props.setProperty("div_size.int", Integer.toString(2));
 
-    
+
     props.setProperty("tab_drag_ghost.int", Integer.toString(0));
-    
+
     props.setProperty("font_size.int", Integer.toString(11));
+
+    props.setProperty("log_timestamp.int", Integer.toString(1));
 
     props.setProperty("font_name.string", UICommon.COMMON_FONT);
   }
-  
+
   public void saveSettings() {
     try {
       if (!settingsFile.exists()) settingsFile.createNewFile();
-      FileWriter fw = new FileWriter(settingsFile); 
+      FileWriter fw = new FileWriter(settingsFile);
       props.store(fw, Essential.name + " v" + Essential.vMaj + "." + Essential.vMin + "." + Essential.vMic);
       fw.close();
     } catch (IOException ioe) {
       Log.printStackTrace(ioe);
     }
   }
-  
+
   void loadSettings() {
     if (!settingsFile.exists()) {
       settingsPath.mkdirs();
@@ -150,24 +153,24 @@ public class Settings {
       }
     }
   }
-  
+
   private Settings() {
     loadSettings();
   }
-  
+
   public String string(String s) {
     if (s.endsWith(".list")) s += ".0";
     String ss = props.getProperty(s);
     return ss == null ? "" : props.getProperty(s);
   }
-  
+
   public void setString(String key, String s) {
     props.setProperty(key, s);
     if (cbString.containsKey(key)) {
       cbString.get(key).modified(key,  s);
     }
   }
-  
+
   public int integer(String s) {
     String v = props.getProperty(s);
     if (v != null)
@@ -175,17 +178,17 @@ public class Settings {
     else
       return Integer.MIN_VALUE;
   }
-  
+
   public void setInt(String key, int i) {
     props.setProperty(key, Integer.toString(i));
     if (cbInt.containsKey(key)) {
       cbInt.get(key).modified(key,  i);
     }
   }
-  
+
   public void listAdd(String key, String s) {
     if (s.equals(props.getProperty(key + ".0"))) return;
-    
+
     for (int i = 0; i <= MAX_LIST_ENTRIES; i++) {
       if (s.equals(props.getProperty(key + "." + Integer.toString(i)))) {
         for (int j = i; j > 0; j--) {
@@ -196,7 +199,7 @@ public class Settings {
         return;
       }
     }
-    
+
     int ix = MAX_LIST_ENTRIES;
     String ixVal;
     while (ix > 0) {
@@ -208,7 +211,7 @@ public class Settings {
     }
     props.setProperty(key + "." + 0, s);
   }
-  
+
   public String[] list(String key) {
     int ix = 0;
     List<String> vals = new ArrayList<String>();
@@ -217,7 +220,7 @@ public class Settings {
       vals.add(ixVal);
       ix++;
     }
-    
+
     return vals.size() == 0 ? new String[0] : vals.toArray(new String[vals.size()]);
   }
 
@@ -236,7 +239,7 @@ public class Settings {
     }
     return s;
   }
-  
+
   public Object keyValue(String key) {
     Object o = null;
     Set<Object> keys = props.keySet();
@@ -275,20 +278,20 @@ public class Settings {
     }
     props.put(key + ".string", val);
   }
-  
-  Map<String, ModCallback<Integer>> cbInt = new HashMap<String, ModCallback<Integer>>(); 
-  Map<String, ModCallback<String>> cbString = new HashMap<String, ModCallback<String>>(); 
-  
+
+  Map<String, ModCallback<Integer>> cbInt = new HashMap<String, ModCallback<Integer>>();
+  Map<String, ModCallback<String>> cbString = new HashMap<String, ModCallback<String>>();
+
   public void listenTrigInt(String key, ModCallback<Integer> cb) {
     cbInt.put(key, cb);
     cb.modified(key, integer(key));
   }
-  
+
   public void listenTrigString(String key, ModCallback<String> cb) {
     cbString.put(key, cb);
     cb.modified(key, string(key));
   }
-  
+
   public static interface ModCallback<E> {
     public void modified(String key, E val);
   }

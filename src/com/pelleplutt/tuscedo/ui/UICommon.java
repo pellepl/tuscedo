@@ -58,6 +58,7 @@ public class UICommon {
   public static Color colTabNotifyOldFg;
   public static Color colTabSelBg;
   public static Color colTextFg;
+  public static Color colTimestampFg;
   public static Color colScrollBarLFg;
   public static Color colScrollBarDFg;
   public static Color colScrollBarLBg;
@@ -68,7 +69,7 @@ public class UICommon {
   public static Color colOpIn;
   public static Color colOpErr;
   public static Color colOpDbg;
-  
+
   public static FastTextPane.Style STYLE_CONN_IN;
   public static FastTextPane.Style STYLE_BASH_INPUT;
   public static FastTextPane.Style STYLE_BASH_DBG;
@@ -78,12 +79,14 @@ public class UICommon {
   public static FastTextPane.Style STYLE_FIND_MARK;
   public static FastTextPane.Style STYLE_GENERIC_INFO;
   public static FastTextPane.Style STYLE_GENERIC_ERR;
+  public static FastTextPane.Style STYLE_TIMESTAMP;
   public static FastTextPane.Style STYLE_OP_IN;
   public static FastTextPane.Style STYLE_OP_DBG;
   public static FastTextPane.Style STYLE_OP_OUT;
   public static FastTextPane.Style STYLE_OP_ERR;
-    
+
   public static final int STYLE_ID_CONN_IN = 1;
+  public static final int STYLE_ID_TIMESTAMP = 3;
   public static final int STYLE_ID_HELP = 5;
   public static final int STYLE_ID_BASH_OUT = 10;
   public static final int STYLE_ID_BASH_ERR = 11;
@@ -97,12 +100,12 @@ public class UICommon {
   public static final int STYLE_ID_OP_ERR = 41;
   public static final int STYLE_ID_OP_IN = 42;
   public static final int STYLE_ID_OP_DBG = 43;
-  
+
   static void uiUpdate() {
     Tuscedo.inst().redecorateAll();
     Tuscedo.settingsDirty = true;
   }
-  
+
   static {
     Settings s = Settings.inst();
     s.listenTrigInt("col_gen_bg.int", new ModCallback<Integer>() {
@@ -117,11 +120,19 @@ public class UICommon {
         uiUpdate();
       }
     });
+    s.listenTrigInt("col_timestamp_fg.int", new ModCallback<Integer>() {
+      public void modified(String key, Integer val) {
+        colTimestampFg = new Color(val);
+        if (STYLE_TIMESTAMP == null) STYLE_TIMESTAMP = new FastTextPane.Style(STYLE_ID_TIMESTAMP, colTimestampFg, null, false);
+        else STYLE_TIMESTAMP.setFgColor(val);
+        uiUpdate();
+      }
+    });
     s.listenTrigInt("col_input_fg.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         colInputFg = new Color(val);
         if (STYLE_CONN_IN == null) STYLE_CONN_IN = new FastTextPane.Style(STYLE_ID_CONN_IN, colInputFg, null, false);
-        else STYLE_CONN_IN.setFgColor(val); 
+        else STYLE_CONN_IN.setFgColor(val);
         uiUpdate();
       }
     });
@@ -141,7 +152,7 @@ public class UICommon {
       public void modified(String key, Integer val) {
         colBashFg = new Color(val);
         if (STYLE_BASH_INPUT == null) STYLE_BASH_INPUT = new FastTextPane.Style(STYLE_ID_BASH_INPUT, colBashFg, null, false);
-        else STYLE_BASH_INPUT.setFgColor(val); 
+        else STYLE_BASH_INPUT.setFgColor(val);
         uiUpdate();
       }
     });
@@ -149,7 +160,7 @@ public class UICommon {
       public void modified(String key, Integer val) {
         colBashDbgFg = new Color(val);
         if (STYLE_BASH_DBG == null) STYLE_BASH_DBG = new FastTextPane.Style(STYLE_ID_BASH_DBG, colBashDbgFg, null, false);
-        else STYLE_BASH_DBG.setFgColor(val); 
+        else STYLE_BASH_DBG.setFgColor(val);
         uiUpdate();
       }
     });
@@ -157,7 +168,7 @@ public class UICommon {
       public void modified(String key, Integer val) {
         colOpOut = new Color(val);
         if (STYLE_OP_OUT == null) STYLE_OP_OUT = new FastTextPane.Style(STYLE_ID_OP_OUT, colOpOut, null, false);
-        else STYLE_OP_OUT.setFgColor(val); 
+        else STYLE_OP_OUT.setFgColor(val);
         uiUpdate();
       }
     });
@@ -165,7 +176,7 @@ public class UICommon {
       public void modified(String key, Integer val) {
         colOpIn = new Color(val);
         if (STYLE_OP_IN == null) STYLE_OP_IN = new FastTextPane.Style(STYLE_ID_OP_IN, colOpIn, null, false);
-        else STYLE_OP_IN.setFgColor(val); 
+        else STYLE_OP_IN.setFgColor(val);
         uiUpdate();
       }
     });
@@ -173,7 +184,7 @@ public class UICommon {
       public void modified(String key, Integer val) {
         colOpErr = new Color(val);
         if (STYLE_OP_ERR == null) STYLE_OP_ERR = new FastTextPane.Style(STYLE_ID_OP_ERR, colOpErr, null, false);
-        else STYLE_OP_ERR.setFgColor(val); 
+        else STYLE_OP_ERR.setFgColor(val);
         uiUpdate();
       }
     });
@@ -181,7 +192,7 @@ public class UICommon {
       public void modified(String key, Integer val) {
         colOpDbg = new Color(val);
         if (STYLE_OP_DBG == null) STYLE_OP_DBG = new FastTextPane.Style(STYLE_ID_OP_DBG, colOpDbg, null, false);
-        else STYLE_OP_DBG.setFgColor(val); 
+        else STYLE_OP_DBG.setFgColor(val);
         uiUpdate();
       }
     });
@@ -189,7 +200,7 @@ public class UICommon {
       public void modified(String key, Integer val) {
         colProcessFg = new Color(val);
         if (STYLE_BASH_OUT == null) STYLE_BASH_OUT = new FastTextPane.Style(STYLE_ID_BASH_OUT, colProcessFg, null, false);
-        else STYLE_BASH_OUT.setFgColor(val); 
+        else STYLE_BASH_OUT.setFgColor(val);
         uiUpdate();
       }
     });
@@ -197,7 +208,7 @@ public class UICommon {
       public void modified(String key, Integer val) {
         colProcessErrFg = new Color(val);
         if (STYLE_BASH_ERR == null) STYLE_BASH_ERR = new FastTextPane.Style(STYLE_ID_BASH_ERR, colProcessErrFg, null, false);
-        else STYLE_BASH_ERR.setFgColor(val); 
+        else STYLE_BASH_ERR.setFgColor(val);
         uiUpdate();
       }
     });
@@ -205,7 +216,7 @@ public class UICommon {
       public void modified(String key, Integer val) {
         colFindFg = new Color(val);
         if (STYLE_FIND == null) STYLE_FIND = new FastTextPane.Style(STYLE_ID_FIND, colFindFg, colFindBg, false);
-        else STYLE_FIND.setFgColor(val); 
+        else STYLE_FIND.setFgColor(val);
         uiUpdate();
       }
     });
@@ -213,7 +224,7 @@ public class UICommon {
       public void modified(String key, Integer val) {
         colFindBg = new Color(val);
         if (STYLE_FIND == null) STYLE_FIND = new FastTextPane.Style(STYLE_ID_FIND, colFindFg, colFindBg, false);
-        else STYLE_FIND.setBgColor(val); 
+        else STYLE_FIND.setBgColor(val);
         uiUpdate();
       }
     });
@@ -221,7 +232,7 @@ public class UICommon {
       public void modified(String key, Integer val) {
         colFindMarkFg = new Color(val);
         if (STYLE_FIND_MARK == null) STYLE_FIND_MARK = new FastTextPane.Style(STYLE_ID_FIND_MARK, colFindMarkFg, colFindMarkBg, true);
-        else STYLE_FIND_MARK.setFgColor(val); 
+        else STYLE_FIND_MARK.setFgColor(val);
         uiUpdate();
       }
     });
@@ -229,7 +240,7 @@ public class UICommon {
       public void modified(String key, Integer val) {
         colGenericInfoFg = new Color(val);
         if (STYLE_GENERIC_INFO == null) STYLE_GENERIC_INFO = new FastTextPane.Style(STYLE_ID_GENERIC_INFO, colGenericInfoFg, null, true);
-        else STYLE_GENERIC_INFO.setFgColor(val); 
+        else STYLE_GENERIC_INFO.setFgColor(val);
         uiUpdate();
       }
     });
@@ -237,11 +248,11 @@ public class UICommon {
       public void modified(String key, Integer val) {
         colGenericErrFg = new Color(val);
         if (STYLE_GENERIC_ERR == null) STYLE_GENERIC_ERR = new FastTextPane.Style(STYLE_ID_GENERIC_ERR, colGenericErrFg, null, true);
-        else STYLE_GENERIC_ERR.setFgColor(val); 
+        else STYLE_GENERIC_ERR.setFgColor(val);
         uiUpdate();
       }
     });
-    
+
     s.listenTrigInt("scrollbar_w.int", new ModCallback<Integer>() {
       public void modified(String key, Integer val) {
         uiUpdate();
@@ -350,14 +361,14 @@ public class UICommon {
     ftp.setBackground(colGenericBg);
     ftp.setFont(font);
   }
-  
+
   public static void decorateComponent(JComponent c) {
     if (c == null) return;
     c.setForeground(colTextFg);
     c.setBackground(colGenericBg);
     c.setFont(font);
   }
-  
+
   public static void decorateHiliteLabel(JLabel l) {
     if (l == null) return;
     l.setFont(font);
@@ -365,11 +376,11 @@ public class UICommon {
     l.setForeground(colInputBg);
     l.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
   }
-  
+
   public static void decorateScrollPane(JScrollPane sp) {
     if (sp == null) return;
     sp.setVisible(false);
-    
+
     UIManager.put("ScrollBar.width", Settings.inst().integer("scrollbar_w.int"));
     UIManager.put("ScrollBar.height", Settings.inst().integer("scrollbar_h.int"));
 
@@ -386,7 +397,7 @@ public class UICommon {
     sp.setFocusable(false);
     sp.setVisible(true);
   }
-  
+
   public static void decorateSplitPane(JSplitPane sp, final boolean main) {
     if (sp == null) return;
     sp.setUI(new BasicSplitPaneUI() {
@@ -408,7 +419,7 @@ public class UICommon {
     sp.setBorder(null);
     sp.setDividerSize(Settings.inst().integer("div_size.int"));
   }
-  
+
   public static void decorateTextEditor(JTextPane tp) {
     if (tp == null) return;
     tp.setFont(font);
@@ -417,8 +428,8 @@ public class UICommon {
     tp.setForeground(colInputFg);
     tp.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
   }
-  
-  public static void defineAction(JComponent c, String name, String keys, 
+
+  public static void defineAction(JComponent c, String name, String keys,
       int when, AbstractAction action) {
     KeyMap key = KeyMap.getKeyDef(name);
     if (key == null) {
@@ -430,17 +441,17 @@ public class UICommon {
         name);
     c.getActionMap().put(name, action);
   }
-  public static void defineAction(JComponent c, String name, String keys, 
+  public static void defineAction(JComponent c, String name, String keys,
       AbstractAction action) {
     defineAction(c, name, keys, JComponent.WHEN_FOCUSED, action);
   }
 
-  public static void defineAnonAction(JComponent c, String name, String keys, int when, 
+  public static void defineAnonAction(JComponent c, String name, String keys, int when,
       AbstractAction action) {
     defineAnonAction(c, name, keys, when, true, action);
   }
-  
-  public static void defineAnonAction(JComponent c, String name, String keys, int when, 
+
+  public static void defineAnonAction(JComponent c, String name, String keys, int when,
       boolean keyDown, AbstractAction action) {
     KeyMap key = KeyMap.fromString(keys);
     c.getInputMap(when).put(
@@ -448,7 +459,7 @@ public class UICommon {
         name);
     c.getActionMap().put(name, action);
   }
-  
+
   private static JButton createZeroButton() {
     JButton jbutton = new JButton();
     jbutton.setPreferredSize(new Dimension(0, 0));
@@ -529,7 +540,7 @@ public class UICommon {
     UICommon.defineAction(c, "common.tab.prev", "ctrl+page_up",when, actionPrevTab);
     UICommon.defineAction(c, "common.tab.next", "ctrl+page_down",when, actionNextTab);
   }
-  
+
   static AbstractAction actionAddTab = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
@@ -538,7 +549,7 @@ public class UICommon {
           null);
     }
   };
-  
+
   static AbstractAction actionCloseTab = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
@@ -547,7 +558,7 @@ public class UICommon {
       stp.removeTab(t);
     }
   };
-  
+
   static AbstractAction actionSelTab[] = new AbstractAction[10];
   static {
     for (int i = 0; i < 10; i++) {
@@ -560,17 +571,17 @@ public class UICommon {
       };
     }
   }
-  
+
   static void selectTab(int ix, Component c) {
-    UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent(c); 
+    UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent(c);
     UISimpleTabPane stp = t.getPane();
     stp.selectTab(ix);
   }
-  
+
   static AbstractAction actionPrevTab = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent((Component)e.getSource()); 
+      UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent((Component)e.getSource());
       UISimpleTabPane stp = t.getPane();
       stp.selectPrevTab();
     }
@@ -579,7 +590,7 @@ public class UICommon {
   static AbstractAction actionNextTab = new AbstractAction() {
     @Override
     public void actionPerformed(ActionEvent e) {
-      UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent((Component)e.getSource()); 
+      UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent((Component)e.getSource());
       UISimpleTabPane stp = t.getPane();
       stp.selectNextTab();
     }

@@ -2,7 +2,6 @@ package com.pelleplutt.tuscedo;
 
 import com.pelleplutt.operandi.Compiler;
 import com.pelleplutt.operandi.proc.Processor.M;
-import com.pelleplutt.operandi.proc.ProcessorError;
 import com.pelleplutt.tuscedo.ui.UIWorkArea;
 
 public class MConf extends MObj {
@@ -35,11 +34,13 @@ public class MConf extends MObj {
 
   @Override
   public void put(Object key, M m) {
+    System.out.println("put setting " + key.toString()+ ":" + m.asString());
     Settings.inst().setKeyValue(key.toString(), m.asString());
   }
-  
+
   @Override
   public void set(M mix, M m) {
+    System.out.println("set setting " + mix.toString()+ ":" + m.asString());
     Settings.inst().setKeyValue(mix.asString(), m.asString());
   }
 

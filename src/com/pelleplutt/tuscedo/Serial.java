@@ -349,6 +349,7 @@ public class Serial implements SerialStreamProvider, Tickable {
     return serialOut;
   }
 
+  volatile long serialTimestamp;
   final Runnable pushSerialToLogRunnable = new Runnable() {
     @Override
     public void run() {
@@ -360,7 +361,7 @@ public class Serial implements SerialStreamProvider, Tickable {
           serialBufIx = 0;
         }
       }
-      if (report != null) area.onSerialData(report);
+      if (report != null) area.onSerialData(serialTimestamp, report);
     }
   };
 
@@ -372,8 +373,13 @@ public class Serial implements SerialStreamProvider, Tickable {
       //Log.println("serial thread started");
       try {
         while (serialRun) {
+          long lastNewlineTS = System.currentTimeMillis();
           try {
             b = serialIn.read();
+            long ts = lastNewlineTS;
+            if (b == '\n') {
+              lastNewlineTS = System.currentTimeMillis();
+            }
             if (b == -1) {
               serialRun = false;
               break;
@@ -393,6 +399,7 @@ public class Serial implements SerialStreamProvider, Tickable {
               }
             }
             if (b == '\n' || serialBufIx >= serialBuf.length/64) {
+              serialTimestamp = ts;
               SwingUtilities.invokeLater(pushSerialToLogRunnable);
             }
           } catch (SocketTimeoutException ste) {
