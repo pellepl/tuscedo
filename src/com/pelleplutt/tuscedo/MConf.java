@@ -40,7 +40,7 @@ public class MConf extends MObj {
 
   @Override
   public void set(M mix, M m) {
-    System.out.println("set setting " + mix.toString()+ ":" + m.asString());
+    System.out.println("set setting " + mix.asString()+ ":" + m.asString());
     Settings.inst().setKeyValue(mix.asString(), m.asString());
   }
 
