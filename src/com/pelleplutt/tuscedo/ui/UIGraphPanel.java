@@ -3,7 +3,6 @@ package com.pelleplutt.tuscedo.ui;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.Event;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
@@ -15,6 +14,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.InputEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
@@ -26,7 +26,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import javax.swing.*;
+import javax.swing.AbstractAction;
+import javax.swing.JComponent;
+import javax.swing.JMenuItem;
+import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
+import javax.swing.JScrollPane;
+import javax.swing.JSeparator;
+import javax.swing.JViewport;
+import javax.swing.SwingUtilities;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
@@ -71,7 +79,9 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   int linkedOldy = 0;
   int linkedOldw = 0;
   int linkedOldh = 0;
-  
+
+  int resizeStep = 0;
+
   static int __id = 0;
   final UIInfo uiinfo;
 
@@ -88,6 +98,11 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   double selMinYSample, selMaxYSample;
   int selMinXSample, selMaxXSample;
   volatile boolean forcePaintSel;
+
+  boolean zoomVerticalForce = false;
+  double zoomVerticalForceMinY;
+  double zoomVerticalForceMaxY;
+
 
   static final Color colGraph[] = { new Color(255, 255, 64, 192),
       new Color(255, 64, 255, 192), new Color(64, 255, 255, 192),
@@ -133,9 +148,9 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     public void onClose() {}
 
     public void decorateUI() {
-      // TODO decor
     }
 
+    
     double mul = 1.0;
     double offs = 0.0;
     boolean detail;
@@ -173,7 +188,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     public void setGraphType(int type) {
       graphType = type;
     }
-    
+
     public void setColor(int color) {
       int r = (color >> 16) & 0xff;
       int g = (color >> 8) & 0xff;
@@ -209,6 +224,11 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     public void clearTags() {
       tags.clear();
       repaint();
+    }
+
+    public void clear() {
+      samples.clear();
+      tags.clear();
     }
 
     public void setSamples(List<Double> data) {
@@ -398,6 +418,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
     scrl.getViewport().setScrollMode(JViewport.SIMPLE_SCROLL_MODE); // fix
                                                                     // artefacts
+
+    UICommon.decorateComponent(this);
     UICommon.decorateScrollPane(scrl);
     setLayout(new BorderLayout());
     add(scrl, BorderLayout.CENTER);
@@ -634,6 +656,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   }
   
   void linkedMagUpdate(double hor, double ver) {
+    if (magHor == hor) return;
     magHor = linkedOldMagHor = hor;
 //    magVer = linkedOldMagVer = ver;
     renderer.recalcSize(getMaxSample(), getMinSample(), magHor, magVer,
@@ -648,6 +671,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   }
   
   void linkedPosUpdate(int x, int y) {
+    if (scrl.getHorizontalScrollBar().getValue() == x) return;
     linkedOldx = x;
     linkedOldy = y;
     scrl.getHorizontalScrollBar().setValue(x);
@@ -680,6 +704,22 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     links.remove(u);
     u.links.remove(this);
   }
+
+  public void setResizeStep(int samples) {
+    resizeStep = samples;
+  }
+
+  public int getResizeStep() {
+    return resizeStep;
+  }
+
+  public void clear() {
+    for (SampleSet set : sets) {
+      set.clear();
+    }
+    sampleUpdate(true);
+  }
+
   
   public void userPress(String k) {
     if (gotoIndex) {
@@ -698,7 +738,9 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   }
   
   public void decorateUI() {
-    // TODO decor
+    setForeground(UICommon.colTextFg);
+    setBackground(UICommon.colGenericBg);
+    setFont(UICommon.font);
   }
 
   public SampleSet getSampleSet(int i) {
@@ -732,6 +774,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   }
 
   protected void sampleUpdate(boolean updateMinMax) {
+    if (zoomVerticalForce) return;
     if (updateMinMax) {
       renderer.recalcSize(getMaxSample(), getMinSample(), magHor, magVer,
           getSampleCount());
@@ -807,10 +850,21 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     return min;
   }
 
+  volatile boolean isAdjusting = false;
   public void scrollToSampleX(int splIx) {
     int vpw = scrl.getViewport().getWidth();
     double scrollVal = ((double) (splIx) * magHor - vpw / 2);
-    scrl.getHorizontalScrollBar().setValue((int) (scrollVal));
+    final int iScrollVal = (int)scrollVal;
+    if (!isAdjusting && iScrollVal != scrl.getHorizontalScrollBar().getValue()) {
+      isAdjusting = true;
+      SwingUtilities.invokeLater(new Runnable() {
+        public void run() {
+          isAdjusting = false;
+          scrl.getHorizontalScrollBar().setValue(iScrollVal);
+        }
+      });
+
+    }
   }
 
   public void scrollToValY(double val) {
@@ -1013,11 +1067,21 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       minSpl = minSample;
       int h = (int) Math.round((maxSample - Math.min(0, minSample)) * magVer);
       int w = (int) Math.round(samples * magHor);
-      __d.width = w;
-      __d.height = h;
-      setMinimumSize(__d);
-      setPreferredSize(__d);
-      setSize(__d);
+      if (h < scrl.getSize().height) h = scrl.getSize().height;
+      if (w < scrl.getSize().width) w = scrl.getSize().width;
+      if (resizeStep > 0) w = ((w + resizeStep - 1) / resizeStep) * resizeStep; // round up to ceil resizeStep pixels
+      if (w != __d.width || h != __d.height) {
+        final int fw = w; final int fh = h;
+        __d.width = fw;
+        __d.height = fh;
+        SwingUtilities.invokeLater(new Runnable() {
+          public void run() {
+            setMinimumSize(__d);
+            setPreferredSize(__d);
+            setSize(__d);
+          }
+        });
+      }
     }
 
     public void paintSet(Graphics2D g, List<Double> samples, TreeMap<Integer, String> tags, double mul, double offs,
@@ -1101,7 +1165,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       
       // tags
       FontMetrics fm = getFontMetrics(getFont());
-      if (tags != null) {
+      if (tags != null && !tags.isEmpty()) {
         Map<Integer, String> submap = tags.subMap(startSample, endSample);
         int tagCount = submap.size();
         if (tagCount > 500)
@@ -1159,6 +1223,12 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
 
       g.setColor(Color.black);
       g.fillRect(0, 0, ww, hh);
+
+      if (zoomVerticalForce) {
+        minSample = zoomVerticalForceMinY;
+        maxSample = zoomVerticalForceMaxY;
+        magVer = (double)vph / (maxSample - minSample);
+      }
 
       // sample sets
       paintSet(g, null, null, 0, 0, 0, true, ww, hh, vpw, vph, vpx, vpy, minSample,
@@ -1443,6 +1513,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     double noffsV = pivotV - portionV * nrangeV;
 
     if (updHor || updVer) {
+      scrl.setIgnoreRepaint(true);
       renderer.recalcSize(getMaxSample(), getMinSample(), magHor, magVer,
           getSampleCount());
       if (updHor) {
@@ -1451,6 +1522,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       if (updVer) {
         scrl.getVerticalScrollBar().setValue((int) (noffsV * magVer));
       }
+      scrl.setIgnoreRepaint(false);
     }
   }
 
@@ -1475,8 +1547,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         magFact = 0.9;
       }
 
-      boolean veri = (e.getModifiers() & Event.CTRL_MASK) == 0;
-      boolean hori = (e.getModifiers() & Event.SHIFT_MASK) == 0;
+      boolean veri = (e.getModifiers() & InputEvent.CTRL_MASK) == 0;
+      boolean hori = (e.getModifiers() & InputEvent.SHIFT_MASK) == 0;
 
       if (hori) {
         magResize(magHor * magFact, magVer, e.getPoint());
@@ -1492,8 +1564,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       renderer.requestFocusInWindow();
       if (e.getButton() == MouseEvent.BUTTON1) {
         selectionDraggingTriggered = true;
-        dragVeri = (e.getModifiers() & Event.CTRL_MASK) != 0;
-        dragHori = (e.getModifiers() & Event.SHIFT_MASK) != 0;
+        dragVeri = (e.getModifiers() & InputEvent.CTRL_MASK) != 0;
+        dragHori = (e.getModifiers() & InputEvent.SHIFT_MASK) != 0;
         selAnchorX = e.getX();
         selAnchorY = e.getY();
         double minGSample = getMinSample();
@@ -1501,8 +1573,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         setCursor((int)(selAnchorX / magHor), (hh - selAnchorY) / magVer + minGSample);
       } else if (e.getButton() == MouseEvent.BUTTON2) {
         translationDraggingTriggered = true;
-        transVeri = (e.getModifiers() & Event.CTRL_MASK) != 0;
-        transHori = (e.getModifiers() & Event.SHIFT_MASK) != 0;
+        transVeri = (e.getModifiers() & InputEvent.CTRL_MASK) != 0;
+        transHori = (e.getModifiers() & InputEvent.SHIFT_MASK) != 0;
         transAnchorH = scrl.getHorizontalScrollBar().getValue();
         transAnchorV = scrl.getVerticalScrollBar().getValue();
         transAnchorX = e.getX() - transAnchorH;
@@ -1522,8 +1594,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       if (selectionDraggingTriggered || selectionDragging) {
         selectionDraggingTriggered = false;
         selectionDragging = true;
-        dragVeri = (e.getModifiers() & Event.CTRL_MASK) != 0;
-        dragHori = (e.getModifiers() & Event.SHIFT_MASK) != 0;
+        dragVeri = (e.getModifiers() & InputEvent.CTRL_MASK) != 0;
+        dragHori = (e.getModifiers() & InputEvent.SHIFT_MASK) != 0;
         selEndX = e.getX();
         selEndY = e.getY();
         double minGSample = getMinSample();
@@ -1533,8 +1605,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       } else if (translationDraggingTriggered || translationDragging) {
         translationDraggingTriggered = false;
         translationDragging = true;
-        transVeri = (e.getModifiers() & Event.CTRL_MASK) != 0;
-        transHori = (e.getModifiers() & Event.SHIFT_MASK) != 0;
+        transVeri = (e.getModifiers() & InputEvent.CTRL_MASK) != 0;
+        transHori = (e.getModifiers() & InputEvent.SHIFT_MASK) != 0;
         int dx = transHori ? 0 : e.getX() - scrl.getHorizontalScrollBar().getValue() - transAnchorX;
         int dy = transVeri ? 0 : e.getY() - scrl.getVerticalScrollBar().getValue() - transAnchorY;
         scrl.getHorizontalScrollBar().setValue(transAnchorH - dx);
@@ -1598,8 +1670,8 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
           && e.getClickCount() == 2) {
         SampleSet s = clickedLegend(e.getX(), e.getY());
         if (s == null) {
-          zoomAll((e.getModifiers() & Event.SHIFT_MASK) == 0,
-              (e.getModifiers() & Event.CTRL_MASK) == 0, e.getPoint());
+          zoomAll((e.getModifiers() & InputEvent.SHIFT_MASK) == 0,
+              (e.getModifiers() & InputEvent.CTRL_MASK) == 0, e.getPoint());
         } else {
           s.setHighlighted(!s.isHighlighted());
         }
@@ -1621,6 +1693,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
   };
 
   public void zoomAll(boolean hori, boolean veri, Point pivot) {
+    zoomVerticalForce = false;
     double newMagVer = magVer;
     double newMagHor = magHor;
     userZoomed = false;
@@ -1636,7 +1709,15 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     repaint();
   }
 
+  public void zoomForceVertical(double minY, double maxY) {
+    zoomVerticalForce = true;
+    zoomVerticalForceMinY = minY;
+    zoomVerticalForceMaxY = maxY;
+    repaint();
+  }
+
   public void zoom(double x, double y) {
+    zoomVerticalForce = false;
     userZoomed = false;
     Point pivot = new Point(
         scrl.getHorizontalScrollBar().getValue()

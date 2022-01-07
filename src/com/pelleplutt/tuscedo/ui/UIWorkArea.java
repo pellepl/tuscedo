@@ -69,6 +69,7 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   StringBuilder lineBuffer = new StringBuilder();
   List<RxFilter> serialFilters = new ArrayList<RxFilter>();
   Map<String, SerialNotifierInfo> serialNotifiers = new HashMap<String, SerialNotifierInfo>();
+  List<SerialLineListener> serialLineListeners = new ArrayList<SerialLineListener>();
 
   String[] lastLookedupSerialDevices;
 
@@ -616,6 +617,9 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
       views[ISTATE_INPUT].ftp.addText("Connected\n", UICommon.STYLE_GENERIC_INFO);
       if (istate == ISTATE_OPEN_SERIAL || istate == ISTATE_OPEN_STREAM) enterInputState(ISTATE_INPUT);
       currentPortSetting = portSetting;
+      for (SerialLineListener sll : serialLineListeners) {
+        sll.onConnect();
+      }
     } catch (Exception e) {
       views[ISTATE_INPUT].ftp.addText("Failed [" + e.getMessage() + "]\n", UICommon.STYLE_GENERIC_ERR);
       e.printStackTrace();
@@ -1497,6 +1501,9 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   }
 
   public void handleSerialLine(String s) {
+    for (SerialLineListener sll : serialLineListeners) {
+      sll.onLine(s);
+    }
     for (RxFilter f : serialFilters) {
       Matcher m = f.pattern.matcher(s);
       if (m.find()) {
@@ -1584,6 +1591,9 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
     views[ISTATE_INPUT].ftp.addText("Disconnected\n", UICommon.STYLE_GENERIC_INFO);
     currentPortSetting = null;
     updateTitle();
+    for (SerialLineListener sll : serialLineListeners) {
+      sll.onDisconnect();
+    }
   }
 
 
@@ -1885,10 +1895,22 @@ public class UIWorkArea extends JPanel implements Disposable, UIO {
   public void clearSerialFilters() {
     serialFilters.clear();
   }
+  public void addSerialLineListener(SerialLineListener sll) {
+    serialLineListeners.add(sll);
+  }
+  public void removeSerialLineListener(SerialLineListener sll) {
+    serialLineListeners.remove(sll);
+  }
 
   class SerialNotifierInfo {
     SerialNotifier sn;
     byte[] filter;
     int index;
+  }
+
+  interface SerialLineListener {
+    public void onLine(String line);
+    public void onDisconnect();
+    public void onConnect();
   }
 }

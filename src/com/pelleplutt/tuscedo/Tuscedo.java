@@ -215,6 +215,12 @@ public class Tuscedo implements Runnable, UIInfo.UIListener {
     stp.selectTab(t);
     return cp.getUIInfo().getId();
   }
+  public String addFDTab(UISimpleTabPane stp, UIWorkArea wa) {
+    UIFDPanel cp = new UIFDPanel(wa);
+    Tab t = stp.createTab(null, cp);
+    stp.selectTab(t);
+    return cp.getUIInfo().getId();
+  }
   
   public UIInfo getUIObject(String id) {
     UIInfo uii = uiobjects.get(id);

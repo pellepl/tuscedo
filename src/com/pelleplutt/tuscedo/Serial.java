@@ -365,6 +365,7 @@ public class Serial implements SerialStreamProvider, Tickable {
     }
   };
 
+  static long startTS = System.nanoTime() / 1000000;
   final Runnable serialEaterRunnable = new Runnable() {
     @Override
     public void run() {
@@ -373,12 +374,12 @@ public class Serial implements SerialStreamProvider, Tickable {
       //Log.println("serial thread started");
       try {
         while (serialRun) {
-          long lastNewlineTS = System.currentTimeMillis();
+          long lastNewlineTS = System.nanoTime() / 1000000;
           try {
             b = serialIn.read();
             long ts = lastNewlineTS;
             if (b == '\n') {
-              lastNewlineTS = System.currentTimeMillis();
+              lastNewlineTS = System.nanoTime() / 1000000;
             }
             if (b == -1) {
               serialRun = false;
@@ -399,7 +400,7 @@ public class Serial implements SerialStreamProvider, Tickable {
               }
             }
             if (b == '\n' || serialBufIx >= serialBuf.length/64) {
-              serialTimestamp = ts;
+              serialTimestamp = ts - startTS;
               SwingUtilities.invokeLater(pushSerialToLogRunnable);
             }
           } catch (SocketTimeoutException ste) {

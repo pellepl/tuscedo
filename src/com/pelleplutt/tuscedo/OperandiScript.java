@@ -1499,6 +1499,7 @@ public class OperandiScript implements Runnable, Disposable {
         addFunc("tag", "graph:tag", comp);
         addFunc("remove_tags", "graph:remove_tags", comp);
         addFunc("data", "graph:data", comp);
+        addFunc("fix_vertical", "graph:fix_vertical", comp);
         addFunc("zoom_all", "graph:zoom_all", comp);
         addFunc("zoom", "graph:zoom", comp);
         addFunc("zoom_x", "graph:zoom_x", comp);
@@ -1635,6 +1636,18 @@ public class OperandiScript implements Runnable, Disposable {
           }
         }
         ss.setSamples(set);
+        return null;
+      }
+    });
+    setExtDef("graph:fix_vertical", "(min_y, max_y) - makes given vertical data range visible",
+        new ExtCall() {
+      public Processor.M exe(Processor p, Processor.M[] args) {
+        if (args == null || args.length < 2)  return null;
+        SampleSet ss = (SampleSet)getUIOByScriptId(p.getMe());
+        if (ss == null) return null;
+        if (!((UIGraphPanel)ss.getUIInfo().getParent().getUI()).isUserZoomed()) {
+          ((UIGraphPanel)ss.getUIInfo().getParent().getUI()).zoomForceVertical(args[0].asFloat(), args[1].asFloat());
+        }
         return null;
       }
     });

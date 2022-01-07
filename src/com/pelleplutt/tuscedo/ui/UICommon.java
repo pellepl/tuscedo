@@ -24,6 +24,7 @@ import javax.swing.JTextPane;
 import javax.swing.KeyStroke;
 import javax.swing.UIManager;
 import javax.swing.border.Border;
+import javax.swing.border.CompoundBorder;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import javax.swing.plaf.basic.BasicSplitPaneDivider;
 import javax.swing.plaf.basic.BasicSplitPaneUI;
@@ -31,6 +32,7 @@ import javax.swing.plaf.basic.BasicSplitPaneUI;
 import com.pelleplutt.tuscedo.Settings;
 import com.pelleplutt.tuscedo.Settings.ModCallback;
 import com.pelleplutt.tuscedo.Tuscedo;
+import com.pelleplutt.tuscedo.ui.UISimpleTabPane.Tab;
 import com.pelleplutt.util.FastTextPane;
 
 public class UICommon {
@@ -377,6 +379,16 @@ public class UICommon {
     l.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
   }
 
+  public static void decorateJButton(JButton b) {
+    if (b == null) return;
+    b.setFont(font);
+    b.setBackground(colScrollBarDBg);
+    b.setForeground(colInputFg);
+    b.setBorder(new CompoundBorder(BorderFactory.createLineBorder(colScrollBarLFg, 1), BorderFactory.createEmptyBorder(4,16,4,16)));
+    b.setRolloverEnabled(false);
+
+  }
+
   public static void decorateScrollPane(JScrollPane sp) {
     if (sp == null) return;
     sp.setVisible(false);
@@ -526,6 +538,7 @@ public class UICommon {
 
   public static void defineCommonActions(JComponent c, int when) {
     UICommon.defineAction(c, "common.tab.add", "ctrl+shift+t", when, actionAddTab);
+    UICommon.defineAction(c, "common.tab.addfd", "ctrl+shift+q", when, actionAddFDTab);
     UICommon.defineAction(c, "common.tab.close", "ctrl+d", when, actionCloseTab);
     UICommon.defineAction(c, "common.tab.1", "ctrl+shift+1",when, actionSelTab[0]);
     UICommon.defineAction(c, "common.tab.2", "ctrl+shift+2",when, actionSelTab[1]);
@@ -547,6 +560,16 @@ public class UICommon {
       Tuscedo.inst().addWorkAreaTab(
           UISimpleTabPane.getTabByComponent((Component)e.getSource()).getPane(),
           null);
+    }
+  };
+
+  static AbstractAction actionAddFDTab = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      Tab tab = UISimpleTabPane.getTabByComponent((Component)e.getSource());
+      if (tab.getContent() instanceof UIWorkArea) {
+        Tuscedo.inst().addFDTab(tab.getPane(), (UIWorkArea)tab.getContent());
+      }
     }
   };
 
