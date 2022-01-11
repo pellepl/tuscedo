@@ -134,7 +134,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
 
   public static class SampleSet implements UIO {
     List<Double> samples = new ArrayList<Double>();
-    TreeMap<Integer, String> tags = new TreeMap<Integer, String>(); 
+    TreeMap<Integer, String> tags = new TreeMap<Integer, String>();
     double minSample = 0;
     double maxSample = 0;
     double sum = 0;
@@ -150,7 +150,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     public void decorateUI() {
     }
 
-    
+
     double mul = 1.0;
     double offs = 0.0;
     boolean detail;
@@ -166,7 +166,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     Color colFade;
     Color colMark;
 
-    
+
     public SampleSet(String name) {
       uiinfo = new UIInfo(this, "samples" + __id, name);
       UIInfo.fireEventOnCreated(uiinfo);
@@ -180,11 +180,11 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       this.hidden = hidden;
       if (hidden) tagsHidden = true;
     }
-    
+
     public void setTagsHidden(boolean hidden) {
       tagsHidden = hidden;
     }
-    
+
     public void setGraphType(int type) {
       graphType = type;
     }
@@ -215,7 +215,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         ((UIGraphPanel) par.getUI()).sampleUpdate();
       }
     }
-    
+
     public void addTag(int sampleIx, String tag) {
       String p = tags.get(sampleIx);
       tags.put(sampleIx, (p == null ? "" : p + " ") + tag);
@@ -400,7 +400,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     public boolean isHighlighted() {
       return highlighted;
     }
-    
+
     public void setHighlighted(boolean b) {
       highlighted = b;
     }
@@ -654,7 +654,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       }
     });
   }
-  
+
   void linkedMagUpdate(double hor, double ver) {
     if (magHor == hor) return;
     magHor = linkedOldMagHor = hor;
@@ -663,13 +663,13 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
         getSampleCount());
     repaint();
   }
-  
+
   void linkedDimUpdate(int w, int h) {
     linkedOldw = w;
     linkedOldw = h;
 //    scrl.setSize(w, h);
   }
-  
+
   void linkedPosUpdate(int x, int y) {
     if (scrl.getHorizontalScrollBar().getValue() == x) return;
     linkedOldx = x;
@@ -677,7 +677,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     scrl.getHorizontalScrollBar().setValue(x);
 //    scrl.getVerticalScrollBar().setValue(y);
   }
-  
+
   private void setupLink(UIGraphPanel u) {
     links.add(u);
     u.getUIInfo().addListener(new UIInfo.UIAdapter() {
@@ -693,13 +693,13 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       }
     });
   }
-  
+
   public void linkOtherGraphPanel(UIGraphPanel u) {
     if (links.contains(u)) return;
     setupLink(u);
     u.setupLink(this);
   }
-  
+
   public void unlinkOtherGraphPanel(UIGraphPanel u) {
     links.remove(u);
     u.links.remove(this);
@@ -720,7 +720,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     sampleUpdate(true);
   }
 
-  
+
   public void userPress(String k) {
     if (gotoIndex) {
       if (k.equals("back_space")) {
@@ -736,7 +736,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       repaint();
     }
   }
-  
+
   public void decorateUI() {
     setForeground(UICommon.colTextFg);
     setBackground(UICommon.colGenericBg);
@@ -915,7 +915,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     selActive = false;
     repaint();
   }
-  
+
   public void setCursor(int sampleIx, double val ) {
     cursorX = sampleIx;
     cursorY = val;
@@ -978,7 +978,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     m.show(renderer, e.getX(), e.getY());
   }
 
-  GraphMenuActionListener graphMenuActionListener = new GraphMenuActionListener(); 
+  GraphMenuActionListener graphMenuActionListener = new GraphMenuActionListener();
 
   void openGraphMenu(MouseEvent e) {
     JPopupMenu m = new JPopupMenu("GRAPH");
@@ -1003,7 +1003,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     }
     m.show(renderer, e.getX(), e.getY());
   }
-  
+
   class GraphMenuActionListener implements ActionListener {
 
     @Override
@@ -1043,7 +1043,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
       }
     }
   }
-  
+
   void expandSelection(int dx, int dy) {
     if (dx != 0)
       selEndX += dx;
@@ -1063,8 +1063,13 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
     }
     public void recalcSize(double maxSample, double minSample, double magHor,
         double magVer, int samples) {
-      maxSpl = maxSample;
-      minSpl = minSample;
+      if (zoomVerticalForce) {
+        maxSpl = zoomVerticalForceMaxY;
+        minSpl = zoomVerticalForceMinY;
+      } else {
+        maxSpl = maxSample;
+        minSpl = minSample;
+      }
       int h = (int) Math.round((maxSample - Math.min(0, minSample)) * magVer);
       int w = (int) Math.round(samples * magHor);
       if (h < scrl.getSize().height) h = scrl.getSize().height;
@@ -1162,7 +1167,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
             endSample, vpx, vpw, hh, colMain, colFade, colMark);
         break;
       }
-      
+
       // tags
       FontMetrics fm = getFontMetrics(getFont());
       if (tags != null && !tags.isEmpty()) {
@@ -1280,7 +1285,7 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
           hhv_inc = hhv;
         }
       }
-      
+
       FontMetrics fm = getFontMetrics(getFont());
       // cursor
       if (cursorX >= 0) {
@@ -1471,18 +1476,18 @@ public class UIGraphPanel extends JPanel implements UIO, UIListener {
    *         <--------r------->
    * o = scrollbar offset
    * r = viewport range
-   * 
+   *
    * after magnification:
    *            o'      x
    *            |-------+---|
    * 012345678901234567890123456789
-   *            <-----r'----> 
-   * o' = new scrollbar offset 
+   *            <-----r'---->
+   * o' = new scrollbar offset
    * r' = new viewport range
-   * 
+   *
    * we want
    * (x-o)/r = (x-o')/r'
-   * so new scrollbar offset is 
+   * so new scrollbar offset is
    * o' = x - r'*((x-o)/r)
    */
   void magResize(double newMagHor, double newMagVer, Point pivot) {

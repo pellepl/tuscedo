@@ -10,6 +10,7 @@ import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.border.Border;
 
@@ -21,12 +22,23 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
   static int __id = 0;
   final UIWorkArea workarea;
 
+  static final int HISTORY_LEN = 50;
+
+  int adcHistIx = 0;
+
+  History histAdcUp = new History(HISTORY_LEN);
+  History histAdcDown = new History(HISTORY_LEN);
+
   // ultrasonix
 
   UIGraphPanel graphUSADC;
   UIGraphPanel.SampleSet graphADCDataUp;
   UIGraphPanel.SampleSet graphADCDataDown;
-  
+  volatile boolean paused = false;
+  JButton butAdcHistPrev, butAdcHistNext;
+  JLabel adcHist;
+
+
   class USReceiver {
     UIGraphPanel graph;
     UIGraphPanel.SampleSet up;
@@ -82,7 +94,7 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
     b = new JButton(new AbstractAction("RESET") {
       @Override
       public void actionPerformed(ActionEvent arg0) {
-        transmit("reset\n"); 
+        transmit("reset\n");
       }
     });
     UICommon.decorateJButton(b);
@@ -91,7 +103,22 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
     b = new JButton(new AbstractAction("ADC") {
       @Override
       public void actionPerformed(ActionEvent arg0) {
-        transmit("\nproto_adc_dump 1\n"); 
+        transmit("\nproto_adc_dump 1\n");
+      }
+    });
+    UICommon.decorateJButton(b);
+    buttons.add(b);
+
+    b = new JButton(new AbstractAction("PAUSE") {
+      @Override
+      public void actionPerformed(ActionEvent arg0) {
+        if (!paused) {
+          paused = true;
+          ((JButton)arg0.getSource()).setText("START");
+        } else {
+          paused = false;
+          ((JButton)arg0.getSource()).setText("PAUSE");
+        }
       }
     });
     UICommon.decorateJButton(b);
@@ -108,10 +135,44 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
           usStick[i].distance[LOCAL].graph.clear();
           usStick[i].distance[REMOTE].graph.clear();
         }
+        histAdcUp.clear();
+        histAdcDown.clear();
+        adcHistIx = 0;
+        adcUpdateGraphHistory();
+        graphUSADC.repaint();
       }
     });
     UICommon.decorateJButton(b);
     buttons.add(b);
+
+    butAdcHistPrev = new JButton(new AbstractAction("< ADC") {
+      @Override
+      public void actionPerformed(ActionEvent arg0) {
+        if (adcHistIx < HISTORY_LEN-1) {
+          adcHistIx++;
+        }
+        adcUpdateGraphHistory();
+      }
+    });
+    UICommon.decorateJButton(butAdcHistPrev);
+    buttons.add(butAdcHistPrev);
+
+    adcHist = new JLabel();
+    UICommon.decorateComponent(adcHist);
+    buttons.add(adcHist);
+
+    butAdcHistNext = new JButton(new AbstractAction("ADC >") {
+      @Override
+      public void actionPerformed(ActionEvent arg0) {
+        if (adcHistIx > 0) {
+          adcHistIx--;
+        }
+        adcUpdateGraphHistory();
+      }
+    });
+    butAdcHistNext.setEnabled(false);
+    UICommon.decorateJButton(butAdcHistNext);
+    buttons.add(butAdcHistNext);
 
     add(buttons, BorderLayout.SOUTH);
   }
@@ -137,7 +198,7 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
       posStick[stick].graph.setResizeStep(200);
 
     }
- 
+
     graphUSADC = new UIGraphPanel("ADC");
     graphUSADC.setBorder(borderA);
     graphADCDataUp = graphUSADC.newSampleSet();
@@ -243,8 +304,26 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
     List<Double> vals = getValuesFromStringArray(words, 1);
     // TODO PETER stick
     graphUSADC.zoomForceVertical(-400, 6000);
-    if (upElseDown) graphADCDataUp.setSamples(vals);
-    else graphADCDataDown.setSamples(vals);
+    if (upElseDown) {
+      graphADCDataUp.setSamples(vals);
+      histAdcUp.save(vals);
+    } else {
+      graphADCDataDown.setSamples(vals);
+      histAdcDown.save(vals);
+    }
+  }
+
+  void adcUpdateGraphHistory() {
+    butAdcHistPrev.setEnabled(adcHistIx < HISTORY_LEN - 1);
+    butAdcHistNext.setEnabled(adcHistIx > 0);
+    adcHist.setText("" + adcHistIx);
+    List<Double> valsU = (List<Double>)histAdcUp.get(adcHistIx);
+    List<Double> valsD = (List<Double>)histAdcDown.get(adcHistIx);
+    if (valsU != null && valsD != null) {
+      graphADCDataUp.setSamples(valsU);
+      graphADCDataDown.setSamples(valsD);
+      graphUSADC.repaint();
+    }
   }
 
   void onInputRawUltrasoundData(int stick, String[] words) {
@@ -281,23 +360,24 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
   // SerialLineListener
   @Override
   public void onLine(String line) {
+    if (paused) return;
     String[] words = line.split("\\s+");
     if (words.length == 0) return;
     if (words[0].startsWith("ADC") && words[0].length() >= 5) {
-      // ADC1U: <x> <x> <x> ...
-      // ADC1D: <x> <x> <x> ...
-      // ADC2U: <x> <x> <x> ...
-      // ADC2D: <x> <x> <x> ...
+      // butAdcHistPrevU: <x> <x> <x> ...
+      // butAdcHistPrevD: <x> <x> <x> ...
+      // butAdcHistNextU: <x> <x> <x> ...
+      // butAdcHistNextD: <x> <x> <x> ...
       onInputADCData(words[0].charAt(3) - '0', words[0].charAt(4) == 'U', words);
     } else if (words[0].equals("raw") && words.length == 11) {
       //       left up / left down / right up / right down
-      // raw 1 LU/LD/RU/RD:      <dist in samples, LU> <qual, LU>       <dist in samples, LD> <qual, LD>       <dist in samples, RU> <qual, RU>       <dist in samples, RD> <qual, RD> 
+      // raw 1 LU/LD/RU/RD:      <dist in samples, LU> <qual, LU>       <dist in samples, LD> <qual, LD>       <dist in samples, RU> <qual, RU>       <dist in samples, RD> <qual, RD>
       onInputRawUltrasoundData(words[1].charAt(0) - '0', words);
     } else if (words[0].equals("pos") && words.length == 5) {
       // pos 1: <x> <y> <z>
       onInputPos(words[1].charAt(0) - '0', words);
     }
-    
+
   }
   @Override
   public void onDisconnect() {
@@ -313,4 +393,42 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
       t.setText("FD:" + workarea.getConnectionInfo());
     }
   }
+
+  class History {
+    Object[] buffer;
+    int histIx;
+    int histLen;
+    public History(int sz) {
+      buffer = new Object[sz];
+      histIx = histLen = 0;
+    }
+    public void save(Object o) {
+      buffer[histIx] = o;
+      if (histIx >= buffer.length-1) {
+        histIx = 0;
+      } else {
+        histIx++;
+      }
+      if (histLen < buffer.length) {
+        histLen++;
+      }
+    }
+    public Object get(int stepsBack) {
+      stepsBack++;
+      if (stepsBack >= histLen) return null;
+      int ix;
+      if (histIx < stepsBack) {
+        ix = histIx + buffer.length - stepsBack;
+      } else {
+        ix = histIx - stepsBack;
+      }
+      return buffer[ix];
+    }
+    public void clear() {
+      histIx = 0;
+      histLen = 0;
+    }
+  }
+
+
 }
