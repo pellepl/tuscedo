@@ -540,6 +540,7 @@ public class UICommon {
     UICommon.defineAction(c, "common.tab.add", "ctrl+shift+t", when, actionAddTab);
     UICommon.defineAction(c, "common.tab.addfd", "ctrl+shift+q", when, actionAddFDTab);
     UICommon.defineAction(c, "common.tab.close", "ctrl+d", when, actionCloseTab);
+    UICommon.defineAction(c, "common.app.close", "ctrl+alt+d", when, actionCloseApp);
     UICommon.defineAction(c, "common.tab.1", "ctrl+shift+1",when, actionSelTab[0]);
     UICommon.defineAction(c, "common.tab.2", "ctrl+shift+2",when, actionSelTab[1]);
     UICommon.defineAction(c, "common.tab.3", "ctrl+shift+3",when, actionSelTab[2]);
@@ -579,6 +580,13 @@ public class UICommon {
       UISimpleTabPane.Tab t = UISimpleTabPane.getTabByComponent((Component)e.getSource());
       UISimpleTabPane stp = t.getPane();
       stp.removeTab(t);
+    }
+  };
+
+  static AbstractAction actionCloseApp = new AbstractAction() {
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      Tuscedo.onExit();
     }
   };
 
