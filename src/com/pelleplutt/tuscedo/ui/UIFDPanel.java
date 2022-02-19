@@ -22,21 +22,9 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
   static int __id = 0;
   final UIWorkArea workarea;
 
-  static final int HISTORY_LEN = 50;
-
-  int adcHistIx = 0;
-
-  History histAdcUp = new History(HISTORY_LEN);
-  History histAdcDown = new History(HISTORY_LEN);
-
   // ultrasonix
 
-  UIGraphPanel graphUSADC;
-  UIGraphPanel.SampleSet graphADCDataUp;
-  UIGraphPanel.SampleSet graphADCDataDown;
   volatile boolean paused = false;
-  JButton butAdcHistPrev, butAdcHistNext;
-  JLabel adcHist;
 
 
   class USReceiver {
@@ -69,7 +57,8 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
   // positioning
   class PosStick {
     UIGraphPanel graph;
-    UIGraphPanel.SampleSet x,y,z;
+    double lastx, lasty, lastz, lasterr;
+    UIGraphPanel.SampleSet x,y,z,error,hit;
   }
   PosStick[] posStick = new PosStick[2];
 
@@ -100,15 +89,6 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
     UICommon.decorateJButton(b);
     buttons.add(b);
 
-    b = new JButton(new AbstractAction("ADC") {
-      @Override
-      public void actionPerformed(ActionEvent arg0) {
-        transmit("\nproto_adc_dump 1\n");
-      }
-    });
-    UICommon.decorateJButton(b);
-    buttons.add(b);
-
     b = new JButton(new AbstractAction("PAUSE") {
       @Override
       public void actionPerformed(ActionEvent arg0) {
@@ -127,7 +107,6 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
     b = new JButton(new AbstractAction("CLEAR") {
       @Override
       public void actionPerformed(ActionEvent arg0) {
-        graphUSADC.clear();
         for (int i = 0; i < 2; i ++) {
           posStick[i].graph.clear();
           usStick[i].quality[LOCAL].graph.clear();
@@ -135,44 +114,10 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
           usStick[i].distance[LOCAL].graph.clear();
           usStick[i].distance[REMOTE].graph.clear();
         }
-        histAdcUp.clear();
-        histAdcDown.clear();
-        adcHistIx = 0;
-        adcUpdateGraphHistory();
-        graphUSADC.repaint();
       }
     });
     UICommon.decorateJButton(b);
     buttons.add(b);
-
-    butAdcHistPrev = new JButton(new AbstractAction("< ADC") {
-      @Override
-      public void actionPerformed(ActionEvent arg0) {
-        if (adcHistIx < HISTORY_LEN-1) {
-          adcHistIx++;
-        }
-        adcUpdateGraphHistory();
-      }
-    });
-    UICommon.decorateJButton(butAdcHistPrev);
-    buttons.add(butAdcHistPrev);
-
-    adcHist = new JLabel();
-    UICommon.decorateComponent(adcHist);
-    buttons.add(adcHist);
-
-    butAdcHistNext = new JButton(new AbstractAction("ADC >") {
-      @Override
-      public void actionPerformed(ActionEvent arg0) {
-        if (adcHistIx > 0) {
-          adcHistIx--;
-        }
-        adcUpdateGraphHistory();
-      }
-    });
-    butAdcHistNext.setEnabled(false);
-    UICommon.decorateJButton(butAdcHistNext);
-    buttons.add(butAdcHistNext);
 
     add(buttons, BorderLayout.SOUTH);
   }
@@ -188,25 +133,24 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
       posStick[stick].y = posStick[stick].graph.newSampleSet();
       posStick[stick].x = posStick[stick].graph.newSampleSet();
       posStick[stick].z = posStick[stick].graph.getSampleSet(0);
+      posStick[stick].error = posStick[stick].graph.newSampleSet();
+      posStick[stick].hit = posStick[stick].graph.newSampleSet();
       posStick[stick].x.getUIInfo().setName("X");
       posStick[stick].x.setColor(0x88ffff);
       posStick[stick].y.getUIInfo().setName("Y");
       posStick[stick].y.setColor(0x444444);
       posStick[stick].z.getUIInfo().setName("Z");
-      posStick[stick].z.setColor(0xff8888);
+      posStick[stick].z.setColor(0xffff88);
+      posStick[stick].error.getUIInfo().setName("ERR");
+      posStick[stick].error.setColor(0xff0000);
+      posStick[stick].error.setOffset(-1500);
+      posStick[stick].hit.getUIInfo().setName("HIT");
+      posStick[stick].hit.setColor(0xffffff);
+      posStick[stick].hit.setOffset(0);
       posStick[stick].graph.zoom(3, 0.01);
       posStick[stick].graph.setResizeStep(200);
 
     }
-
-    graphUSADC = new UIGraphPanel("ADC");
-    graphUSADC.setBorder(borderA);
-    graphADCDataUp = graphUSADC.newSampleSet();
-    graphADCDataDown = graphUSADC.getSampleSet(0);
-    graphADCDataUp.getUIInfo().setName("ADC up");
-    graphADCDataDown.getUIInfo().setName("ADC down");
-    graphADCDataUp.setColor(0xffff88);
-    graphADCDataDown.setColor(0xff88ff);
 
     JPanel[] usRawPanels = new JPanel[4];
     for (int stick = 0; stick < 2; stick++) {
@@ -252,7 +196,6 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
     usRawGraphPanel.add(usRawPanels[0]);
     usRawGraphPanel.add(usRawPanels[1]);
     usGraphPanel.add(usRawGraphPanel);
-    usGraphPanel.add(graphUSADC);
     graphPanel.add(posGraphPanel);
     graphPanel.add(usGraphPanel);
 
@@ -292,39 +235,18 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
     if (arrayOffset >= array.length) return new ArrayList<Double>();
     List<Double> v = new ArrayList<Double>(array.length - arrayOffset);
     for (int i = arrayOffset; i < array.length; i++) {
+      String s = array[i];
       try {
-        v.add(Double.valueOf(array[i]));
-      } catch(Throwable ignore) {}
+        v.add(Double.valueOf(s));
+      } catch(Throwable ignore) {
+        try {
+          v.add(Double.valueOf(s.substring(s.indexOf(":")+1)));
+        } catch(Throwable ignore_more) {}
+      }
     }
     return v;
   }
 
-
-  void onInputADCData(int stick, boolean upElseDown, String[] words) {
-    List<Double> vals = getValuesFromStringArray(words, 1);
-    // TODO PETER stick
-    graphUSADC.zoomForceVertical(-400, 6000);
-    if (upElseDown) {
-      graphADCDataUp.setSamples(vals);
-      histAdcUp.save(vals);
-    } else {
-      graphADCDataDown.setSamples(vals);
-      histAdcDown.save(vals);
-    }
-  }
-
-  void adcUpdateGraphHistory() {
-    butAdcHistPrev.setEnabled(adcHistIx < HISTORY_LEN - 1);
-    butAdcHistNext.setEnabled(adcHistIx > 0);
-    adcHist.setText("" + adcHistIx);
-    List<Double> valsU = (List<Double>)histAdcUp.get(adcHistIx);
-    List<Double> valsD = (List<Double>)histAdcDown.get(adcHistIx);
-    if (valsU != null && valsD != null) {
-      graphADCDataUp.setSamples(valsU);
-      graphADCDataDown.setSamples(valsD);
-      graphUSADC.repaint();
-    }
-  }
 
   void onInputRawUltrasoundData(int stick, String[] words) {
     List<Double> vals = getValuesFromStringArray(words, 3);
@@ -349,13 +271,39 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
     List<Double> vals = getValuesFromStringArray(words, 2);
     if (vals.size() < 3 || stick < 1 || stick > 2 ) return;
     stick--;
-    posStick[stick].x.addSample(vals.get(0));
-    posStick[stick].y.addSample(vals.get(1));
-    posStick[stick].z.addSample(vals.get(2));
+    posStick[stick].lastx = vals.get(0);
+    posStick[stick].lasty = vals.get(1);
+    posStick[stick].lastz = vals.get(2);
+    double err = Math.sqrt(vals.get(3));
+    if (err > 1000+1500) err = 1000;
+    posStick[stick].lasterr = err;
+
+    posStick[stick].x.addSample(posStick[stick].lastx);
+    posStick[stick].y.addSample(posStick[stick].lasty);
+    posStick[stick].z.addSample(posStick[stick].lastz);
+    posStick[stick].error.addSample(posStick[stick].lasterr);
+    posStick[stick].hit.addSample(0);
+
     posStick[stick].graph.zoom(2, 0.01);
     posStick[stick].graph.zoomForceVertical(-1700, 1700);
     posStick[stick].graph.scrollToSampleX(0x7fffffff);
   }
+
+  void onInputHit(int stick, String[] words) {
+    List<Double> vals = getValuesFromStringArray(words, 4);
+    if (vals.size() < 3 || stick < 1 || stick > 2 ) return;
+    stick--;
+    posStick[stick].x.addSample(posStick[stick].lastx);
+    posStick[stick].y.addSample(posStick[stick].lasty);
+    posStick[stick].z.addSample(posStick[stick].lastz);
+    posStick[stick].error.addSample(posStick[stick].lasterr);
+    posStick[stick].hit.addSample(1000);
+
+    posStick[stick].graph.zoom(2, 0.01);
+    posStick[stick].graph.zoomForceVertical(-1700, 1700);
+    posStick[stick].graph.scrollToSampleX(0x7fffffff);
+  }
+
 
   // SerialLineListener
   @Override
@@ -363,20 +311,18 @@ public class UIFDPanel extends JPanel implements UIO, UIWorkArea.SerialLineListe
     if (paused) return;
     String[] words = line.split("\\s+");
     if (words.length == 0) return;
-    if (words[0].startsWith("ADC") && words[0].length() >= 5) {
-      // butAdcHistPrevU: <x> <x> <x> ...
-      // butAdcHistPrevD: <x> <x> <x> ...
-      // butAdcHistNextU: <x> <x> <x> ...
-      // butAdcHistNextD: <x> <x> <x> ...
-      onInputADCData(words[0].charAt(3) - '0', words[0].charAt(4) == 'U', words);
-    } else if (words[0].equals("raw") && words.length == 11) {
+    if (words[0].equals("raw") && words.length == 11) {
       //       left up / left down / right up / right down
       // raw 1 LU/LD/RU/RD:      <dist in samples, LU> <qual, LU>       <dist in samples, LD> <qual, LD>       <dist in samples, RU> <qual, RU>       <dist in samples, RD> <qual, RD>
       onInputRawUltrasoundData(words[1].charAt(0) - '0', words);
-    } else if (words[0].equals("pos") && words.length == 5) {
-      // pos 1: <x> <y> <z>
+    } else if (words[0].equals("pos") && words.length >= 6) {
+      // pos 1: <x> <y> <z> <(B)> <error>
       onInputPos(words[1].charAt(0) - '0', words);
+    } else if (words[0].equals("perc:") && words[1].equals("hit") && words.length >= 7) {
+      // perc: hit 1:    p:<pitch>    r:<roll>   y:<yaw>    v:<velocity>
+      onInputHit(words[2].charAt(0) - '0', words);
     }
+
 
   }
   @Override
