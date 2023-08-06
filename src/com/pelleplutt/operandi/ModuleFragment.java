@@ -64,7 +64,7 @@ public class ModuleFragment {
       if (node != prevNode && node != null) {
         srcinfo = source.getLine(node.stroffset);
         if (srcinfo != null) {
-          FRAGMCsrcref.add(new Integer(code.size()));
+          FRAGMCsrcref.add(code.size());
           SrcRef srcref = new SrcRef();
           srcref.line = (Integer)srcinfo[0];
           srcref.lineLen = ((String)srcinfo[1]).length();
@@ -72,7 +72,7 @@ public class ModuleFragment {
           srcref.symLen = node.strlen;
           srcref.symOffs = node.stroffset;
           fragmcSRCREF.add(srcref);
-          fragmcsrcrefMap.put(new Integer(code.size()), srcref);
+          fragmcsrcrefMap.put(code.size(), srcref);
         }
       }
     }

@@ -249,7 +249,7 @@ public class Settings {
         if (tkey.endsWith(".string")) {
           o = (String)props.getProperty(tkey, "");
         } else if (tkey.endsWith(".int")) {
-          o = new Integer(Integer.parseInt(props.getProperty(tkey, "0")));
+          o = Integer.parseInt(props.getProperty(tkey, "0"));
         } else if (tkey.endsWith(".list")) {
           // TODO
           throw new Error("not implemented");

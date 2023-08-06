@@ -177,6 +177,7 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
     add(scrl, BorderLayout.CENTER);
     add(new UISlider(), BorderLayout.SOUTH);
     decorateUI();
+    setDoubleBuffered(false);
 
     renderer.addMouseListener(mouseCtrl);
     renderer.addMouseMotionListener(mouseCtrl);
@@ -236,7 +237,7 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
         blit();
       }
     });
-    UICommon.defineAnonAction(renderer, "3d.color.smoothflat", "f6", when, new AbstractAction() {
+    UICommon.defineAnonAction(renderer, "3d.color.smoothflat", "f9", when, new AbstractAction() {
       @Override
       public void actionPerformed(ActionEvent e) {
         renderSpec.smoothOrFlat = renderSpec.smoothOrFlat == 0 ? 1 : 0;
@@ -340,10 +341,10 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
     registerMotionKeys("numpad6", "3d.mov.yawr", MOVE_YAW_RIGHT);
     registerMotionKeys("z", "3d.mov.roll", MOVE_ROLL_LEFT);
     registerMotionKeys("c", "3d.mov.rolr", MOVE_ROLL_RIGHT);
-    registerMotionKeys("up", "3d.mod.up", MODEL_PITCH_UP);
-    registerMotionKeys("down", "3d.mod.down", MODEL_PITCH_DOWN);
-    registerMotionKeys("left", "3d.mod.left", MODEL_ROLL_LEFT);
-    registerMotionKeys("right", "3d.mod.right", MODEL_ROLL_RIGHT);
+    registerMotionKeys("t", "3d.mod.up", MODEL_PITCH_UP);
+    registerMotionKeys("g", "3d.mod.down", MODEL_PITCH_DOWN);
+    registerMotionKeys("f", "3d.mod.left", MODEL_ROLL_LEFT);
+    registerMotionKeys("h", "3d.mod.right", MODEL_ROLL_RIGHT);
 
     renderSpec = new RenderSpec();
     renderSpec.playerPos.set(0, model.length, model.length);
@@ -447,25 +448,30 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
 
   volatile boolean rendering = false;
   public void blit() {
-    if (rendering) return;
+    if (rendering) {
+      return;
+    }
     rendering = true;
     SwingUtilities.invokeLater(() -> {
       render();
-      repaint();
       rendering = false;
+      SwingUtilities.invokeLater(() -> {
+        repaint();
+      });
     });
   }
 
   static final AffineTransform flip = AffineTransform.getScaleInstance(1d, -1d);
+
   synchronized void render() {
-    Graphics2D g = getPriGraphics();
     BufferedImage bi = Tuscedo.inst().render3d(renderSpec);
+    Graphics2D g = getPriGraphics();
     AffineTransform tran = AffineTransform.getTranslateInstance(0,
         bi.getHeight());
     tran.concatenate(flip);
     g.setFont(UICommon.font);
     g.setTransform(tran);
-    g.drawImage(bi, 0, 0, null);
+    g.drawImage(bi, 0, 0, this);
     g.setTransform(AffineTransform.getScaleInstance(1.0, 1.0));
     g.setColor(Color.white);
     g.drawString(String.format("POS  x:%-8.1f y:%-8.1f z:%-8.1f"
@@ -476,6 +482,21 @@ public class UI3DPanel extends JPanel implements UIO, UIListener {
         , -renderSpec.vdirz.x
         , -renderSpec.vdirz.y
         , -renderSpec.vdirz.z), 0, 24);
+    switch (renderSpec.primitive) {
+    case 0:
+      g.drawString("SOLID", 0, 36);
+      break;
+    case 1:
+      g.drawString("WIRE", 0, 36);
+      break;
+    case 2:
+      g.drawString("POINTS", 0, 36);
+      break;
+    }
+    g.drawString(renderSpec.smoothOrFlat != 0 ? "SMOOTH" : "FLAT", 60, 36);
+    g.drawString(renderSpec.disableShadows ? "SHADOWLESS" : "SHADOWS", 120, 36);
+    g.drawString(renderSpec.checkered ? "CHECKERED" : "", 180, 36);
+
 //    float s, t;
 //    s = (float)Math.atan2(renderSpec.vdirx.y, renderSpec.vdirx.x);
 //    t = (float)Math.acos(renderSpec.vdirx.z / 1f);

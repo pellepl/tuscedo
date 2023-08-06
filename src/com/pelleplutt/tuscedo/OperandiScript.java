@@ -302,7 +302,7 @@ public class OperandiScript implements Runnable, Disposable {
         if (args == null || args.length == 0) {
           return null;
         }
-        float max = Float.MIN_VALUE;
+        float max = -Float.MAX_VALUE;
         for (M m : args) {
           float v;
           if (m.type == Processor.TSET) {
